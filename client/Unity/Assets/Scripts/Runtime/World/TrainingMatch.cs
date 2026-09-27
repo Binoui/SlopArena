@@ -402,7 +402,8 @@ namespace SlopArena.Client.World
 
                 foreach (var hit in _bridge.LastTickHits)
                 {
-                    if (hit.OwnerEntityId != npc.Id || hit.TargetEntityId != PlayerEntityId)
+                    if (hit.Blocked || hit.OwnerEntityId != npc.Id
+                        || hit.TargetEntityId != PlayerEntityId)
                         continue;
                     var playerAfterHit = _bridge.GetState(PlayerEntityId);
                     npc.Memory.RecordOpponentHit(hit.AttackSlot, !playerAfterHit.IsGrounded,
@@ -559,8 +560,7 @@ namespace SlopArena.Client.World
         {
             return state.State is ActionState.Attacking or ActionState.Aiming or ActionState.Warping
                 || state.AnimLockTicks > 0
-                || state.LandingLagTicks > 0
-                || state.BurstRecoveryTicks > 0;
+                || state.LandingLagTicks > 0;
         }
 
         /// <summary>

@@ -8,8 +8,6 @@
 An airborne tick counter that determines fall gravity phase. Incremented each tick while airborne. Reset behavior is conditional:
 - **0** on: the RecoveryMove, taking damage, landing (re-grants FloatWindow; aerial attacks no longer reset — ADR-0015)
 - **FloatWindowTicks** on: any jump (ground or double). JumpArc handles the ascent visually, so the float window is skipped — full gravity applies immediately after jump.
-- **clamped to ≥ FloatWindowTicks** on: aerial dash (never resets the float window, but doesn't advance past it either)
-Ground dash sets AirTime to 0.
 _Avoid_: air timer, hang time, air duration
 
 **FloatWindow**:
@@ -60,7 +58,7 @@ A reduced jump triggered by releasing the jump key within a short window (3–5 
 _Avoid_: mini jump, light jump, tap jump
 
 **FastFall**:
-A fresh press of the dedicated Down action while already descending commits to the character's fast-fall speed until landing or an interrupting action. Release does not cancel it; ascent/apex presses are discarded. Backward movement is independent. Ordinary aerial attacks may coexist; Hitstun, Hitstop, Dash, ledges and authored vertical motion cannot be overridden.
+A fresh press of the dedicated Down action while already descending commits to the character's fast-fall speed until landing or an interrupting action. Release does not cancel it; ascent/apex presses are discarded. Backward movement is independent. Ordinary aerial attacks may coexist; Hitstun, Hitstop, ledges and authored vertical motion cannot be overridden.
 _Avoid_: dive, plummet, down air
 
 **Crouch**:
@@ -80,14 +78,14 @@ The single ground locomotion tier (ADR-0020 §1 — replaces the old walk/sprint
 _Avoid_: walk, sprint (the deleted two-tier model)
 
 **Rush**:
-The reversal-free burst that starts a Run from a standstill — a fixed window (`RushTicks`, ~10 ticks) during which velocity is at `RunSpeed` immediately. Reversing within the window is an instant full-speed flip that restarts it — Melee's "dash-dance", renamed because "Dash" is the SA mechanic. A perpendicular (90°) redirect also restarts the window, so an 8-way WASD dash-dance never drops out of Rush. Releasing inside the window stops dead (no drift — a tap is a fixed burst, not a slide). Holding one direction steady past the window enters Run proper; reversals remain immediate.
+The reversal-free burst that starts a Run from a standstill — a fixed window (`RushTicks`, ~10 ticks) during which velocity is at `RunSpeed` immediately. Reversing within the window is an instant full-speed flip that restarts it; a perpendicular (90°) redirect also restarts the window. Releasing inside the window stops dead (no drift — a tap is a fixed burst, not a slide). Holding one direction steady past the window enters Run proper; reversals remain immediate.
 
 **Turnaround**:
 ~~Removed — grounded reversals are now immediate after the Rush window.~~
 
-**Dash** (SA Dash):
-The Shift-triggered burst — the shield substitute (SA has no shields), used for quick dodges and approaches (wavedash-like). A *mechanic*, not a locomotion tier (ADR-0020 §1). Short burst (2-10 m per character style); grounded dash **hard-stops** on expiry, aerial dash **preserves momentum** (approach tool). I-frames cover only the start (`DashInvincibilityTicks` = 4) — dodging through is doable but timing-tight. See **DashInvincibility**.
-_Avoid_: SA dash, shift dash, dodge
+**Shield**:
+A permanent, full-body defensive state entered by holding Defense (Left Shift / RT) while actionable and grounded. It blocks ordinary attacks from every direction and freezes combat facing. Releasing enters a vulnerable 7-tick ShieldDrop; contact adds block stun and hitstop, and releasing during stun starts the full drop only after stun expires.
+_Avoid_: directional block
 
 **LedgeHang**:
 The occupied hanging state at a ledge (ADR-0020 §4). Grab is briefly invincible with full refresh on re-grab; no auto-getup — the fighter hangs until it acts. Escapes: S = drop, jump = ledge jump, W = stand. Single-occupancy (ledgehog): a second grab fails and the would-be grabber falls past.
@@ -120,28 +118,23 @@ Any attack can also use a per-hit **Custom** profile with its own angle/base/gro
 _Avoid_: push force, hit reaction, knockback velocity
 
 **Hitstun**:
-The victim-side no-input lock after a hit. The victim cannot act (inputs buffer instead) until HitstunTicks expires; control returns with whatever residual speed remains — the lock is the stun, not the flight. Duration is the hitbox's StunTicks capped by the knockback-derived `clamp(8 + magnitude/2, 8, 60)`. Burst (below) is the explicit exception to the lock.
-_Avoid_: stun lock, flinch, hitstun lock
+The victim-side no-action lock after a damaging hit. Inputs buffer according to simulation rules; residual launch continues after the lock expires.
 
 **Hitstop**:
-The brief freeze of attacker and victim when a hit connects — per-pair, not global; the match clock keeps running. Knockback launches only when the freeze ends. The decision beat: the defender picks Combo Influence direction and whether to Burst while both are frozen.
+The brief per-pair freeze when an attack connects or is blocked — not global; the match clock keeps running. Damaging knockback launches only when its freeze ends. Block hitstop does not queue damaging launch or DI effects.
 _Avoid_: hitlag (Melee connotation), freeze, hit pause
 
 **Duration Lock**:
-A fixed-tick state during which a character cannot act. Two kinds: the attacker's attack commitment (AnimLockTicks, from startup through recovery) and the victim's Hitstun. Burst's offensive use cancels the attacker's lock.
+A fixed-tick state during which a character cannot act. Two kinds: the attacker's attack commitment (`AnimLockTicks`, from startup through recovery) and the victim's Hitstun or block stun.
 _Avoid_: endlag, animation lock, commitment lock
 
 **Combo Influence**:
 The defender's launch-drift input — additive velocity applied to remaining horizontal knockback in the held direction, scaled to the launch magnitude. Captured during Hitstop + Hitstun, applied when the lock expires. Additive (Smash-4 vectoring model), not rotational (Smash DI) — 3D-native: push where you want to drift.
 _Avoid_: DI (Smash rotation connotation), vectoring (Smash 4), smash DI
 
-**Burst**:
-The universal escape/extender on one long per-entity cooldown that persists through KO. Defensive: breaks Hitstun + knockback, small push on the attacker, then a recovery window — punishable if baited. Offensive: cancels your own Duration Lock and spawns a fixed-knockback hitbox (zero damage scaling) to extend a string. Cooldown visible to both players.
-_Avoid_: trinket (WoW connotation), get-out-of-jail, escape tool
-
-**DashInvincibility**:
-The i-frames granted at the START of a dash — the opening few ticks only (`DashInvincibilityTicks` = 4, shared const), not the full dash. The dash tail and recovery are vulnerable, so dodging an attack with the dash is possible but requires tight timing. Shared across all characters for now.
-_Avoid_: i-frames, dodge window, invuln
+**BlockStun**:
+The defender-side action lock after a blocked contact. Its duration is `clamp(ceil(0.6 × incoming damage) + 2, 4, 15)` ticks; overlapping contacts retain the greater remaining duration rather than stacking.
+_Avoid_: damaging Hitstun
 
 **FloatWindowReset**:
 The restoration of FloatWindow gravity by setting AirTime to 0 mid-air. Triggered by: the RecoveryMove, taking damage, or landing (ADR-0015: aerial attacks no longer reset it — that was the hover crutch). Without a reset, the character progresses into full gravity (the old FallRamp is removed by ADR-0020).
@@ -160,7 +153,7 @@ Information about an opponent's combat state that a CPU Opponent can use after i
 _Avoid_: input reading
 
 **True Combo**:
-A sequence of hits against one defender with no opportunity for an ordinary action between hits. Burst remains an explicit escape.
+A sequence of hits against one defender with no opportunity for an ordinary action between hits. Shield and Grab provide defensive/action options according to their normal state gates.
 _Avoid_: pressure string, hit streak
 
 **Pressure String**:
@@ -168,7 +161,7 @@ A sequence of attacks that maintains pressure while leaving the defender opportu
 _Avoid_: true combo, guaranteed follow-up
 
 **Stage Recovery**:
-The return from offstage to a stage surface or LedgeHang. It can combine movement, jumps, Dash, and a RecoveryMove.
+The return from offstage to a stage surface or LedgeHang. It can combine normal movement, jumps, and a character's RecoveryMove or other kit mobility.
 _Avoid_: attack recovery, RecoveryMove (when referring to the whole return)
 
 **Stage-side Edgeguarding**:
@@ -180,7 +173,7 @@ One of three named CPU skill tiers: Easy, Normal, and Hard. All tiers retain the
 _Avoid_: CPU level, 1–9 scale
 
 **Character Kit**:
-A character's grounded and aerial normals and specials, identified by the canonical Slot grid. Universal mechanics such as Dash, Burst, and Combo Influence are not part of the Character Kit.
+A character's grounded and aerial normals and specials, identified by the canonical Slot grid. Universal mechanics such as Shield, Grab, air dodge, and Combo Influence are not part of the Character Kit.
 _Avoid_: control scheme
 
 ## PvP / Multiplayer
@@ -284,11 +277,11 @@ An opponent rendered from received state rather than local re-simulation while i
 _Avoid_: unpredicted entity, fallback display, snap-only entity
 
 **Predictable ActionState**:
-An action whose movement can be reproduced from confirmed state and exact input history. Idle, Dashing, JumpSquat, AirDodging, Run, Sliding and Crouching belong to this partition, but active Hitstop still prevents reconstruction or replay because its queued launch is not reconstructible from a snapshot.
+An action whose movement can be reproduced from confirmed state and exact input history. Idle, legacy airborne Dashing, JumpSquat, Run, Sliding, Crouching, Shielding, ShieldDrop, GrabAttempt and air-dodge phases qualify only without active Hitstop, block-hitstop or a coupled interaction.
 _Avoid_: safe state, simple state, movement state
 
 **Complex ActionState**:
-An `ActionState` whose behavior depends on fields no sync packet carries — the per-instance `ServerAbility` layer (private fields like `NilusVoidRift`'s cached aim/seed state) and/or `SpellResolver`'s live hitbox/projectile list, plus knockback/hitstun/DI fields. Currently `Attacking`, `Hitstun`, `Warping`, `LedgeHang`. Never re-simulated on PredictedTrack — entities in these states run RawTrack instead.
+An action requiring private ability/resolver state or paired server authority. Attacking, Hitstun, Warping, LedgeHang, Grabbed and Throwing render from authoritative state; the self track uses a targeted barrier for confirmed capture or block contact instead of replaying through a coupled interval.
 _Avoid_: unsafe state, hard state, ability state
 
 

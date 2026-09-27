@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using SlopArena.Client.Animation;
+using SlopArena.Client.Combat;
 using SlopArena.Client.Entities;
 using SlopArena.Shared;
 using UnityEngine;
@@ -66,6 +67,12 @@ namespace SlopArena.Client.World
             foreach (TimelinePresentationEvent presentationEvent in events)
             {
                 if (!_seenEvents.Add(presentationEvent.Key)) continue;
+                if (presentationEvent.Source == PresentationEventSource.BlockContact)
+                {
+                    GraphicHitEffect.SpawnBlock(
+                        new Vector3(presentationEvent.WorldX, presentationEvent.WorldY, presentationEvent.WorldZ));
+                    continue;
+                }
                 if (!_entries.TryGetValue(presentationEvent.EntityId, out Entry entry)) continue;
                 if (entry.Renderer == null || entry.Catalog == null) continue;
 

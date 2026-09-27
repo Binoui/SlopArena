@@ -60,6 +60,7 @@ public sealed class CookedCharacterDefinition
     public float CapsuleHeight { get; }
     public float HipHeight { get; }
     public float HurtboxRadius { get; }
+    public CookedCaptureGeometry CaptureGeometry { get; }
     public IReadOnlyList<CookedHurtboxCapsule> HurtboxCapsules { get; }
     public IReadOnlyList<CookedHurtboxBone> HurtboxBoneDefs { get; }
     public IReadOnlyList<string> AttachmentBoneIds { get; }
@@ -76,6 +77,7 @@ public sealed class CookedCharacterDefinition
         float capsuleHeight,
         float hipHeight,
         float hurtboxRadius,
+        CookedCaptureGeometry captureGeometry,
         IReadOnlyList<CookedHurtboxCapsule> hurtboxCapsules,
         IReadOnlyList<CookedHurtboxBone> hurtboxBoneDefs,
         IReadOnlyList<string> attachmentBoneIds,
@@ -91,6 +93,7 @@ public sealed class CookedCharacterDefinition
         CapsuleHeight = capsuleHeight;
         HipHeight = hipHeight;
         HurtboxRadius = hurtboxRadius;
+        CaptureGeometry = captureGeometry;
         HurtboxCapsules = Copy(hurtboxCapsules);
         HurtboxBoneDefs = Copy(hurtboxBoneDefs);
         AttachmentBoneIds = Copy(attachmentBoneIds);
@@ -146,7 +149,12 @@ public sealed record CookedPresentation(
     bool AutoModelYOffset = false,
     string Tumble = "",
     string Crouch = "",
-    string Slide = "");
+    string Slide = "",
+    string Shield = "",
+    string Grab = "",
+    string Grabbed = "",
+    string ThrowForward = "",
+    string AirDodge = "");
 
 public sealed record CookedHurtboxCapsule(
     float StartX,
@@ -163,6 +171,16 @@ public sealed record CookedHurtboxBone(
     float OffsetY,
     float OffsetZ,
     float Radius);
+
+public sealed record CookedCaptureGeometry(
+    float Reach,
+    float Width,
+    float Height,
+    float OffsetY,
+    CaptureAnchor AttackerAnchor,
+    CaptureAnchor VictimAnchor);
+
+public sealed record CaptureAnchor(float X, float Y, float Z);
 public sealed record CookedCapabilityRequirement(string CapabilityId, string CapabilityVersion);
 public sealed class CookedSlotDefinition
 {

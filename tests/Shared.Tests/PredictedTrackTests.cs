@@ -114,6 +114,25 @@ public class PredictedTrackTests
         Assert.True(packet.Input.DownPressed);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ApplyBatch_DoesNotRepeatDefenseEdgesOnPredictionFrontier(bool grab)
+    {
+        var arena = TestHelpers.TestArena();
+        var def = TestHelpers.MankiDef;
+        var track = new SlopArena.Shared.Rollback.PredictedTrack(arena);
+        var defs = new Dictionary<ulong, CharacterDefinition> { [OpponentId] = def };
+        var baked = new Dictionary<ulong, BakedAnimationData?> { [OpponentId] = null };
+        var edge = new InputState { ShieldPressed = !grab, GrabPressed = grab };
+
+        track.ApplyBatch(new[] { MakePacket(10, TestHelpers.PlayerState(), true, edge) },
+            11, defs, baked);
+
+        Assert.NotEqual(grab ? ActionState.GrabAttempt : ActionState.Shielding,
+            track.GetState(OpponentId).State);
+    }
+
     [Fact]
     public void StopTracking_RemovesEntityFromPrediction()
     {

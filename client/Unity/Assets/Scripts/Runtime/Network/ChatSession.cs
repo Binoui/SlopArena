@@ -7,6 +7,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
 using SlopArena.Client;
+using SlopArena.Client.Input;
+using SlopArena.Client.UI;
 using SlopArena.Shared;
 using Steamworks;
 
@@ -31,6 +33,8 @@ namespace SlopArena.Client.Network
         private const float TokenRenewalLeadSeconds = 60f;
         private const string SteamBackendIdentity = "sloparena-playtest";
         private const int SteamTicketTimeoutSeconds = 15;
+        private const float InviteOpenTimeoutSeconds = 5f;
+        private const float InviteDebounceSeconds = 1f;
 
         private static ChatSession? _instance;
         private readonly List<ChatConversation> _conversations = new();
@@ -44,11 +48,21 @@ namespace SlopArena.Client.Network
         private Task<bool>? _authTask;
         private Task<bool>? _renewTask;
         private Callback<GetTicketForWebApiResponse_t>? _ticketCallback;
+        private Callback<GameRichPresenceJoinRequested_t>? _roomJoinCallback;
+        private Callback<NewUrlLaunchParameters_t>? _urlLaunchCallback;
+        private Callback<GameOverlayActivated_t>? _overlayCallback;
         private TaskCompletionSource<string?>? _pendingTicket;
         private HAuthTicket _ticketHandle;
         private bool _ownsSteamApi;
+        private RoomSteamPresence? _roomPresence;
+        private SteamRoomJoinCoordinator? _roomJoin;
         private bool _developmentGuest;
         private ulong _authenticatedSteamId;
+        private bool _inviteOverlayPending;
+        private bool _steamOverlayActive;
+        private bool _overlayInputHeld;
+        private float _inviteRequestedAt;
+        private float _nextInviteAt;
         private int _accountGeneration;
         private string _masterServerUrl = ClientSession.DefaultMasterServerUrl;
         private string _savedDisplayName = string.Empty;
@@ -74,6 +88,8 @@ namespace SlopArena.Client.Network
         public event Action? Changed;
         public event Action? AccountChanged;
 
+        public event Action? RoomInviteStateChanged;
+        public event Action<string>? RoomInviteFeedback;
         public event Action<LobbyClient?>? ActiveLobbyChanged;
 
         /// <summary>
@@ -101,6 +117,14 @@ namespace SlopArena.Client.Network
         public LobbyClient? ActiveLobby => _lobby;
         public string? AuthToken => _masterClient?.Token;
         public long? SteamId => _masterClient?.SteamId;
+        public bool HasPendingRoomJoin => _roomJoin?.HasPendingJoin == true;
+        public bool InviteOverlayBusy => _inviteOverlayPending || _steamOverlayActive ||
+            Time.unscaledTime < _nextInviteAt || ChatInputGate.ExternalOverlaySuppressed;
+        public void CancelPendingRoomJoin()
+        {
+            _roomJoin?.Cancel();
+            NotifyChanged();
+        }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         private static void Bootstrap()
@@ -157,7 +181,16 @@ namespace SlopArena.Client.Network
                         return;
                     }
                     _ownsSteamApi = true;
+                    _roomPresence = new RoomSteamPresence();
+                    _roomPresence.Reset(true, Time.unscaledTime);
                     _ticketCallback = Callback<GetTicketForWebApiResponse_t>.Create(OnWebTicket);
+                    _roomJoin = new SteamRoomJoinCoordinator(this);
+                    _roomJoinCallback = Callback<GameRichPresenceJoinRequested_t>.Create(
+                        request => OnRoomJoinRequested(request.m_rgchConnect));
+                    _urlLaunchCallback = Callback<NewUrlLaunchParameters_t>.Create(
+                        _ => ReadSteamLaunchRoom());
+                    _overlayCallback = Callback<GameOverlayActivated_t>.Create(OnSteamOverlayActivated);
+                    ReadSteamLaunchRoom();
                 }
                 catch (Exception ex)
                 {
@@ -182,6 +215,21 @@ namespace SlopArena.Client.Network
                 if (_authenticatedSteamId != 0 && observedSteamId != 0 &&
                     observedSteamId != _authenticatedSteamId)
                     ClearAccountSession();
+            }
+            _roomPresence?.Refresh(_ownsSteamApi, !_developmentGuest &&
+                _masterClient?.IsAuthenticated == true &&
+                _authenticatedSteamId != 0 &&
+                (ulong)(_masterClient.SteamId ?? 0) == _authenticatedSteamId,
+                IsConnected && _masterClient?.TokenExpiresAt > DateTimeOffset.UtcNow,
+                Time.unscaledTime);
+            _roomJoin?.Tick();
+            if (_inviteOverlayPending && !_steamOverlayActive &&
+                Time.unscaledTime - _inviteRequestedAt >= InviteOpenTimeoutSeconds)
+            {
+                _inviteOverlayPending = false;
+                SetSteamOverlayInput(false);
+                NotifyInviteFeedback("Steam's invite dialog did not open. Enable the Steam overlay and retry.");
+                NotifyInviteStateChanged();
             }
             if (_lobby?.HasPendingOverflow == true)
             {
@@ -592,6 +640,7 @@ namespace SlopArena.Client.Network
                     _developmentGuest ? 0 : SteamMatchDescriptor.CurrentProtocolVersion);
                 SubscribeLobby(_lobby);
                 ClientSession.ActiveLobby = _lobby;
+                _roomPresence?.Attach(_lobby);
                 ActiveLobbyChanged?.Invoke(_lobby);
             }
             var lobby = _lobby;
@@ -710,6 +759,7 @@ namespace SlopArena.Client.Network
                 _nameApplied = false;
                 ActiveLobbyChanged?.Invoke(null);
                 ClientSession.ActiveLobby = null;
+                _roomPresence?.Attach(null);
                 _ = _lobby?.DisconnectAsync();
                 _lobby = null;
                 SetStatus("Authentication expired. Reconnect requires Steam.");
@@ -753,8 +803,173 @@ namespace SlopArena.Client.Network
                     : null);
         }
 
+        /// <summary>A Room locator can be invited only from its latest confirmed, joinable snapshot.</summary>
+        public static string? InviteUnavailableReason(RoomSnapshot? room, Guid joinedRoomId,
+            bool latest, bool steamReady, bool sessionUsable, bool overlayAvailable, bool busy)
+        {
+            if (room == null || room.Id == Guid.Empty || joinedRoomId != room.Id || !latest)
+                return "Waiting for confirmed Room membership.";
+            if (!room.Joinable || room.Phase != "Lobby" || room.Capacity <= room.MemberCount)
+                return "This Room is full or preparing for a match. Invite when it is joinable.";
+            if (!steamReady || !sessionUsable)
+                return "Steam or your Room session is unavailable. Reconnect to invite.";
+            if (!overlayAvailable)
+                return "Steam overlay is unavailable. Enable it in Steam, or ask friends to use Join Game.";
+            if (busy)
+                return "Finish the Steam overlay and release held controls before inviting again.";
+            return null;
+        }
+
+        public string? GetRoomInviteUnavailableReason(RoomSnapshot? room)
+        {
+            Guid joinedRoomId = _lobby?.JoinedRoomId ?? Guid.Empty;
+            bool latest = _roomPresence?.IsCurrentRoom(room) == true;
+            var roomReason = InviteUnavailableReason(room, joinedRoomId, latest,
+                true, true, true, false);
+            if (roomReason != null) return roomReason;
+            bool steamReady = _ownsSteamApi && !_developmentGuest && !_destroyed;
+            bool sessionUsable = false;
+            bool overlayAvailable = false;
+            if (steamReady)
+            {
+                try
+                {
+                    sessionUsable = _masterClient?.IsSteamAuthenticated == true &&
+                        _masterClient.TokenExpiresAt > DateTimeOffset.UtcNow &&
+                        _authenticatedSteamId != 0 &&
+                        SteamUser.GetSteamID().m_SteamID == _authenticatedSteamId && IsConnected;
+                    if (sessionUsable)
+                        overlayAvailable = SteamUtils.IsOverlayEnabled();
+                }
+                catch (Exception) { /* Steam may be temporarily unavailable. */ }
+            }
+            return InviteUnavailableReason(room, joinedRoomId, latest,
+                steamReady, sessionUsable, overlayAvailable, InviteOverlayBusy);
+        }
+
+        /// <summary>Opening a dialog is not confirmation that an invitation was sent.</summary>
+        public static bool TryOpenInviteDialog(Guid roomId, bool overlayAvailable,
+            Action<string> openDialog, float now, ref float nextAllowedAt, out string feedback)
+        {
+            if (roomId == Guid.Empty || !overlayAvailable)
+            {
+                feedback = "Steam overlay is unavailable. Enable it in Steam and retry.";
+                return false;
+            }
+            if (now < nextAllowedAt)
+            {
+                feedback = "Wait before reopening the Steam invite dialog.";
+                return false;
+            }
+            try
+            {
+                openDialog(RoomConnection.Format(roomId));
+                nextAllowedAt = now + InviteDebounceSeconds;
+                feedback = "Steam invite dialog requested. Choose a friend there; delivery is not confirmed.";
+                return true;
+            }
+            catch (Exception)
+            {
+                feedback = "Steam could not open the invite dialog. Check the overlay and retry.";
+                return false;
+            }
+        }
+
+        public bool TryInviteRoom(RoomSnapshot? room, out string feedback)
+        {
+            feedback = GetRoomInviteUnavailableReason(room) ?? string.Empty;
+            if (feedback.Length != 0) return false;
+            if (!TryOpenInviteDialog(room!.Id, true,
+                SteamFriends.ActivateGameOverlayInviteDialogConnectString,
+                Time.unscaledTime, ref _nextInviteAt, out feedback))
+                return false;
+            _inviteOverlayPending = true;
+            _inviteRequestedAt = Time.unscaledTime;
+            SetSteamOverlayInput(true);
+            NotifyInviteStateChanged();
+            return true;
+        }
+
+        private void OnSteamOverlayActivated(GameOverlayActivated_t activation)
+        {
+            _steamOverlayActive = activation.m_bActive != 0;
+            _inviteOverlayPending = false;
+            if (_steamOverlayActive)
+                SetSteamOverlayInput(true);
+            else
+            {
+                SetSteamOverlayInput(false);
+                _nextInviteAt = Math.Max(_nextInviteAt, Time.unscaledTime + InviteDebounceSeconds);
+            }
+            NotifyInviteStateChanged();
+        }
+        private void SetSteamOverlayInput(bool active)
+        {
+            if (active)
+            {
+                ChatInputGate.BeginExternalOverlay();
+                if (_overlayInputHeld) return;
+                UiModalState.Push();
+                _overlayInputHeld = true;
+            }
+            else
+            {
+                ChatInputGate.EndExternalOverlay();
+                if (!_overlayInputHeld) return;
+                UiModalState.Pop();
+                _overlayInputHeld = false;
+            }
+        }
+
+        private void NotifyInviteStateChanged()
+        {
+            try { RoomInviteStateChanged?.Invoke(); }
+            catch (Exception ex) { Debug.LogException(ex); }
+        }
+
+        private void NotifyInviteFeedback(string message)
+        {
+            try { RoomInviteFeedback?.Invoke(message); }
+            catch (Exception ex) { Debug.LogException(ex); }
+        }
+
+
+        private void OnRoomJoinRequested(string? payload)
+        {
+            if (_destroyed) return;
+            _roomJoin?.Receive(payload);
+            NotifyChanged();
+        }
+
+        private void ReadSteamLaunchRoom()
+        {
+            if (!_ownsSteamApi || _destroyed) return;
+            try
+            {
+                // Steam's API, not the OS command line, owns both cold and updated launches.
+                const int bufferSize = 1024;
+                int count = SteamApps.GetLaunchCommandLine(out var payload, bufferSize);
+                if (count == 0) return;
+                if (count < 0 || count >= bufferSize - 1 || payload == null)
+                    _roomJoin?.RejectInvalid();
+                else
+                    OnRoomJoinRequested(payload);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[ChatSession] Steam launch parameters unavailable: {ex.GetType().Name}");
+            }
+        }
+
         private void ClearAccountSession()
         {
+            _roomPresence?.Reset(_ownsSteamApi, Time.unscaledTime);
+            _inviteOverlayPending = false;
+            _nextInviteAt = 0;
+            if (!_steamOverlayActive)
+                SetSteamOverlayInput(false);
+            NotifyInviteStateChanged();
+            _roomJoin?.Cancel();
             _accountGeneration++;
             _authenticatedSteamId = 0;
             _pendingTicket?.TrySetResult(null);
@@ -1221,6 +1436,9 @@ namespace SlopArena.Client.Network
             if (_instance != this)
                 return;
             _destroyed = true;
+            _roomPresence?.Reset(_ownsSteamApi, Time.unscaledTime);
+            _roomJoin?.Cancel();
+            SetSteamOverlayInput(false);
             if (_lobby != null)
                 UnsubscribeLobby(_lobby);
             _lobby?.DisconnectAsync();
@@ -1228,6 +1446,9 @@ namespace SlopArena.Client.Network
             _lobby = null;
             _masterClient = null;
             _ticketCallback?.Dispose();
+            _roomJoinCallback?.Dispose();
+            _urlLaunchCallback?.Dispose();
+            _overlayCallback?.Dispose();
             if (_ownsSteamApi)
                 SteamAPI.Shutdown();
             _instance = null;

@@ -105,7 +105,7 @@ public class HitstunAnimationTierTests
     [Fact]
     public void CharacterStatePacket_Size_IncludesHitstunLevel()
     {
-        Assert.Equal(114, CharacterStatePacket.Size);
+        Assert.Equal(156, CharacterStatePacket.Size);
     }
 
     // ═══════════════════════════════════════════════════════════════════

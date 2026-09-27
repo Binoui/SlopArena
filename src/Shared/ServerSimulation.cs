@@ -15,6 +15,11 @@ namespace SlopArena.Shared
 		private readonly Dictionary<ulong, (ulong attackerId, uint tick, byte slot)> _lastHitContexts = new();
 		private readonly Dictionary<ulong, ulong> _lastActivationIds = new();
 		private ulong _nextActivationId;
+		private ulong _nextInteractionId;
+		private ulong[] _interactionScratch = Array.Empty<ulong>();
+		/// <summary>False for online local prediction; capture, release and interruption remain server-owned.</summary>
+		public bool PredictCoupledInteractions { get; set; } = true;
+
 		private uint _tick;
 		public void SetTick(uint tick) => _tick = tick;
 		private readonly List<TimelinePresentationEvent> _presentationEvents = new();
@@ -125,28 +130,55 @@ namespace SlopArena.Shared
 
 		public void RemoveEntity(ulong id)
 		{
-			if (_activeAbilities.TryGetValue(id, out var ability)
-			    && _states.TryGetValue(id, out var state))
-			{
-				ability.OnCancel(ref state);
-			}
+			if (PredictCoupledInteractions && _states.TryGetValue(id, out var state))
+				InterruptInteraction(ref state);
+			CancelAttackRuntime(id, _states.TryGetValue(id, out state) ? state : default);
 			_states.Remove(id);
 			_defs.Remove(id);
 			_bakedData.Remove(id);
 			_animFrames.Remove(id);
 			_prevAnimIndex.Remove(id);
-			_activeAbilities.Remove(id);
 			_respawnPositions.Remove(id);
 			_kos.Remove(id);
 			_lastActivationIds.Remove(id);
 			_lastHitCredits.Remove(id);
 			_lastHitContexts.Remove(id);
-
 		}
+
 
 		public CharacterState GetState(ulong id) => _states.TryGetValue(id, out var s) ? s : default;
 		public CharacterDefinition GetDefinition(ulong id) => _defs.TryGetValue(id, out var d) ? d : null;
 		public void SetState(ulong id, CharacterState state) => _states[id] = state;
+		/// <summary>
+		/// Replace a local state with an authoritative barrier without allowing the old ability's
+		/// cancellation callback to rewrite the incoming snapshot.
+		/// </summary>
+		public void ApplyAuthoritativeState(ulong id, CharacterState state)
+		{
+			var cleanupState = _states.TryGetValue(id, out var current) ? current : state;
+			CancelAttackRuntime(id, cleanupState);
+			_states[id] = state;
+		}
+
+		private void CancelAttackRuntime(ulong id, CharacterState state)
+		{
+			if (_activeAbilities.TryGetValue(id, out var ability))
+			{
+				ability.OnCancel(ref state);
+				_spellResolver.RemoveOwnedHitboxes(id, ability.ActivationId);
+				_activeAbilities.Remove(id);
+			}
+			_pendingWarpAttacks.Remove(id);
+		}
+		private void CancelDefenseAttackRuntime(ulong id, ref CharacterState state)
+		{
+			if (_activeAbilities.TryGetValue(id, out var ability)
+				&& ability.Slot < AbilitySlots.Count && NoCooldownsEntityId != id)
+				state.SetCooldown((byte)(ability.Slot + 1), ability.Cooldown);
+			CancelAttackRuntime(id, state);
+		}
+
+
 		public Dictionary<ulong, CharacterState> GetAllStates() => _states;
 		/// <summary>Latest activation identity for an entity, including lingering projectiles.</summary>
 		public ulong GetLastActivationId(ulong entityId)
@@ -549,12 +581,11 @@ namespace SlopArena.Shared
 		/// spec — its landing carries no lag, because the ground spec declares none
 		/// (ADR-0021 §3: landing lag belongs to aerials, not to ground normals).
 		///
-		/// Landing frame is pre-lock for committal escapes — by design (ADR-0021 §3): the
-		/// input gates (burst especially) run inside SimulateTick BEFORE this applies the lock,
-		/// so a press on the landing frame itself is processed pre-lock. That lets a burst
-		/// (offensive cancel — costs the ~60 s committal cooldown, ADR-0014) or an air-jump
-		/// (costs a double jump) cancel on the landing frame; dash and abilities stay blocked
-		/// by their own gates, so there is no free cancel. Every later locked tick is fully gated.
+		/// Landing frame is pre-lock for ordinary actions by design (ADR-0021 §3): the
+		/// input gates run inside SimulateTick BEFORE this applies the lock, so a press on
+		/// the landing frame itself is processed pre-lock. An air-jump can cancel on that
+		/// frame; dash and abilities stay blocked by their own gates, so there is no free
+		/// cancel. Every later locked tick is fully gated.
 		/// </summary>
 		private static void ApplyLandingLag(ref CharacterState state, CharacterDefinition def, bool wasGrounded, ServerAbility? activeAbility)
 		{
@@ -655,8 +686,8 @@ namespace SlopArena.Shared
 
 		private bool CanTakeOrdinaryAbilityAction(in CharacterState state, CharacterDefinition def)
 		{
-			if (state.HitstunTicks > 0 || state.HitstopTicks > 0
-				|| state.BurstRecoveryTicks > 0 || state.LandingLagTicks > 0)
+			if (state.HitstunTicks > 0 || state.HitstopTicks > 0 || state.BlockStunTicks > 0
+				|| state.LandingLagTicks > 0)
 				return false;
 			bool iasaUnlocked = Simulation.IsIasaUnlocked(state, def);
 			if (state.State != ActionState.Idle && state.State != ActionState.Run
@@ -705,8 +736,8 @@ namespace SlopArena.Shared
                 || ((input.MoveX * input.MoveX) + (input.MoveY * input.MoveY) <= 1e-4f))
                 return false;
 
-            if (state.HitstunTicks > 0 || state.HitstopTicks > 0
-                || state.BurstRecoveryTicks > 0 || state.LandingLagTicks > 0
+            if (state.HitstunTicks > 0 || state.HitstopTicks > 0 || state.BlockStunTicks > 0
+                || state.LandingLagTicks > 0
                 || !Simulation.IsIasaUnlocked(state, def)
                 || !_activeAbilities.TryGetValue(id, out var ability))
                 return false;
@@ -726,6 +757,68 @@ namespace SlopArena.Shared
             return true;
         }
 
+		private static bool HasQueuedShieldLaunch(in CharacterState state)
+			=> state.QueuedKBResolvedForce || state.QueuedKBZero
+				|| state.QueuedKBBase != 0f || state.QueuedKBGrowth != 0f
+				|| state.QueuedKBForce != 0f || state.QueuedKBDamage != 0f
+				|| state.QueuedKBStun > 0 || state.QueuedKVOverride
+				|| state.QueuedKVX != 0f || state.QueuedKVY != 0f || state.QueuedKVZ != 0f
+				|| state.QueuedKBDirX != 0f || state.QueuedKBDirZ != 0f
+				|| state.QueuedKBAngle != 0 || state.QueuedCrouchBrace;
+		private static bool CanAcceptGroundShield(
+			in CharacterState state, CharacterDefinition def, in InputState input)
+		{
+			if (!input.ShieldHeld || input.GrabPressed || input.Jump || !state.IsGrounded
+				|| state.HitstunTicks > 0 || state.HitstopTicks > 0 || state.BlockStunTicks > 0
+				|| state.LandingLagTicks > 0 || state.WarpSpeed > 0f || state.InteractionId != 0
+				|| Simulation.HasKnockback(state) || HasQueuedShieldLaunch(in state)
+				|| state.AnimLockTicks > 0 && !Simulation.IsIasaUnlocked(state, def))
+				return false;
+
+			return state.State is ActionState.Idle or ActionState.Run
+				or ActionState.Crouching or ActionState.Sliding
+				or ActionState.Attacking or ActionState.Shielding;
+		}
+
+		private static bool CanAcceptGroundShieldAfterTimers(
+			in CharacterState state, CharacterDefinition def, in InputState input)
+		{
+			if (CanAcceptGroundShield(in state, def, in input)) return true;
+			var nextState = state;
+			if (nextState.AnimLockTicks > 0) nextState.AnimLockTicks--;
+			if (nextState.AttackElapsedTicks < ushort.MaxValue) nextState.AttackElapsedTicks++;
+			return CanAcceptGroundShield(in nextState, def, in input);
+		}
+
+		private bool HandleShieldPreTickAdmission(
+			ulong id, ref CharacterState state, ref InputState input,
+			Dictionary<ulong, InputState> inputs, CharacterDefinition def)
+		{
+			if (input.ShieldHeld && (input.GrabPressed || input.Jump) && input.ActiveSlot != 0)
+			{
+				input.ActiveSlot = 0;
+				inputs[id] = input;
+			}
+			bool shieldState = state.State is ActionState.Shielding or ActionState.ShieldDrop;
+            bool shieldRequest = CanAcceptGroundShieldAfterTimers(in state, def, in input);
+			if (!shieldState && !shieldRequest) return false;
+
+			if (shieldRequest && _activeAbilities.TryGetValue(id, out var active)
+				&& active.OwnsVerticalMotion)
+				return false;
+
+			if (_activeAbilities.ContainsKey(id))
+				CancelDefenseAttackRuntime(id, ref state);
+
+			if (input.ActiveSlot != 0)
+			{
+				input.ActiveSlot = 0;
+				inputs[id] = input;
+			}
+			_states[id] = state;
+			return true;
+		}
+
 		private void PreTickAbilities(Dictionary<ulong, InputState> inputs)
 		{
 			// ── Pre-sim: Activate server abilities from inputs ──
@@ -737,6 +830,8 @@ namespace SlopArena.Shared
 				if (!_states.TryGetValue(id, out var state)) continue;
 				var input = inputs.TryGetValue(id, out var i) ? i : default;
 				var def = _defs[id];
+				if (HandleShieldPreTickAdmission(id, ref state, ref input, inputs, def))
+					continue;
 				if (CanTakeOrdinaryAbilityAction(state, def))
 					_lastTickOrdinaryActionOpportunities.Add(id);
 				if (input.ActiveSlot == 0)
@@ -749,12 +844,12 @@ namespace SlopArena.Shared
 				// IASA early-out (issue #124): an attack stage that has passed its IasaTicks
 				// releases the anim lock for ability inputs — the press interrupts the recovery.
 				// IasaTicks = 0 (default) keeps the full ADR-0014 lock. Only the AnimLockTicks
-				// term relaxes: hitstun, hitstop, burst recovery and landing lag (issue #125)
-				// always block — attacker hitstop (FreezesOwner) keeps State == Attacking, so
-				// relaxing those too would let a press cancel the attack mid-freeze (ADR-0012),
-				// and landing lag is a hard no-input lock that IASA must not bypass.
+				// term relaxes: hitstun, hitstop and landing lag always block — attacker
+				// hitstop (FreezesOwner) keeps State == Attacking, so relaxing those too
+				// would let a press cancel the attack mid-freeze (ADR-0012), and landing lag
+				// is a hard no-input lock that IASA must not bypass.
 				bool iasaUnlocked = Simulation.IsIasaUnlocked(state, def);
-				if (state.HitstunTicks > 0 || state.HitstopTicks > 0 || state.BurstRecoveryTicks > 0
+				if (state.HitstunTicks > 0 || state.HitstopTicks > 0 || state.BlockStunTicks > 0
 					|| state.LandingLagTicks > 0
 					|| (state.AnimLockTicks > 0 && !iasaUnlocked)) continue; // ADR-0014
 				if (state.State != ActionState.Idle && state.State != ActionState.Attacking
@@ -907,6 +1002,298 @@ namespace SlopArena.Shared
 			}
 		}
 
+		private const float PlaceholderGrabReach = 1.5f;
+
+		private bool HasGrabAttempts()
+		{
+			foreach (var state in _states.Values)
+				if (state.State == ActionState.GrabAttempt
+					&& state.InteractionPhase == (byte)DefenseInteractionPhase.Attempt)
+					return true;
+			return false;
+		}
+
+		private bool HasCoupledInteraction()
+		{
+			foreach (var state in _states.Values)
+				if (state.InteractionId != 0)
+					return true;
+			return false;
+		}
+
+		private int CopyInteractionIds()
+		{
+			int count = _states.Count;
+			if (_interactionScratch.Length < count)
+				Array.Resize(ref _interactionScratch, count);
+			_states.Keys.CopyTo(_interactionScratch, 0);
+			Array.Sort(_interactionScratch, 0, count);
+			return count;
+		}
+
+		private bool IsActiveGrabAttempt(in CharacterState state)
+		{
+			if (state.State != ActionState.GrabAttempt
+				|| state.InteractionPhase != (byte)DefenseInteractionPhase.Attempt)
+				return false;
+			ushort activeEnd = (ushort)(DefenseConfig.GrabWhiffRecoveryTicks
+				+ DefenseConfig.GrabActiveTicks);
+			return state.StateTicks > DefenseConfig.GrabWhiffRecoveryTicks
+				&& state.StateTicks <= activeEnd;
+		}
+
+		private ulong FindPlaceholderGrabTarget(ulong grabberId, in CharacterState grabber)
+		{
+			if (!_defs.TryGetValue(grabberId, out var grabberDef))
+				return 0;
+			float yaw = grabber.CapturedYaw * 0.01f * (MathF.PI / 180f);
+			float forwardX = MathF.Sin(yaw);
+			float forwardZ = MathF.Cos(yaw);
+			float maxDistanceSquared = PlaceholderGrabReach * PlaceholderGrabReach;
+			ulong closestId = 0;
+			float closestDistanceSquared = maxDistanceSquared;
+
+			foreach (var (targetId, target) in _states)
+			{
+				if (targetId == grabberId || target.InteractionId != 0
+					|| target.State is (ActionState.Grabbed or ActionState.Throwing)
+					|| !_defs.TryGetValue(targetId, out var targetDef)
+					|| _rule.IsEliminated(target) || target.InvincibilityTicks > 0)
+					continue;
+
+				float dx = target.PX - grabber.PX;
+				float dz = target.PZ - grabber.PZ;
+				float forwardDistance = dx * forwardX + dz * forwardZ;
+				float distanceSquared = dx * dx + dz * dz;
+				if (forwardDistance <= 0f || distanceSquared > maxDistanceSquared
+					|| MathF.Abs(target.PY - grabber.PY)
+						> (grabberDef.CapsuleHeight + targetDef.CapsuleHeight) * 0.5f)
+					continue;
+
+				if (closestId == 0 || distanceSquared < closestDistanceSquared
+					|| distanceSquared == closestDistanceSquared && targetId < closestId)
+				{
+					closestId = targetId;
+					closestDistanceSquared = distanceSquared;
+				}
+			}
+			return closestId;
+		}
+
+		private void ResolveGrabAttempts()
+		{
+			if (!PredictCoupledInteractions)
+				return;
+			if (!HasGrabAttempts())
+				return;
+
+			int count = CopyInteractionIds();
+
+			for (int i = 0; i < count; i++)
+			{
+				ulong id = _interactionScratch[i];
+				if (!_states.TryGetValue(id, out var state) || !IsActiveGrabAttempt(in state)
+					|| !state.IsGrounded || state.VX * state.VX + state.VZ * state.VZ > 0.0025f)
+					continue;
+
+				ulong targetId = FindPlaceholderGrabTarget(id, in state);
+				if (targetId == 0 || !_states.TryGetValue(targetId, out var target))
+					continue;
+
+				if (IsActiveGrabAttempt(in target)
+					&& FindPlaceholderGrabTarget(targetId, in target) == id)
+				{
+					if (id < targetId)
+						ClashGrabAttempts(id, targetId, state, target);
+					continue;
+				}
+
+				CaptureInteraction(id, targetId, state, target);
+			}
+		}
+
+		private void ClashGrabAttempts(ulong firstId, ulong secondId,
+			CharacterState first, CharacterState second)
+		{
+			first.StateTicks = DefenseConfig.GrabClashRecoveryTicks;
+			first.InteractionId = 0;
+			first.InteractionPartnerId = 0;
+			first.InteractionPhase = (byte)DefenseInteractionPhase.None;
+			first.InteractionTick = 0;
+			second.StateTicks = DefenseConfig.GrabClashRecoveryTicks;
+			second.InteractionId = 0;
+			second.InteractionPartnerId = 0;
+			second.InteractionPhase = (byte)DefenseInteractionPhase.None;
+			second.InteractionTick = 0;
+			_states[firstId] = first;
+			_states[secondId] = second;
+		}
+
+		private void CaptureInteraction(ulong grabberId, ulong targetId,
+			CharacterState grabber, CharacterState target)
+		{
+			CancelDefenseAttackRuntime(grabberId, ref grabber);
+			CancelDefenseAttackRuntime(targetId, ref target);
+			unchecked
+			{
+				_nextInteractionId++;
+				if (_nextInteractionId == 0)
+					_nextInteractionId = 1;
+			}
+
+			ulong interactionId = _nextInteractionId;
+			ClearAttackState(ref grabber);
+			ClearAttackState(ref target);
+			grabber.State = ActionState.Throwing;
+			grabber.StateTicks = DefenseConfig.ThrowReleaseTicks;
+			grabber.InteractionId = interactionId;
+			grabber.InteractionPartnerId = targetId;
+			grabber.InteractionPhase = (byte)DefenseInteractionPhase.Captured;
+			grabber.InteractionTick = _tick;
+			grabber.VX = grabber.VY = grabber.VZ = 0f;
+			grabber.FacingYaw = grabber.CapturedYaw * 0.01f * (MathF.PI / 180f);
+
+			target.State = ActionState.Grabbed;
+			target.StateTicks = DefenseConfig.ThrowReleaseTicks;
+			target.InteractionId = interactionId;
+			target.InteractionPartnerId = grabberId;
+			target.InteractionPhase = (byte)DefenseInteractionPhase.Captured;
+			target.InteractionTick = _tick;
+			target.CapturedYaw = grabber.CapturedYaw;
+			target.VX = target.VY = target.VZ = 0f;
+
+			_states[grabberId] = grabber;
+			_states[targetId] = target;
+		}
+
+		private static void ClearAttackState(ref CharacterState state)
+		{
+			state.AttackSlot = 0;
+			state.ComboStage = 0;
+			state.AttackElapsedTicks = 0;
+			state.AnimLockTicks = 0;
+			state.BufferedSlot = 0;
+			state.ChargeTicks = 0;
+			state.IsAiming = false;
+			state.AnimIndex = 0;
+			state.SlideAttackCarryActive = false;
+		}
+
+		private void UpdateCoupledInteractions(bool releaseDue)
+		{
+			int count = CopyInteractionIds();
+			for (int i = 0; i < count; i++)
+			{
+				ulong ownerId = _interactionScratch[i];
+				if (!_states.TryGetValue(ownerId, out var owner) || owner.InteractionId == 0)
+					continue;
+				if (owner.State == ActionState.Grabbed)
+				{
+					if (!_states.TryGetValue(owner.InteractionPartnerId, out var grabber)
+						|| grabber.State != ActionState.Throwing
+						|| grabber.InteractionId != owner.InteractionId
+						|| grabber.InteractionPartnerId != ownerId
+						|| grabber.InteractionPhase != owner.InteractionPhase)
+					{
+						InterruptInteraction(ref owner);
+						_states[ownerId] = owner;
+					}
+					continue;
+				}
+				if (owner.State != ActionState.Throwing)
+				{
+					InterruptInteraction(ref owner);
+					_states[ownerId] = owner;
+					continue;
+				}
+
+				ulong interactionId = owner.InteractionId;
+				ulong partnerId = owner.InteractionPartnerId;
+				if ((owner.InteractionPhase != (byte)DefenseInteractionPhase.Captured
+						&& owner.InteractionPhase != (byte)DefenseInteractionPhase.Throwing)
+					|| !_states.TryGetValue(partnerId, out var partner)
+					|| partner.InteractionId != interactionId
+					|| partner.InteractionPartnerId != ownerId
+					|| partner.InteractionPhase != owner.InteractionPhase
+					|| partner.State != ActionState.Grabbed
+					|| !owner.IsGrounded || _rule.IsEliminated(owner) || _rule.IsEliminated(partner))
+				{
+					InterruptInteraction(ref owner);
+					_states[ownerId] = owner;
+					continue;
+				}
+
+				uint elapsed = _tick - owner.InteractionTick;
+				if (elapsed >= DefenseConfig.ThrowReleaseTicks && releaseDue)
+				{
+					ClearAttackState(ref owner);
+					owner.State = ActionState.Idle;
+					owner.StateTicks = 0;
+					owner.AnimLockTicks = DefenseConfig.ThrowAttackerRecoveryTicks;
+					ClearAttackState(ref partner);
+					partner.State = ActionState.Idle;
+					partner.StateTicks = 0;
+					MarkInteractionTerminal(ref owner, interactionId);
+					MarkInteractionTerminal(ref partner, interactionId);
+					_states[ownerId] = owner;
+					_states[partnerId] = partner;
+					continue;
+				}
+
+				if (elapsed > 0)
+				{
+					owner.InteractionPhase = (byte)DefenseInteractionPhase.Throwing;
+					partner.InteractionPhase = (byte)DefenseInteractionPhase.Throwing;
+				}
+				ushort remainingTicks = elapsed >= DefenseConfig.ThrowReleaseTicks
+					? (ushort)0 : (ushort)(DefenseConfig.ThrowReleaseTicks - elapsed);
+				owner.StateTicks = remainingTicks;
+				partner.StateTicks = remainingTicks;
+				_states[ownerId] = owner;
+				_states[partnerId] = partner;
+
+			}
+		}
+
+		private void InterruptInteraction(ref CharacterState affected)
+		{
+			ulong interactionId = affected.InteractionId;
+			if (interactionId == 0)
+				return;
+
+			ulong partnerId = affected.InteractionPartnerId;
+			if (_states.TryGetValue(partnerId, out var partner)
+				&& partner.InteractionId == interactionId)
+			{
+				if (partner.State is ActionState.Grabbed or ActionState.Throwing)
+				{
+					ClearAttackState(ref partner);
+					partner.State = partner.HitstunTicks > 0
+						? ActionState.Hitstun : ActionState.Idle;
+					partner.StateTicks = 0;
+				}
+				MarkInteractionTerminal(ref partner, interactionId);
+				_states[partnerId] = partner;
+			}
+			if ((affected.State is ActionState.Grabbed or ActionState.Throwing)
+				&& affected.HitstunTicks == 0)
+			{
+				ClearAttackState(ref affected);
+				affected.State = ActionState.Idle;
+				affected.StateTicks = 0;
+			}
+			MarkInteractionTerminal(ref affected, interactionId);
+		}
+
+		private void MarkInteractionTerminal(ref CharacterState state, ulong interactionId)
+		{
+			state.InteractionId = 0;
+			state.InteractionPartnerId = 0;
+			state.LastTerminalInteractionId = interactionId;
+			state.InteractionTerminalTick = _tick;
+			state.InteractionPhase = (byte)DefenseInteractionPhase.Terminal;
+		}
+
 		private void SimulateMovement(Dictionary<ulong, InputState> inputs)
 		{
 			// ── Step 1: Simulate each entity ──
@@ -919,6 +1306,9 @@ namespace SlopArena.Shared
 				// Eliminated (0 stocks / rule) — frozen spectator, no physics (issue #37).
 				if (_rule.IsEliminated(state)) continue;
 				if (!_defs.TryGetValue(id, out var def)) continue; // state exists but no definition — invalid entity, skip (never simulate)
+				if (state.InteractionId != 0
+					&& state.State is (ActionState.Grabbed or ActionState.Throwing))
+					continue;
 				var input = inputs.TryGetValue(id, out var i2) ? i2 : default;
 				bool wasGrounded = state.IsGrounded;
 				_activeAbilities.TryGetValue(id, out var activeAbility);
@@ -926,6 +1316,9 @@ namespace SlopArena.Shared
                 Simulation.SimulateTick(ref state, def, input, _arena,
 					out bool ordinaryActionOpportunity, out bool movementActionAccepted,
 					_downActionTuning, verticalMotionOwned, activeAbility?.GravityMultiplier ?? 1f);
+				if (state.State is ActionState.Shielding or ActionState.GrabAttempt or ActionState.AirDodgeStartup)
+					CancelDefenseAttackRuntime(id, ref state);
+
 				if (ordinaryActionOpportunity)
 					_lastTickOrdinaryActionOpportunities.Add(id);
 				if (movementActionAccepted)
@@ -953,67 +1346,6 @@ namespace SlopArena.Shared
 				_states[id] = state;
 			}
 
-			// ── Step 1a: Burst side effects (ADR-0014): server-only — shove (defensive)
-			// / hitbox (offensive). The user's own state changes already happened inside
-			// SimulateTick. ──
-			foreach (var id in simIds)
-			{
-				if (!_states.TryGetValue(id, out var burstState) || burstState.BurstPending == 0) continue;
-				if (burstState.BurstPending == 1)
-				{
-					ulong attackerId = burstState.LastAttackerEntityId;
-					if (attackerId != 0 && attackerId != id
-					    && _states.TryGetValue(attackerId, out var attackerState))
-					{
-						float dx = attackerState.PX - burstState.PX;
-						float dz = attackerState.PZ - burstState.PZ;
-						float dist = MathF.Sqrt(dx * dx + dz * dz);
-						if (dist > 0.001f) { dx /= dist; dz /= dist; }
-						else { dx = MathF.Sin(burstState.FacingYaw); dz = MathF.Cos(burstState.FacingYaw); }
-						// Small fixed shove, stun 0 → no hitstun, no punish. Interrupts a mid-attack
-						// attacker via ApplyKnockback's State=Idle → TickAbilities drops their ability
-						// (breaks the string — the point of the escape); they are free to act at once.
-                        // Fixed defensive shove — NOT a damage launch: bypasses KbScaleFactor
-                        // (the escape tool must not shrink with the hit-knockback balance).
-                        Simulation.ApplyKnockbackForce(ref attackerState, dx, dz,
-                            BurstConfig.AttackerPushAngle, BurstConfig.AttackerPushBaseKnockback, 0);
-
-						_states[attackerId] = attackerState;
-					}
-					burstState.LastAttackerEntityId = 0;
-				}
-				else if (burstState.BurstPending == 2)
-				{
-					float cos = MathF.Cos(burstState.FacingYaw), sin = MathF.Sin(burstState.FacingYaw);
-					float hx = burstState.PX + sin * BurstConfig.HitboxForwardOffset;
-					float hy = burstState.PY + BurstConfig.HitboxHeightOffset;
-					float hz = burstState.PZ + cos * BurstConfig.HitboxForwardOffset;
-					unchecked
-					{
-						_nextActivationId++;
-						if (_nextActivationId == 0) _nextActivationId = 1;
-					}
-					ulong burstActivationId = _nextActivationId;
-					_spellResolver.Spawn(new Hitbox
-					{
-						X = hx, Y = hy, Z = hz,
-						EndX = hx, EndY = hy, EndZ = hz,           // sphere — End == start (BuildHurtboxList convention)
-						Radius = BurstConfig.HitboxRadius, Shape = HitboxShape.Sphere,
-						Damage = BurstConfig.HitboxDamage,
-						BaseKnockback = BurstConfig.HitboxBaseKnockback,
-						KnockbackGrowth = BurstConfig.HitboxKnockbackGrowth, // 0 → ApplyKnockback never scales by DamagePercent
-						KnockbackAngle = BurstConfig.HitboxAngle,
-						StunTicks = BurstConfig.HitboxStunTicks,
-						DurationTicks = BurstConfig.HitboxDurationTicks,
-						OwnerId = id,
-						ActivationId = burstActivationId,
-						ActivationAirborne = !burstState.IsGrounded,
-						FreezesOwner = false,   // user is already in recovery; freezing them inside it would muddy the punish window
-					});
-				}
-				burstState.BurstPending = 0;
-				_states[id] = burstState;
-			}
 
 			// ── Step 1b: Tick server-side abilities (overrides movement, spawns hitboxes) ──
 			TickAbilities(inputs);
@@ -1059,6 +1391,8 @@ namespace SlopArena.Shared
 					    || _rule.IsEliminated(second))
 						continue;
 
+					if (first.InteractionId != 0 && first.InteractionId == second.InteractionId)
+						continue;
 					float verticalReach = (firstDef.CapsuleHeight + secondDef.CapsuleHeight) * 0.5f;
 					if (MathF.Abs(first.PY - second.PY) >= verticalReach)
 						continue;
@@ -1224,6 +1558,7 @@ namespace SlopArena.Shared
 			foreach (var id in ids)
 			{
 				if (!_states.TryGetValue(id, out var state)) continue;
+				if (state.InteractionId != 0) continue;
 				bool hasInput = inputs.TryGetValue(id, out var input);
 				if (hasInput && input.ToggleLock)
 					state.LockOn = !state.LockOn;
@@ -1247,6 +1582,17 @@ namespace SlopArena.Shared
 						if (lockDx * lockDx + lockDz * lockDz > LockRangeMeters * LockRangeMeters)
 							state.LockOn = false;
 					}
+				}
+				bool shieldFacingLocked = state.State is ActionState.Shielding or ActionState.ShieldDrop;
+				if (!shieldFacingLocked && hasInput
+					&& CanAcceptGroundShieldAfterTimers(in state, _defs[id], in input)
+					&& (!_activeAbilities.TryGetValue(id, out var shieldAbility)
+						|| !shieldAbility.OwnsVerticalMotion))
+					shieldFacingLocked = true;
+				if (shieldFacingLocked)
+				{
+					_states[id] = state;
+					continue;
 				}
 
 				if (targetId == 0)
@@ -1408,6 +1754,102 @@ namespace SlopArena.Shared
             return baked.FrameCountFor(def.CrouchAnim) > 0;
         }
 
+		private AbilitySpec? GetHitstopSpec(ulong ownerId, in CharacterState ownerState)
+		{
+			if (ownerState.AttackSlot > 0 && _defs.TryGetValue(ownerId, out var def))
+				return def.GetSlotAbility(ownerState.AttackSlot - 1, !ownerState.IsGrounded);
+			return null;
+		}
+
+		private static (float x, float z) GetBlockPushbackDirection(
+			in SpellResolver.HitResult hit, in CharacterState targetState,
+			in CharacterState attackerState, bool attackerExists)
+		{
+			float dx = attackerExists ? targetState.PX - attackerState.PX : hit.DirX;
+			float dz = attackerExists ? targetState.PZ - attackerState.PZ : hit.DirZ;
+			float lengthSquared = dx * dx + dz * dz;
+			if (lengthSquared <= 0.000001f)
+			{
+				dx = hit.DirX;
+				dz = hit.DirZ;
+				lengthSquared = dx * dx + dz * dz;
+			}
+			if (lengthSquared <= 0.000001f)
+			{
+				dx = -MathF.Sin(targetState.FacingYaw);
+				dz = -MathF.Cos(targetState.FacingYaw);
+				lengthSquared = dx * dx + dz * dz;
+			}
+			float inverseLength = 1f / MathF.Sqrt(lengthSquared);
+			return (dx * inverseLength, dz * inverseLength);
+		}
+
+		private void ApplyShieldBlockPushback(
+			ref CharacterState targetState, CharacterDefinition targetDef, float dirX, float dirZ)
+		{
+			if (!targetState.IsGrounded) return;
+
+			var displaced = targetState;
+			Simulation.MoveThroughStage(ref displaced, targetDef, _arena,
+				dirX * 0.10f, 0f, dirZ * 0.10f);
+			if (!displaced.IsGrounded && targetState.IsGrounded) return;
+			if (!ArenaCollision.HasTriangles(_arena)
+				&& _arena.Heightmap.Data is { Length: > 0 }
+				&& _arena.Heightmap.Sample(displaced.PX, displaced.PZ) == float.MinValue)
+				return;
+
+			targetState.PX = displaced.PX;
+			targetState.PY = displaced.PY;
+			targetState.PZ = displaced.PZ;
+			targetState.IsGrounded = displaced.IsGrounded;
+		}
+
+		private void ResolveShieldBlock(
+			in SpellResolver.HitResult hit, ref CharacterState targetState,
+			ref CharacterState attackerState, bool attackerExists)
+		{
+			ushort freeze = ComputeHitstopTicks(
+				hit.Damage, attackerExists ? GetHitstopSpec(hit.OwnerEntityId, in attackerState) : null);
+			int incomingStun = Math.Clamp(
+				(int)MathF.Ceiling(MathF.Max(0f, hit.Damage) * 0.6f) + 2, 4, 15);
+			targetState.BlockStunTicks = (ushort)Math.Max(targetState.BlockStunTicks, incomingStun);
+			targetState.HitstopTicks = Math.Max(targetState.HitstopTicks, freeze);
+			targetState.BlockHitstopKind = (byte)DefenseBlockHitstopKind.ShieldContact;
+
+			var direction = GetBlockPushbackDirection(
+				in hit, in targetState, in attackerState, attackerExists);
+			ApplyShieldBlockPushback(
+				ref targetState, _defs[hit.TargetEntityId], direction.x, direction.z);
+
+			if (hit.FreezesOwner && attackerExists && hit.OwnerEntityId != hit.TargetEntityId)
+				attackerState.HitstopTicks = Math.Max(attackerState.HitstopTicks, freeze);
+
+			_states[hit.TargetEntityId] = targetState;
+			if (attackerExists && hit.OwnerEntityId != hit.TargetEntityId)
+				_states[hit.OwnerEntityId] = attackerState;
+
+			var blockedHit = hit;
+			blockedHit.Blocked = true;
+			blockedHit.MatchTick = _tick;
+			blockedHit.Damage = 0f;
+			blockedHit.DirX = direction.x;
+			blockedHit.DirZ = direction.z;
+			blockedHit.ImpactForce = 0f;
+			blockedHit.HitstopTicks = freeze;
+			LastTickHits.Add(blockedHit);
+
+			_presentationEvents.Add(new TimelinePresentationEvent(
+				_tick, hit.TargetEntityId, BlockContactOperationIndex(in hit),
+				"combat.block", hit.AttackSequence, PresentationEventSource.BlockContact,
+				hit.HitX, hit.HitY, hit.HitZ, targetState.FacingYaw));
+		}
+
+		private static int BlockContactOperationIndex(in SpellResolver.HitResult hit)
+		{
+			ulong foldedOwner = hit.OwnerEntityId ^ (hit.OwnerEntityId >> 32);
+			return (int)(((foldedOwner & 0x07ff_ffffUL) << 4) | (hit.AttackSlot & 0x0fUL));
+		}
+
         private void ResolveHits(List<SpellResolver.EntityData> entityList, Dictionary<ulong, InputState> inputs)
 		{
 			// Bone-tracked hitboxes sweep with their limb: re-resolve positions from
@@ -1424,6 +1866,12 @@ namespace SlopArena.Shared
 
 				// Invincible (respawn grace, dash) — the hit is fully ignored (issue #37).
 				if (targetState.InvincibilityTicks > 0) continue;
+				if (!PredictCoupledInteractions && targetState.InteractionId != 0) continue;
+				if (targetState.State == ActionState.Shielding)
+				{
+					ResolveShieldBlock(hit, ref targetState, ref attackerState, attackerExists);
+					continue;
+				}
 
 				// ── Counter interception (target-side): if the defender has an active
 				// ability that counters this hit, it absorbs the hit and applies its own
@@ -1445,6 +1893,9 @@ namespace SlopArena.Shared
 				}
 				// Snapshot settled crouch before reaction cleanup/callbacks. A later
 				// replacement hit may overwrite this queue, but cannot earn a new stance.
+				if (PredictCoupledInteractions && targetState.InteractionId != 0 && hit.Damage > 0f)
+					InterruptInteraction(ref targetState);
+
 				bool crouchBraceEligible = IsCrouchBraceEligible(
 					hit.TargetEntityId, in targetState, _defs[hit.TargetEntityId]);
 				Simulation.ClearMovementInterruptionFlags(ref targetState);
@@ -1479,10 +1930,6 @@ namespace SlopArena.Shared
 				// ProcessNormalMovement re-faces on the next input/land.
 				targetState.FacingYaw = MathF.Atan2(-dirX, -dirZ);
 
-				// Burst (ADR-0014): remember who hit us — consumed by the defensive shove.
-				// Placed after the invincibility/counter continues, so ignored hits never mark.
-				if (attackerExists && hit.OwnerEntityId != hit.TargetEntityId)
-					targetState.LastAttackerEntityId = hit.OwnerEntityId;
 
 
 
@@ -1628,6 +2075,7 @@ namespace SlopArena.Shared
 				}
 
 				var resolvedHit = hit;
+				resolvedHit.MatchTick = _tick;
 				resolvedHit.Damage = finalDamage;
 				resolvedHit.DirX = dirX;
 				resolvedHit.DirZ = dirZ;
@@ -1652,7 +2100,7 @@ namespace SlopArena.Shared
             // values into the config itself before Resolver.Spawn: NilusVoidRift does
             // exactly that (its explosion IS the payload rift), while MankiBazooka and
             // NilusEventHorizon use their authored configs.
-			foreach (var (ex, ey, ez, explosion, ownerId, attackSlot, activationId, airborne) in _spellResolver.DrainPendingExplosions())
+			foreach (var (ex, ey, ez, explosion, ownerId, attackSlot, activationId, airborne, attackSequence) in _spellResolver.DrainPendingExplosions())
 			{
 				var (kbAngle, kbBase, kbGrowth) = explosion.Knockback.Resolve();
 				_spellResolver.Spawn(new Hitbox
@@ -1670,6 +2118,7 @@ namespace SlopArena.Shared
 					AttackSlot = attackSlot,
 					ActivationId = activationId,
 					ActivationAirborne = airborne,
+					AttackSequence = attackSequence,
 					CanHitOwner = explosion.CanHitOwner,
 					RehitIntervalTicks = explosion.RehitIntervalTicks,
 				});
@@ -1749,6 +2198,7 @@ namespace SlopArena.Shared
 			foreach (var kvp in _states)
 			{
 				var s = kvp.Value;
+				if (!PredictCoupledInteractions && s.InteractionId != 0) continue;
 				if (s.PY < _blastLines.KillHeight || s.PY > _blastLines.KillTop
 					|| s.PX < _blastLines.KillMinX || s.PX > _blastLines.KillMaxX
 					|| s.PZ < _blastLines.KillMinZ || s.PZ > _blastLines.KillMaxZ)
@@ -1790,6 +2240,9 @@ namespace SlopArena.Shared
 					LastHitSlot = lastHitSlot,
 					Boundary = boundary,
 				});
+				if (PredictCoupledInteractions && oldState.InteractionId != 0)
+					InterruptInteraction(ref oldState);
+
 				if (_activeAbilities.TryGetValue(id, out var deadAbility))
 				{
 					deadAbility.OnCancel(ref oldState);
@@ -1833,10 +2286,13 @@ namespace SlopArena.Shared
 					InPostHitstunFlight = false,
 					JumpsLeft = d.Movement.MaxJumps, AirDodgesLeft = 1,
 					Deaths = newDeaths, DamagePercent = 0,
+					LastTerminalInteractionId = oldState.LastTerminalInteractionId,
+					InteractionTerminalTick = oldState.InteractionTerminalTick,
+					InteractionPhase = (byte)(oldState.LastTerminalInteractionId != 0
+						? DefenseInteractionPhase.Terminal : DefenseInteractionPhase.None),
 				};
-				// Burst cooldown persists through KO (issue #99 user story 12) — the ONLY
-				// carry-over. Recovery is deliberately NOT carried: death clears the punish window.
-				respawned.BurstCooldownTicks = oldState.BurstCooldownTicks;
+				// The last terminal interaction identity survives KO to prevent a delayed
+				// capture from resurrecting a pair after respawn.
 
 				if (_rule.IsEliminated(respawned))
 				{
@@ -1890,12 +2346,15 @@ namespace SlopArena.Shared
 			_lastTickTouchdowns.Clear();
 			_settledCrouchCandidates.Clear();
 			_tick++;
+			if (PredictCoupledInteractions && HasCoupledInteraction())
+				UpdateCoupledInteractions(releaseDue: false);
 			CaptureSettledCrouchCandidates();
 			PreTickAbilities(inputs);
 
 			ProcessTargetLock(inputs);
 
 			SimulateMovement(inputs);
+			ResolveGrabAttempts();
 
 			// ── Warp arrival: activate pending attacks ──
 			ProcessWarpArrivals();
@@ -1907,6 +2366,9 @@ namespace SlopArena.Shared
 			var entityList = BuildHurtboxList();
 
             ResolveHits(entityList, inputs);
+			if (PredictCoupledInteractions && HasCoupledInteraction())
+				UpdateCoupledInteractions(releaseDue: true);
+
 
 			ProcessProjectileExplosions();
 

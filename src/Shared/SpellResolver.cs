@@ -17,7 +17,7 @@ namespace SlopArena.Shared
         /// Projectile deactivation events this tick (for explosion spawning).
         /// Position is the last known position before deactivation.
         /// </summary>
-        private readonly List<(float x, float y, float z, ProjectileExplosion explosion, ulong ownerId, byte attackSlot, ulong activationId, bool airborne)> _pendingExplosions = new();
+        private readonly List<(float x, float y, float z, ProjectileExplosion explosion, ulong ownerId, byte attackSlot, ulong activationId, bool airborne, byte attackSequence)> _pendingExplosions = new();
         /// <summary>Fired when any hitbox is removed. Args: the hitbox, its last position, removal reason.</summary>
         public Action<Hitbox, float, float, float>? OnHitboxRemoved;
 
@@ -33,6 +33,8 @@ namespace SlopArena.Shared
             public byte AttackSlot;
             /// <summary>Unique server-local ability activation that produced the hit.</summary>
             public ulong ActivationId;
+            /// <summary>Per-owner attack sequence captured when the hitbox was spawned.</summary>
+            public byte AttackSequence;
             /// <summary>True when the originating ability activation began airborne.</summary>
             public bool Airborne;
             public float Damage;
@@ -52,7 +54,17 @@ namespace SlopArena.Shared
             public float ImpactForce;
             /// <summary>Hitstop applied to this accepted hit.</summary>
             public ushort HitstopTicks;
+            /// <summary>True when this contact was blocked by an active shield.</summary>
+            public bool Blocked;
+            /// <summary>Authoritative simulation tick used by the stable block feedback key.</summary>
+            public uint MatchTick;
+            public BlockEventIdentity BlockEventIdentity =>
+                new(MatchTick, OwnerEntityId, ActivationId, TargetEntityId);
         }
+
+        /// <summary>Stable combat-block identity across prediction correction and feedback replay.</summary>
+        public readonly record struct BlockEventIdentity(
+            uint MatchTick, ulong OwnerEntityId, ulong ActivationId, ulong TargetEntityId);
 
         /// <summary>
         /// Entity data needed for hit detection.
@@ -102,7 +114,7 @@ namespace SlopArena.Shared
 
                 if (hb.Explosion.HasValue)
                     _pendingExplosions.Add((hb.X, hb.Y, hb.Z, hb.Explosion.Value, hb.OwnerId, hb.AttackSlot,
-                        hb.ActivationId, hb.ActivationAirborne));
+                        hb.ActivationId, hb.ActivationAirborne, hb.AttackSequence));
                 OnHitboxRemoved?.Invoke(hb, hb.X, hb.Y, hb.Z);
                 _hitboxes.RemoveAt(i);
                 return true;
@@ -138,9 +150,9 @@ namespace SlopArena.Shared
         /// Drain and return all pending explosion events from this tick.
         /// Call after Tick() to spawn explosion hitboxes at the returned positions.
         /// </summary>
-        public List<(float x, float y, float z, ProjectileExplosion explosion, ulong ownerId, byte attackSlot, ulong activationId, bool airborne)> DrainPendingExplosions()
+        public List<(float x, float y, float z, ProjectileExplosion explosion, ulong ownerId, byte attackSlot, ulong activationId, bool airborne, byte attackSequence)> DrainPendingExplosions()
         {
-            var result = new List<(float x, float y, float z, ProjectileExplosion explosion, ulong ownerId, byte attackSlot, ulong activationId, bool airborne)>(_pendingExplosions);
+            var result = new List<(float x, float y, float z, ProjectileExplosion explosion, ulong ownerId, byte attackSlot, ulong activationId, bool airborne, byte attackSequence)>(_pendingExplosions);
             _pendingExplosions.Clear();
             return result;
         }
@@ -170,7 +182,7 @@ namespace SlopArena.Shared
                 // Ground contact: queue explosion at ground level, deactivate
                 var exp = hb.Explosion.Value;
                 _pendingExplosions.Add((hb.X, groundY, hb.Z, exp, hb.OwnerId, hb.AttackSlot,
-                    hb.ActivationId, hb.ActivationAirborne));
+                    hb.ActivationId, hb.ActivationAirborne, hb.AttackSequence));
                 OnHitboxRemoved?.Invoke(hb, hb.X, groundY, hb.Z);
                 _hitboxes.RemoveAt(i);
             }
@@ -330,6 +342,7 @@ namespace SlopArena.Shared
                                 ActivationId = hb.ActivationId,
                                 Airborne = hb.ActivationAirborne,
                                 Damage = hb.Damage,
+                                AttackSequence = hb.AttackSequence,
                                 DirX = dirXNorm,
                                 KnockbackAngle = launchAngle,
                                 KnockbackDirection = hb.KnockbackDirection,
@@ -363,7 +376,7 @@ namespace SlopArena.Shared
                 {
                     if (hb.Explosion.HasValue)
                         _pendingExplosions.Add((prevX, prevY, prevZ, hb.Explosion.Value, hb.OwnerId, hb.AttackSlot,
-                            hb.ActivationId, hb.ActivationAirborne));
+                            hb.ActivationId, hb.ActivationAirborne, hb.AttackSequence));
                     OnHitboxRemoved?.Invoke(hb, prevX, prevY, prevZ);
                     _hitboxes.RemoveAt(i);
                 }

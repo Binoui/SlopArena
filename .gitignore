@@ -160,6 +160,12 @@ client/Unity/Assets/ThirdParty.meta
 client/Unity/Assets/Cartoon*/
 client/Unity/Assets/Cartoon*.meta
 
+# Locally installed animation and shader packs (non-redistributable)
+client/Unity/Assets/Martial Art Animations/
+client/Unity/Assets/Martial Art Animations.meta
+client/Unity/Assets/Shield Shader FREE/
+client/Unity/Assets/Shield Shader FREE.meta
+
 # Locally generated Cartoon FX variants (Asset Store source dependency)
 client/Unity/Assets/Resources/VFX/SlopArena/
 client/Unity/Assets/Resources/VFX/SlopArena.meta

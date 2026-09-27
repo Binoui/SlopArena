@@ -60,6 +60,8 @@ namespace SlopArena.Shared.Rollback
                 // edge. The packet itself remains untouched for exact-tick consumers.
                 var frontierInput = packet.HasInput ? packet.Input : default;
                 frontierInput.DownPressed = false;
+                frontierInput.ShieldPressed = false;
+                frontierInput.GrabPressed = false;
                 _lastKnownInput[packet.EntityId] = frontierInput;
                 if (packet.Tick > maxConfirmedTick) maxConfirmedTick = packet.Tick;
             }

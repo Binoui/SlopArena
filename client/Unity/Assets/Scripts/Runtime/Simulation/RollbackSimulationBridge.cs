@@ -50,16 +50,7 @@ namespace SlopArena.Client.Simulation
             foreach (var result in _client.ReceiveMatchResults())
                 LatestMatchResult = result;
 
-            var opponentBatch = new List<ServerEntityPacket>(packets.Count);
-            foreach (var packet in packets)
-            {
-                if (packet.EntityId == _selfId)
-                    _core.ReconcileSelf(packet);
-                else
-                    opponentBatch.Add(packet);
-            }
-            if (opponentBatch.Count > 0)
-                _core.IngestOpponentBatch(opponentBatch);
+            _core.IngestAuthoritativeBatch(packets);
             _core.IngestPresentationEvents(_client.ReceivePresentationEvents());
             _lastTickPresentationEvents.Clear();
             _lastTickPresentationEvents.AddRange(_core.DrainPresentationEvents());

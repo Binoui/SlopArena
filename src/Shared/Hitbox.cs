@@ -55,6 +55,8 @@ namespace SlopArena.Shared
         public ulong ActivationId;
         /// <summary>Ground/air identity of the activation, independent of bone pose sampling.</summary>
         public bool ActivationAirborne;
+        /// <summary>Stable per-owner attack sequence captured at activation for feedback identity.</summary>
+        public byte AttackSequence;
 
         /// <summary>Originating attack slot for presentation routing (0 = unspecified).</summary>
         public byte AttackSlot;

@@ -19,6 +19,11 @@ namespace SlopArena.Shared.Rollback
         private uint _localTick;
         private readonly List<TimelinePresentationEvent> _acceptedPresentationEvents = new();
         private readonly HashSet<PresentationEventKey> _seenPresentationEvents = new();
+        private readonly Dictionary<ulong, uint> _latestPacketTick = new();
+        private readonly Dictionary<ulong, uint> _terminalTick = new();
+        private readonly Dictionary<ulong, ulong> _terminalIdentity = new();
+        private readonly Dictionary<ulong, ServerEntityPacket> _pendingCompanions = new();
+        private const uint CompanionWindow = 30;
 
         public RollbackSimulator(ArenaDefinition arena, ulong selfEntityId, IMatchRule? rule = null)
         {
@@ -58,21 +63,91 @@ namespace SlopArena.Shared.Rollback
         /// <summary>Feed one network drain's worth of opponent packets. Predictable low
         /// states go to PredictedTrack; Complex or hitstop states stay on RawTrack.</summary>
         public void IngestOpponentBatch(IReadOnlyList<ServerEntityPacket> packets)
+            => IngestAuthoritativeBatch(packets);
+
+        /// <summary>Ingest the entire network drain together. Paired snapshots never
+        /// enter independent opponent replay; a missing companion may arrive in a
+        /// later drain, while terminal snapshots stand on their own.</summary>
+        public void IngestAuthoritativeBatch(IReadOnlyList<ServerEntityPacket> packets)
         {
             var predictable = new List<ServerEntityPacket>();
             foreach (var packet in packets)
             {
                 var state = packet.State.ToState();
-                if (ActionStateClassifier.IsPredictable(state) && _defs.ContainsKey(packet.EntityId))
+                if (_latestPacketTick.TryGetValue(packet.EntityId, out uint last) &&
+                    packet.Tick <= last) continue;
+                if (state.InteractionId != 0 &&
+                    _terminalTick.TryGetValue(packet.EntityId, out uint ended) &&
+                    packet.Tick <= ended &&
+                    _terminalIdentity[packet.EntityId] == state.InteractionId)
+                    continue;
+                // An opponent's capture can arrive before the self packet. Do not
+                // present a one-sided pair; keep only the newest bounded snapshot.
+                if (packet.EntityId != _selfId && state.InteractionId != 0 &&
+                    state.InteractionPartnerId == _selfId &&
+                    (state.State == ActionState.Grabbed || state.State == ActionState.Throwing))
+                {
+                    var self = _local.GetState();
+                    if (self.InteractionId != state.InteractionId ||
+                        self.InteractionTick != state.InteractionTick)
+                    {
+                        _pendingCompanions[packet.EntityId] = packet;
+                        continue;
+                    }
+                }
+
+                _latestPacketTick[packet.EntityId] = packet.Tick;
+                if (state.LastTerminalInteractionId != 0 &&
+                    state.InteractionTerminalTick != 0 &&
+                    (!_terminalTick.TryGetValue(packet.EntityId, out uint previous) ||
+                     state.InteractionTerminalTick > previous))
+                {
+                    _terminalTick[packet.EntityId] = state.InteractionTerminalTick;
+                    _terminalIdentity[packet.EntityId] = state.LastTerminalInteractionId;
+                    _pendingCompanions.Remove(packet.EntityId);
+                    if (packet.EntityId == _selfId)
+                    {
+                        var stale = new List<ulong>();
+                        foreach (var pending in _pendingCompanions)
+                            if (pending.Value.State.InteractionId == state.LastTerminalInteractionId)
+                                stale.Add(pending.Key);
+                        foreach (var id in stale) _pendingCompanions.Remove(id);
+                    }
+                }
+
+                if (packet.EntityId == _selfId)
+                {
+                    _local.ReconcileWithServer(packet);
+                    if (state.InteractionId != 0 &&
+                        _pendingCompanions.TryGetValue(state.InteractionPartnerId, out var companion))
+                    {
+                        var companionState = companion.State.ToState();
+                        if (companionState.InteractionId == state.InteractionId &&
+                            companionState.InteractionTick == state.InteractionTick &&
+                            companionState.InteractionPartnerId == _selfId &&
+                            (!_latestPacketTick.TryGetValue(companion.EntityId, out uint newest) ||
+                             newest <= companion.Tick) &&
+                            (!_terminalTick.TryGetValue(companion.EntityId, out uint endedAt) ||
+                             endedAt < companionState.InteractionTick))
+                        {
+                            _pendingCompanions.Remove(state.InteractionPartnerId);
+                            _predicted.StopTracking(companion.EntityId);
+                            companionState.EntityId = companion.EntityId;
+                            _rawTrackLatest[companion.EntityId] = companionState;
+                            _latestPacketTick[companion.EntityId] = companion.Tick;
+                        }
+                    }
+                    continue;
+                }
+                if (ActionStateClassifier.IsPredictable(state) &&
+                    state.InteractionTerminalTick != packet.Tick &&
+                    _defs.ContainsKey(packet.EntityId))
                 {
                     predictable.Add(packet);
                     _rawTrackLatest.Remove(packet.EntityId);
                 }
                 else
                 {
-                    // Unknown def, hitstop, or any Complex state: RawTrack —
-                    // render as received, never reconstruct missing live ability/
-                    // queued-launch state from the wire snapshot.
                     _predicted.StopTracking(packet.EntityId);
                     state.EntityId = packet.EntityId;
                     _rawTrackLatest[packet.EntityId] = state;
@@ -83,11 +158,16 @@ namespace SlopArena.Shared.Rollback
                 _predicted.ApplyBatch(predictable, _localTick, _defs, _baked);
                 Publish(_predicted.DrainPresentationEvents());
             }
-
+            var expired = new List<ulong>();
+            foreach (var pending in _pendingCompanions)
+                if (_localTick > pending.Value.Tick + CompanionWindow)
+                    expired.Add(pending.Key);
+            foreach (var id in expired) _pendingCompanions.Remove(id);
         }
 
-        /// <summary>Feed the self entity's own received packet (LocalTrack correction, D4).</summary>
-        public void ReconcileSelf(ServerEntityPacket packet) => _local.ReconcileWithServer(packet);
+        /// <summary>Legacy one-packet entry point; the bridge uses the batched path.</summary>
+        public void ReconcileSelf(ServerEntityPacket packet)
+            => IngestAuthoritativeBatch(new[] { packet });
 
         public CharacterState GetState(ulong id)
         {

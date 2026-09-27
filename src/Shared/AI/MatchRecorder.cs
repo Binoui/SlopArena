@@ -156,6 +156,7 @@ public sealed class MatchRecorder
         
         foreach (var hit in sim.LastTickHits)
         {
+            if (hit.Blocked) continue;
             _openComboPairs.Clear();
             foreach (var pair in _openCombos.Keys)
                 _openComboPairs.Add(pair);

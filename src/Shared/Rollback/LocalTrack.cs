@@ -23,6 +23,8 @@ namespace SlopArena.Shared.Rollback
         private readonly HashSet<ulong> _mirrored = new();
         private const int WindowCap = 30;
         private uint _localTick;
+        private uint _lastAuthoritativeTick;
+        private bool _coupledBarrier;
 
         public int CorrectionCount { get; private set; }
 
@@ -30,6 +32,7 @@ namespace SlopArena.Shared.Rollback
         {
             _sim = new ServerSimulation(arena, rule);
             _entityId = entityId;
+            _sim.PredictCoupledInteractions = false;
         }
 
         public void RegisterEntity(CharacterDefinition def, CharacterState initialState, BakedAnimationData? baked = null)
@@ -37,6 +40,8 @@ namespace SlopArena.Shared.Rollback
             _sim.RegisterEntity(_entityId, def, initialState, baked);
             _history.Clear();
             _localTick = 0;
+            _lastAuthoritativeTick = 0;
+            _coupledBarrier = false;
             _history.Add((0, _sim.GetState(_entityId), default));
         }
 
@@ -52,7 +57,8 @@ namespace SlopArena.Shared.Rollback
 
         public CharacterState Tick(InputState input)
         {
-            _sim.Tick(new Dictionary<ulong, InputState> { { _entityId, input } });
+            if (!_coupledBarrier)
+                _sim.Tick(new Dictionary<ulong, InputState> { { _entityId, input } });
             var state = _sim.GetState(_entityId);
             _localTick++;
             _history.Add((_localTick, state, input));
@@ -60,12 +66,31 @@ namespace SlopArena.Shared.Rollback
             return state;
         }
 
-        /// <summary>Apply a received packet for the self entity (D4). Only actually replays
-        /// when every ticked state from the packet's tick to "now" was Predictable — a Complex
-        /// tick anywhere in that suffix means the live sim (with its real, never-rebuilt
-        /// ability instance) is trusted as-is instead.</summary>
+        /// <summary>Correct safe history normally. Block contact and coupled outcomes
+        /// establish a barrier even when the local history contains an active ability.</summary>
         public void ReconcileWithServer(ServerEntityPacket packet)
         {
+            if (packet.Tick < _lastAuthoritativeTick) return;
+            var authoritative = packet.State.ToState();
+            authoritative.EntityId = _entityId;
+            bool coupled = authoritative.InteractionId != 0 &&
+                (authoritative.State == ActionState.Grabbed ||
+                 authoritative.State == ActionState.Throwing);
+            bool terminal = authoritative.LastTerminalInteractionId != 0 &&
+                authoritative.InteractionTerminalTick == packet.Tick;
+            bool contact = authoritative.BlockStunTicks != 0 ||
+                authoritative.BlockHitstopKind != 0;
+            if (coupled || terminal || contact || _coupledBarrier)
+            {
+                _lastAuthoritativeTick = packet.Tick;
+                _sim.ApplyAuthoritativeState(_entityId, authoritative);
+                _coupledBarrier = coupled;
+                _history.Clear();
+                _history.Add((_localTick, authoritative, default));
+                CorrectionCount++;
+                return;
+            }
+
             // Hitstop carries live ability/queued-launch state not represented in the
             // packet. Never reconstruct from an authoritative frozen snapshot.
             if (packet.State.HitstopTicks > 0) return;
@@ -76,6 +101,7 @@ namespace SlopArena.Shared.Rollback
             for (int i = idx; i < _history.Count; i++)
                 if (!ActionStateClassifier.IsSnapSafe(_history[i].State))
                     return;
+            _lastAuthoritativeTick = packet.Tick;
             CorrectionCount++;
 
             var corrected = _history[idx].State;

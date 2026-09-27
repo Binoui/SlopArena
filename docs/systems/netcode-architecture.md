@@ -170,8 +170,13 @@ Send packet: entityId(8) + tick(4) + InputState(21) = 33 bytes
 | 14-15  | short   | AimPitch        | Degrees × 100 (camera vertical aim) |
 | 16-17  | ushort  | AimDistance     | cm (0-6500 = 0-65m)                |
 | 18     | byte    | TargetEntityId  | Client-selected target (0 = none)  |
-| 19     | byte    | flags2          | bit0: JumpHeld, bit1: FaceToCamera, bit2: ToggleLock, bit3: DownPressed |
-| 20     | byte    | protocolVersion | `SimulationProtocol.Version = 1` |
+| 19     | byte    | flags2          | bit0: JumpHeld, bit1: FaceToCamera, bit2: ToggleLock, bit3: DownPressed, bit4: ShieldHeld, bit5: ShieldPressed, bit6: GrabPressed |
+| 20     | byte    | protocolVersion | `SimulationProtocol.Version = 2` |
+
+`ShieldHeld` is a per-tick physical hold. `ShieldPressed` and `GrabPressed` are logical
+one-tick edges; the shared simulation selects shield versus air dodge using authoritative
+grounded state. A completed controller grab chord consumes the competing defense edge,
+not the held flag.
 
 Total: 33 bytes (8 + 4 + 21). Validate the exact envelope and supported version before
 endpoint registration or reconnect/countdown side effects. This is a coordinated cutover,
@@ -180,23 +185,30 @@ not backward-compatible partial decoding.
 ### 4b. Server → Client (per entity)
 
 ```
-Receive packet per entity: entityId(8) + tick(4) + CharacterStatePacket(114) + hasInput(1) + InputState(21) = up to 148 bytes
+Receive packet per entity: entityId(8) + tick(4) + CharacterStatePacket(156) + hasInput(1) + InputState(21) = up to 190 bytes
 
-[0..7]    entityId          (ulong)
-[8..11]   tick              (uint)       ← echoes client's tick number
-[12..125] CharacterStatePacket (114 bytes) — fixed state payload; see §4b table below
-[126]     hasInput          (byte)       ← exactly 0 or 1
-[127..147] InputState       (21 bytes)   ← present iff hasInput == 1
-```
+[0..7]      entityId          (ulong)
+[8..11]     tick              (uint)       ← echoes client's tick number
+[12..167]   CharacterStatePacket (156 bytes) — fixed state payload; see §4b table below
+[168]       hasInput          (byte)       ← exactly 0 or 1
+[169..189]  InputState       (21 bytes)   ← present iff hasInput == 1
+
 
 **The relay section** carries the exact input consumed for that entity/tick. A missing
-exact server input may extend its prior held input, but clears only `DownPressed`.
-`hasInput = 0` denotes no consumed input and is not a truncated relay. The envelope must
-be exactly 127 bytes for marker 0 or 148 bytes for marker 1; mismatches are rejected.
-The client discards malformed/incompatible state datagrams without ending its receive
-loop. Codec owner: `src/Shared/ServerEntityPacket.cs`.
+exact server input may extend prior held input but clears one-shot `DownPressed`,
+`ShieldPressed`, and `GrabPressed`; `ShieldHeld` remains latched. `hasInput = 0` denotes
+no consumed input and is not a truncated relay. The envelope must be exactly 169 bytes
+for marker 0 or 190 bytes for marker 1; mismatches are rejected. The client discards
+malformed/incompatible state datagrams without ending its receive loop. Codec owner:
+`src/Shared/ServerEntityPacket.cs`.
 
-**CharacterStatePacket layout (114 bytes):**
+InputState remains 21 bytes. `Flags2` (byte 19) assigns bits `0x10=ShieldHeld`,
+`0x20=ShieldPressed`, and `0x40=GrabPressed`; `Flags2` bit `0x80` remains reserved.
+`ShieldPressed` and `GrabPressed` are one-tick edges. The sim chooses grounded shield
+versus airborne dodge from authoritative state; client-side chord binding emits
+`GrabPressed` and removes a competing defense edge without clearing the physical hold.
+
+**CharacterStatePacket layout (156 bytes):**
 | Offset | Type    | Field                       | Notes                              |
 |--------|---------|-----------------------------|------------------------------------|
 | 0-3    | uint    | TickNumber                  | Echoed client tick (for matching)  |
@@ -206,7 +218,7 @@ loop. Codec owner: `src/Shared/ServerEntityPacket.cs`.
 | 16-19  | float   | VelocityX                   | World velocity X                   |
 | 20-23  | float   | VelocityY                   | World velocity Y                   |
 | 24-27  | float   | VelocityZ                   | World velocity Z                   |
-| 28     | byte    | CurrentActionState          | Idle/Dashing/Attacking/Hitstun     |
+| 28     | byte    | CurrentActionState          | 0-11 remain stable; 12 Shielding, 13 ShieldDrop, 14 GrabAttempt, 15 Grabbed, 16 Throwing, 17 AirDodgeStartup, 18 AirDodgeMovement, 19 AirDodgeRecovery |
 | 29     | byte    | IsGrounded                  | 0 or 1                             |
 | 30-31  | ushort  | StateDurationFrames         | Remaining ticks in current state   |
 | 32     | byte    | AttackSlot                  | 0=none, 1-11 (ADR-0016 slot layout)|
@@ -240,11 +252,23 @@ loop. Codec owner: `src/Shared/ServerEntityPacket.cs`.
 | 109    | byte    | AttackSequence              | Changes for each ability activation |
 | 110-111| ushort  | LandingLagTicks             | Authoritative landing lock for reconciliation and presentation |
 | 112    | byte    | MovementFlags                | bit0: IsFastFalling; bit1: JumpFromSlide; bit2: SlideAttackCarryActive; bit3: CrouchSettled; bit4: QueuedCrouchBrace; bit5: InPostHitstunFlight |
-| 113    | byte    | ProtocolVersion              | `SimulationProtocol.Version = 1` |
+| 113-114| ushort  | ShieldDropTicks              | Remaining vulnerable shield-drop recovery |
+| 115-116| ushort  | BlockStunTicks               | Remaining block stun |
+| 117    | byte    | BlockHitstopKind             | `0=none`, `1=shield contact` |
+| 118    | byte    | InteractionPhase             | `0=none`, `1=attempt`, `2=captured`, `3=throwing`, `4=terminal` |
+| 119-126| ulong   | InteractionId                | Stable active interaction identity; zero means no active interaction |
+| 127-134| ulong   | InteractionPartnerId         | Paired fighter entity ID; zero means no partner |
+| 135-142| ulong   | LastTerminalInteractionId    | Last completed/interrupted interaction; zero means none recorded |
+| 143-146| uint    | InteractionTick              | Authoritative capture tick |
+| 147-150| uint    | InteractionTerminalTick      | Authoritative terminal outcome tick |
+| 151-152| short   | CapturedYaw                  | Grab facing snapshot, signed degrees × 100 |
+| 153-154| ushort  | AirDodgeRecoveryTicks         | Grounded commitment left after an air-dodge landing |
+| 155    | byte    | ProtocolVersion              | `SimulationProtocol.Version = 2` |
 
-**Packet sizes:** `CharacterStatePacket` is 114 bytes. `ServerEntityPacket` is 126 bytes
-before its mandatory relay marker, 127 bytes without input and 148 bytes with input.
-Legacy/unversioned peers are rejected; deploy client and server together.
+**Packet sizes:** `CharacterStatePacket` is 156 bytes. `ServerEntityPacket` is 168 bytes
+before its mandatory relay marker, 169 bytes without input and 190 bytes with input.
+Input remains 21 bytes. Protocol-v1 state/input payloads are rejected; deploy client and
+server together.
 
 **The server sends ALL states to every client.** Clients ignore the ones that don't concern them. No routing overhead.
 
@@ -289,6 +313,21 @@ The client uses the three-track model implemented in
 
 This is narrower than predicting every remote ability: predictable opponents can be
 replayed, while complex or unknown opponents use received state.
+
+Defense interactions use a targeted authoritative barrier. The client predicts shield,
+grab attempt/whiff, and airborne dodge but sets
+`ServerSimulation.PredictCoupledInteractions = false` for the self track. A server capture
+or block contact replaces self state even across locally complex attack history;
+`ApplyAuthoritativeState` cancels the old live ability and owned hitboxes first.
+During capture the self track holds the newest authoritative snapshot rather than
+replaying itself through a two-fighter interval. The bridge ingests a full packet drain
+together. Captured opponents stay raw; matching interaction ID, partner IDs and capture
+tick pair companion snapshots when they arrive. Missing companions are bounded to a
+30-tick pending window. A terminal outcome is sufficient without a prior capture and
+allows ordinary prediction on later snapshots; per-entity packet ticks and terminal identity/tick reject
+duplicate or older capture packets. Presentation events retain their stable event-key
+deduplication across rollback. This barrier does not make arbitrary ability snapshots
+reconstructible.
 
 Sliding and Crouching are predictable locomotion states. Exact history replay preserves
 DownPressed; every speculative opponent frontier tick clears it, including the first

@@ -7,6 +7,7 @@ using UnityEngine;
 using UnityEngine.UIElements;
 using SlopArena.Shared;
 using SlopArena.Client.Network;
+using SlopArena.Client.Input;
 using SlopArena.Client;
 
 namespace SlopArena.Client.UI
@@ -39,10 +40,12 @@ namespace SlopArena.Client.UI
         private VisualElement? _playerList;
         private Button? _btnStart;
         private Button? _btnLeave;
+        private Button? _btnInvite;
         private Button? _btnRetry;
         private Button? _backButton;
         private Label? _lblStatus;
         private Label? _lblServer;
+        private Label? _lblInviteHint;
         private LobbySnapshot? _snapshot;
         private CancellationTokenSource? _lifecycleCts;
         private RoomSnapshot? _roomSnapshot;
@@ -55,11 +58,17 @@ namespace SlopArena.Client.UI
         private bool _startPending;
         private bool _leaving;
         private int _attempt;
+        private float _nextInviteRefreshAt;
+        private bool _overlayBlocked;
+        private VisualElement? _focusBeforeOverlay;
 
         private void OnEnable()
         {
             _alive = true;
             _leaving = false;
+            _overlayBlocked = false;
+            _focusBeforeOverlay = null;
+            _nextInviteRefreshAt = 0;
             // Page re-entry is a fresh room (ADR-0032): a roster or start
             // attempt left by a previous visit must not outlive its page.
             _snapshot = null;
@@ -71,11 +80,14 @@ namespace SlopArena.Client.UI
             _playerList = _context.Q<VisualElement>("player-list");
             _btnStart = _context.Q<Button>("btn-start");
             _btnLeave = _context.Q<Button>("btn-leave");
+            _btnInvite = _context.Q<Button>("btn-invite");
             _btnRetry = _context.Q<Button>("btn-retry");
             _backButton = _context.Q<Button>("btn-back");
             _lblStatus = _context.Q<Label>("lbl-status");
+            _lblInviteHint = _context.Q<Label>("lbl-invite-hint");
             _lblServer = _context.Q<Label>("lbl-server");
             if (_lblServer != null) _lblServer.enableRichText = false;
+            if (_lblInviteHint != null) _lblInviteHint.enableRichText = false;
 
             if (_lblServer != null)
                 _lblServer.text = string.IsNullOrEmpty(ClientSession.SelectedServerName)
@@ -83,6 +95,12 @@ namespace SlopArena.Client.UI
                     : ClientSession.SelectedServerName;
             if (_backButton != null) _backButton.clicked += Leave;
             if (_btnLeave != null) _btnLeave.clicked += Leave;
+            if (_btnInvite != null)
+            {
+                _btnInvite.style.display = _roomMode ? DisplayStyle.Flex : DisplayStyle.None;
+                _btnInvite.SetEnabled(false);
+                _btnInvite.clicked += InviteFriend;
+            }
             if (_btnRetry != null)
             {
                 _btnRetry.clicked += RetryConnection;
@@ -103,6 +121,8 @@ namespace SlopArena.Client.UI
             {
                 chat.AccountChanged += OnAccountChanged;
                 chat.ActiveLobbyChanged += OnActiveLobbyChanged;
+                chat.RoomInviteStateChanged += OnInviteStateChanged;
+                chat.RoomInviteFeedback += OnInviteFeedback;
             }
             if (chat == null)
             {
@@ -114,6 +134,7 @@ namespace SlopArena.Client.UI
             _lobby = chat.ActiveLobby;
             if (_lobby != null)
                 SubscribeLobby(_lobby);
+            OnInviteStateChanged();
             _awaitingLobby = true;
             SetStatus(chat.NeedsDisplayName
                 ? "Choose a display name before joining a room."
@@ -121,6 +142,13 @@ namespace SlopArena.Client.UI
             SetRetryVisible(false);
             StartLobbyWatchdog(generation);
             ConnectAndJoin(generation, _lifecycleCts.Token);
+        }
+
+        private void Update()
+        {
+            if (!_alive || !_roomMode || Time.unscaledTime < _nextInviteRefreshAt) return;
+            _nextInviteRefreshAt = Time.unscaledTime + 0.5f;
+            OnInviteStateChanged();
         }
 
         private void SubscribeLobby(LobbyClient lobby)
@@ -433,11 +461,87 @@ namespace SlopArena.Client.UI
                 if (_startWatchdog != null) StopCoroutine(_startWatchdog);
                 RenderPlayers();
             }
+            if (_roomMode)
+            {
+                _roomSnapshot = null;
+                RenderPlayers();
+            }
             _awaitingLobby = true;
             SetRetryVisible(true);
             SetStatus(ex == null
                 ? "The room connection closed. Retry, or return to the browser."
                 : "The room connection dropped. Retry, or return to the browser.", true);
+        }
+
+        private void InviteFriend()
+        {
+            if (!_alive || !_roomMode || _leaving || !_context.Valid) return;
+            if (_chatSession == null)
+            {
+                SetStatus("Steam session unavailable. Reconnect to invite.", true);
+                return;
+            }
+            bool opened = _chatSession.TryInviteRoom(_roomSnapshot, out var feedback);
+            SetStatus(feedback, !opened);
+            OnInviteStateChanged();
+        }
+
+        private void OnInviteFeedback(string message)
+        {
+            if (_alive && _roomMode)
+                SetStatus(message, true);
+            OnInviteStateChanged();
+        }
+
+        private void OnInviteStateChanged()
+        {
+            if (!_alive || !_roomMode) return;
+            bool blocked = ChatInputGate.ExternalOverlaySuppressed;
+            VisualElement? restore = null;
+            if (_overlayBlocked != blocked)
+            {
+                if (blocked)
+                {
+                    var focused = _context.Shell?.Root?.panel?.focusController?.focusedElement as VisualElement;
+                    _focusBeforeOverlay = null;
+                    foreach (var root in _context.OwnedRoots)
+                        if (focused != null && root.Contains(focused))
+                            _focusBeforeOverlay = focused;
+                }
+                foreach (var root in _context.OwnedRoots)
+                    root.SetEnabled(!blocked);
+                _overlayBlocked = blocked;
+                if (!blocked)
+                {
+                    restore = _focusBeforeOverlay;
+                    _focusBeforeOverlay = null;
+                }
+            }
+            RenderInviteState();
+            if (restore != null)
+            {
+                if (restore.panel != null && restore.enabledInHierarchy)
+                    restore.Focus();
+                else if (_btnLeave?.enabledInHierarchy == true)
+                    _btnLeave.Focus();
+            }
+
+        }
+
+        private void RenderInviteState()
+        {
+            if (_btnInvite == null || !_roomMode) return;
+            string? reason = _leaving
+                ? "Leaving this Room. Wait before inviting."
+                : _chatSession?.GetRoomInviteUnavailableReason(_roomSnapshot) ??
+                    "Steam session is unavailable. Reconnect to invite.";
+            _btnInvite.SetEnabled(reason == null && !_overlayBlocked);
+            _btnInvite.tooltip = reason ?? "Open Steam's friend invitation dialog for this Room.";
+            if (_lblInviteHint != null)
+            {
+                _lblInviteHint.text = reason ?? string.Empty;
+                _lblInviteHint.style.display = reason == null ? DisplayStyle.None : DisplayStyle.Flex;
+            }
         }
 
         private void OnStartClicked()
@@ -529,6 +633,7 @@ namespace SlopArena.Client.UI
                 }
                 if (_roomSnapshot != null)
                     SetStatus($"{_roomSnapshot.Phase} — {_roomSnapshot.MemberCount}/{_roomSnapshot.Capacity} members.", false);
+                RenderInviteState();
                 return;
             }
             var players = _snapshot?.Players ?? Array.Empty<LobbyPlayerInfo>();
@@ -630,6 +735,7 @@ namespace SlopArena.Client.UI
         {
             if (!_alive || _leaving) return;
             _leaving = true;
+            RenderInviteState();
             _attempt++;
             if (!_roomMode) _lifecycleCts?.Cancel();
             if (_roomMode)
@@ -679,14 +785,19 @@ namespace SlopArena.Client.UI
             if (_startWatchdog != null) StopCoroutine(_startWatchdog);
             if (_backButton != null) _backButton.clicked -= Leave;
             if (_btnLeave != null) _btnLeave.clicked -= Leave;
+            if (_btnInvite != null) _btnInvite.clicked -= InviteFriend;
             if (_btnRetry != null) _btnRetry.clicked -= RetryConnection;
             if (_btnStart != null) _btnStart.clicked -= OnStartClicked;
             if (_chatSession != null)
             {
                 _chatSession.AccountChanged -= OnAccountChanged;
                 _chatSession.ActiveLobbyChanged -= OnActiveLobbyChanged;
+                _chatSession.RoomInviteStateChanged -= OnInviteStateChanged;
+                _chatSession.RoomInviteFeedback -= OnInviteFeedback;
             }
             _chatSession = null;
+            _focusBeforeOverlay = null;
+            _overlayBlocked = false;
             if (_lobby != null) UnsubscribeLobby(_lobby);
             _lifecycleCts?.Dispose();
             _lifecycleCts = null;

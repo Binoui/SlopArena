@@ -50,6 +50,49 @@ public sealed class CharacterPackageCompilerTests
     }
 
     [Fact]
+    public void CaptureGeometryAndDefenseRoles_CookDeterministicallyIntoContent()
+    {
+        var baseline = CompileCharacter();
+        var configured = CompileCharacter(character =>
+        {
+            character["captureGeometry"]!["reach"] = 1.1f;
+            character["captureGeometry"]!["attackerAnchor"]!["z"] = 0.22f;
+            character["presentation"]!["shield"] = "anim.fightguy.shield";
+            character["presentation"]!["grab"] = "anim.fightguy.grab";
+            character["presentation"]!["grabbed"] = "anim.fightguy.grabbed";
+            character["presentation"]!["throwForward"] = "anim.fightguy.throw-forward";
+            character["presentation"]!["airDodge"] = "anim.fightguy.air-dodge";
+        });
+
+        Assert.NotNull(baseline.CookedPackage);
+        Assert.NotNull(configured.CookedPackage);
+        var definition = configured.CookedPackage!.Definition;
+        Assert.Equal(1.1f, definition.CaptureGeometry.Reach);
+        Assert.Equal(0.22f, definition.CaptureGeometry.AttackerAnchor.Z);
+        Assert.Equal("anim.fightguy.shield", definition.Presentation.Shield);
+        Assert.Equal("anim.fightguy.grab", definition.Presentation.Grab);
+        Assert.Equal("anim.fightguy.grabbed", definition.Presentation.Grabbed);
+        Assert.Equal("anim.fightguy.throw-forward", definition.Presentation.ThrowForward);
+        Assert.Equal("anim.fightguy.air-dodge", definition.Presentation.AirDodge);
+        Assert.False(baseline.CookedPackage!.CanonicalBytes.SequenceEqual(configured.CookedPackage.CanonicalBytes));
+
+        var repeated = CompileCharacter(character =>
+        {
+            character["captureGeometry"]!["reach"] = 1.1f;
+            character["captureGeometry"]!["attackerAnchor"]!["z"] = 0.22f;
+            character["presentation"]!["shield"] = "anim.fightguy.shield";
+            character["presentation"]!["grab"] = "anim.fightguy.grab";
+            character["presentation"]!["grabbed"] = "anim.fightguy.grabbed";
+            character["presentation"]!["throwForward"] = "anim.fightguy.throw-forward";
+            character["presentation"]!["airDodge"] = "anim.fightguy.air-dodge";
+        });
+        Assert.Equal(configured.CookedPackage.CanonicalBytes, repeated.CookedPackage!.CanonicalBytes);
+
+        AssertError(CompileCharacter(character => character["captureGeometry"]!["reach"] = 0), "value.out-of-range");
+        AssertError(CompileCharacter(character => character["presentation"]!["shield"] = "anim.idle"), "id.duplicate");
+    }
+
+    [Fact]
     public void SlideCarry_CompilesGroundNormalsAndDefaultsFalseElsewhere()
     {
         var result = CompileCharacter();

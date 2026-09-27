@@ -14,13 +14,16 @@ namespace SlopArena.Shared.Rollback
         public static bool IsPredictable(ActionState state) => state is
             ActionState.Idle or ActionState.Dashing or ActionState.JumpSquat or
             ActionState.AirDodging or ActionState.Run or ActionState.Sliding or
-            ActionState.Crouching;
+            ActionState.Crouching or ActionState.Shielding or ActionState.ShieldDrop or
+            ActionState.GrabAttempt or ActionState.AirDodgeStartup or
+            ActionState.AirDodgeMovement or ActionState.AirDodgeRecovery;
 
         /// <summary>State-aware opponent classification. Hitstop is excluded because
         /// the snapshot omits the live ability and queued-launch payloads that must
         /// remain frozen in the authoritative simulation.</summary>
         public static bool IsPredictable(CharacterState state)
-            => state.HitstopTicks == 0 && IsPredictable(state.State);
+            => state.HitstopTicks == 0 && state.BlockHitstopKind == 0 &&
+               state.InteractionId == 0 && IsPredictable(state.State);
 
         /// <summary>True when the self entity's continuous sim may snap wire fields and replay
         /// through this state (LocalTrack correction). LedgeHang has no ServerAbility instance and
@@ -32,6 +35,7 @@ namespace SlopArena.Shared.Rollback
         /// <summary>State-aware local correction classification. Hitstop suffixes are
         /// never rebuilt from an incomplete packet.</summary>
         public static bool IsSnapSafe(CharacterState state)
-            => state.HitstopTicks == 0 && IsSnapSafe(state.State);
+            => state.HitstopTicks == 0 && state.BlockHitstopKind == 0 &&
+               state.InteractionId == 0 && IsSnapSafe(state.State);
     }
 }

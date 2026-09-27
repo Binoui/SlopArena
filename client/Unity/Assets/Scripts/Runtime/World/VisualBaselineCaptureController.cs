@@ -94,8 +94,9 @@ namespace SlopArena.Client.World
                 _match.SetCaptureInput(default);
                 for (int tick = 0; tick < 90; tick++)
                 {
-                    if (_match.CaptureLastTickHits.Count > 0)
+                    foreach (var hit in _match.CaptureLastTickHits)
                     {
+                        if (hit.Blocked) continue;
                         connectedAt(distance);
                         Capture(file);
                         yield return null;

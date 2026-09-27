@@ -51,6 +51,14 @@
   "capsuleHeight": 1.7,
   "hipHeight": 0.82,
   "hurtboxRadius": 1,
+  "captureGeometry": {
+    "reach": 0.9,
+    "width": 0.7,
+    "height": 1.2,
+    "offsetY": 0.6,
+    "attackerAnchor": { "x": 0, "y": 0.6, "z": 0.3 },
+    "victimAnchor": { "x": 0, "y": 0.6, "z": 0.45 }
+  },
   "hurtboxCapsules": [
     {
       "startX": 0,

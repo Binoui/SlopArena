@@ -5,10 +5,9 @@ namespace SlopArena.Shared.Tests;
 
 /// <summary>
 /// Movement data sheet probe (issue #150) — external-behavior assertions on the real sim:
-/// run reaches authored RunSpeed, dash distance tracks DashSpeed × duration, jump apex
-/// respects Gravity + float window, fast fall reaches FastFallSpeed, drift caps at
-/// AirSpeedMax, release stops. Tolerances absorb tick quantization — the values come from
-/// the same probe the report renders, so a failure means the sim's movement changed.
+/// run reaches authored RunSpeed, shield stops and holds from cruise, jump apex
+/// respects Gravity + float window, fast fall reaches FastFallSpeed, and drift caps at
+/// AirSpeedMax. The report uses the same probe, so failures expose simulation changes.
 /// </summary>
 public class MovementProbeTests
 {
@@ -29,19 +28,15 @@ public class MovementProbeTests
     }
 
     [Fact]
-    public void Dash_Distance_TracksAuthoredSpeedAndDuration()
+    public void Shield_FromCruiseBrakesImmediatelyAndHolds()
     {
-        var dash = Measured().Dash;
-        // Constant DashSpeed for DashDurationTicks, then hard stop.
-        Assert.InRange(dash.DurationTicks, M.DashDurationTicks - 1, M.DashDurationTicks + 1);
-        float expected = M.DashSpeed * (M.DashDurationTicks / 60f);
-        // Input lands on the next tick's movement: the sim moves 19 of 20 ticks, so the
-        // tolerance absorbs the tick-quantized duration (6.33 vs 6.67).
-        Assert.True(Math.Abs(dash.TotalDistance - expected) <= expected * 0.08f,
-            $"dash distance {dash.TotalDistance:F2} vs {expected:F2}");
-        // Hard stop: actionable right after the burst, speed zeroed.
-        Assert.True(dash.Curve[dash.ActionableTick].Speed < 0.01f, "dash coasts after expiry");
+        var shield = Measured().Shield;
+        Assert.Equal(1, shield.StopTicks);
+        Assert.InRange(shield.StopDistance, 0f, 0.001f);
+        Assert.Equal(30, shield.HoldTicks);
+        Assert.Equal(ActionState.Shielding, shield.Curve[shield.Curve.Length - 1].State);
     }
+
 
     [Fact]
     public void Jump_Apex_RespectsGravityAndFloatWindow()
@@ -124,7 +119,7 @@ public class MovementProbeTests
         var a = Measured();
         var b = Measured();
         Assert.Equal(a.Run.MaxSpeed, b.Run.MaxSpeed);
-        Assert.Equal(a.Dash.TotalDistance, b.Dash.TotalDistance);
+        Assert.Equal(a.Shield.StopDistance, b.Shield.StopDistance);
         Assert.Equal(a.Jump.ApexHeight, b.Jump.ApexHeight);
         Assert.Equal(a.Jump.AirtimeTicks, b.Jump.AirtimeTicks);
         Assert.Equal(a.Fall.MaxFallSpeed, b.Fall.MaxFallSpeed);

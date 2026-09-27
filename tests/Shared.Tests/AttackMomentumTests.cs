@@ -144,24 +144,31 @@ public class AttackMomentumTests
         Assert.False(sim.GetState(1).SlideAttackCarryActive);
     }
 
-    [Fact]
-    public void SlideCarry_DashCancellationClearsCarryWithoutResurrection()
-    {
-        var def = TestHelpers.CombatDef;
-        var state = TestHelpers.PlayerState()
-            with
-            {
-                PY = TestHelpers.GroundPY(def),
-                State = ActionState.Attacking,
-                AttackSlot = AbilitySlots.Slot1,
-                SlideAttackCarryActive = true,
-                VX = def.Movement.RunSpeed,
-            };
+[Fact]
+public void SlideCarry_ShieldAdmissionClearsCarryAndBrakes()
+{
+    var def = TestHelpers.CombatDef;
+    var sim = TestHelpers.MakeSim();
+    sim.RegisterEntity(1, def, TestHelpers.PlayerState()
+        with
+        {
+            PY = TestHelpers.GroundPY(def),
+            State = ActionState.Sliding,
+            SlideAttackCarryActive = true,
+            VX = def.Movement.RunSpeed,
+        });
 
-        Assert.True(Simulation.StartDash(ref state, def.Movement, 1f, 0f));
-        Assert.Equal(ActionState.Dashing, state.State);
-        Assert.False(state.SlideAttackCarryActive);
-    }
+    sim.Tick(new Dictionary<ulong, InputState>
+    {
+        [1] = new InputState { ShieldHeld = true, ShieldPressed = true },
+    });
+
+    var state = sim.GetState(1);
+    Assert.Equal(ActionState.Shielding, state.State);
+    Assert.False(state.SlideAttackCarryActive);
+    Assert.Equal(0f, state.VX);
+    Assert.Equal(0f, state.VZ);
+}
 
     private static CharacterDefinition WithSlideCarry(CharacterDefinition source)
     {

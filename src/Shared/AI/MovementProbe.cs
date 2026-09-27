@@ -5,7 +5,7 @@ namespace SlopArena.Shared
 {
     /// <summary>
     /// Movement data sheet probe (issue #150): drives a character through the REAL
-    /// ServerSimulation with scripted inputs (hold run, dash, full jump, double jump,
+    /// ServerSimulation with scripted inputs (hold run, shield, full jump, double jump,
     /// fast fall, drift, stop) and samples position/velocity per tick. Every metric is
     /// derived from the samples — no formulas re-derived from authored constants, so the
     /// report reflects actual server-authoritative behavior (acceleration curves, rush
@@ -24,8 +24,8 @@ namespace SlopArena.Shared
         public sealed record RunMetrics(float MaxSpeed, int TimeToMaxTicks, float DistanceToMax, string Note,
             MovementSample[] Curve);
 
-        public sealed record DashMetrics(int DurationTicks, float TotalDistance, float MaxSpeed,
-            int ActionableTick, MovementSample[] Curve);
+        public sealed record ShieldMetrics(int StopTicks, float StopDistance, int HoldTicks,
+            MovementSample[] Curve);
 
         /// <summary>Shared shape for the three jump probes: apex / airtime / horizontal distance.</summary>
         public sealed record JumpMetrics(float ApexHeight, int TimeToApexTicks, int AirtimeTicks,
@@ -40,7 +40,7 @@ namespace SlopArena.Shared
         public sealed record ReversalMetrics(int ReversalTicks, float Displacement, MovementSample[] Curve);
 
         public sealed record CharacterMovement(string Character, MovementStats Authored, RunMetrics Run,
-            DashMetrics Dash, JumpMetrics Jump, JumpMetrics RunningJump, JumpMetrics DoubleJump,
+            ShieldMetrics Shield, JumpMetrics Jump, JumpMetrics RunningJump, JumpMetrics DoubleJump,
             JumpMetrics ShortHop, FallMetrics Fall, StopMetrics Stop, ReversalMetrics Reversal);
 
         // ── Scenarios ──────────────────────────────────────────────────────────
@@ -61,13 +61,15 @@ namespace SlopArena.Shared
                 : "";
             var runMetrics = new RunMetrics(runMax, runTimeToMax, runDistToMax, runNote, run.ToArray());
 
-            // Dash: one dash press, right.
-            var dash = RunSim(def, arena, groundY,
-                t => t == 0 ? Input(dash: true, right: true) : default, 40);
-            int dashTicks = Count(dash, s => s.State == ActionState.Dashing);
-            int actionable = First(dash, s => s.State != ActionState.Dashing, 0);
-            var dashMetrics = new DashMetrics(dashTicks, dash[actionable].PosX - dash[0].PosX,
-                Max(dash, s => s.Speed), actionable, dash.ToArray());
+
+            // Shield: reach cruise, then raise shield and hold it for 30 ticks.
+            var shield = RunSim(def, arena, groundY,
+                t => t < 30 ? Input(right: true) : Input(shield: true, shieldPressed: t == 30), 60);
+            int shieldStart = First(shield, s => s.State == ActionState.Shielding, 30);
+            var shieldMetrics = new ShieldMetrics(shieldStart - 29,
+                shield[shieldStart].PosX - shield[29].PosX,
+                Count(shield, s => s.Tick >= shieldStart && s.State == ActionState.Shielding),
+                shield.ToArray());
 
             // Full jump from standstill, stick held right (drift flight) — one sim gives
             // apex/airtime/horizontal AND the air-drift speed cap. Drift is the max speed
@@ -160,20 +162,21 @@ namespace SlopArena.Shared
             var reversalMetrics = new ReversalMetrics(revDone - 30, Math.Abs(rev[revDone].PosX - rev[30].PosX),
                 rev.ToArray());
 
-            return new CharacterMovement(def.DisplayName, m, runMetrics, dashMetrics, jumpMetrics,
+            return new CharacterMovement(def.DisplayName, m, runMetrics, shieldMetrics, jumpMetrics,
                 runningJump, doubleJump, shortHopMetrics, fallMetrics, stopMetrics, reversalMetrics);
         }
 
         // ── Sim driving ────────────────────────────────────────────────────────
 
         private static InputState Input(bool right = false, bool left = false, bool jump = false,
-            bool jumpHeld = false, bool dash = false, bool down = false) => new()
+            bool jumpHeld = false, bool down = false, bool shield = false, bool shieldPressed = false) => new()
         {
             MoveX = right ? 1f : left ? -1f : 0f,
             Jump = jump,
             JumpHeld = jumpHeld,
-            Dash = dash,
             Down = down,
+            ShieldHeld = shield,
+            ShieldPressed = shieldPressed,
         };
 
         /// <summary>Full-jump input plan: jump edge + held on tick 0, held through the squat

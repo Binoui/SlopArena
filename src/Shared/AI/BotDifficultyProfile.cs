@@ -21,7 +21,7 @@ public readonly struct BotDifficultyProfile
     public readonly int ReactionDelayTicks;
     public readonly float AttackChance;
     public readonly float RetreatChance;
-    public readonly float DodgeChance;
+    public readonly float DefenseChance;
     public readonly float JumpChance;
     public readonly float RangeError;
     public readonly float PunishChance;
@@ -33,7 +33,7 @@ public readonly struct BotDifficultyProfile
         int reactionDelayTicks,
         float attackChance,
         float retreatChance,
-        float dodgeChance,
+        float defenseChance,
         float jumpChance,
         float rangeError,
         float punishChance,
@@ -44,7 +44,7 @@ public readonly struct BotDifficultyProfile
         ReactionDelayTicks = reactionDelayTicks;
         AttackChance = attackChance;
         RetreatChance = retreatChance;
-        DodgeChance = dodgeChance;
+        DefenseChance = defenseChance;
         JumpChance = jumpChance;
         RangeError = rangeError;
         PunishChance = punishChance;

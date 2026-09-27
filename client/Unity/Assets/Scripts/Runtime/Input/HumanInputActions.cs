@@ -38,8 +38,8 @@ namespace SlopArena.Client.Input
         public static InputAction Zoom => Get("Zoom");
         public static IReadOnlyList<string> RebindableActions { get; } = new[]
         {
-            "MoveUp", "MoveDown", "MoveLeft", "MoveRight", "MoveStick", "Jump", "Dash", "Burst", "Down",
-            "Slot1", "Slot2", "Slot3", "Slot4", "SlotA", "SlotE", "SlotR", "SlotF",
+            "MoveUp", "MoveDown", "MoveLeft", "MoveRight", "MoveStick", "Jump", "Down",
+            "Shield", "Grab", "Slot1", "Slot2", "Slot3", "Slot4", "SlotA", "SlotE", "SlotR", "SlotF",
             "SpecialModifier", "FaceToCamera", "ToggleLock", "Pause"
         };
 
@@ -187,8 +187,8 @@ namespace SlopArena.Client.Input
             AddButton("MoveLeft", "<Keyboard>/a");
             AddButton("MoveRight", "<Keyboard>/d");
             AddButton("Jump", "<Keyboard>/space", "<Gamepad>/rightShoulder");
-            AddButton("Dash", "<Keyboard>/leftShift", "<Gamepad>/rightTrigger");
-            AddButton("Burst", "<Keyboard>/c", "<Gamepad>/dpad/left");
+            AddButton("Shield", "<Keyboard>/leftShift", "<Gamepad>/rightTrigger");
+            AddButton("Grab", "<Keyboard>/c");
             AddButton("Down", "<Keyboard>/x", "<Gamepad>/leftTrigger");
             AddButton("Slot1", "<Keyboard>/1", "<Gamepad>/buttonSouth");
             AddButton("Slot2", "<Keyboard>/2", "<Gamepad>/buttonEast");

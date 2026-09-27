@@ -358,25 +358,18 @@ public sealed class StageCollisionTests
             2f - Def.CapsuleHeight * 0.5f + 0.03f);
     }
 
-    [Fact]
-    public void DashAndKnockback_DoNotTunnelThroughThinWall()
-    {
-        var arena = Arena(Floor(0f, -10f, 10f, -10f, 10f), WallX(2f, 0f, 4f));
-        var dash = Grounded(0f, 0f);
-        dash.State = ActionState.Dashing;
-        dash.DashDurationTicks = 1;
-        dash.VX = 240f;
-        Simulation.SimulateTick(ref dash, Def, default, arena, out _, out _, DownActionTuning.Default, false);
+[Fact]
+public void Knockback_DoesNotTunnelThroughThinWall()
+{
+    var arena = Arena(Floor(0f, -10f, 10f, -10f, 10f), WallX(2f, 0f, 4f));
+    var knockback = Grounded(0f, 0f);
+    knockback.State = ActionState.Idle;
+    knockback.IsGrounded = false;
+    knockback.KVX = 240f;
+    Simulation.SimulateTick(ref knockback, Def, default, arena, out _, out _, DownActionTuning.Default, false);
 
-        var knockback = Grounded(0f, 0f);
-        knockback.State = ActionState.Idle;
-        knockback.IsGrounded = false;
-        knockback.KVX = 240f;
-        Simulation.SimulateTick(ref knockback, Def, default, arena, out _, out _, DownActionTuning.Default, false);
-
-        Assert.True(dash.PX < 2f);
-        Assert.True(knockback.PX < 2f);
-    }
+    Assert.True(knockback.PX < 2f);
+}
 
     [Fact]
     public void WalkingOffFinitePlatform_StartsFalling()

@@ -120,6 +120,7 @@ internal static class Program
             }
             foreach (var hit in sim.LastTickHits)
             {
+                if (hit.Blocked) continue;
                 if (!respawnedA && hit.TargetEntityId == SelfPlayMatch.EntityB)
                     memA.RecordOpponentHit(hit.AttackSlot, !postB.IsGrounded, postB,
                         postB.HitstunTicks, hit.HitstopTicks);

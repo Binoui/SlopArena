@@ -36,6 +36,7 @@ namespace SlopArena.Client.UI
         private TextField? _field;
         private Button? _submit;
         private Label? _feedback;
+        private Button? _cancelRoomJoin;
         private Button? _topBarIdentity;
         private bool _bound;
         private bool _presented;
@@ -263,6 +264,14 @@ namespace SlopArena.Client.UI
 
             _feedback = new Label(string.Empty) { name = "shell-identity-feedback" };
             _feedback.AddToClassList("shell-modal-feedback");
+            _cancelRoomJoin = new Button(() =>
+            {
+                _session?.CancelPendingRoomJoin();
+                RenderModal();
+            }) { name = "shell-identity-cancel-room-join", text = "CANCEL ROOM JOIN" };
+            _cancelRoomJoin.AddToClassList("shell-modal-submit");
+            _cancelRoomJoin.style.marginLeft = 0;
+            box.Add(_cancelRoomJoin);
             box.Add(_feedback);
 
             _field.RegisterValueChangedCallback(_ => RenderModal());
@@ -292,7 +301,9 @@ namespace SlopArena.Client.UI
                 _help.text = _joinProhibition
                     ? "RENAMING IS UNAVAILABLE WHILE JOINED TO A GAMESERVER."
                     : _mandatory
-                        ? "Your guest identity stays with this launch. Solo and Training work offline; chat connects when the network allows."
+                        ? _session.HasPendingRoomJoin
+                            ? "Steam Room request saved. Choose a display name to connect, or cancel the Room join below. Local play remains available."
+                            : "Your guest identity stays with this launch. Solo and Training work offline; chat connects when the network allows."
                         : "The name is sent to the chat service when it accepts changes. A rejection is reported here.";
             }
             if (_field != null)
@@ -307,6 +318,9 @@ namespace SlopArena.Client.UI
                 _submit.text = _mandatory ? "SET DISPLAY NAME" : "RENAME";
                 _submit.SetEnabled(!_joinProhibition && IsNameValid(_field?.value ?? string.Empty));
             }
+            if (_cancelRoomJoin != null)
+                _cancelRoomJoin.style.display = _mandatory && _session.HasPendingRoomJoin
+                    ? DisplayStyle.Flex : DisplayStyle.None;
             if (_feedback != null && !_suppressFeedback)
             {
                 SetFeedback(_feedback, _session.Status);

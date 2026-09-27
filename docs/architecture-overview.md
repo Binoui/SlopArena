@@ -82,7 +82,7 @@ serialized; callers must not rebuild it after loading an `.arena` file.
 Package abilities are fixed timelines of typed, versioned operations on the canonical
 16-entry grid: grounded and aerial variants for `1`, `2`, `3`, `4`, `A`, `E`, `R`, and `F`.
 Engine-owned Shared primitives implement movement, hitbox/projectile resolution, damage,
-Knockback, Hitstun, Hitstop, Clash, Burst, timing locks, and presentation events.
+Knockback, Hitstun, Hitstop, Clash, Shield, timing locks, and presentation events.
 
 `CookedTimelineAbility` is the current interpreter. `ServerAbility` and character-specific
 classes remain for legacy implementations and trusted temporary FightGuy capabilities.

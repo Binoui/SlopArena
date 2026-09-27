@@ -35,6 +35,8 @@ public sealed class BotDifficultyProfileTests
         Assert.True(normal.RangeError > hard.RangeError);
         Assert.True(easy.AttackChance < normal.AttackChance);
         Assert.True(normal.AttackChance < hard.AttackChance);
+        Assert.True(easy.DefenseChance < normal.DefenseChance);
+        Assert.True(normal.DefenseChance < hard.DefenseChance);
         Assert.True(easy.PunishChance < normal.PunishChance);
         Assert.True(normal.PunishChance < hard.PunishChance);
         Assert.True(easy.ComboChance < normal.ComboChance);

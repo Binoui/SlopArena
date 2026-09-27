@@ -1,3 +1,5 @@
+using SlopArena.Shared.Abilities;
+
 using Xunit;
 
 namespace SlopArena.Shared.Tests;
@@ -524,5 +526,433 @@ public class ServerSimulationTests
         ability2.Cooldown = slot.CooldownTicks;
         sim2.ActivateAbility(1, ability2, 0, def);
         Assert.Equal((ushort)0, sim2.GetState(1).GetCooldown(AbilitySlots.Lmb));
+    }
+    private static CharacterState GroundedState(ulong id, CharacterDefinition def, float z = 0f)
+    {
+        var state = MakeIdleState(id);
+        state.PY = TestHelpers.GroundPY(def);
+        state.PZ = z;
+        return state;
+    }
+
+    private sealed class CancelMutatingAbility : ServerAbility
+    {
+        public override void OnStart(ref CharacterState state, CharacterDefinition def)
+        {
+            state.State = ActionState.Attacking;
+            state.AttackSlot = 1;
+        }
+
+        public override void Tick(ref CharacterState state, ref InputState input, CharacterDefinition def) { }
+
+        public override void OnCancel(ref CharacterState state)
+        {
+            state.State = ActionState.Idle;
+            state.AttackSlot = 0;
+        }
+    }
+
+    [Fact]
+    public void Shielding_GrabAndJumpPrecedence_AndHeldShieldNeverCreatesAirDodge()
+    {
+        var def = MakeTestDef();
+        var sim = new ServerSimulation(TestHelpers.TestArena());
+        var state = GroundedState(1, def);
+        state.VX = 3f;
+        state.VZ = -2f;
+        sim.RegisterEntity(1, def, state);
+        var input = new Dictionary<ulong, InputState>
+        {
+            [1] = new() { ShieldHeld = true, ShieldPressed = true },
+        };
+
+        sim.Tick(input);
+        var shielding = sim.GetState(1);
+        Assert.Equal(ActionState.Shielding, shielding.State);
+        Assert.Equal(0f, shielding.VX);
+        Assert.Equal(0f, shielding.VZ);
+
+        input[1] = new InputState { Jump = true, JumpHeld = true, ShieldHeld = true };
+        sim.Tick(input);
+        Assert.Equal(ActionState.JumpSquat, sim.GetState(1).State);
+
+        input[1] = new InputState { JumpHeld = true, ShieldHeld = true };
+        for (int i = 0; i < 15; i++)
+            sim.Tick(input);
+
+        var airborne = sim.GetState(1);
+        Assert.False(airborne.IsGrounded);
+        Assert.Equal((byte)1, airborne.AirDodgesLeft);
+        Assert.NotEqual(ActionState.AirDodgeStartup, airborne.State);
+        Assert.NotEqual(ActionState.AirDodgeMovement, airborne.State);
+    }
+
+    [Fact]
+    public void GrabPressWinsJumpAndShield_WhileAirborneGrabIsRejectedWithoutDodging()
+    {
+        var def = MakeTestDef();
+        var sim = new ServerSimulation(TestHelpers.TestArena());
+        var grounded = GroundedState(1, def);
+        sim.RegisterEntity(1, def, grounded);
+
+        sim.Tick(new Dictionary<ulong, InputState>
+        {
+            [1] = new() { GrabPressed = true, Jump = true, ShieldHeld = true, ShieldPressed = true },
+        });
+        var attempt = sim.GetState(1);
+        Assert.Equal(ActionState.GrabAttempt, attempt.State);
+        Assert.Equal((byte)2, attempt.JumpsLeft);
+        Assert.Equal((byte)DefenseInteractionPhase.Attempt, attempt.InteractionPhase);
+        Assert.Equal(0u, attempt.InteractionTick);
+
+        var airborneSim = new ServerSimulation(TestHelpers.TestArena());
+        var airborne = GroundedState(1, def);
+        airborne.PY += 3f;
+        airborne.IsGrounded = false;
+        airborneSim.RegisterEntity(1, def, airborne);
+        airborneSim.Tick(new Dictionary<ulong, InputState>
+        {
+            [1] = new() { GrabPressed = true, Jump = true, ShieldHeld = true, ShieldPressed = true },
+        });
+        var rejected = airborneSim.GetState(1);
+        Assert.Equal(ActionState.Idle, rejected.State);
+        Assert.Equal((byte)2, rejected.JumpsLeft);
+        Assert.Equal((byte)1, rejected.AirDodgesLeft);
+    }
+
+    [Fact]
+    public void AirDodge_RequiresFreshAirPress_CapturesFacingAndConsumesOneUse()
+    {
+        var def = MakeTestDef();
+        var sim = new ServerSimulation(TestHelpers.TestArena());
+        var state = GroundedState(1, def);
+        state.PY += 5f;
+        state.IsGrounded = false;
+        state.FacingYaw = MathF.PI * 0.5f;
+        state.VX = 20f;
+        state.VZ = -4f;
+        sim.RegisterEntity(1, def, state);
+
+        var heldShield = new Dictionary<ulong, InputState>
+        {
+            [1] = new() { ShieldPressed = true, ShieldHeld = true },
+        };
+        sim.Tick(heldShield);
+        var startup = sim.GetState(1);
+        Assert.Equal(ActionState.AirDodgeStartup, startup.State);
+        Assert.Equal((byte)0, startup.AirDodgesLeft);
+        Assert.Equal(DefenseConfig.AirDodgeInvulnerabilityTicks, startup.InvincibilityTicks);
+        Assert.Equal(0f, startup.VX);
+        Assert.Equal(0f, startup.VZ);
+
+        heldShield[1] = new InputState { ShieldHeld = true };
+        for (int i = 0; i < DefenseConfig.AirDodgeInvulnerabilityTicks; i++)
+            sim.Tick(heldShield);
+        var movement = sim.GetState(1);
+        Assert.Equal(ActionState.AirDodgeMovement, movement.State);
+        TestHelpers.AssertNear(def.Movement.DashSpeed * DefenseConfig.AirDodgeSpeedMultiplier, movement.VX);
+        TestHelpers.AssertNear(0f, movement.VZ);
+
+        for (int i = 0; i < DefenseConfig.AirDodgeMovementTicks; i++)
+            sim.Tick(heldShield);
+        var recovery = sim.GetState(1);
+        Assert.Equal(ActionState.AirDodgeRecovery, recovery.State);
+        Assert.Equal(DefenseConfig.AirDodgeRecoveryTicks, recovery.AirDodgeRecoveryTicks);
+        Assert.Equal((byte)0, recovery.AirDodgesLeft);
+    }
+
+    [Fact]
+    public void AirDodgeOnLandingBoundaryDoesNotAlsoEnterGroundShield()
+    {
+        var def = MakeTestDef();
+        var sim = new ServerSimulation(TestHelpers.TestArena());
+        var state = GroundedState(1, def);
+        state.PY += 0.005f;
+        state.IsGrounded = false;
+        state.VY = -1f;
+        sim.RegisterEntity(1, def, state);
+
+        sim.Tick(new Dictionary<ulong, InputState>
+        {
+            [1] = new() { ShieldHeld = true, ShieldPressed = true },
+        });
+
+        var landed = sim.GetState(1);
+        Assert.True(landed.IsGrounded);
+        Assert.Equal(ActionState.AirDodgeRecovery, landed.State);
+        Assert.NotEqual(ActionState.Shielding, landed.State);
+        Assert.Equal((byte)1, landed.AirDodgesLeft);
+        Assert.Equal(DefenseConfig.AirDodgeRecoveryTicks, landed.AirDodgeRecoveryTicks);
+    }
+
+    [Fact]
+    public void ShieldRelease_RequiresFullDropBeforeReentry()
+    {
+        var def = MakeTestDef();
+        var sim = new ServerSimulation(TestHelpers.TestArena());
+        sim.RegisterEntity(1, def, GroundedState(1, def));
+
+        sim.Tick(new Dictionary<ulong, InputState>
+        {
+            [1] = new() { ShieldHeld = true, ShieldPressed = true },
+        });
+        sim.Tick(new Dictionary<ulong, InputState> { [1] = default });
+        Assert.Equal(ActionState.ShieldDrop, sim.GetState(1).State);
+        Assert.Equal(DefenseConfig.ShieldDropTicks, sim.GetState(1).ShieldDropTicks);
+
+        var rehold = new Dictionary<ulong, InputState>
+        {
+            [1] = new() { ShieldHeld = true, Jump = true },
+        };
+        for (int i = 0; i < DefenseConfig.ShieldDropTicks - 1; i++)
+        {
+            sim.Tick(rehold);
+            Assert.Equal(ActionState.ShieldDrop, sim.GetState(1).State);
+        }
+
+        rehold[1] = new InputState { ShieldHeld = true };
+        sim.Tick(rehold);
+        Assert.Equal(ActionState.Shielding, sim.GetState(1).State);
+    }
+
+    [Fact]
+    public void GrabAttempt_CapturesAndReleasesBothParticipantsOnce()
+    {
+        var def = MakeTestDef();
+        var sim = new ServerSimulation(TestHelpers.TestArena());
+        sim.RegisterEntity(1, def, GroundedState(1, def));
+        sim.RegisterEntity(2, def, GroundedState(2, def, z: 1f));
+        var inputs = new Dictionary<ulong, InputState>
+        {
+            [1] = new() { GrabPressed = true },
+            [2] = default,
+        };
+        sim.Tick(inputs);
+        inputs[1] = default;
+
+        for (int i = 0; i < DefenseConfig.GrabStartupTicks; i++)
+            sim.Tick(inputs);
+
+        var attacker = sim.GetState(1);
+        var victim = sim.GetState(2);
+        Assert.Equal(ActionState.Throwing, attacker.State);
+        Assert.Equal(ActionState.Grabbed, victim.State);
+        Assert.NotEqual(0ul, attacker.InteractionId);
+        Assert.Equal(attacker.InteractionId, victim.InteractionId);
+        Assert.Equal(2ul, attacker.InteractionPartnerId);
+        Assert.Equal(1ul, victim.InteractionPartnerId);
+        ulong interactionId = attacker.InteractionId;
+        Assert.NotEqual(0u, attacker.InteractionTick);
+        Assert.Equal((byte)DefenseInteractionPhase.Captured, attacker.InteractionPhase);
+        Assert.Equal((byte)DefenseInteractionPhase.Captured, victim.InteractionPhase);
+        var capturedPositions = (attacker.PX, attacker.PY, attacker.PZ, victim.PX, victim.PY, victim.PZ);
+
+
+        for (int i = 0; i < DefenseConfig.ThrowReleaseTicks - 1; i++)
+        {
+            sim.Tick(inputs);
+            if (i == 0)
+                Assert.Equal((byte)DefenseInteractionPhase.Throwing, sim.GetState(1).InteractionPhase);
+            Assert.Equal(interactionId, sim.GetState(1).InteractionId);
+            Assert.Equal(interactionId, sim.GetState(2).InteractionId);
+        }
+        sim.Tick(inputs);
+        Assert.Equal(capturedPositions,
+            (sim.GetState(1).PX, sim.GetState(1).PY, sim.GetState(1).PZ,
+                sim.GetState(2).PX, sim.GetState(2).PY, sim.GetState(2).PZ));
+
+        attacker = sim.GetState(1);
+        victim = sim.GetState(2);
+        Assert.Equal(ActionState.Idle, attacker.State);
+        Assert.Equal(ActionState.Idle, victim.State);
+        Assert.Equal(0ul, attacker.InteractionId);
+        Assert.Equal(0ul, victim.InteractionId);
+        Assert.Equal(interactionId, attacker.LastTerminalInteractionId);
+        Assert.Equal(interactionId, victim.LastTerminalInteractionId);
+        Assert.True(attacker.AnimLockTicks > 0);
+    }
+
+    [Fact]
+    public void SimultaneousReciprocalGrabsClashWithoutRegistrationOrderAdvantage()
+    {
+        var def = MakeTestDef();
+        var sim = new ServerSimulation(TestHelpers.TestArena());
+        var first = GroundedState(1, def);
+        var second = GroundedState(2, def, z: 1f);
+        second.FacingYaw = MathF.PI;
+        sim.RegisterEntity(1, def, first);
+        sim.RegisterEntity(2, def, second);
+        var inputs = new Dictionary<ulong, InputState>
+        {
+            [1] = new() { GrabPressed = true },
+            [2] = new() { GrabPressed = true },
+        };
+        sim.Tick(inputs);
+        inputs[1] = default;
+        inputs[2] = default;
+        for (int i = 0; i < DefenseConfig.GrabStartupTicks; i++)
+            sim.Tick(inputs);
+
+        var firstAfter = sim.GetState(1);
+        var secondAfter = sim.GetState(2);
+        Assert.Equal(ActionState.GrabAttempt, firstAfter.State);
+        Assert.Equal(ActionState.GrabAttempt, secondAfter.State);
+        Assert.Equal(DefenseConfig.GrabClashRecoveryTicks, firstAfter.StateTicks);
+        Assert.Equal(DefenseConfig.GrabClashRecoveryTicks, secondAfter.StateTicks);
+        Assert.Equal(0ul, firstAfter.InteractionId);
+        Assert.Equal(0ul, secondAfter.InteractionId);
+    }
+
+    [Fact]
+    public void LocalPredictionModeDoesNotCommitCoupledCapture()
+    {
+        var def = MakeTestDef();
+        var sim = new ServerSimulation(TestHelpers.TestArena())
+        {
+            PredictCoupledInteractions = false,
+        };
+        sim.RegisterEntity(1, def, GroundedState(1, def));
+        sim.RegisterEntity(2, def, GroundedState(2, def, z: 1f));
+        var inputs = new Dictionary<ulong, InputState>
+        {
+            [1] = new() { GrabPressed = true },
+            [2] = default,
+        };
+        sim.Tick(inputs);
+        inputs[1] = default;
+        for (int i = 0; i < DefenseConfig.GrabStartupTicks; i++)
+            sim.Tick(inputs);
+
+        Assert.Equal(ActionState.GrabAttempt, sim.GetState(1).State);
+        Assert.Equal(0ul, sim.GetState(1).InteractionId);
+        Assert.Equal(ActionState.Idle, sim.GetState(2).State);
+    }
+
+    [Fact]
+    public void DeathDuringCaptureTerminatesSurvivorAndPreservesRespawnBarrier()
+    {
+        var def = MakeTestDef();
+        var sim = new ServerSimulation(TestHelpers.TestArena());
+        sim.RegisterEntity(1, def, GroundedState(1, def));
+        sim.RegisterEntity(2, def, GroundedState(2, def, z: 1f));
+        var inputs = new Dictionary<ulong, InputState>
+        {
+            [1] = new() { GrabPressed = true },
+            [2] = default,
+        };
+        sim.Tick(inputs);
+        inputs[1] = default;
+        for (int i = 0; i < DefenseConfig.GrabStartupTicks; i++)
+            sim.Tick(inputs);
+        ulong interactionId = sim.GetState(1).InteractionId;
+
+        var dying = sim.GetState(2);
+        dying.PY = -30f;
+        sim.SetState(2, dying);
+        sim.Tick(inputs);
+
+        var survivor = sim.GetState(1);
+        var respawned = sim.GetState(2);
+        Assert.Equal(ActionState.Idle, survivor.State);
+        Assert.Equal(0ul, survivor.InteractionId);
+        Assert.Equal(interactionId, survivor.LastTerminalInteractionId);
+        Assert.Equal(ActionState.Idle, respawned.State);
+        Assert.Equal(0ul, respawned.InteractionId);
+        Assert.Equal(interactionId, respawned.LastTerminalInteractionId);
+        Assert.Equal((byte)1, respawned.Deaths);
+    }
+
+    [Fact]
+    public void AcceptedExternalHitInterruptsBothSidesOfCapture()
+    {
+        var def = MakeTestDef();
+        var sim = new ServerSimulation(TestHelpers.TestArena());
+        sim.RegisterEntity(1, def, GroundedState(1, def));
+        sim.RegisterEntity(2, def, GroundedState(2, def, z: 1f));
+        var hitter = GroundedState(3, def);
+        hitter.PX = 20f;
+        sim.RegisterEntity(3, def, hitter);
+        var inputs = new Dictionary<ulong, InputState>
+        {
+            [1] = new() { GrabPressed = true },
+            [2] = default,
+            [3] = default,
+        };
+        sim.Tick(inputs);
+        inputs[1] = default;
+        for (int i = 0; i < DefenseConfig.GrabStartupTicks; i++)
+            sim.Tick(inputs);
+        ulong interactionId = sim.GetState(1).InteractionId;
+
+        var victim = sim.GetState(2);
+        sim.Resolver.Spawn(new Hitbox
+        {
+            X = victim.PX, Y = victim.PY, Z = victim.PZ,
+            EndX = victim.PX, EndY = victim.PY, EndZ = victim.PZ,
+            Radius = 0.1f,
+            Shape = HitboxShape.Sphere,
+            Damage = 5f,
+            BaseKnockback = 10f,
+            KnockbackAngle = 45,
+            StunTicks = 20,
+            DurationTicks = 30,
+            OwnerId = 3,
+            ActivationId = 99,
+        });
+        sim.Tick(inputs);
+
+        var attacker = sim.GetState(1);
+        victim = sim.GetState(2);
+        Assert.Equal(0ul, attacker.InteractionId);
+        Assert.Equal(0ul, victim.InteractionId);
+        Assert.Equal(interactionId, attacker.LastTerminalInteractionId);
+        Assert.Equal(interactionId, victim.LastTerminalInteractionId);
+        Assert.NotEqual(ActionState.Grabbed, victim.State);
+        Assert.True(victim.HitstopTicks > 0);
+    }
+
+    [Fact]
+    public void ApplyAuthoritativeState_CancelsOwnedAbilityAndPreservesBlockStunSnapshot()
+    {
+        var def = MakeTestDef();
+        var sim = new ServerSimulation(TestHelpers.TestArena());
+        sim.RegisterEntity(1, def, GroundedState(1, def));
+        var target = GroundedState(2, def, z: 1f);
+        sim.RegisterEntity(2, def, target);
+        var ability = new CancelMutatingAbility();
+        sim.ActivateAbility(1, ability, 0, def);
+        var active = sim.GetActiveAbility(1);
+        Assert.NotNull(active);
+        sim.Resolver.Spawn(new Hitbox
+        {
+            X = target.PX, Y = target.PY, Z = target.PZ,
+            EndX = target.PX, EndY = target.PY, EndZ = target.PZ,
+            Radius = 0.1f,
+            Shape = HitboxShape.Sphere,
+            Damage = 5f,
+            DurationTicks = 30,
+            OwnerId = 1,
+            ActivationId = active!.ActivationId,
+        });
+
+        var authoritative = sim.GetState(1);
+        authoritative.State = ActionState.Idle;
+        authoritative.AttackSlot = 0;
+        authoritative.AnimLockTicks = 0;
+        authoritative.BlockStunTicks = 5;
+        authoritative.BlockHitstopKind = (byte)DefenseBlockHitstopKind.ShieldContact;
+        sim.ApplyAuthoritativeState(1, authoritative);
+
+        Assert.Equal(authoritative, sim.GetState(1));
+        Assert.Null(sim.GetActiveAbility(1));
+        sim.Tick(new Dictionary<ulong, InputState>
+        {
+            [1] = new() { GrabPressed = true, Jump = true, ShieldHeld = true, ShieldPressed = true },
+            [2] = default,
+        });
+        var after = sim.GetState(1);
+        Assert.Equal(ActionState.Idle, after.State);
+        Assert.Equal((ushort)4, after.BlockStunTicks);
+        Assert.Equal((ushort)0, sim.GetState(2).DamagePercent);
     }
 }

@@ -87,6 +87,7 @@ namespace SlopArena.Shared
         public static float HitstunMagBonus = 0f;
         private const byte MaxAirDodges = 1;
 
+
         /// <summary>
         /// Dash duration: 0.25 second = 15 ticks
         /// </summary>
@@ -216,56 +217,31 @@ namespace SlopArena.Shared
             _lastDownAdmissionReason = null;
             ordinaryActionOpportunity = false;
             movementActionAccepted = false;
+            if (s.InteractionId != 0
+                && s.State is (ActionState.Grabbed or ActionState.Throwing))
+                return;
+
             var stats = def.Movement;
             bool wasGrounded = s.IsGrounded;   // airborne→grounded detection for the Rush reset
+            bool blockStunLocked = s.BlockStunTicks > 0;
+
             if (verticalMotionOwned)
                 ClearMovementInterruptionFlags(ref s);
             bool canFastFallEdge = !wasGrounded
                 && s.VY < 0f
                 && input.DownPressed
                 && !verticalMotionOwned
+                && !blockStunLocked
                 && s.HitstopTicks == 0
                 && s.HitstunTicks == 0
                 && !HasKnockback(s)
                 && s.State != ActionState.LedgeHang
                 && s.State != ActionState.Dashing
                 && s.State != ActionState.JumpSquat
-                && s.State != ActionState.Warping
                 && s.State != ActionState.AirDodging
+                && !IsDefenseActionState(s.State)
                 && s.WarpSpeed <= 0f;
 
-            // ── Burst (ADR-0014): dual-use escape/extender. Runs before the hitstop gate —
-            // the freeze is the decision window. Cooldown + recovery gate re-use. ──
-            if (input.Burst && s.LandingLagTicks == 0 && s.BurstRecoveryTicks == 0 && s.BurstCooldownTicks == 0)
-            {
-                bool attacking = (s.State is ActionState.Attacking or ActionState.Aiming) && s.AnimLockTicks > 0;
-                if (s.HitstopTicks > 0)
-                {
-                    // Frozen: a defender (launch queued — or any non-attacker, since the queue is
-                    // server-local and absent on predicted tracks) escapes; an attacker frozen by
-                    // their own connecting hit (no queue) cancels offensively.
-                    if (attacking && !HasQueuedLaunch(s))
-                    {
-                        DoOffensiveBurst(ref s);
-                        movementActionAccepted = true;
-                    }
-                    else
-                    {
-                        DoDefensiveBurst(ref s);
-                        movementActionAccepted = true;
-                    }
-                }
-                else if (s.State == ActionState.Hitstun || HasKnockback(s))
-                {
-                    DoDefensiveBurst(ref s);
-                    movementActionAccepted = true;
-                }
-                else if (attacking)
-                {
-                    DoOffensiveBurst(ref s);
-                    movementActionAccepted = true;
-                }
-            }
 
             // Preserve the last committed aim when a neutral input omits aim data.
             if (input.AimYaw != 0 || input.IsAiming || input.FaceToCamera)
@@ -282,6 +258,15 @@ namespace SlopArena.Shared
             // The launch queued at hit connect applies at freeze expiry.
             if (s.HitstopTicks > 0)
             {
+                // Block contact freezes the defender but never queues a launch,
+                // directional influence, or a damaging hit reaction.
+                if (s.BlockHitstopKind == (byte)DefenseBlockHitstopKind.ShieldContact)
+                {
+                    s.HitstopTicks--;
+                    if (s.HitstopTicks == 0)
+                        s.BlockHitstopKind = (byte)DefenseBlockHitstopKind.None;
+                    return;
+                }
                 if (input.MoveX != 0f || input.MoveY != 0f)
                 {
                     if (!s.SdiApplied)
@@ -357,6 +342,7 @@ namespace SlopArena.Shared
                     s.QueuedKVX = 0f; s.QueuedKVY = 0f; s.QueuedKVZ = 0f;
                     s.QueuedKBDirX = 0f; s.QueuedKBDirZ = 0f; s.QueuedKBAngle = 0;
                     s.QueuedKBBase = 0f; s.QueuedKBGrowth = 0f; s.QueuedKBDamage = 0f; s.QueuedKBForce = 0f; s.QueuedKBResolvedForce = false; s.QueuedKBStun = 0;
+                    s.BlockHitstopKind = (byte)DefenseBlockHitstopKind.None;
                 }
                 return;
             }
@@ -416,11 +402,16 @@ namespace SlopArena.Shared
             // 1. Tick timers
             ushort rushBeforeMovement = s.RushTicks;
             TickTimers(ref s);
+            blockStunLocked |= s.BlockStunTicks > 0;
+            if (blockStunLocked)
+                s.VX = s.VZ = 0f;
+            AdvanceDefenseStates(ref s, stats);
+
             if (s.State != ActionState.Hitstun && !HasKnockback(s))
             {
                 bool movementAllowed = s.HitstunTicks == 0
                     && s.HitstopTicks == 0
-                    && s.BurstRecoveryTicks == 0
+                    && !blockStunLocked
                     && s.LandingLagTicks == 0;
                 bool mobileAim = s.State == ActionState.Aiming
                     && s.AttackSlot > 0
@@ -434,14 +425,13 @@ namespace SlopArena.Shared
                     && s.AnimLockTicks == 0
                     && s.State != ActionState.JumpSquat
                     && s.State != ActionState.Aiming
-                    && s.State != ActionState.LedgeHang;
-                bool dash = movementAllowed
+                    && s.State != ActionState.LedgeHang
+                    && (!IsDefenseActionState(s.State) || s.State == ActionState.Shielding);
+                bool dash = movementAllowed && !s.IsGrounded
                     && (s.AnimLockTicks == 0 || IsIasaUnlocked(s, def))
-                    && s.DashDurationTicks == 0
-                    && s.DashCooldownTicks == 0
-                    && s.State != ActionState.JumpSquat
-                    && s.State != ActionState.Aiming
-                    && s.State != ActionState.LedgeHang;
+                    && s.DashDurationTicks == 0 && s.DashCooldownTicks == 0
+                    && s.State != ActionState.JumpSquat && s.State != ActionState.Aiming
+                    && s.State != ActionState.LedgeHang && !IsDefenseActionState(s.State);
                 bool ledgeExit = s.State == ActionState.LedgeHang
                     && FindLedge(s, arena, def.CapsuleHeight * 0.5f,
                         out _, out _, out _, out _, out _);
@@ -479,14 +469,14 @@ namespace SlopArena.Shared
             // Only process state machine if not warping
             else
             {
-                // 5. State machine
                 if (s.State == ActionState.Dashing)
                     ProcessDash(ref s, stats);
                 else if (s.State == ActionState.AirDodging)
                     ProcessAirDodge();
+                else if (s.State is ActionState.AirDodgeStartup or ActionState.AirDodgeMovement or ActionState.AirDodgeRecovery)
+                    ProcessDefenseAirDodge(ref s, stats);
                 else if (s.State == ActionState.LedgeHang)
                     ProcessLedgeHang(ref s, stats, input, arena, def);
-                // Attacking state is now purely handled by ServerSimulation.TickAbilities
             }
             if (wasLedgeHang && s.State == ActionState.JumpSquat)
             {
@@ -501,9 +491,10 @@ namespace SlopArena.Shared
 
             // 5.5 Consume buffered input (any lock just expired)
             if (s.BufferedSlot > 0 && s.AnimLockTicks == 0 && s.HitstunTicks == 0 &&
-                s.BurstRecoveryTicks == 0 && s.LandingLagTicks == 0 &&
+                s.LandingLagTicks == 0 &&
                 (s.State == ActionState.Idle || s.State == ActionState.Run
-                    || s.State == ActionState.Crouching || s.State == ActionState.Sliding) && !input.Jump && !input.Dash)
+                    || s.State == ActionState.Crouching || s.State == ActionState.Sliding)
+                && !input.Jump && !input.ShieldHeld && !input.GrabPressed)
             {
                 byte slot = s.BufferedSlot;
                 // Issue #117: grounded-only moves (no air spec) buffered while airborne must
@@ -522,25 +513,42 @@ namespace SlopArena.Shared
                     s.AttackSlot = slot;
                 }
             }
-            if (input.Jump && s.JumpsLeft > 0 && s.AnimLockTicks == 0 && s.HitstunTicks == 0 && s.BurstRecoveryTicks == 0 && s.LandingLagTicks == 0 && s.State != ActionState.JumpSquat && s.State != ActionState.Aiming && s.State != ActionState.LedgeHang)
+            if (input.GrabPressed && s.IsGrounded
+                && s.VX * s.VX + s.VZ * s.VZ <= 0.0025f
+                && CanAcceptDefenseAction(in s, def, blockStunLocked, verticalMotionOwned))
+            {
+                StartGrabAttempt(ref s);
+                movementActionAccepted = true;
+            }
+
+            if (!input.GrabPressed && input.Jump && s.JumpsLeft > 0 && s.AnimLockTicks == 0
+                && s.HitstunTicks == 0 && !blockStunLocked && !verticalMotionOwned
+                && s.LandingLagTicks == 0 && s.State != ActionState.JumpSquat
+                && s.State != ActionState.Aiming && s.State != ActionState.LedgeHang
+                && !HasKnockback(s) && !HasQueuedLaunch(s)
+                && (!IsDefenseActionState(s.State) || s.State == ActionState.Shielding))
             {
                 movementActionAccepted = true;
+                if (s.IsGrounded && input.ShieldHeld
+                    && s.State is (ActionState.Idle or ActionState.Run or ActionState.Crouching or ActionState.Sliding))
+                {
+                    // Brake before squat, without carrying a protected frame or slide momentum.
+                    s.VX = s.VZ = 0f;
+                    s.State = ActionState.Idle;
+                    ClearMovementInterruptionFlags(ref s);
+                }
                 bool jumpFromSlide = s.IsGrounded && s.State == ActionState.Sliding;
                 ClearMovementInterruptionFlags(ref s);
+                s.ShieldDropTicks = 0;
                 if (s.IsGrounded)
                 {
-                    // Ground jump → enter JumpSquat
                     s.JumpFromSlide = jumpFromSlide;
                     s.State = ActionState.JumpSquat;
                     s.StateTicks = stats.JumpSquatTicks;
                     s.JumpsLeft--;
-                    // VX, VZ preserved — momentum carries through squat into air
-                    // VY stays 0 — applied when squat expires
                 }
                 else
                 {
-                    // Double jump — acting mid-tail ends the flight regime (ADR-0019 §6):
-                    // a jump after a launch is a normal jump, not a floaty one.
                     s.VY = stats.JumpForce * stats.AirJumpVMultiplier;
                     (float dirX, float dirZ) = GetInputDirection(input);
                     s.VX += dirX * stats.AirSpeedMax * stats.AirJumpHMultiplier;
@@ -549,15 +557,45 @@ namespace SlopArena.Shared
                     s.AirTimeTicks = stats.FloatWindowTicks;
                 }
             }
-
-            else if (input.Jump)
+            else if (input.Jump && !input.GrabPressed)
             {
                 string reason = s.AnimLockTicks > 0 ? "anim_lock" :
                     s.LandingLagTicks > 0 ? "landing_lag" :
-                    s.HitstunTicks > 0 ? "hitstun" :
+                    s.HitstunTicks > 0 || blockStunLocked ? "hitstun" :
                     s.State == ActionState.JumpSquat ? "already_squatting" :
                     s.JumpsLeft <= 0 ? "no_jumps" : "unknown";
                 OnDebugLog?.Invoke($"[JumpBlocked] input.Jump=true but blocked by {reason}");
+            }
+
+            if (s.State == ActionState.Shielding && !input.ShieldHeld
+                && !blockStunLocked && s.HitstopTicks == 0)
+            {
+                s.State = ActionState.ShieldDrop;
+                s.ShieldDropTicks = DefenseConfig.ShieldDropTicks;
+                s.StateTicks = DefenseConfig.ShieldDropTicks;
+                s.VX = s.VZ = 0f;
+            }
+            else if (!input.GrabPressed && !input.Jump
+                && CanAcceptDefenseAction(in s, def, blockStunLocked, verticalMotionOwned))
+            {
+                if (s.IsGrounded && input.ShieldHeld)
+                {
+                    if (s.State != ActionState.Shielding)
+                    {
+                        s.State = ActionState.Shielding;
+                        s.ShieldDropTicks = 0;
+                        s.StateTicks = 0;
+                        ClearMovementInterruptionFlags(ref s);
+                        ClearDefenseAttackState(ref s);
+                        movementActionAccepted = true;
+                    }
+                    s.VX = s.VZ = 0f;
+                }
+                else if (!s.IsGrounded && input.ShieldPressed && s.AirDodgesLeft > 0)
+                {
+                    StartAirDodge(ref s);
+                    movementActionAccepted = true;
+                }
             }
 
             // 6. Input-driven actions (only when not locked by animation, landing lag or in
@@ -565,17 +603,18 @@ namespace SlopArena.Shared
             // The dash unlocks on IASA (ADR-0021 §1): a normal whose stage has passed its
             // IASA ticks may open DASH while AnimLockTicks still counts down. Attack
             // activation admits ordinary grounded low states alongside Idle/Run.
-            if (s.LandingLagTicks == 0 && (s.AnimLockTicks == 0 || IsIasaUnlocked(s, def)) && s.State != ActionState.Hitstun && s.State != ActionState.JumpSquat && s.State != ActionState.Aiming && s.State != ActionState.LedgeHang)
+            if (s.LandingLagTicks == 0 && (s.AnimLockTicks == 0 || IsIasaUnlocked(s, def))
+                && s.State != ActionState.Hitstun && s.State != ActionState.JumpSquat
+                && s.State != ActionState.Aiming && s.State != ActionState.LedgeHang
+                && !blockStunLocked && !IsDefenseActionState(s.State))
             {
-                // Jump — handled inside ProcessNormalMovement/ProcessAirMovement
-                // Dash
-                if (input.Dash && s.DashDurationTicks == 0 && s.DashCooldownTicks == 0)
+                if (!s.IsGrounded && input.Dash && s.DashDurationTicks == 0 && s.DashCooldownTicks == 0)
                 {
                     if (StartDash(ref s, stats, input.MoveX, input.MoveY))
                         movementActionAccepted = true;
                 }
                 if (input.ActiveSlot > 0 && (s.State == ActionState.Idle || s.State == ActionState.Run
-                    || s.State == ActionState.Crouching || s.State == ActionState.Sliding) && s.BurstRecoveryTicks == 0)
+                    || s.State == ActionState.Crouching || s.State == ActionState.Sliding))
                 {
                     ushort cd = s.GetCooldown(input.ActiveSlot);
                     if (cd == 0)
@@ -587,18 +626,20 @@ namespace SlopArena.Shared
                     }
                 }
             }
+
             // Buffer input if locked within window
             // NOTE: Combo buffering is now handled by ServerAbility.Tick lifecycle
             // Only general input buffering (unlock window) is kept for client prediction.
             // Landing lag never buffers (issue #125): the lock is a hard no-input window —
             // a press inside it is dropped, like Melee, not queued for unlock.
-            if (input.ActiveSlot > 0 && s.LandingLagTicks == 0 && (s.AnimLockTicks > 0 || s.HitstunTicks > 0 || s.BurstRecoveryTicks > 0 || s.State == ActionState.JumpSquat) && s.BufferedSlot == 0)
+            if (!blockStunLocked && input.ActiveSlot > 0 && s.LandingLagTicks == 0
+                && (s.AnimLockTicks > 0 || s.HitstunTicks > 0
+                    || s.State == ActionState.JumpSquat) && s.BufferedSlot == 0)
             {
                 // General buffer: within window of unlock
                 if (s.State == ActionState.JumpSquat ||
                     (s.AnimLockTicks > 0 && s.AnimLockTicks <= InputBufferWindow) ||
-                    (s.HitstunTicks > 0 && s.HitstunTicks <= InputBufferWindow) ||
-                    (s.BurstRecoveryTicks > 0 && s.BurstRecoveryTicks <= InputBufferWindow))
+                    (s.HitstunTicks > 0 && s.HitstunTicks <= InputBufferWindow))
                 {
                     // No cooldown check here — ServerSimulation handles ability activation validation
                     s.BufferedSlot = input.ActiveSlot;
@@ -613,12 +654,11 @@ namespace SlopArena.Shared
                 && def.GetAimMovementMode(s.AttackSlot, !s.IsGrounded) == AimMovementMode.Fixed;
             // Landing lag (issue #125): "no input, no movement" — the stick cannot steer
             // during the lock, even once the aerial has ended and the state is Idle.
-            if (s.LandingLagTicks == 0 && (s.State == ActionState.Idle || s.State == ActionState.Aiming
-                || s.State == ActionState.Run || s.State == ActionState.Crouching || s.State == ActionState.Sliding))
-            {
-
+            if (!blockStunLocked && s.LandingLagTicks == 0
+                && (s.State == ActionState.Idle || s.State == ActionState.Aiming
+                    || s.State == ActionState.Run || s.State == ActionState.Crouching
+                    || s.State == ActionState.Sliding))
                 ProcessNormalMovement(ref s, stats, input, tuning, movementActionAccepted, processInput: !fixedAim);
-            }
             if (verticalMotionOwned && s.IsGrounded
                 && (input.Down || input.DownPressed)
                 && !movementActionAccepted)
@@ -629,17 +669,14 @@ namespace SlopArena.Shared
 
             // 6c. Facing snap (LMB, ADR-0017 / issue #126): utility input honored at the
             // input gate — instant facing to the camera azimuth (AimYaw), usable when not
-            // attack-locked, not in hitstun, not in burst recovery / landing lag / jump
-            // squat / aim stance. Runs AFTER normal movement so the snap wins the tick it
-            // is pressed (on the ground, the next tick's movement re-faces — one-tick
-            // turnaround for poke spacing). Air facing is sticky, so an air snap holds
-            // until the next snap / lock / landing.
+            // attack-locked, not in hitstun / landing lag / jump squat / aim stance.
+            // Runs AFTER normal movement so an accepted snap wins its input tick.
             // While locked (ADR-0018 / issue #127), an accepted snap exits the lock —
             // the manual-facing button is the "break free" escape hatch. Rejected snaps
             // (mid-attack, hitstun) leave the lock untouched.
             if (input.FaceToCamera && s.LandingLagTicks == 0 && s.AnimLockTicks == 0
-                && s.BurstRecoveryTicks == 0 && s.State != ActionState.Hitstun
-                && s.State != ActionState.JumpSquat && s.State != ActionState.Aiming)
+                && s.State != ActionState.Hitstun && s.State != ActionState.JumpSquat
+                && s.State != ActionState.Aiming && !IsDefenseActionState(s.State))
             {
                 s.FacingYaw = input.AimYaw * 0.01f * (MathF.PI / 180f);
                 s.AimYaw = s.FacingYaw;
@@ -659,13 +696,13 @@ namespace SlopArena.Shared
             }
             
             if (canFastFallEdge && !movementActionAccepted && !verticalMotionOwned
-                && s.HitstopTicks == 0 && s.HitstunTicks == 0
+                && s.HitstopTicks == 0 && s.HitstunTicks == 0 && !blockStunLocked
                 && !HasKnockback(s) && s.WarpSpeed <= 0f
                 && s.State != ActionState.LedgeHang
                 && s.State != ActionState.Dashing
                 && s.State != ActionState.JumpSquat
                 && s.State != ActionState.Warping
-                && s.State != ActionState.AirDodging)
+                && !IsDefenseActionState(s.State))
             {
                 s.IsFastFalling = true;
                 s.InPostHitstunFlight = false;
@@ -769,11 +806,23 @@ namespace SlopArena.Shared
                 ClearMovementInterruptionFlags(ref s);
             }
 
-            // 11. Landing cleanup
             if (s.State == ActionState.AirDodging && s.IsGrounded)
-            {
                 s.State = ActionState.Idle;
+            else if ((s.State is ActionState.AirDodgeStartup or ActionState.AirDodgeMovement
+                    or ActionState.AirDodgeRecovery) && s.IsGrounded)
+            {
+                if (s.State != ActionState.AirDodgeRecovery)
+                    s.AirDodgeRecoveryTicks = DefenseConfig.AirDodgeRecoveryTicks;
+                s.State = ActionState.AirDodgeRecovery;
+                s.StateTicks = s.AirDodgeRecoveryTicks;
+                if (s.InvincibilityTicks <= DefenseConfig.AirDodgeInvulnerabilityTicks)
+                    s.InvincibilityTicks = 0;
+                s.VX = s.VZ = 0f;
+                s.JumpsLeft = stats.MaxJumps;
+                s.AirDodgesLeft = MaxAirDodges;
             }
+            if (s.State == ActionState.Shielding && !s.IsGrounded)
+                s.State = ActionState.Idle;
 
 
             // DEBUG: log ground collision data (every 60 ticks = ~1/sec per entity)
@@ -792,9 +841,11 @@ namespace SlopArena.Shared
             if (s.AnimLockTicks > 0) s.AnimLockTicks--;
             if (s.LandingLagTicks > 0) s.LandingLagTicks--;
             if (s.HitstunTicks > 0) s.HitstunTicks--;
-            if (s.BurstCooldownTicks > 0) s.BurstCooldownTicks--;
-            if (s.BurstRecoveryTicks > 0) s.BurstRecoveryTicks--;
-            if (s.AttackElapsedTicks < 65535) s.AttackElapsedTicks++;
+            if (s.BlockStunTicks > 0) s.BlockStunTicks--;
+            if (s.ShieldDropTicks > 0) s.ShieldDropTicks--;
+            if (s.State == ActionState.AirDodgeRecovery && s.AirDodgeRecoveryTicks > 0)
+                s.AirDodgeRecoveryTicks--;
+            if (s.AttackElapsedTicks < ushort.MaxValue) s.AttackElapsedTicks++;
 
             // Rush window ticks: counts only while purely moving in one direction on the
             // ground. Other actions freeze it; the expired window no longer adds turn lag.
@@ -802,15 +853,18 @@ namespace SlopArena.Shared
                 s.RushTicks--;
             if (s.LedgeRegrabLockTicks > 0) s.LedgeRegrabLockTicks--;
 
-            // State ticks (generic expiry — JumpSquat is handled specially below)
+            // Only a timer that actually expires can end a state. An untimed
+            // attack, jump squat, run, or hitstun must not be reset to Idle.
             if (s.StateTicks > 0 && s.State != ActionState.JumpSquat)
             {
                 s.StateTicks--;
-                if (s.StateTicks == 0 && s.State != ActionState.Idle)
-                {
+                if (s.StateTicks == 0 && s.State != ActionState.Idle &&
+                    s.State is not (ActionState.Shielding or ActionState.ShieldDrop or
+                        ActionState.GrabAttempt or ActionState.AirDodgeStartup or
+                        ActionState.AirDodgeMovement or ActionState.AirDodgeRecovery))
                     s.State = ActionState.Idle;
-                }
             }
+
 
             // Cooldowns (all 11 slots — issue #117; slots 6-10 got fields in #116 but the
             // decrement only covered 1-6, so their cooldowns never expired).
@@ -842,6 +896,114 @@ namespace SlopArena.Shared
                     s.StatusFlags = 0;  // clear all statuses when timer expires
             }
         }
+        private static bool IsDefenseActionState(ActionState state)
+            => state is ActionState.Shielding or ActionState.ShieldDrop or ActionState.GrabAttempt
+                or ActionState.Grabbed or ActionState.Throwing
+                or ActionState.AirDodgeStartup or ActionState.AirDodgeMovement or ActionState.AirDodgeRecovery;
+
+        private static bool CanAcceptDefenseAction(in CharacterState state, CharacterDefinition def,
+            bool blockStunLocked, bool verticalMotionOwned)
+        {
+            if (verticalMotionOwned || blockStunLocked || state.HitstunTicks > 0 || state.HitstopTicks > 0
+                || HasKnockback(state) || HasQueuedLaunch(state)
+                || state.AnimLockTicks > 0 && !IsIasaUnlocked(state, def)
+                || state.LandingLagTicks > 0 || state.WarpSpeed > 0f)
+                return false;
+
+            return state.State is ActionState.Idle or ActionState.Run or ActionState.Crouching
+                or ActionState.Sliding or ActionState.Attacking or ActionState.Shielding;
+        }
+
+        private static void ClearDefenseAttackState(ref CharacterState state)
+        {
+            state.AttackSlot = 0;
+            state.ComboStage = 0;
+            state.AttackElapsedTicks = 0;
+            state.AnimLockTicks = 0;
+            state.BufferedSlot = 0;
+            state.ChargeTicks = 0;
+            state.IsAiming = false;
+            state.AnimIndex = 0;
+            state.SlideAttackCarryActive = false;
+        }
+
+        private static void StartGrabAttempt(ref CharacterState state)
+        {
+            ClearMovementInterruptionFlags(ref state);
+            state.State = ActionState.GrabAttempt;
+            state.StateTicks = (ushort)(DefenseConfig.GrabStartupTicks
+                + DefenseConfig.GrabActiveTicks + DefenseConfig.GrabWhiffRecoveryTicks);
+            state.InteractionId = 0;
+            state.InteractionPartnerId = 0;
+            state.InteractionPhase = (byte)DefenseInteractionPhase.Attempt;
+            state.InteractionTick = 0;
+            state.CapturedYaw = (short)Math.Clamp(
+                (int)MathF.Round(state.FacingYaw * (18000f / MathF.PI)), short.MinValue, short.MaxValue);
+            state.ShieldDropTicks = 0;
+            ClearDefenseAttackState(ref state);
+            state.VX = state.VZ = 0f;
+        }
+
+        private static void StartAirDodge(ref CharacterState state)
+        {
+            ClearMovementInterruptionFlags(ref state);
+            ClearDefenseAttackState(ref state);
+            state.DashDirX = MathF.Sin(state.FacingYaw);
+            state.DashDirZ = MathF.Cos(state.FacingYaw);
+            state.State = ActionState.AirDodgeStartup;
+            state.StateTicks = DefenseConfig.AirDodgeInvulnerabilityTicks;
+            state.AirDodgeRecoveryTicks = 0;
+            state.InvincibilityTicks = Math.Max(state.InvincibilityTicks,
+                DefenseConfig.AirDodgeInvulnerabilityTicks);
+            state.AirDodgesLeft--;
+            state.VX = state.VZ = 0f;
+        }
+
+        private static void AdvanceDefenseStates(ref CharacterState state, MovementStats stats)
+        {
+            if (state.State == ActionState.ShieldDrop && state.ShieldDropTicks == 0)
+                state.State = ActionState.Idle;
+            else if (state.State == ActionState.GrabAttempt && state.StateTicks == 0)
+            {
+                state.State = ActionState.Idle;
+                state.InteractionPhase = (byte)DefenseInteractionPhase.None;
+                state.InteractionId = 0;
+                state.InteractionPartnerId = 0;
+                state.InteractionTick = 0;
+            }
+            else if (state.State == ActionState.AirDodgeStartup && state.StateTicks == 0)
+            {
+                state.State = ActionState.AirDodgeMovement;
+                state.StateTicks = DefenseConfig.AirDodgeMovementTicks;
+                state.VX = state.DashDirX * stats.DashSpeed * DefenseConfig.AirDodgeSpeedMultiplier;
+                state.VZ = state.DashDirZ * stats.DashSpeed * DefenseConfig.AirDodgeSpeedMultiplier;
+            }
+            else if (state.State == ActionState.AirDodgeMovement && state.StateTicks == 0)
+            {
+                state.State = ActionState.AirDodgeRecovery;
+                state.StateTicks = DefenseConfig.AirDodgeRecoveryTicks;
+                state.AirDodgeRecoveryTicks = DefenseConfig.AirDodgeRecoveryTicks;
+                state.VX = state.VZ = 0f;
+            }
+            else if (state.State == ActionState.AirDodgeRecovery && state.AirDodgeRecoveryTicks == 0)
+            {
+                state.State = ActionState.Idle;
+                state.StateTicks = 0;
+            }
+        }
+
+        private static void ProcessDefenseAirDodge(ref CharacterState state, MovementStats stats)
+        {
+            if (state.State == ActionState.AirDodgeStartup
+                || state.State == ActionState.AirDodgeRecovery)
+                state.VX = state.VZ = 0f;
+            else
+            {
+                state.VX = state.DashDirX * stats.DashSpeed * DefenseConfig.AirDodgeSpeedMultiplier;
+                state.VZ = state.DashDirZ * stats.DashSpeed * DefenseConfig.AirDodgeSpeedMultiplier;
+            }
+        }
+
 
         // ── HITSTUN + DI (Directional Influence) ──
 
@@ -1380,7 +1542,6 @@ namespace SlopArena.Shared
                 && s.HitstunTicks == 0
                 && s.AnimLockTicks == 0
                 && s.LandingLagTicks == 0
-                && s.BurstRecoveryTicks == 0
                 && s.DashDurationTicks == 0
                 && s.WarpSpeed <= 0f
                 && !s.IsAiming
@@ -1822,16 +1983,11 @@ namespace SlopArena.Shared
             return false; // still warping
         }
 
-        /// Start a dash (ground or air). 1 second duration, grants invincibility.
-        /// Can be used on ground or in air.
-        /// Clears attack state if interrupting an attack (AttackSlot, AnimLockTicks, ability).
-        /// Deactivation of the server-side ability instance is handled by the caller
-        /// (ServerSimulation) — StartDash only clears the state fields.
-        /// </summary>
+        /// <summary>Legacy airborne Dash remains until #253. The universal grounded
+        /// dash has no admission path; character-specific dash abilities are separate.</summary>
         public static bool StartDash(ref CharacterState s, MovementStats stats, float dirX, float dirZ)
         {
-            if (s.BurstRecoveryTicks > 0) return false; // ADR-0014: burst recovery blocks dash
-            if (s.DashCooldownTicks > 0) return false;
+            if (s.IsGrounded || s.DashCooldownTicks > 0) return false;
             if (s.State != ActionState.Idle && s.State != ActionState.Attacking && s.State != ActionState.Dashing && s.State != ActionState.Run
                 && s.State != ActionState.Crouching && s.State != ActionState.Sliding) return false;
             if (s.InvincibilityTicks > 0) return false; // already invincible
@@ -1878,8 +2034,8 @@ namespace SlopArena.Shared
 
             s.VX = dirX * stats.DashSpeed;
             s.VZ = dirZ * stats.DashSpeed;
-            s.VY = s.IsGrounded ? Math.Max(s.VY, 0f) : 0f;
-            s.AirTimeTicks = s.IsGrounded ? (ushort)0 : (ushort)Math.Max(s.AirTimeTicks, stats.FloatWindowTicks);
+            s.VY = 0f;
+            s.AirTimeTicks = (ushort)Math.Max(s.AirTimeTicks, stats.FloatWindowTicks);
             return true;
         }
 
@@ -2008,44 +2164,9 @@ namespace SlopArena.Shared
             s.WasAirborneDuringKnockback = !s.IsGrounded;
         }
 
-        // ── Burst (ADR-0014) ──
-
         private static bool HasQueuedLaunch(CharacterState s)
             => s.QueuedKBZero || s.QueuedKBBase != 0f || s.QueuedKBGrowth != 0f || s.QueuedKVOverride || s.QueuedKBStun > 0;
 
-        private static void DoDefensiveBurst(ref CharacterState s)
-        {
-            ClearMovementInterruptionFlags(ref s);
-            // Cancel the pending launch entirely (hitstop path) + break any lock + full stop.
-            s.HitstopTicks = 0;
-            s.QueuedKVOverride = false;
-            s.QueuedKBZero = false;
-            s.QueuedKVX = s.QueuedKVY = s.QueuedKVZ = 0f;
-            s.QueuedKBDirX = s.QueuedKBDirZ = 0f;
-            s.QueuedKBAngle = 0;
-            s.QueuedKBBase = 0f; s.QueuedKBGrowth = 0f; s.QueuedKBStun = 0;
-            s.HitstunTicks = 0;
-            s.KVX = s.KVY = s.KVZ = 0f;
-            s.VX = s.VY = s.VZ = 0f;
-            s.State = ActionState.Idle;
-            s.InvincibilityTicks = BurstConfig.DefensiveInvincibilityTicks; // startup telegraph beats the triggering hit
-            s.BurstRecoveryTicks = BurstConfig.DefensiveRecoveryTicks;
-            s.BurstCooldownTicks = BurstConfig.CooldownTicks;
-            s.BurstPending = 1; // ServerSimulation shoves the last attacker
-        }
-
-        private static void DoOffensiveBurst(ref CharacterState s)
-        {
-            ClearMovementInterruptionFlags(ref s);
-            s.AnimLockTicks = 0;
-            s.AttackElapsedTicks = 0;
-            s.ComboStage = 0;                       // LMB chain resets to stage 1
-            s.AttackSlot = 0;                       // signals TickAbilities to drop the ability (interrupt, no OnEnd)
-            s.State = ActionState.Idle;
-            s.BurstRecoveryTicks = BurstConfig.OffensiveRecoveryTicks;
-            s.BurstCooldownTicks = BurstConfig.CooldownTicks;
-            s.BurstPending = 2;                     // ServerSimulation spawns the forward hitbox
-        }
 
         /// <summary>
         /// Apply damage and increase damage percentage.

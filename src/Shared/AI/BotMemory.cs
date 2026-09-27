@@ -18,7 +18,7 @@ public readonly struct CpuObservation
     public readonly ushort AttackElapsedTicks;
     public readonly byte AttackSlot, ComboStage;
     public readonly ushort ComboTimerTicks, AnimLockTicks, LandingLagTicks, ChargeTicks;
-    public readonly ushort HitstunTicks, HitstopTicks, BurstRecoveryTicks;
+    public readonly ushort HitstunTicks, HitstopTicks;
 
     private CpuObservation(int observationTick, in CharacterState state)
     {
@@ -42,7 +42,6 @@ public readonly struct CpuObservation
         ChargeTicks = state.ChargeTicks;
         HitstunTicks = state.HitstunTicks;
         HitstopTicks = state.HitstopTicks;
-        BurstRecoveryTicks = state.BurstRecoveryTicks;
     }
 
     internal static CpuObservation Capture(int observationTick, in CharacterState state)
@@ -51,8 +50,7 @@ public readonly struct CpuObservation
     public bool IsThreatening
         => State is ActionState.Attacking or ActionState.Aiming or ActionState.Warping
             || AnimLockTicks > 0
-            || LandingLagTicks > 0
-            || BurstRecoveryTicks > 0;
+            || LandingLagTicks > 0;
 }
 
 internal readonly struct CpuHitObservation

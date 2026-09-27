@@ -145,57 +145,6 @@ public class PhysicsTests
         Assert.Equal(4, (int)after.HitstunTicks);
     }
 
-    // ── Dash ──
-
-    [Fact]
-    public void GroundDash_TransitionsToIdle()
-    {
-        var arena = TestHelpers.TestArena();
-        var sim = TestHelpers.MakeSim(arena);
-        var state = TestHelpers.PlayerState();
-        state.PY = GroundPx;
-        TestHelpers.RegisterPlayer(sim, Def, state);
-
-        var t0 = TestHelpers.TickN(sim, TestHelpers.Input(dash: true), 1);
-        Assert.Equal(ActionState.Dashing, t0.State);
-
-        // Tick enough frames for the dash to complete and settle
-        for (int i = 0; i < 25; i++)
-            TestHelpers.TickDefault(sim, 1);
-
-        var after = sim.GetState(1);
-        Assert.Equal(ActionState.Idle, after.State);
-        Assert.Equal(0, (int)after.DashDurationTicks);
-    }
-
-    [Fact]
-    public void DashCooldown_BlocksRedash()
-    {
-        var arena = TestHelpers.TestArena();
-        var sim = TestHelpers.MakeSim(arena);
-        var state = TestHelpers.PlayerState();
-        state.PY = GroundPx;
-        TestHelpers.RegisterPlayer(sim, Def, state);
-
-        // Start dash
-        TestHelpers.TickN(sim, TestHelpers.Input(dash: true), 1);
-        for (int i = 0; i < 25; i++)
-            TestHelpers.TickDefault(sim, 1);
-
-        // Re-dash attempt blocked by cooldown
-        var blocked = TestHelpers.TickN(sim, TestHelpers.Input(dash: true), 1);
-        Assert.Equal(ActionState.Idle, blocked.State);
-        Assert.True(blocked.DashCooldownTicks > 0,
-            $"Expected DashCooldownTicks>0 but got {blocked.DashCooldownTicks}");
-
-        // Wait for cooldown
-        for (int i = 0; i < Move.DashCooldownTicks + 5; i++)
-            TestHelpers.TickDefault(sim, 1);
-
-        // Re-dash works
-        var reDash = TestHelpers.TickN(sim, TestHelpers.Input(dash: true), 1);
-        Assert.Equal(ActionState.Dashing, reDash.State);
-    }
 
     // ── Landing ──
 

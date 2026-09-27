@@ -1,0 +1,8 @@
+"lang"
+{
+    "Language" "english"
+    "Tokens"
+    {
+        "#SlopArenaRoom" "%room_name% — %room_phase% (%room_count%)"
+    }
+}

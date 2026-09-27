@@ -1066,16 +1066,41 @@
     flex-direction: column;
     justify-content: flex-end;
 }
+.lobby-invite-hint {
+    margin-top: 6px;
+    color: rgb(240, 238, 232);
+    font-size: 13px;
+    white-space: normal;
+}
+
 
 .lobby-actions-section {
     flex-shrink: 0;
     flex-direction: row;
     align-items: center;
+    flex-wrap: wrap;
+    justify-content: flex-end;
 }
 
 .lobby-actions-section .lobby-action--leave {
     margin-left: 0;
 }
+.lobby-action--invite:disabled {
+    background-color: rgb(83, 77, 91);
+    border-color: rgb(83, 77, 91);
+    color: rgb(222, 216, 224);
+}
+
+.frontend-shell--compact .lobby-actions-section .lobby-action {
+    width: 150px;
+    min-height: 44px;
+    font-size: 15px;
+}
+
+.frontend-shell--compact .lobby-actions-section .lobby-action--start {
+    width: 190px;
+}
+
 
 .frontend-shell--compact .lobby-header-section {
     min-height: 56px;

@@ -179,6 +179,7 @@ namespace SlopArena.Shared.Abilities
                 OwnerId = s.EntityId,
                 ActivationId = ActivationId,
                 ActivationAirborne = AirborneAtStart,
+                AttackSequence = PresentationAttackSequence,
                 FreezesOwner = true,
                 HitsMultipleOpponents = true,
                 HitEntities = sharedHitEntities,
@@ -210,6 +211,7 @@ namespace SlopArena.Shared.Abilities
         {
             hitbox.ActivationId = ActivationId;
             hitbox.ActivationAirborne = AirborneAtStart;
+            hitbox.AttackSequence = PresentationAttackSequence;
             Resolver.Spawn(hitbox);
         }
 

@@ -101,6 +101,8 @@ namespace SlopArena.Client.UI
             var shell = FrontendController.Shell;
             if (shell?.Root == null || !FrontendController.IsFrontendActive)
                 return;
+            if (ChatInputGate.ExternalOverlaySuppressed)
+                return; // Native Steam overlay owns input until every held control is released.
 
             // Exactly one pump owner on shell pages: the chat overlay skips
             // the shell panel, so the router pumps it here (issue #220).
@@ -341,7 +343,7 @@ namespace SlopArena.Client.UI
                 return;
             if (evt.target is not VisualElement target)
                 return;
-            if (UiModalState.Presented)
+            if (UiModalState.Presented || ChatInputGate.ExternalOverlaySuppressed)
                 return;
             if (shell.TopBar != null && shell.TopBar.Contains(target))
             {
@@ -386,6 +388,11 @@ namespace SlopArena.Client.UI
         {
             if (!FrontendController.IsFrontendActive)
                 return;
+            if (ChatInputGate.ExternalOverlaySuppressed)
+            {
+                evt.StopImmediatePropagation();
+                return;
+            }
             evt.StopImmediatePropagation();
             HandlePageCancel();
         }
@@ -398,6 +405,8 @@ namespace SlopArena.Client.UI
         /// </summary>
         public void HandlePageCancel()
         {
+            if (ChatInputGate.ExternalOverlaySuppressed)
+                return;
             if (_cancelConsumedFrame == Time.frameCount)
                 return;
             _cancelConsumedFrame = Time.frameCount;
@@ -426,6 +435,8 @@ namespace SlopArena.Client.UI
                 identity.HandleCancel();
                 return;
             }
+            if (SteamRoomJoinPrompt.CancelActive())
+                return;
             // Escape/Start opens over ordinary page dialogs, chat and editors.
             if (Gamepad.current?.startButton.wasPressedThisFrame == true
                 || Keyboard.current?.escapeKey.wasPressedThisFrame == true)

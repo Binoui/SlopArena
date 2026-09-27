@@ -17,12 +17,11 @@ namespace SlopArena.Client.UI
     ///    Camera.WorldToScreenPoint → RuntimePanelUtils.ScreenToPanel. Panels are
     ///    built at runtime from the roster, so 1v1, 2/3/4-player PvP all adapt
     ///    with no per-count UXML variants.
-    ///  • Action bar — the local player's cooldowns: Dash + canonical abilities 1–4/A/E/R/F.
+    ///  • Action bar — the local player's canonical abilities 1–4/A/E/R/F.
     ///    Labels use effective Input System bindings; cooldown data remains read-only.
     ///
-    /// Juice (spec §3.2): cooldown-ready pulse (1.15x / 0.15s) + white flash,
-    /// persistent burst glow while available, and a damage-taken hit-flash on the
-    /// overhead percent.
+    /// Juice: cooldown-ready pulse (1.15x / 0.15s) + white flash,
+    /// and a damage-taken hit-flash on the overhead percent.
     /// </summary>
     public class HUDManager : MonoBehaviour
     {
@@ -167,18 +166,11 @@ namespace SlopArena.Client.UI
         private readonly Dictionary<ulong, OverheadPanel> _panels = new();
         private readonly Dictionary<ulong, OverheadPanel> _billboardPanels = new();
 
-        private ActionSlot _dashSlot;
-        private ActionSlot _burstSlot;
         private ActionSlot[] _abilitySlots = Array.Empty<ActionSlot>();
 
-        // Consumed-feedback detection state. AttackSlot (1-based ActiveSlot) is the
-        // authoritative "just cast" signal for abilities — it fires on press for every
-        // slot including 0-cooldown normals (1-4), unlike the cooldown fill which only
-        // moves at ability end. Dash/burst never touch AttackSlot, so they are detected
-        // by their own immediate cooldown-start instead.
+        // AttackSlot (1-based ActiveSlot) is the authoritative "just cast" signal for
+        // abilities — it fires on press for every slot, including 0-cooldown normals.
         private byte _prevAttackSlot;
-        private ushort _prevDashCd;
-        private ushort _prevBurstCd;
 
         /// <summary>
         /// Initialize the HUD.
@@ -254,8 +246,6 @@ namespace SlopArena.Client.UI
             if (_uiDocument == null) return;
             var root = _uiDocument.rootVisualElement;
 
-            _dashSlot = new ActionSlot(root.Q<VisualElement>("dash-slot"), "dash-cooldown", "dash-timer", "dash-key", "dash-flash");
-            _burstSlot = new ActionSlot(root.Q<VisualElement>("burst-slot"), "burst-cooldown", "burst-timer", "burst-key", "burst-flash");
 
             _abilitySlots = new ActionSlot[AbilitySlotDefs.Length];
             for (int i = 0; i < AbilitySlotDefs.Length; i++)
@@ -266,8 +256,6 @@ namespace SlopArena.Client.UI
                     $"{d.Name}-cooldown", $"{d.Name}-timer", $"{d.Name}-key", $"{d.Name}-flash");
             }
 
-            _dashSlot.Key.text = HumanInputActions.BindingLabel("Dash", HumanInputActions.KeyboardGroup);
-            _burstSlot.Key.text = HumanInputActions.BindingLabel("Burst", HumanInputActions.KeyboardGroup);
             for (int i = 0; i < AbilitySlotDefs.Length; i++)
                 _abilitySlots[i].Key.text = HumanInputActions.BindingLabel(AbilitySlotDefs[i].Action, HumanInputActions.KeyboardGroup);
         }
@@ -408,8 +396,6 @@ namespace SlopArena.Client.UI
                 LoadSlotIcon(slot.Root.Q<VisualElement>($"{d.Name}-icon"), grounded ?? airborne);
             }
 
-            _dashSlot.MaxCooldown = def.Movement.DashCooldownTicks;
-            _burstSlot.MaxCooldown = BurstConfig.CooldownTicks;
         }
 
         private void LoadSlotIcon(VisualElement icon, AbilitySpec spec)
@@ -504,11 +490,6 @@ namespace SlopArena.Client.UI
             {
                 var state = _getState(_localEntityId);
 
-                UpdateCooldownSlot(_dashSlot, state.DashCooldownTicks);
-
-                ushort burstCd = state.BurstCooldownTicks;
-                UpdateCooldownSlot(_burstSlot, burstCd);
-                _burstSlot.Root.EnableInClassList("ready-glow", burstCd == 0);
 
                 for (int i = 0; i < _abilitySlots.Length; i++)
                 {
@@ -519,8 +500,7 @@ namespace SlopArena.Client.UI
 
                 // Consumed feedback: pulse the slot the instant its action starts.
                 // Abilities pulse on the AttackSlot transition (0→cast — fires at press
-                // for 0-cooldown normals too); dash/burst pulse on their immediate
-                // cooldown start (they never set AttackSlot).
+                // for 0-cooldown normals too).
                 byte castSlot = state.AttackSlot;
                 if (castSlot != _prevAttackSlot)
                 {
@@ -537,10 +517,6 @@ namespace SlopArena.Client.UI
                     }
                     _prevAttackSlot = castSlot;
                 }
-                if (state.DashCooldownTicks > 0 && _prevDashCd == 0) PulseConsumed(_dashSlot);
-                _prevDashCd = state.DashCooldownTicks;
-                if (state.BurstCooldownTicks > 0 && _prevBurstCd == 0) PulseConsumed(_burstSlot);
-                _prevBurstCd = state.BurstCooldownTicks;
             }
         }
 
@@ -588,8 +564,6 @@ namespace SlopArena.Client.UI
             float dt = Time.unscaledDeltaTime;
             UpdateNetworkStats();
 
-            if (_dashSlot != null) TickSlotJuice(_dashSlot, dt);
-            if (_burstSlot != null) TickSlotJuice(_burstSlot, dt);
             for (int i = 0; i < _abilitySlots.Length; i++) TickSlotJuice(_abilitySlots[i], dt);
 
             foreach (var panel in _panels.Values)

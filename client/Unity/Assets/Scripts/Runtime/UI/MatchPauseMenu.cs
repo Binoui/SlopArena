@@ -50,6 +50,8 @@ namespace SlopArena.Client.UI
 
         private void Update()
         {
+            if (SteamRoomJoinPrompt.IsConfirming)
+                return;
             if (ChatInputGate.SuppressShortcuts)
                 return;
             if (SettingsOverlay.ClosedThisFrame)

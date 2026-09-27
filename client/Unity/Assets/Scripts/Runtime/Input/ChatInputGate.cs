@@ -18,6 +18,9 @@ namespace SlopArena.Client.Input
     public static class ChatInputGate
     {
         private static bool _isComposing;
+        private static bool _externalOverlayActive;
+        private static bool _externalReleaseRequired;
+        private static int _externalSuppressThroughFrame = -1;
         private static bool _releaseRequired;
         private static int _suppressThroughFrame = -1;
 
@@ -28,6 +31,34 @@ namespace SlopArena.Client.Input
 
         /// <summary>True while menu/pause and other background shortcuts must be ignored.</summary>
         public static bool SuppressShortcuts => IsInputSuppressed;
+        public static bool ExternalOverlaySuppressed
+        {
+            get
+            {
+                if (_externalOverlayActive || Time.frameCount <= _externalSuppressThroughFrame)
+                    return true;
+                if (!_externalReleaseRequired)
+                    return false;
+                if (AnyHumanInputHeld())
+                    return true;
+                _externalReleaseRequired = false;
+                return false;
+            }
+        }
+
+        public static void BeginExternalOverlay()
+        {
+            _externalOverlayActive = true;
+            _externalReleaseRequired = true;
+            _externalSuppressThroughFrame = Mathf.Max(_externalSuppressThroughFrame, Time.frameCount);
+        }
+
+        public static void EndExternalOverlay()
+        {
+            _externalOverlayActive = false;
+            _externalReleaseRequired = true;
+            _externalSuppressThroughFrame = Mathf.Max(_externalSuppressThroughFrame, Time.frameCount);
+        }
 
         /// <summary>
         /// True for the actual match scenes. Arena_Offline hosts both Training and Solo;
@@ -50,7 +81,7 @@ namespace SlopArena.Client.Input
         {
             get
             {
-                if (_isComposing || Time.frameCount <= _suppressThroughFrame)
+                if (ExternalOverlaySuppressed || _isComposing || Time.frameCount <= _suppressThroughFrame)
                     return true;
 
                 // ChatOverlay opens on Enter during gameplay and focuses the field through

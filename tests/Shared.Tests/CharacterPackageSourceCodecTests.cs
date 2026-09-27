@@ -59,6 +59,38 @@ public sealed class CharacterPackageSourceCodecTests
     }
 
     [Fact]
+    public void CaptureGeometryAndDefenseAnimationRoles_RoundTripThroughAuthoringSource()
+    {
+        var character = JsonNode.Parse(Fixture("character.json"))!.AsObject();
+        character["captureGeometry"]!["reach"] = 1.15f;
+        character["captureGeometry"]!["attackerAnchor"]!["z"] = 0.24f;
+        character["presentation"]!["shield"] = "anim.fightguy.shield";
+        character["presentation"]!["grab"] = "anim.fightguy.grab";
+        character["presentation"]!["grabbed"] = "anim.fightguy.grabbed";
+        character["presentation"]!["throwForward"] = "anim.fightguy.throw-forward";
+        character["presentation"]!["airDodge"] = "anim.fightguy.air-dodge";
+
+        var parsed = CharacterPackageSourceCodec.Load(Fixture("package.json"), character.ToJsonString());
+        Assert.True(parsed.IsValid, string.Join("\n", parsed.Diagnostics));
+        string serialized = CharacterPackageSourceCodec.SerializeCharacter(parsed.Source!.Character);
+        var roundTrip = CharacterPackageSourceCodec.Load(Fixture("package.json"), serialized);
+
+        Assert.True(roundTrip.IsValid, string.Join("\n", roundTrip.Diagnostics));
+        var source = roundTrip.Source!.Character;
+        Assert.Equal(1.15f, source.CaptureGeometry.Reach);
+        Assert.Equal(0.24f, source.CaptureGeometry.AttackerAnchor.Z);
+        Assert.Equal("anim.fightguy.shield", source.Presentation.Shield);
+        Assert.Equal("anim.fightguy.grab", source.Presentation.Grab);
+        Assert.Equal("anim.fightguy.grabbed", source.Presentation.Grabbed);
+        Assert.Equal("anim.fightguy.throw-forward", source.Presentation.ThrowForward);
+        Assert.Equal("anim.fightguy.air-dodge", source.Presentation.AirDodge);
+
+        character.Remove("captureGeometry");
+        var missing = CharacterPackageSourceCodec.Load(Fixture("package.json"), character.ToJsonString());
+        Assert.Contains(missing.Diagnostics, x => x.Code == "schema.missing" && x.Path == "character.captureGeometry");
+    }
+
+    [Fact]
     public void TumbleAndLowPoseBindings_AreOptionalAndRoundTripWhenDeclared()
     {
         var legacyJson = JsonNode.Parse(Fixture("character.json"))!.AsObject();

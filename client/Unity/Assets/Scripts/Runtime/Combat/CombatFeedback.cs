@@ -46,6 +46,7 @@ namespace SlopArena.Client.Combat
 
             foreach (var hit in _bridge.LastTickHits)
             {
+                if (hit.Blocked) continue; // block feedback arrives once via its authoritative semantic event
                 ImpactTier tier = Classify(in hit);
                 GraphicHitEffect.Spawn(in hit, tier);
                 _sfx.Play(tier, _characters.TryGetValue(

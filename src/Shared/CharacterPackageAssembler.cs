@@ -294,9 +294,19 @@ public static class CharacterPackageAssembler
                 EnsureFields(metadata, new[] { "packageId", "version", "cookedSchemaVersion", "compatibility" }, RuntimePath + ".metadata", d);
                 if (HasObject(metadata, "compatibility"))
                     EnsureFields(metadata.GetProperty("compatibility"), new[] { "runtimeApiMin", "runtimeApiMax" }, RuntimePath + ".metadata.compatibility", d);
-                EnsureFieldsOptional(root.GetProperty("character"), new[] { "displayName", "weight", "movement", "presentation", "capsuleRadius", "capsuleHeight", "hipHeight", "hurtboxRadius", "hurtboxCapsules", "hurtboxBoneDefs", "attachmentBoneIds", "presentationIds", "capabilityRequirements", "slots" }, RuntimePath + ".character", d);
+                EnsureFieldsOptional(root.GetProperty("character"), new[] { "displayName", "weight", "movement", "presentation", "capsuleRadius", "capsuleHeight", "hipHeight", "hurtboxRadius", "captureGeometry", "hurtboxCapsules", "hurtboxBoneDefs", "attachmentBoneIds", "presentationIds", "capabilityRequirements", "slots" }, RuntimePath + ".character", d);
                 if (HasObject(root.GetProperty("character"), "presentation"))
-                    EnsureFields(root.GetProperty("character").GetProperty("presentation"), new[] { "idle", "run", "dash", "jump", "fall", "hitSmall", "hitMedium", "hitHard", "tumble", "crouch", "slide", "landStartOffsetSeconds", "modelResourcePath", "visualScale", "hurtboxBoneScale", "modelYOffset", "modelSoleOffset", "autoModelYOffset" }, RuntimePath + ".character.presentation", d);
+                    EnsureFields(root.GetProperty("character").GetProperty("presentation"), new[] { "idle", "run", "dash", "jump", "fall", "hitSmall", "hitMedium", "hitHard", "tumble", "crouch", "slide", "shield", "grab", "grabbed", "throwForward", "airDodge", "landStartOffsetSeconds", "modelResourcePath", "visualScale", "hurtboxBoneScale", "modelYOffset", "modelSoleOffset", "autoModelYOffset" }, RuntimePath + ".character.presentation", d);
+                if (!HasObject(root.GetProperty("character"), "captureGeometry"))
+                    d.Add(Error("package.runtime.schema", RuntimePath + ".character.captureGeometry", "Capture geometry is required."));
+                else
+                {
+                    var capture = root.GetProperty("character").GetProperty("captureGeometry");
+                    EnsureFields(capture, new[] { "reach", "width", "height", "offsetY", "attackerAnchor", "victimAnchor" }, RuntimePath + ".character.captureGeometry", d);
+                    foreach (string anchorName in new[] { "attackerAnchor", "victimAnchor" })
+                        if (HasObject(capture, anchorName))
+                            EnsureFields(capture.GetProperty(anchorName), new[] { "x", "y", "z" }, RuntimePath + ".character.captureGeometry." + anchorName, d);
+                }
                 EnsureFields(root.GetProperty("budget"), new[] { "slotCount", "stageCount", "operationCount", "hitboxCount", "projectileCount", "capabilityCount", "maxTimelineDurationTicks" }, RuntimePath + ".budget", d);
                 if (GetString(metadata, "packageId") != manifest.PackageId || GetString(metadata, "version") != manifest.Version || GetUInt16(metadata, "cookedSchemaVersion") != manifest.CookedSchemaVersion)
                     d.Add(Error("package.runtime.metadata-mismatch", RuntimePath, "Runtime metadata does not match manifest."));
@@ -334,6 +344,11 @@ public static class CharacterPackageAssembler
         AddOptional(required, package.Definition.Presentation.Tumble, d, "character.presentation");
         AddOptional(required, package.Definition.Presentation.Crouch, d, "character.presentation");
         AddOptional(required, package.Definition.Presentation.Slide, d, "character.presentation");
+        AddOptional(required, package.Definition.Presentation.Shield, d, "character.presentation");
+        AddOptional(required, package.Definition.Presentation.Grab, d, "character.presentation");
+        AddOptional(required, package.Definition.Presentation.Grabbed, d, "character.presentation");
+        AddOptional(required, package.Definition.Presentation.ThrowForward, d, "character.presentation");
+        AddOptional(required, package.Definition.Presentation.AirDodge, d, "character.presentation");
         foreach (var slot in package.Definition.Slots)
         {
             if (!string.IsNullOrEmpty(slot.AimAnimationId))
@@ -359,6 +374,9 @@ public static class CharacterPackageAssembler
                 AddOptional(required, crouch.GetString() ?? "", d, "character.presentation");
             if (presentation.TryGetProperty("slide", out var slide) && slide.ValueKind == JsonValueKind.String)
                 AddOptional(required, slide.GetString() ?? "", d, "character.presentation");
+            foreach (string name in new[] { "shield", "grab", "grabbed", "throwForward", "airDodge" })
+                if (presentation.TryGetProperty(name, out var role) && role.ValueKind == JsonValueKind.String)
+                    AddOptional(required, role.GetString() ?? "", d, "character.presentation");
         }
         if (character.TryGetProperty("slots", out var slots) && slots.ValueKind == JsonValueKind.Array)
             foreach (var slot in slots.EnumerateArray())

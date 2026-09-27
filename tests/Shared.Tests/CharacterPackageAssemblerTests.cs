@@ -97,6 +97,7 @@ public sealed class CharacterPackageAssemblerTests
         character["presentation"]!["tumble"] = "anim.tumble";
         character["presentation"]!["crouch"] = "anim.fightguy.crouch";
         character["presentation"]!["slide"] = "anim.fightguy.slide";
+        character["presentation"]!["shield"] = "anim.fightguy.shield";
         var compile = CharacterPackageCompiler.Compile(
             File.ReadAllText(Path.Combine(root, "package.json")),
             character.ToJsonString(), CharacterCookProfile.TrustedBuiltIn);
@@ -107,6 +108,7 @@ public sealed class CharacterPackageAssemblerTests
         var animations = binding["animations"]!.AsArray();
         animations.Remove(animations.Single(x => x!["semanticId"]!.GetValue<string>() == "anim.tumble"));
         animations.Remove(animations.Single(x => x!["semanticId"]!.GetValue<string>() == "anim.fightguy.crouch"));
+        animations.Remove(animations.Single(x => x!["semanticId"]!.GetValue<string>() == "anim.fightguy.shield"));
         var broken = new CharacterPackageAssemblyInput(
             input.PackageId, input.Version, input.Creator, input.License, input.Attribution,
             input.AuthoringSchemaVersion, input.CookedSchemaVersion, input.RuntimeApiMin, input.RuntimeApiMax,
@@ -123,6 +125,9 @@ public sealed class CharacterPackageAssemblerTests
         string root = FindRepoFile("client/Unity/Assets/CharacterPackages/fightguy");
         var character = JsonNode.Parse(File.ReadAllText(Path.Combine(root, "character.json")))!.AsObject();
         character["slots"]![0]!["allowSlideCarry"] = false;
+        character["captureGeometry"]!["reach"] = 1.1f;
+        character["captureGeometry"]!["attackerAnchor"]!["z"] = 0.22f;
+        character["presentation"]!["shield"] = "anim.fightguy.shield";
         ((JsonArray)character["slots"]![0]!["timeline"]!["stages"]![0]!["operations"]!).Add(new JsonObject
         {
             ["kind"] = "gravityWindow",
@@ -145,7 +150,11 @@ public sealed class CharacterPackageAssemblerTests
 
         var loaded = CookedCharacterPackageLoader.LoadAssembly(assembly);
         Assert.True(loaded.IsValid, string.Join("; ", loaded.Diagnostics.Select(x => x.Message)));
-        var operation = Assert.Single(loaded.Package!.Definition.Slots
+        var loadedPackage = loaded.Package!;
+        Assert.Equal(1.1f, loadedPackage.Definition.CaptureGeometry.Reach);
+        Assert.Equal(0.22f, loadedPackage.Definition.CaptureGeometry.AttackerAnchor.Z);
+        Assert.Equal("anim.fightguy.shield", loadedPackage.Definition.Presentation.Shield);
+        var operation = Assert.Single(loadedPackage.Definition.Slots
             .Single(slot => slot.Id == "ground.1").Timeline.Stages[0].Operations
             .OfType<CookedGravityWindowOperation>());
         Assert.Equal((0.5f, (ushort)5), (operation.GravityScale, operation.DurationTicks));
@@ -180,6 +189,33 @@ public sealed class CharacterPackageAssemblerTests
             Assert.Contains(loaded.Diagnostics, diagnostic => diagnostic.Code == "package.compatibility.unsupported");
     }
 
+    [Fact]
+    public void CaptureGeometryChangesCookedContentAndPackageHashes()
+    {
+        var baselinePackage = Compile();
+        string root = FindRepoFile("client/Unity/Assets/CharacterPackages/fightguy");
+        var character = JsonNode.Parse(File.ReadAllText(Path.Combine(root, "character.json")))!.AsObject();
+        character["captureGeometry"]!["reach"] = 1.2f;
+        var changedCompile = CharacterPackageCompiler.Compile(
+            File.ReadAllText(Path.Combine(root, "package.json")),
+            character.ToJsonString(),
+            CharacterCookProfile.TrustedBuiltIn);
+        Assert.NotNull(changedCompile.CookedPackage);
+
+        var emptyDependencies = Array.Empty<PackageDependencySource>();
+        var emptyCapabilities = Array.Empty<CookedCapabilityRequirement>();
+        var noWarnings = Array.Empty<CharacterDiagnostic>();
+        var baseline = CharacterPackageAssembler.Assemble(BuildInput(
+            baselinePackage, emptyDependencies, emptyCapabilities, noWarnings));
+        var changed = CharacterPackageAssembler.Assemble(BuildInput(
+            changedCompile.CookedPackage!, emptyDependencies, emptyCapabilities, noWarnings));
+
+        Assert.True(baseline.IsValid, string.Join("; ", baseline.Diagnostics.Select(x => x.Message)));
+        Assert.True(changed.IsValid, string.Join("; ", changed.Diagnostics.Select(x => x.Message)));
+        Assert.NotEqual(baseline.CookedContentHash, changed.CookedContentHash);
+        Assert.NotEqual(baseline.PackageHash, changed.PackageHash);
+    }
+
     private static CharacterPackageAssemblyResult AssembleFixture()
     {
         var package = Compile();
@@ -201,6 +237,16 @@ public sealed class CharacterPackageAssemblerTests
             names.Add(package.Definition.Presentation.Crouch);
         if (!string.IsNullOrEmpty(package.Definition.Presentation.Slide))
             names.Add(package.Definition.Presentation.Slide);
+        foreach (string role in new[]
+        {
+            package.Definition.Presentation.Shield,
+            package.Definition.Presentation.Grab,
+            package.Definition.Presentation.Grabbed,
+            package.Definition.Presentation.ThrowForward,
+            package.Definition.Presentation.AirDodge,
+        })
+            if (!string.IsNullOrEmpty(role))
+                names.Add(role);
         foreach (var slot in package.Definition.Slots)
         {
             if (!string.IsNullOrEmpty(slot.AimAnimationId)) names.Add(slot.AimAnimationId);

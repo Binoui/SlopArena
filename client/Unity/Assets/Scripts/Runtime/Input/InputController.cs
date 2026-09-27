@@ -9,6 +9,84 @@ using UnityEngine.InputSystem.Controls;
 
 namespace SlopArena.Client.Input
 {
+    /// <summary>Latched logical defense and grab edges between input polls and simulation ticks.</summary>
+    internal struct DefenseInputEdges
+    {
+        private bool _grabChordArmed;
+        private bool _shieldReleaseRequired;
+        private bool _controllerChordHeld;
+        private bool _pendingShieldPressed;
+        private bool _pendingGrabPressed;
+
+        public DefenseInputEdges(bool grabChordArmed)
+        {
+            _grabChordArmed = grabChordArmed;
+            _shieldReleaseRequired = false;
+            _controllerChordHeld = false;
+            _pendingShieldPressed = false;
+            _pendingGrabPressed = false;
+        }
+
+        public void Update(bool shieldHeld, bool rtHeld, bool rtPressed, bool modifierHeld,
+            bool modifierPressed, bool keyboardShieldPressed, bool directGrabPressed)
+        {
+            _controllerChordHeld = modifierHeld && rtHeld;
+            bool chordComplete = _grabChordArmed && _controllerChordHeld && (modifierPressed || rtPressed);
+            if (chordComplete)
+            {
+                _pendingGrabPressed = true;
+                _pendingShieldPressed = false;
+                _grabChordArmed = false;
+                _shieldReleaseRequired = true;
+            }
+            else if (!modifierHeld || !rtHeld)
+            {
+                _grabChordArmed = true;
+            }
+
+            if (_shieldReleaseRequired && !shieldHeld)
+                _shieldReleaseRequired = false;
+
+            if (directGrabPressed)
+            {
+                _pendingGrabPressed = true;
+                _pendingShieldPressed = false;
+                if (shieldHeld) _shieldReleaseRequired = true;
+            }
+
+            bool defenseConsumed = directGrabPressed || chordComplete || _shieldReleaseRequired || _controllerChordHeld;
+            if (!defenseConsumed && (rtPressed || keyboardShieldPressed))
+                _pendingShieldPressed = true;
+        }
+
+        public bool ShieldHeld(bool rawShieldHeld) =>
+            rawShieldHeld && !_shieldReleaseRequired && !_controllerChordHeld;
+
+        public bool TakeShieldPressed()
+        {
+            bool value = _pendingShieldPressed;
+            _pendingShieldPressed = false;
+            return value;
+        }
+
+        public bool TakeGrabPressed()
+        {
+            bool value = _pendingGrabPressed;
+            _pendingGrabPressed = false;
+            return value;
+        }
+
+        public void ClearPending(bool shieldHeld)
+        {
+            _pendingShieldPressed = false;
+            _pendingGrabPressed = false;
+            if (shieldHeld) _shieldReleaseRequired = true;
+        }
+
+        public static byte ResolveFaceSlot(bool gamepad, bool modifierHeld, byte normal, byte special) =>
+            gamepad && modifierHeld ? special : normal;
+    }
+
     /// <summary>
     /// Centralized human input adapter. Polls the shared Input System action map once
     /// per frame, buffers discrete edges, and builds the existing InputState contract.
@@ -25,10 +103,7 @@ namespace SlopArena.Client.Input
         // ── Frame state (set by Poll) ──
         /// <summary>Pending jump: set by Poll, consumed by BuildInputState.</summary>
         private bool _pendingJump;
-        /// <summary>Pending dash: set by Poll, consumed by BuildInputState.</summary>
-        private bool _pendingDash;
-        /// <summary>Pending burst: set by Poll, consumed by BuildInputState (ADR-0014).</summary>
-        private bool _pendingBurst;
+        private DefenseInputEdges _defenseInputEdges = new DefenseInputEdges(true);
         /// <summary>Pending dedicated Down press edge: set by Poll/InjectAI and consumed once by BuildInputState.</summary>
         private bool _pendingDownPressed;
         /// <summary>
@@ -174,7 +249,6 @@ namespace SlopArena.Client.Input
                 // AI-driven: use injected input. DownPressed was latched by InjectAI and is
                 // consumed by BuildInputState exactly once for this supplied input.
                 _pendingJump = _aiInput.Jump;
-                _pendingDash = _aiInput.Dash;
                 return;
             }
 
@@ -190,12 +264,9 @@ namespace SlopArena.Client.Input
             }
 
             var jump = HumanInputActions.Get("Jump");
-            var dash = HumanInputActions.Get("Dash");
-            var burst = HumanInputActions.Get("Burst");
+            PollDefense();
             var down = HumanInputActions.Get("Down");
             if (jump.WasPressedThisFrame()) _pendingJump = true;
-            if (dash.WasPressedThisFrame()) _pendingDash = true;
-            if (burst.WasPressedThisFrame()) _pendingBurst = true;
             if (_downReleaseRequired)
             {
                 if (!down.IsPressed()) _downReleaseRequired = false;
@@ -234,11 +305,13 @@ namespace SlopArena.Client.Input
                     if (control.device is Gamepad && button.wasPressedThisFrame && _controllerButtons[face] == null)
                     {
                         _controllerButtons[face] = button;
-                        _controllerSlots[face] = modifier ? SpecialSlots[face] : NormalSlots[face];
+                        _controllerSlots[face] = DefenseInputEdges.ResolveFaceSlot(
+                            true, modifier, NormalSlots[face], SpecialSlots[face]);
                         if (_pendingSlotPress == 0) _pendingSlotPress = _controllerSlots[face];
                     }
                     else if (control.device is Keyboard && button.wasPressedThisFrame && _pendingSlotPress == 0)
-                        _pendingSlotPress = NormalSlots[face];
+                        _pendingSlotPress = DefenseInputEdges.ResolveFaceSlot(
+                            false, false, NormalSlots[face], SpecialSlots[face]);
                 }
             }
             foreach (var (actionName, slot) in SlotActions)
@@ -249,24 +322,48 @@ namespace SlopArena.Client.Input
                     _pendingSlotPress = slot;
             }
         }
+        private void PollDefense()
+        {
+            var shield = HumanInputActions.Get("Shield");
+            var modifier = HumanInputActions.Get("SpecialModifier");
+            bool rtHeld = false;
+            bool rtPressed = false;
+            bool keyboardShieldPressed = false;
+            foreach (var control in shield.controls)
+            {
+                if (control is not ButtonControl button) continue;
+                if (control.device is Gamepad)
+                {
+                    rtHeld |= button.isPressed;
+                    rtPressed |= button.wasPressedThisFrame;
+                }
+                else if (control.device is Keyboard)
+                    keyboardShieldPressed |= button.wasPressedThisFrame;
+            }
+            _defenseInputEdges.Update(
+                shield.IsPressed(), rtHeld, rtPressed, modifier.IsPressed(),
+                modifier.WasPressedThisFrame(), keyboardShieldPressed,
+                HumanInputActions.Get("Grab").WasPressedThisFrame());
+        }
+
+
 
         private static readonly string[] FaceActions = { "Slot1", "Slot2", "Slot3", "Slot4" };
         private static readonly byte[] NormalSlots = { AbilitySlots.Slot1, AbilitySlots.Slot2, AbilitySlots.Slot3, AbilitySlots.Slot4 };
         private static readonly byte[] SpecialSlots = { AbilitySlots.A, AbilitySlots.E, AbilitySlots.R, AbilitySlots.F };
 
         /// <summary>
-        /// Discard buffered jump/dash/slot presses without consuming them. Called
+        /// Discard buffered jump/slot presses without consuming them. Called
         /// when pausing so stale presses don't fire on the first frame after
         /// resume (issue #77).
         /// </summary>
         public void ClearPendingFrameState()
         {
             _pendingJump = false;
-            _pendingDash = false;
-            _pendingBurst = false;
             _pendingDownPressed = false;
             _pendingFaceToCamera = false;
             _pendingToggleLock = false;
+            _defenseInputEdges.ClearPending(HumanInputActions.Get("Shield").IsPressed());
             _pendingSlotPress = 0;
             Array.Clear(_controllerSlots, 0, _controllerSlots.Length);
             Array.Clear(_controllerButtons, 0, _controllerButtons.Length);
@@ -352,6 +449,9 @@ namespace SlopArena.Client.Input
                 input.Left = move.x < -0.3f;
                 input.Right = move.x > 0.3f;
                 input.JumpHeld = _aiInput.JumpHeld;
+                input.ShieldHeld = _aiInput.ShieldHeld;
+                input.ShieldPressed = _aiInput.ShieldPressed;
+                input.GrabPressed = _aiInput.GrabPressed;
                 input.FaceToCamera = _aiInput.FaceToCamera;
                 input.ToggleLock = _aiInput.ToggleLock;
                 input.ActiveSlot = pendingSlotPress;
@@ -359,11 +459,6 @@ namespace SlopArena.Client.Input
                 {
                     input.Jump = true;
                     _pendingJump = false;
-                }
-                if (_pendingDash)
-                {
-                    input.Dash = true;
-                    _pendingDash = false;
                 }
 
                 Vector3 moveDir = new Vector3(move.x, 0f, move.y).normalized;
@@ -426,10 +521,10 @@ namespace SlopArena.Client.Input
             input.Left = moveDirection.x < -0.3f;
             input.Right = moveDirection.x > 0.3f;
             input.JumpHeld = HumanInputActions.Get("Jump").IsPressed();
-            // Burst fires even when the FSM gates movement — it must work during
-            // hitstop/hitstun (the gate zeroes Jump/Dash only).
-            input.Burst = _pendingBurst;
-            _pendingBurst = false;
+            var shieldAction = HumanInputActions.Get("Shield");
+            input.ShieldHeld = _defenseInputEdges.ShieldHeld(shieldAction.IsPressed());
+            input.ShieldPressed = _defenseInputEdges.TakeShieldPressed();
+            input.GrabPressed = _defenseInputEdges.TakeGrabPressed();
             input.ActiveSlot = pendingSlotPress;
             input.IsAiming = aimCtx.IsAiming;
             // Utility edges (ADR-0017/0018): consumed here, one tick each. Set before the
@@ -463,7 +558,6 @@ namespace SlopArena.Client.Input
                 input.MoveY = 0f;
                 input.Jump = false;
                 input.JumpHeld = false;
-                input.Dash = false;
                 moveDirection = Vector3.zero;
                 snappedInputDirection = Vector2.zero;
             }
@@ -475,12 +569,6 @@ namespace SlopArena.Client.Input
                     input.Jump = true;
                     _pendingJump = false;
                     Debug.Log("[Input] _pendingJump consumed -> input.Jump=true");
-                }
-                if (_pendingDash)
-                {
-                    input.Dash = true;
-                    _pendingDash = false;
-                    Debug.Log("[Input] _pendingDash consumed -> input.Dash=true");
                 }
             }
 

@@ -12,6 +12,13 @@ namespace SlopArena.Shared
     {
         public bool Up, Down, DownPressed, Left, Right;
         public bool Jump, Dash, Burst;
+        // Dash is legacy airborne-only until #253. Burst is a reserved inert wire bit.
+        /// <summary>Logical shield/air-dodge control held this tick.</summary>
+        public bool ShieldHeld;
+        /// <summary>Fresh logical defense press edge; simulation chooses ground shield or air dodge.</summary>
+        public bool ShieldPressed;
+        /// <summary>Fresh logical grab edge; client modifier/chord handling is already resolved.</summary>
+        public bool GrabPressed;
         /// <summary>
         /// True while the jump key is physically held (issue #116 / #106). The sim counts
         /// consecutive held ticks (<c>CharacterState.JumpHeldTicks</c>) and releases within
@@ -54,11 +61,12 @@ namespace SlopArena.Shared
 
         /// <summary>21 bytes: 20-byte input payload plus the protocol version.</summary>
         /// <remarks>
-        /// Flags byte (byte 8): 1=Up, 2=Down, 4=Left, 8=Right, 0x10=Jump, 0x20=Dash,
-        /// 0x40=Burst (ADR-0014; formerly Crouch, deprecated), 0x80=IsAiming.
+        /// Flags byte (byte 8): 1=Up, 2=Down, 4=Left, 8=Right, 0x10=Jump, 0x20=legacy airborne Dash,
+        /// 0x40=retired Burst (reserved, inert), 0x80=IsAiming.
         /// Flags2 byte (byte 19): 1=JumpHeld (ADR-0016 short hop, issue #116),
         /// 2=FaceToCamera (ADR-0017 LMB facing snap, issue #126), 4=ToggleLock
-        /// (ADR-0018 RMB target-lock toggle, issue #127), 8=DownPressed.
+        /// (ADR-0018 RMB target-lock toggle, issue #127), 8=DownPressed,
+        /// 0x10=ShieldHeld, 0x20=ShieldPressed, 0x40=GrabPressed.
         /// Byte 20 is the exact SimulationProtocol version.
         /// </remarks>
         public const int Size = 21;
@@ -90,6 +98,9 @@ namespace SlopArena.Shared
             if (JumpHeld) flags2 |= 1;
             if (FaceToCamera) flags2 |= 2;
             if (ToggleLock) flags2 |= 4;
+            if (ShieldHeld) flags2 |= 0x10;
+            if (ShieldPressed) flags2 |= 0x20;
+            if (GrabPressed) flags2 |= 0x40;
             if (DownPressed) flags2 |= 8;
             buf[19] = flags2;
             buf[20] = SimulationProtocol.Version;
@@ -125,6 +136,9 @@ namespace SlopArena.Shared
             input.JumpHeld = (buf[19] & 1) != 0;
             input.FaceToCamera = (buf[19] & 2) != 0;
             input.ToggleLock = (buf[19] & 4) != 0;
+            input.ShieldHeld = (buf[19] & 0x10) != 0;
+            input.ShieldPressed = (buf[19] & 0x20) != 0;
+            input.GrabPressed = (buf[19] & 0x40) != 0;
             input.DownPressed = (buf[19] & 8) != 0;
             return input;
         }

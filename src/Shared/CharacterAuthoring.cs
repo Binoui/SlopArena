@@ -30,6 +30,7 @@ public sealed record CharacterAuthoringDocument(
     float CapsuleHeight,
     float HipHeight,
     float HurtboxRadius,
+    CharacterCaptureGeometrySource CaptureGeometry,
     IReadOnlyList<HurtboxCapsuleSource> HurtboxCapsules,
     IReadOnlyList<HurtboxBoneSource> HurtboxBoneDefs,
     IReadOnlyList<string> AttachmentBoneIds,
@@ -81,7 +82,12 @@ public sealed record CharacterPresentationSource(
     bool AutoModelYOffset = false,
     string Tumble = "",
     string Crouch = "",
-    string Slide = "");
+    string Slide = "",
+    string Shield = "",
+    string Grab = "",
+    string Grabbed = "",
+    string ThrowForward = "",
+    string AirDodge = "");
 
 public sealed record HurtboxCapsuleSource(
     float StartX,
@@ -98,6 +104,16 @@ public sealed record HurtboxBoneSource(
     float OffsetY,
     float OffsetZ,
     float Radius);
+
+public sealed record CharacterCaptureGeometrySource(
+    float Reach,
+    float Width,
+    float Height,
+    float OffsetY,
+    CaptureAnchorSource AttackerAnchor,
+    CaptureAnchorSource VictimAnchor);
+
+public sealed record CaptureAnchorSource(float X, float Y, float Z);
 
 public sealed record CapabilityRequirementSource(string CapabilityId, string CapabilityVersion);
 public sealed record CharacterSlotSource(

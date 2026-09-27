@@ -14,6 +14,15 @@ namespace SlopArena.Shared
         Aiming = 8,
         Run = 9,
         LedgeHang = 10,
-        Crouching = 11
+        Crouching = 11,
+        // Defense states; appended to preserve all existing wire values.
+        Shielding = 12,
+        ShieldDrop = 13,
+        GrabAttempt = 14,
+        Grabbed = 15,
+        Throwing = 16,
+        AirDodgeStartup = 17,
+        AirDodgeMovement = 18,
+        AirDodgeRecovery = 19
     }
 }

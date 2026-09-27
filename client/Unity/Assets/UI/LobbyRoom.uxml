@@ -30,9 +30,11 @@
         </ui:VisualElement>
         <ui:VisualElement name="page-summary" class="page-section lobby-summary-section">
             <ui:Label name="lbl-status" text="Connecting to the room…" class="lobby-status" />
+            <ui:Label name="lbl-invite-hint" class="lobby-invite-hint" style="display: none;" />
             <ui:Button name="btn-retry" text="RETRY CONNECTION" class="btn-secondary lobby-retry" style="display: none;" />
         </ui:VisualElement>
         <ui:VisualElement name="page-actions" class="page-section lobby-actions-section">
+            <ui:Button name="btn-invite" text="INVITE FRIEND" class="btn-secondary lobby-action lobby-action--invite" style="display: none;" />
             <ui:Button name="btn-leave" text="LEAVE ROOM" class="btn-secondary lobby-action lobby-action--leave" />
             <ui:Button name="btn-start" text="CHOOSE FIGHTERS" class="btn-primary lobby-action lobby-action--start" style="display: none;" />
         </ui:VisualElement>

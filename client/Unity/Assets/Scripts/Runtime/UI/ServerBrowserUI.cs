@@ -222,14 +222,7 @@ namespace SlopArena.Client.UI
                     return;
                 if (myRoom != null)
                 {
-                    ClientSession.AuthToken = chat.AuthToken;
-                    ClientSession.SteamId = chat.SteamId ?? 0;
-                    ClientSession.Username = chat.Self?.DisplayName;
-                    ClientSession.SelectedOnlineMode = ClientSession.OnlineSelection.Room;
-                    ClientSession.SelectedRoomId = myRoom.Id;
-                    ClientSession.SelectedServerId = Guid.Empty;
-                    ClientSession.SelectedServerName = myRoom.Name;
-                    chat.UpdateRoomTitle(myRoom);
+                    AdoptRoom(chat, myRoom);
                     FrontendController.Show(FrontendPage.LobbyRoom);
                     return;
                 }
@@ -349,14 +342,7 @@ namespace SlopArena.Client.UI
                     return;
                 }
 
-                ClientSession.AuthToken = chat!.AuthToken;
-                ClientSession.SteamId = chat.SteamId ?? 0;
-                ClientSession.Username = chat.Self?.DisplayName;
-                ClientSession.SelectedOnlineMode = ClientSession.OnlineSelection.Room;
-                ClientSession.SelectedRoomId = joined.Id;
-                ClientSession.SelectedServerId = Guid.Empty;
-                ClientSession.SelectedServerName = joined.Name;
-                chat!.UpdateRoomTitle(joined);
+                AdoptRoom(chat!, joined);
                 FrontendController.Show(FrontendPage.LobbyRoom);
             }
             catch (OperationCanceledException) when (request.IsCancellationRequested)
@@ -406,14 +392,7 @@ namespace SlopArena.Client.UI
                     await LeaveStaleRoomAsync(lobby, created);
                     return;
                 }
-                ClientSession.AuthToken = chat!.AuthToken;
-                ClientSession.SteamId = chat.SteamId ?? 0;
-                ClientSession.Username = chat.Self?.DisplayName;
-                ClientSession.SelectedOnlineMode = ClientSession.OnlineSelection.Room;
-                ClientSession.SelectedRoomId = room.Id;
-                ClientSession.SelectedServerId = Guid.Empty;
-                ClientSession.SelectedServerName = room.Name;
-                chat!.UpdateRoomTitle(room);
+                AdoptRoom(chat!, room);
                 FrontendController.Show(FrontendPage.LobbyRoom);
             }
             catch (OperationCanceledException) when (request.IsCancellationRequested)
@@ -511,6 +490,19 @@ namespace SlopArena.Client.UI
             ShowBrowserFailure("Steam account changed. Sign in with the current account before using Rooms.");
         }
 
+
+        /// <summary>Shared accepted-Room handoff for browser and Steam requests.</summary>
+        public static void AdoptRoom(ChatSession chat, RoomSnapshot room)
+        {
+            ClientSession.AuthToken = chat.AuthToken;
+            ClientSession.SteamId = chat.SteamId ?? 0;
+            ClientSession.Username = chat.Self?.DisplayName;
+            ClientSession.SelectedOnlineMode = ClientSession.OnlineSelection.Room;
+            ClientSession.SelectedRoomId = room.Id;
+            ClientSession.SelectedServerId = Guid.Empty;
+            ClientSession.SelectedServerName = room.Name;
+            chat.UpdateRoomTitle(room);
+        }
 
         private static string DescribeRoomError(Exception ex, string fallback)
         {

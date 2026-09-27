@@ -366,26 +366,6 @@
     background-color: rgba(240, 238, 232, 0.88);
 }
 
-.dash-slot {
-    width: 46px;
-    height: 46px;
-    margin-right: 3px;
-    rotate: -1deg;
-    border-bottom-color: #2f6bff;
-}
-
-.burst-slot {
-    width: 50px;
-    height: 46px;
-    margin-left: 3px;
-    rotate: 1deg;
-    border-bottom-color: #e05c2a;
-}
-
-.burst-slot.ready-glow {
-    background-color: #4b231e;
-    border-bottom-color: #ffc821;
-}
 
 /* ── Locked target readout ──────────────────────────────────────────────── */
 .target-lock {

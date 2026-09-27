@@ -115,6 +115,7 @@ public static class CharacterPackageCompiler
         }
         if (capabilityCount > CookedBudget.MaxCapabilityRequirements) d.Error("budget.exceeded", "character.capabilityRequirements", "Capability requirement budget exceeded.");
         ValidateFinite(c, d);
+        ValidateCaptureGeometry(c.CaptureGeometry, d);
         ValidateIds(c, d);
         var explicitSlots = new Dictionary<string, CharacterSlotSource>(StringComparer.Ordinal);
         for (var i = 0; i < (c.Slots?.Count ?? 0); i++)
@@ -146,7 +147,22 @@ public static class CharacterPackageCompiler
         if (resolved.Count != CanonicalSlots.Length) d.Error("reference.unresolved", "character.slots", "Not all canonical slots resolve.");
         if (d.HasErrors) return;
         var metadata = new CookedPackageMetadata(m.PackageId, m.Version, SchemaVersion, RuntimeApiMin, RuntimeApiMax);
-        var definition = new CookedCharacterDefinition(c.DisplayName, c.Weight, CookMovement(c.Movement), CookPresentation(c.Presentation), c.CapsuleRadius, c.CapsuleHeight, c.HipHeight, c.HurtboxRadius, c.HurtboxCapsules.Select(x => new CookedHurtboxCapsule(x.StartX, x.StartY, x.StartZ, x.EndX, x.EndY, x.EndZ, x.Radius)).ToList(), c.HurtboxBoneDefs.Select(x => new CookedHurtboxBone(x.BoneId, x.OffsetX, x.OffsetY, x.OffsetZ, x.Radius)).ToList(), c.AttachmentBoneIds.OrderBy(x => x, StringComparer.Ordinal).ToList(), c.PresentationIds.OrderBy(x => x, StringComparer.Ordinal).ToList(), c.CapabilityRequirements.OrderBy(x => x.CapabilityId, StringComparer.Ordinal).Select(x => new CookedCapabilityRequirement(x.CapabilityId, x.CapabilityVersion)).ToList(), cookedSlots);
+        var definition = new CookedCharacterDefinition(
+            c.DisplayName,
+            c.Weight,
+            CookMovement(c.Movement),
+            CookPresentation(c.Presentation),
+            c.CapsuleRadius,
+            c.CapsuleHeight,
+            c.HipHeight,
+            c.HurtboxRadius,
+            CookCaptureGeometry(c.CaptureGeometry),
+            c.HurtboxCapsules.Select(x => new CookedHurtboxCapsule(x.StartX, x.StartY, x.StartZ, x.EndX, x.EndY, x.EndZ, x.Radius)).ToList(),
+            c.HurtboxBoneDefs.Select(x => new CookedHurtboxBone(x.BoneId, x.OffsetX, x.OffsetY, x.OffsetZ, x.Radius)).ToList(),
+            c.AttachmentBoneIds.OrderBy(x => x, StringComparer.Ordinal).ToList(),
+            c.PresentationIds.OrderBy(x => x, StringComparer.Ordinal).ToList(),
+            c.CapabilityRequirements.OrderBy(x => x.CapabilityId, StringComparer.Ordinal).Select(x => new CookedCapabilityRequirement(x.CapabilityId, x.CapabilityVersion)).ToList(),
+            cookedSlots);
         var budget = new CookedBudget(cookedSlots.Count, stageCount, operationCount, hitboxCount, projectileCount, capabilityOperationCount, maxDuration);
         var bytes = WriteCanonical(metadata, definition, budget);
         package = new CookedCharacterPackage(metadata, definition, budget, d.ToList(), bytes);
@@ -374,7 +390,16 @@ public static class CharacterPackageCompiler
             ValidateId(c.Presentation.Tumble, "character.presentation.tumble", d);
             if (!standardAnimations.Add(c.Presentation.Tumble)) d.Error("id.duplicate", "character.presentation", "Duplicate standard animation ID.");
         }
-        foreach (var (id, field) in new[] { (c.Presentation.Crouch, "crouch"), (c.Presentation.Slide, "slide") })
+        foreach (var (id, field) in new[]
+        {
+            (c.Presentation.Crouch, "crouch"),
+            (c.Presentation.Slide, "slide"),
+            (c.Presentation.Shield, "shield"),
+            (c.Presentation.Grab, "grab"),
+            (c.Presentation.Grabbed, "grabbed"),
+            (c.Presentation.ThrowForward, "throwForward"),
+            (c.Presentation.AirDodge, "airDodge")
+        })
         {
             if (string.IsNullOrEmpty(id)) continue;
             ValidateId(id, $"character.presentation.{field}", d);
@@ -417,6 +442,26 @@ public static class CharacterPackageCompiler
         floats.AddRange(c.HurtboxCapsules.SelectMany(x => new[] { x.StartX, x.StartY, x.StartZ, x.EndX, x.EndY, x.EndZ, x.Radius }));
         floats.AddRange(c.HurtboxBoneDefs.SelectMany(x => new[] { x.OffsetX, x.OffsetY, x.OffsetZ, x.Radius }));
         foreach (var value in floats) if (float.IsNaN(value) || float.IsInfinity(value)) d.Error("value.non-finite", "character", "Numeric value must be finite.");
+    }
+    private static void ValidateCaptureGeometry(CharacterCaptureGeometrySource? geometry, DiagnosticBag d)
+    {
+        if (geometry == null || geometry.AttackerAnchor == null || geometry.VictimAnchor == null)
+        {
+            d.Error("schema.missing", "character.captureGeometry", "Capture geometry and both anchors are required.");
+            return;
+        }
+
+        ValidateFiniteValues(
+            new[]
+            {
+                geometry.Reach, geometry.Width, geometry.Height, geometry.OffsetY,
+                geometry.AttackerAnchor.X, geometry.AttackerAnchor.Y, geometry.AttackerAnchor.Z,
+                geometry.VictimAnchor.X, geometry.VictimAnchor.Y, geometry.VictimAnchor.Z
+            },
+            "character.captureGeometry",
+            d);
+        if (geometry.Reach <= 0f || geometry.Width <= 0f || geometry.Height <= 0f)
+            d.Error("value.out-of-range", "character.captureGeometry", "Capture reach, width, and height must be greater than zero.");
     }
 
     private static CharacterSlotSource? ResolveSlot(string id, Dictionary<string, CharacterSlotSource> explicitSlots, Dictionary<string, string> aliases, Dictionary<string, CharacterSlotSource> resolved, HashSet<string> visiting, DiagnosticBag d)
@@ -535,7 +580,15 @@ public static class CharacterPackageCompiler
     };
 
     private static CookedMovement CookMovement(CharacterMovementSource x) => new(x.RunSpeed, x.RunAccelerationA, x.RunAccelerationB, x.DashSpeed, x.AirSpeedMax, x.AirAccelStick, x.AirAccelBase, x.JumpForce, x.ShortHopForce, x.AirJumpVMultiplier, x.AirJumpHMultiplier, x.Gravity, x.AirFloatGravity, x.DashDurationTicks, x.DashCooldownTicks, x.GroundFriction, x.AirFriction, x.MaxFallSpeed, x.FastFallSpeed, x.MaxJumps, x.JumpSquatTicks, x.FloatWindowTicks, x.RushTicks);
-    private static CookedPresentation CookPresentation(CharacterPresentationSource x) => new(x.Idle, x.Run, x.Dash, x.Jump, x.Fall, x.HitSmall, x.HitMedium, x.HitHard, x.LandStartOffsetSeconds, x.ModelResourcePath, x.VisualScale, x.HurtboxBoneScale, x.ModelYOffset, x.ModelSoleOffset, x.AutoModelYOffset, x.Tumble, x.Crouch, x.Slide);
+    private static CookedPresentation CookPresentation(CharacterPresentationSource x)
+        => new(x.Idle, x.Run, x.Dash, x.Jump, x.Fall, x.HitSmall, x.HitMedium, x.HitHard,
+            x.LandStartOffsetSeconds, x.ModelResourcePath, x.VisualScale, x.HurtboxBoneScale,
+            x.ModelYOffset, x.ModelSoleOffset, x.AutoModelYOffset, x.Tumble, x.Crouch, x.Slide,
+            x.Shield, x.Grab, x.Grabbed, x.ThrowForward, x.AirDodge);
+    private static CookedCaptureGeometry CookCaptureGeometry(CharacterCaptureGeometrySource x)
+        => new(x.Reach, x.Width, x.Height, x.OffsetY,
+            new CaptureAnchor(x.AttackerAnchor.X, x.AttackerAnchor.Y, x.AttackerAnchor.Z),
+            new CaptureAnchor(x.VictimAnchor.X, x.VictimAnchor.Y, x.VictimAnchor.Z));
 
     private static byte[] WriteCanonical(CookedPackageMetadata metadata, CookedCharacterDefinition definition, CookedBudget budget)
     {
@@ -545,6 +598,7 @@ public static class CharacterPackageCompiler
             writer.WriteStartObject();
             writer.WritePropertyName("metadata"); writer.WriteStartObject(); writer.WriteString("packageId", metadata.PackageId); writer.WriteString("version", metadata.Version); writer.WriteNumber("cookedSchemaVersion", metadata.CookedSchemaVersion); writer.WritePropertyName("compatibility"); writer.WriteStartObject(); writer.WriteString("runtimeApiMin", metadata.RuntimeApiMin); writer.WriteString("runtimeApiMax", metadata.RuntimeApiMax); writer.WriteEndObject(); writer.WriteEndObject();
             writer.WritePropertyName("character"); writer.WriteStartObject(); writer.WriteString("displayName", definition.DisplayName); Number(writer, "weight", definition.Weight); WriteMovement(writer, definition.Movement); WritePresentation(writer, definition.Presentation); Number(writer, "capsuleRadius", definition.CapsuleRadius); Number(writer, "capsuleHeight", definition.CapsuleHeight); Number(writer, "hipHeight", definition.HipHeight); Number(writer, "hurtboxRadius", definition.HurtboxRadius);
+            WriteCaptureGeometry(writer, definition.CaptureGeometry);
             writer.WritePropertyName("hurtboxCapsules"); writer.WriteStartArray(); foreach (var x in definition.HurtboxCapsules) { writer.WriteStartObject(); Number(writer, "startX", x.StartX); Number(writer, "startY", x.StartY); Number(writer, "startZ", x.StartZ); Number(writer, "endX", x.EndX); Number(writer, "endY", x.EndY); Number(writer, "endZ", x.EndZ); Number(writer, "radius", x.Radius); writer.WriteEndObject(); } writer.WriteEndArray();
             writer.WritePropertyName("hurtboxBoneDefs"); writer.WriteStartArray(); foreach (var x in definition.HurtboxBoneDefs.OrderBy(x => x.BoneId, StringComparer.Ordinal)) { writer.WriteStartObject(); writer.WriteString("boneId", x.BoneId); Number(writer, "offsetX", x.OffsetX); Number(writer, "offsetY", x.OffsetY); Number(writer, "offsetZ", x.OffsetZ); Number(writer, "radius", x.Radius); writer.WriteEndObject(); } writer.WriteEndArray();
             writer.WritePropertyName("attachmentBoneIds"); writer.WriteStartArray(); foreach (var x in definition.AttachmentBoneIds) writer.WriteStringValue(x); writer.WriteEndArray();
@@ -557,7 +611,58 @@ public static class CharacterPackageCompiler
     }
 
     private static void WriteMovement(Utf8JsonWriter w, CookedMovement x) { w.WritePropertyName("movement"); w.WriteStartObject(); Number(w, "runSpeed", x.RunSpeed); Number(w, "runAccelerationA", x.RunAccelerationA); Number(w, "runAccelerationB", x.RunAccelerationB); Number(w, "dashSpeed", x.DashSpeed); Number(w, "airSpeedMax", x.AirSpeedMax); Number(w, "airAccelStick", x.AirAccelStick); Number(w, "airAccelBase", x.AirAccelBase); Number(w, "jumpForce", x.JumpForce); Number(w, "shortHopForce", x.ShortHopForce); Number(w, "airJumpVMultiplier", x.AirJumpVMultiplier); Number(w, "airJumpHMultiplier", x.AirJumpHMultiplier); Number(w, "gravity", x.Gravity); Number(w, "airFloatGravity", x.AirFloatGravity); w.WriteNumber("dashDurationTicks", x.DashDurationTicks); w.WriteNumber("dashCooldownTicks", x.DashCooldownTicks); Number(w, "groundFriction", x.GroundFriction); Number(w, "airFriction", x.AirFriction); Number(w, "maxFallSpeed", x.MaxFallSpeed); Number(w, "fastFallSpeed", x.FastFallSpeed); w.WriteNumber("maxJumps", x.MaxJumps); w.WriteNumber("jumpSquatTicks", x.JumpSquatTicks); w.WriteNumber("floatWindowTicks", x.FloatWindowTicks); w.WriteNumber("rushTicks", x.RushTicks); w.WriteEndObject(); }
-    private static void WritePresentation(Utf8JsonWriter w, CookedPresentation x) { w.WritePropertyName("presentation"); w.WriteStartObject(); w.WriteString("idle", x.Idle); w.WriteString("run", x.Run); w.WriteString("dash", x.Dash); w.WriteString("jump", x.Jump); w.WriteString("fall", x.Fall); w.WriteString("hitSmall", x.HitSmall); w.WriteString("hitMedium", x.HitMedium); w.WriteString("hitHard", x.HitHard); if (!string.IsNullOrEmpty(x.Tumble)) w.WriteString("tumble", x.Tumble); if (!string.IsNullOrEmpty(x.Crouch)) w.WriteString("crouch", x.Crouch); if (!string.IsNullOrEmpty(x.Slide)) w.WriteString("slide", x.Slide); Number(w, "landStartOffsetSeconds", x.LandStartOffsetSeconds); w.WriteString("modelResourcePath", x.ModelResourcePath); Number(w, "visualScale", x.VisualScale); Number(w, "hurtboxBoneScale", x.HurtboxBoneScale); Number(w, "modelYOffset", x.ModelYOffset); Number(w, "modelSoleOffset", x.ModelSoleOffset); w.WriteBoolean("autoModelYOffset", x.AutoModelYOffset); w.WriteEndObject(); }
+    private static void WritePresentation(Utf8JsonWriter w, CookedPresentation x)
+    {
+        w.WritePropertyName("presentation");
+        w.WriteStartObject();
+        w.WriteString("idle", x.Idle);
+        w.WriteString("run", x.Run);
+        w.WriteString("dash", x.Dash);
+        w.WriteString("jump", x.Jump);
+        w.WriteString("fall", x.Fall);
+        w.WriteString("hitSmall", x.HitSmall);
+        w.WriteString("hitMedium", x.HitMedium);
+        w.WriteString("hitHard", x.HitHard);
+        if (!string.IsNullOrEmpty(x.Tumble)) w.WriteString("tumble", x.Tumble);
+        if (!string.IsNullOrEmpty(x.Crouch)) w.WriteString("crouch", x.Crouch);
+        if (!string.IsNullOrEmpty(x.Slide)) w.WriteString("slide", x.Slide);
+        if (!string.IsNullOrEmpty(x.Shield)) w.WriteString("shield", x.Shield);
+        if (!string.IsNullOrEmpty(x.Grab)) w.WriteString("grab", x.Grab);
+        if (!string.IsNullOrEmpty(x.Grabbed)) w.WriteString("grabbed", x.Grabbed);
+        if (!string.IsNullOrEmpty(x.ThrowForward)) w.WriteString("throwForward", x.ThrowForward);
+        if (!string.IsNullOrEmpty(x.AirDodge)) w.WriteString("airDodge", x.AirDodge);
+        Number(w, "landStartOffsetSeconds", x.LandStartOffsetSeconds);
+        w.WriteString("modelResourcePath", x.ModelResourcePath);
+        Number(w, "visualScale", x.VisualScale);
+        Number(w, "hurtboxBoneScale", x.HurtboxBoneScale);
+        Number(w, "modelYOffset", x.ModelYOffset);
+        Number(w, "modelSoleOffset", x.ModelSoleOffset);
+        w.WriteBoolean("autoModelYOffset", x.AutoModelYOffset);
+        w.WriteEndObject();
+    }
+
+    private static void WriteCaptureGeometry(Utf8JsonWriter w, CookedCaptureGeometry x)
+    {
+        w.WritePropertyName("captureGeometry");
+        w.WriteStartObject();
+        Number(w, "reach", x.Reach);
+        Number(w, "width", x.Width);
+        Number(w, "height", x.Height);
+        Number(w, "offsetY", x.OffsetY);
+        WriteCaptureAnchor(w, "attackerAnchor", x.AttackerAnchor);
+        WriteCaptureAnchor(w, "victimAnchor", x.VictimAnchor);
+        w.WriteEndObject();
+    }
+
+    private static void WriteCaptureAnchor(Utf8JsonWriter w, string name, CaptureAnchor x)
+    {
+        w.WritePropertyName(name);
+        w.WriteStartObject();
+        Number(w, "x", x.X);
+        Number(w, "y", x.Y);
+        Number(w, "z", x.Z);
+        w.WriteEndObject();
+    }
     private static void WriteSlot(Utf8JsonWriter w, CookedSlotDefinition x)
     {
         w.WriteStartObject();

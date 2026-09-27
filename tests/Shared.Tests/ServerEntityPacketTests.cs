@@ -3,9 +3,8 @@ using Xunit;
 namespace SlopArena.Shared.Tests;
 
 /// <summary>
-/// Downlink per-entity envelope: entityId(8) + tick(4) + CharacterStatePacket(114)
+/// Downlink per-entity envelope: entityId(8) + tick(4) + CharacterStatePacket(156)
 /// + hasInput(1) + InputState(21) when the server consumed input that tick.
-/// Input relay for client rollback prediction (issue #80, ADR-0010).
 /// </summary>
 public class ServerEntityPacketTests
 {
@@ -61,6 +60,9 @@ public class ServerEntityPacketTests
         Jump = true,
         Dash = true,
         Burst = true,
+        ShieldHeld = true,
+        ShieldPressed = true,
+        GrabPressed = true,
         IsAiming = true,
         ActiveSlot = 3,
         FacingYaw = 420,
@@ -125,6 +127,9 @@ public class ServerEntityPacketTests
         Assert.Equal(input.Jump, restored.Input.Jump);
         Assert.Equal(input.Dash, restored.Input.Dash);
         Assert.Equal(input.Burst, restored.Input.Burst);
+        Assert.Equal(input.ShieldHeld, restored.Input.ShieldHeld);
+        Assert.Equal(input.ShieldPressed, restored.Input.ShieldPressed);
+        Assert.Equal(input.GrabPressed, restored.Input.GrabPressed);
         Assert.Equal(input.IsAiming, restored.Input.IsAiming);
         Assert.Equal(input.ActiveSlot, restored.Input.ActiveSlot);
         Assert.Equal(input.FacingYaw, restored.Input.FacingYaw);
@@ -182,13 +187,13 @@ public class ServerEntityPacketTests
     [Fact]
     public void SizeConstants_AssertWireLayout()
     {
-        // Downlink max packet: 8 entityId + 4 tick + 114 state + 1 marker + 21 input.
+        // Downlink max packet: 8 entityId + 4 tick + 156 state + 1 marker + 21 input.
         Assert.Equal(8 + 4 + CharacterStatePacket.Size, ServerEntityPacket.BaseSize);
-        Assert.Equal(126, ServerEntityPacket.BaseSize);
+        Assert.Equal(168, ServerEntityPacket.BaseSize);
         Assert.Equal(1 + InputState.Size, ServerEntityPacket.RelaySize);
         Assert.Equal(22, ServerEntityPacket.RelaySize);
-        Assert.Equal(148, ServerEntityPacket.MaxSize);
-        Assert.Equal(127, ServerEntityPacket.NoInputSize);
+        Assert.Equal(190, ServerEntityPacket.MaxSize);
+        Assert.Equal(169, ServerEntityPacket.NoInputSize);
         Assert.Equal(21, InputState.Size);
     }
 
@@ -247,7 +252,7 @@ public class ServerEntityPacketTests
         var input = new byte[InputState.Size];
         default(InputState).Write(input);
         Assert.Throws<ArgumentException>(() => InputState.Deserialize(input.AsSpan(0, InputState.Size - 1)));
-        input[20] = 2;
+        input[20] = 1;
         Assert.Throws<InvalidDataException>(() => InputState.Deserialize(input));
 
         var packet = new ServerEntityPacket

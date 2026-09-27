@@ -14,7 +14,7 @@ namespace SlopArena.Shared
         public float VelocityY;
         public float VelocityZ;
         /// <summary>
-        /// ActionState value, including the appended Crouching state.
+        /// ActionState value, including append-only defense and air-dodge phases.
         /// </summary>
         public byte CurrentActionState;
         /// <summary>
@@ -75,17 +75,28 @@ namespace SlopArena.Shared
         public bool InPostHitstunFlight;
         /// <summary>Remaining hitstop freeze ticks (ADR-0012).</summary>
         public ushort HitstopTicks;
-        /// <summary>Remaining Burst cooldown ticks (ADR-0014) — HUD for both players.</summary>
+        /// <summary>Reserved retired Burst wire field; no gameplay or HUD meaning.</summary>
         public ushort BurstCooldownTicks;
-        /// <summary>Remaining Burst recovery lock ticks (ADR-0014) — opponent's punish window must be visible.</summary>
+        /// <summary>Reserved retired Burst wire field; never locks actions.</summary>
         public ushort BurstRecoveryTicks;
         /// <summary>Ledge re-grab suppression (walk-off self-grab guard) — on-wire so the rollback
         /// opponent track reproduces a walk-off exactly (off-wire it re-grabbed the ledge and wedged).</summary>
         public ushort LedgeRegrabLockTicks;
         /// <summary>Remaining landing-lag lock ticks. Authoritative so local and remote presentation/rollback tracks agree.</summary>
         public ushort LandingLagTicks;
-        /// <summary>114 bytes: fixed state fields plus replicated movement flags and protocol version.</summary>
-        public const int Size = 114;
+        public ushort ShieldDropTicks;
+        public ushort BlockStunTicks;
+        public byte BlockHitstopKind;
+        public byte InteractionPhase;
+        public ulong InteractionId;
+        public ulong InteractionPartnerId;
+        public ulong LastTerminalInteractionId;
+        public uint InteractionTick;
+        public uint InteractionTerminalTick;
+        public short CapturedYaw;
+        public ushort AirDodgeRecoveryTicks;
+        /// <summary>156 bytes: fixed state fields, defense contract, movement flags, and protocol version.</summary>
+        public const int Size = 156;
 
         /// <summary>Convert from CharacterState to serializable packet.</summary>
         public static CharacterStatePacket FromState(CharacterState s, uint tick = 0)
@@ -148,6 +159,17 @@ namespace SlopArena.Shared
                 BurstRecoveryTicks = s.BurstRecoveryTicks,
                 LedgeRegrabLockTicks = s.LedgeRegrabLockTicks,
                 LandingLagTicks = s.LandingLagTicks,
+                ShieldDropTicks = s.ShieldDropTicks,
+                BlockStunTicks = s.BlockStunTicks,
+                BlockHitstopKind = s.BlockHitstopKind,
+                InteractionPhase = s.InteractionPhase,
+                InteractionId = s.InteractionId,
+                InteractionPartnerId = s.InteractionPartnerId,
+                LastTerminalInteractionId = s.LastTerminalInteractionId,
+                InteractionTick = s.InteractionTick,
+                InteractionTerminalTick = s.InteractionTerminalTick,
+                CapturedYaw = s.CapturedYaw,
+                AirDodgeRecoveryTicks = s.AirDodgeRecoveryTicks,
             };
         }
  
@@ -210,6 +232,17 @@ namespace SlopArena.Shared
                 BurstRecoveryTicks = BurstRecoveryTicks,
                 LedgeRegrabLockTicks = LedgeRegrabLockTicks,
                 LandingLagTicks = LandingLagTicks,
+                ShieldDropTicks = ShieldDropTicks,
+                BlockStunTicks = BlockStunTicks,
+                BlockHitstopKind = BlockHitstopKind,
+                InteractionPhase = InteractionPhase,
+                InteractionId = InteractionId,
+                InteractionPartnerId = InteractionPartnerId,
+                LastTerminalInteractionId = LastTerminalInteractionId,
+                InteractionTick = InteractionTick,
+                InteractionTerminalTick = InteractionTerminalTick,
+                CapturedYaw = CapturedYaw,
+                AirDodgeRecoveryTicks = AirDodgeRecoveryTicks,
             };
         }
 
@@ -276,15 +309,26 @@ namespace SlopArena.Shared
             if (QueuedCrouchBrace) movementFlags |= 0x10;
             if (InPostHitstunFlight) movementFlags |= 0x20;
             buffer[112] = movementFlags;
-            buffer[113] = SimulationProtocol.Version;
+            BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(113, 2), ShieldDropTicks);
+            BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(115, 2), BlockStunTicks);
+            buffer[117] = BlockHitstopKind;
+            buffer[118] = InteractionPhase;
+            BinaryPrimitives.WriteUInt64LittleEndian(buffer.Slice(119, 8), InteractionId);
+            BinaryPrimitives.WriteUInt64LittleEndian(buffer.Slice(127, 8), InteractionPartnerId);
+            BinaryPrimitives.WriteUInt64LittleEndian(buffer.Slice(135, 8), LastTerminalInteractionId);
+            BinaryPrimitives.WriteUInt32LittleEndian(buffer.Slice(143, 4), InteractionTick);
+            BinaryPrimitives.WriteUInt32LittleEndian(buffer.Slice(147, 4), InteractionTerminalTick);
+            BinaryPrimitives.WriteInt16LittleEndian(buffer.Slice(151, 2), CapturedYaw);
+            BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(153, 2), AirDodgeRecoveryTicks);
+            buffer[155] = SimulationProtocol.Version;
         }
 
         public static CharacterStatePacket Deserialize(ReadOnlySpan<byte> buffer)
         {
             if (buffer.Length != Size)
                 throw new ArgumentException($"State payload must be exactly {Size} bytes.", nameof(buffer));
-            if (buffer[113] != SimulationProtocol.Version)
-                throw new InvalidDataException($"Unsupported state protocol version {buffer[113]}.");
+            if (buffer[155] != SimulationProtocol.Version)
+                throw new InvalidDataException($"Unsupported state protocol version {buffer[155]}.");
             var packet = new CharacterStatePacket();
             packet.TickNumber = BinaryPrimitives.ReadUInt32LittleEndian(buffer.Slice(0, 4));
             packet.PositionX = BitConverter.Int32BitsToSingle(BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(4, 4)));
@@ -343,6 +387,17 @@ namespace SlopArena.Shared
             packet.CrouchSettled = (movementFlags & 0x08) != 0;
             packet.QueuedCrouchBrace = (movementFlags & 0x10) != 0;
             packet.InPostHitstunFlight = (movementFlags & 0x20) != 0;
+            packet.ShieldDropTicks = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(113, 2));
+            packet.BlockStunTicks = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(115, 2));
+            packet.BlockHitstopKind = buffer[117];
+            packet.InteractionPhase = buffer[118];
+            packet.InteractionId = BinaryPrimitives.ReadUInt64LittleEndian(buffer.Slice(119, 8));
+            packet.InteractionPartnerId = BinaryPrimitives.ReadUInt64LittleEndian(buffer.Slice(127, 8));
+            packet.LastTerminalInteractionId = BinaryPrimitives.ReadUInt64LittleEndian(buffer.Slice(135, 8));
+            packet.InteractionTick = BinaryPrimitives.ReadUInt32LittleEndian(buffer.Slice(143, 4));
+            packet.InteractionTerminalTick = BinaryPrimitives.ReadUInt32LittleEndian(buffer.Slice(147, 4));
+            packet.CapturedYaw = BinaryPrimitives.ReadInt16LittleEndian(buffer.Slice(151, 2));
+            packet.AirDodgeRecoveryTicks = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(153, 2));
             return packet;
         }
 
@@ -359,6 +414,7 @@ namespace SlopArena.Shared
             s.PX = PositionX; s.PY = PositionY; s.PZ = PositionZ;
             s.VX = VelocityX; s.VY = VelocityY; s.VZ = VelocityZ;
             s.State = (ActionState)CurrentActionState;
+            s.StateTicks = StateDurationFrames;
             s.IsGrounded = IsGrounded;
             s.AttackSlot = AttackSlot;
             s.ComboStage = ComboStage;
@@ -397,6 +453,17 @@ namespace SlopArena.Shared
             s.BurstRecoveryTicks = BurstRecoveryTicks;
             s.LedgeRegrabLockTicks = LedgeRegrabLockTicks;
             s.LandingLagTicks = LandingLagTicks;
+            s.ShieldDropTicks = ShieldDropTicks;
+            s.BlockStunTicks = BlockStunTicks;
+            s.BlockHitstopKind = BlockHitstopKind;
+            s.InteractionPhase = InteractionPhase;
+            s.InteractionId = InteractionId;
+            s.InteractionPartnerId = InteractionPartnerId;
+            s.LastTerminalInteractionId = LastTerminalInteractionId;
+            s.InteractionTick = InteractionTick;
+            s.InteractionTerminalTick = InteractionTerminalTick;
+            s.CapturedYaw = CapturedYaw;
+            s.AirDodgeRecoveryTicks = AirDodgeRecoveryTicks;
         }
     }
 }

@@ -157,10 +157,10 @@ namespace SlopArena.Client.UI
                 foreach (var action in new[]
                          {
                              "MoveStick", "Slot1", "Slot2", "Slot3", "Slot4", "SpecialModifier",
-                             "Jump", "Down", "Dash", "Burst", "FaceToCamera", "ToggleLock", "Pause"
+                             "Jump", "Down", "Shield", "FaceToCamera", "ToggleLock", "Pause"
                          })
                     AddBindingRow(root, action, ActionLabel(action, controller: true));
-                root.Add(new Label("Specials: hold Special Modifier + Normal button."));
+                root.Add(new Label("Specials: hold Special Modifier + Normal button. Grab: hold Special Modifier + RT."));
             }
             else
             {
@@ -234,7 +234,7 @@ namespace SlopArena.Client.UI
             "Slot3" => controller ? "Normal 3" : "Action 3",
             "Slot4" => controller ? "Normal 4" : "Action 4",
             "SpecialModifier" => "Special Modifier",
-            "Burst" => "Burst", "Jump" => "Jump", "Dash" => "Dash",
+            "Shield" => "Shield", "Grab" => "Grab", "Jump" => "Jump",
             "SlotA" => "Action A", "SlotE" => "Action E", "SlotR" => "Action R", "SlotF" => "Action F",
             _ => action,
         };

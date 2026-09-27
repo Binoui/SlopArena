@@ -15,7 +15,7 @@ Keep the three authoring modules separate:
 
 - `package.json` owns identity, version, creator, license, attribution, and dependencies.
 - `character.json` owns gameplay source, presentation IDs, and the canonical sixteen-slot
-  grid.
+  grid, capture geometry/anchors, and standardized defense animation roles.
 - `CharacterAssetCatalog.asset` owns Unity rig and clip bindings.
 
 The starter values are editable defaults, not approved gameplay balance. Replace them with
@@ -47,6 +47,18 @@ stage capsule or pushbox. Low-track baking inverts the renderer's root/visual-sc
 instead of subtracting the sampled hips; other tracks retain their existing convention.
 Absent legacy bindings remain upright and cannot enable CrouchBrace. Never fabricate
 duck protection with a shrunken hurtbox or a runtime offset.
+
+Every package must define `captureGeometry` in `character.json`: positive `reach`,
+`width`, and `height`, a vertical `offsetY`, and local-space `attackerAnchor` and
+`victimAnchor` positions in meters. Local +Z is fighter-forward. These values are
+authoritative package content and flow through validation, cooking, and hashes; never
+edit generated `character.runtime.json` as their source. The initial built-in values
+are placeholders for the defense implementation spike, not final geometry or balance.
+
+The defense presentation roles are `presentation.shield`, `grab`, `grabbed`,
+`throwForward`, and `airDodge`. They may be empty until real clips are authored. Once a
+role has a semantic animation ID, the package cooker requires its normal asset-catalog
+binding and deterministic pose track; do not map a role to a generic fallback clip.
 
 ## 3. Author the canonical grid
 

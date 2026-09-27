@@ -12,7 +12,7 @@ namespace SlopArena.Shared.AI;
 /// trading at guaranteed-connect range produce degenerate telemetry (100% hit rate, no KOs).
 ///
 /// Attack reach is the move's ACTUAL hitbox reach (OffX/OffZ extent + radius + lunge), NOT the
-/// authored <c>AttackRange</c> (the sim's auto-dash engage distance, far beyond where the hitbox
+/// authored <c>AttackRange</c> (the sim's engage distance, far beyond where the hitbox
 /// connects). The sim normalizes <c>MoveX/Y</c> (no analog easing), so the policy approaches
 /// outright rather than trying to slow precisely.
 ///
@@ -21,8 +21,8 @@ namespace SlopArena.Shared.AI;
 /// <c>FaceToCamera</c> (ADR-0017).
 ///
 /// Invariants: <c>MoveX/MoveY</c> magnitude ≤ 1; no action input while
-/// hitstun/hitstop/burst-recovery/landing-lag/anim-lock; no dash on cooldown; no slot press on
-/// cooldown. Same <c>Random</c> stream → same decisions.
+/// hitstun/hitstop/recovery/landing-lag/anim-lock; no slot press on cooldown.
+/// Same <c>Random</c> stream → same decisions.
 /// </summary>
 public sealed class HeuristicBotPolicy
 {
@@ -271,8 +271,6 @@ public sealed class HeuristicBotPolicy
                 / MathF.Max(1f, def.Movement.Gravity) * 60f)) / 60f;
         regularReach += self.JumpsLeft * def.Movement.AirSpeedMax
             * def.Movement.AirJumpHMultiplier * 0.75f;
-        if (self.DashCooldownTicks == 0)
-            regularReach += def.Movement.DashSpeed * def.Movement.DashDurationTicks / 60f;
 
         float bestScore = float.PositiveInfinity;
         for (int i = 0; i < _recoveryTargetCount; i++)
@@ -386,11 +384,6 @@ public sealed class HeuristicBotPolicy
             input.Jump = true;
             input.JumpHeld = true;
         }
-        else if (self.DashCooldownTicks == 0 && self.DashDurationTicks == 0
-            && distance > 1.2f)
-        {
-            input.Dash = true;
-        }
         return true;
     }
 
@@ -440,7 +433,6 @@ public sealed class HeuristicBotPolicy
                 ? ledgeInput : default;
         bool movementAllowed = self.HitstunTicks == 0
             && self.HitstopTicks == 0
-            && self.BurstRecoveryTicks == 0
             && self.LandingLagTicks == 0;
         bool actionable = movementAllowed
             && (self.AnimLockTicks == 0 || Simulation.IsIasaUnlocked(self, def))
@@ -469,6 +461,10 @@ public sealed class HeuristicBotPolicy
             memory.DecisionTicksRemaining--;
 
         var input = new InputState();
+        if (self.State == ActionState.Shielding)
+            return memory.TryGetDelayedOpponent(out var threat) && threat.IsThreatening
+                ? new InputState { ShieldHeld = true }
+                : default;
         if (!actionable)
             return input;
         if (TryBuildRecoveryInput(self, def, in arena, memory, out input))
@@ -513,6 +509,16 @@ public sealed class HeuristicBotPolicy
             return input;
 
         memory.DecisionTicksRemaining = profile.DecisionIntervalTicks;
+        // A fighter with every attack cooling down still needs to guard nearby
+        // pressure; offensive reach must not disable the defensive decision.
+        if (!inRange && self.IsGrounded && target.IsThreatening
+            && dist <= 2f * def.CapsuleRadius
+            && rng.NextDouble() < profile.DefenseChance)
+        {
+            input.MoveX = input.MoveY = 0f;
+            input.ShieldHeld = input.ShieldPressed = true;
+            return input;
+        }
         if (!inRange)
             return input;
 
@@ -531,9 +537,6 @@ public sealed class HeuristicBotPolicy
         bool targetThreatening = target.IsThreatening;
         var candidate = ChooseSlot(self, target, dist, rangeScale, rng,
             profile.SpecialChance, allowRecoveryMove: !IsNearEdge(self, in arena), in arena);
-        bool canDash = self.DashCooldownTicks == 0
-            && self.DashDurationTicks == 0
-            && self.BurstRecoveryTicks == 0;
 
         bool punish = candidate.HasValue
             && targetThreatening
@@ -564,11 +567,18 @@ public sealed class HeuristicBotPolicy
             return input;
         }
 
-        if (targetThreatening && canDash && rng.NextDouble() < profile.DodgeChance)
+        if (targetThreatening && rng.NextDouble() < profile.DefenseChance)
         {
-            input.Dash = true;
-            input.MoveX = -dx / dist;
-            input.MoveY = -dz / dist;
+            if (self.IsGrounded)
+            {
+                input.ShieldHeld = true;
+                input.ShieldPressed = true;
+            }
+            else
+            {
+                input.MoveX = -dx / dist;
+                input.MoveY = -dz / dist;
+            }
             return input;
         }
 
@@ -649,7 +659,6 @@ public sealed class HeuristicBotPolicy
     private static bool CanPress(in CharacterState self, CharacterDefinition def, byte slot)
         => self.HitstunTicks == 0
             && self.HitstopTicks == 0
-            && self.BurstRecoveryTicks == 0
             && self.LandingLagTicks == 0
             && (self.AnimLockTicks == 0 || Simulation.IsIasaUnlocked(self, def))
             && (self.State == ActionState.Idle
@@ -786,7 +795,6 @@ public sealed class HeuristicBotPolicy
         => self.Deaths != memory.PlanDeaths
             || self.HitstunTicks > 0
             || self.LandingLagTicks > 0
-            || self.BurstRecoveryTicks > 0
             || (memory.PlanWasAirborne && self.IsGrounded)
             || (memory.PlanPressIssued
                 && (self.State is ActionState.Attacking or ActionState.Aiming)

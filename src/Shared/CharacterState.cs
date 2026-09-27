@@ -22,6 +22,28 @@ namespace SlopArena.Shared
         /// remaining ticks in current state
         /// </summary>
         public ushort StateTicks;
+        /// <summary>Remaining vulnerable shield-drop recovery ticks.</summary>
+        public ushort ShieldDropTicks;
+        /// <summary>Remaining block stun after a successful shield contact.</summary>
+        public ushort BlockStunTicks;
+        /// <summary>Block-contact hitstop classification; values are DefenseBlockHitstopKind.</summary>
+        public byte BlockHitstopKind;
+        /// <summary>Air-dodge recovery remaining after landing retains grounded commitment.</summary>
+        public ushort AirDodgeRecoveryTicks;
+        /// <summary>Current paired interaction phase; values are DefenseInteractionPhase.</summary>
+        public byte InteractionPhase;
+        /// <summary>Stable server-owned interaction ID; zero means no active interaction.</summary>
+        public ulong InteractionId;
+        /// <summary>Paired fighter entity ID; zero means no partner.</summary>
+        public ulong InteractionPartnerId;
+        /// <summary>Authoritative tick at which the current interaction was captured.</summary>
+        public uint InteractionTick;
+        /// <summary>Last terminal interaction ID; zero means no terminal result recorded.</summary>
+        public ulong LastTerminalInteractionId;
+        /// <summary>Authoritative tick at which the last terminal interaction was committed.</summary>
+        public uint InteractionTerminalTick;
+        /// <summary>Forward-facing snapshot in signed degrees × 100, captured when the grab is accepted.</summary>
+        public short CapturedYaw;
         /// <summary>Match lifecycle state (Waiting, Countdown, Playing, Ended).</summary>
         public MatchState MatchState;
 
@@ -68,6 +90,7 @@ namespace SlopArena.Shared
         /// remaining dash ticks
         /// </summary>
         public ushort DashDurationTicks;
+        /// <summary>Direction is also used by forward air dodge while an air-dodge state is active.</summary>
         public float DashDirX, DashDirZ;
 
         /// <summary>
@@ -160,17 +183,10 @@ namespace SlopArena.Shared
         /// <summary>Server/local-only marker for the one-shot hitstop SDI.</summary>
         public bool SdiApplied;
 
-        /// <summary>
-        /// ── Burst (ADR-0014) ──
-        /// </summary>
-        /// <summary>Remaining cooldown ticks for Burst (one use per 60 s). ON THE WIRE — both players' HUDs read it.</summary>
+        /// <summary>Retired Burst fields reserved in protocol v2. Neither value
+        /// gates actions, ticks down, nor grants gameplay effects.</summary>
         public ushort BurstCooldownTicks;
-        /// <summary>Remaining recovery lock ticks after bursting (the punish window). ON THE WIRE — opponent's window must be visible.</summary>
         public ushort BurstRecoveryTicks;
-        /// <summary>1 = defensive fired (shove attacker pending), 2 = offensive fired (hitbox pending). Set by SimulateTick, consumed+cleared by ServerSimulation each tick. Server + local-sim only — NOT on the wire.</summary>
-        public byte BurstPending;
-        /// <summary>Last entity to land a hit on this state. Set in ResolveHits, consumed by the defensive shove. Server + local-sim only — NOT on the wire.</summary>
-        public ulong LastAttackerEntityId;
 
 
         /// <summary>
@@ -283,5 +299,21 @@ namespace SlopArena.Shared
         /// </summary>
         public byte StatusFlags;           // bitfield, see StatusType enum
         public ushort StatusRemainingTicks; // shared countdown for all statuses; 0 = no active status
+    }
+    /// <summary>Paired grab/capture/throw phase replicated as part of CharacterState.</summary>
+    public enum DefenseInteractionPhase : byte
+    {
+        None = 0,
+        Attempt = 1,
+        Captured = 2,
+        Throwing = 3,
+        Terminal = 4
+    }
+
+    /// <summary>Hitstop reason for defensive block contacts.</summary>
+    public enum DefenseBlockHitstopKind : byte
+    {
+        None = 0,
+        ShieldContact = 1
     }
 }

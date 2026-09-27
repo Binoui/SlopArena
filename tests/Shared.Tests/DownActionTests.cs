@@ -141,23 +141,18 @@ public class DownActionTests
         Assert.Equal(ActionState.Crouching, state.State);
     }
 
-    [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
-    public void AcceptedJumpOrDash_WinsOverLowPosture(bool jump)
-    {
-        var sim = Ground(Run, action: ActionState.Sliding);
-        var state = Tick(sim, new InputState { Down = true, DownPressed = true, Jump = jump, JumpHeld = jump, Dash = !jump, MoveX = 1 });
-        Assert.Equal(jump ? ActionState.JumpSquat : ActionState.Dashing, state.State);
-        Assert.False(state.CrouchSettled);
-        Assert.Contains(1UL, sim.LastTickAcceptedActions);
-        if (jump)
-        {
-            byte remaining = state.JumpsLeft;
-            state = Tick(sim, new InputState { Down = true, JumpHeld = true });
-            Assert.Equal(remaining, state.JumpsLeft);
-        }
-    }
+[Fact]
+public void AcceptedJump_WinsOverLowPosture()
+{
+    var sim = Ground(Run, action: ActionState.Sliding);
+    var state = Tick(sim, new InputState { Down = true, DownPressed = true, Jump = true, JumpHeld = true, MoveX = 1 });
+    Assert.Equal(ActionState.JumpSquat, state.State);
+    Assert.False(state.CrouchSettled);
+    Assert.Contains(1UL, sim.LastTickAcceptedActions);
+    byte remaining = state.JumpsLeft;
+    state = Tick(sim, new InputState { Down = true, JumpHeld = true });
+    Assert.Equal(remaining, state.JumpsLeft);
+}
 
     [Fact]
     public void GroundNormal_IsAcceptedFromSettledCrouchImmediately()

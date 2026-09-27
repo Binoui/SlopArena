@@ -9,13 +9,6 @@
         </ui:VisualElement>
         <ui:VisualElement name="player-billboard" class="player-billboard" />
         <ui:VisualElement name="action-bar" class="action-bar">
-            <ui:VisualElement name="dash-slot" class="slot dash-slot">
-                <ui:VisualElement name="dash-icon" class="slot-icon-inner" />
-                <ui:VisualElement name="dash-flash" class="slot-flash" />
-                <ui:VisualElement name="dash-cooldown" class="slot-cooldown" />
-                <ui:Label name="dash-timer" class="slot-timer" />
-                <ui:Label name="dash-key" class="slot-key-label" />
-            </ui:VisualElement>
             <ui:VisualElement name="ability-group-1-4" class="slot-group">
                 <ui:VisualElement name="ab-1" class="slot ability-slot">
                     <ui:VisualElement name="ab-1-icon" class="slot-icon-inner" />
@@ -75,13 +68,6 @@
                     <ui:Label name="ab-f-timer" class="slot-timer" />
                     <ui:Label name="ab-f-key" class="slot-key-label" />
                 </ui:VisualElement>
-            </ui:VisualElement>
-            <ui:VisualElement name="burst-slot" class="slot burst-slot">
-                <ui:VisualElement name="burst-icon" class="slot-icon-inner" />
-                <ui:VisualElement name="burst-flash" class="slot-flash" />
-                <ui:VisualElement name="burst-cooldown" class="slot-cooldown" />
-                <ui:Label name="burst-timer" class="slot-timer" />
-                <ui:Label name="burst-key" class="slot-key-label" />
             </ui:VisualElement>
         </ui:VisualElement>
     </ui:VisualElement>

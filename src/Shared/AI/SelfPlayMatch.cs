@@ -79,6 +79,7 @@ public static class SelfPlayMatch
 
             foreach (var hit in sim.LastTickHits)
             {
+                if (hit.Blocked) continue;
                 if (!respawnedA && hit.TargetEntityId == EntityB)
                     memA.RecordOpponentHit(hit.AttackSlot, !postB.IsGrounded, postB,
                         postB.HitstunTicks, hit.HitstopTicks);

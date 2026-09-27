@@ -4,6 +4,7 @@ public enum PresentationEventSource : byte
 {
     Timeline = 0,
     CapabilityExplosion = 1,
+    BlockContact = 2,
 }
 
 public readonly record struct PresentationEventKey(

@@ -57,6 +57,17 @@ public class CharacterStatePacketTests
             BurstCooldownTicks = 1234,
             BurstRecoveryTicks = 25,
             LandingLagTicks = 18,
+            ShieldDropTicks = 6,
+            BlockStunTicks = 9,
+            BlockHitstopKind = (byte)DefenseBlockHitstopKind.ShieldContact,
+            AirDodgeRecoveryTicks = 14,
+            InteractionPhase = (byte)DefenseInteractionPhase.Throwing,
+            InteractionId = 0x0102030405060708UL,
+            InteractionPartnerId = 0x1112131415161718UL,
+            LastTerminalInteractionId = 0x2122232425262728UL,
+            InteractionTick = 0x31323334,
+            InteractionTerminalTick = 0x41424344,
+            CapturedYaw = -12345,
         };
 
         // Act: FromState → Serialize → Deserialize → ToState
@@ -115,13 +126,24 @@ public class CharacterStatePacketTests
         Assert.Equal(original.BurstCooldownTicks, restored.BurstCooldownTicks);
         Assert.Equal(original.BurstRecoveryTicks, restored.BurstRecoveryTicks);
         Assert.Equal(original.LandingLagTicks, restored.LandingLagTicks);
+        Assert.Equal(original.ShieldDropTicks, restored.ShieldDropTicks);
+        Assert.Equal(original.BlockStunTicks, restored.BlockStunTicks);
+        Assert.Equal(original.BlockHitstopKind, restored.BlockHitstopKind);
+        Assert.Equal(original.AirDodgeRecoveryTicks, restored.AirDodgeRecoveryTicks);
+        Assert.Equal(original.InteractionPhase, restored.InteractionPhase);
+        Assert.Equal(original.InteractionId, restored.InteractionId);
+        Assert.Equal(original.InteractionPartnerId, restored.InteractionPartnerId);
+        Assert.Equal(original.LastTerminalInteractionId, restored.LastTerminalInteractionId);
+        Assert.Equal(original.InteractionTick, restored.InteractionTick);
+        Assert.Equal(original.InteractionTerminalTick, restored.InteractionTerminalTick);
+        Assert.Equal(original.CapturedYaw, restored.CapturedYaw);
     }
 
     [Fact]
     public void Size_MatchesActualSerializedLayout()
     {
-        // 114 bytes: fixed state fields plus replicated movement flags and protocol version.
-        Assert.Equal(114, CharacterStatePacket.Size);
+        // 156 bytes: legacy state fields, defense contract, movement flags, protocol version.
+        Assert.Equal(156, CharacterStatePacket.Size);
 
         // Prove it: serialize into an exactly-Size buffer must not throw
         var packet = CharacterStatePacket.FromState(new CharacterState { AimPitch = 1f, LastDirX = 2f });
@@ -156,18 +178,37 @@ public class CharacterStatePacketTests
     [Fact]
     public void ApplyTo_OverwritesOnlyWireFields_PreservesRest()
     {
-        // Arrange: a CharacterState with non-wire fields set (AttackElapsedTicks and the
-        // hitstop queued-launch payload are never on the wire — this proves ApplyTo
-        // doesn't zero them, unlike ToState()).
+        // Non-wire fields survive while all carried fields, including the state timer and
+        // defense reconstruction data, are overwritten by the server snapshot.
         var target = new CharacterState
         {
             PX = 1f,
+            StateTicks = 900,
+            ShieldDropTicks = 300,
+            InteractionId = 90,
             AttackElapsedTicks = 500, // NOT carried by CharacterStatePacket — must survive
             AirTimeTicks = 999,       // IS carried — must be overwritten
             QueuedKBDirX = 3.5f,      // NOT carried (queued launch payload, ADR-0012) — must survive
             HitstopTicks = 0,         // IS carried — must be overwritten
         };
-        var packet = CharacterStatePacket.FromState(new CharacterState { PX = 42f, AirTimeTicks = 7, HitstopTicks = 9 });
+        var packet = CharacterStatePacket.FromState(new CharacterState
+        {
+            PX = 42f,
+            StateTicks = 7,
+            AirTimeTicks = 7,
+            HitstopTicks = 9,
+            ShieldDropTicks = 4,
+            InteractionId = 12,
+            InteractionPartnerId = 13,
+            BlockStunTicks = 8,
+            BlockHitstopKind = (byte)DefenseBlockHitstopKind.ShieldContact,
+            AirDodgeRecoveryTicks = 17,
+            InteractionPhase = (byte)DefenseInteractionPhase.Captured,
+            LastTerminalInteractionId = 14,
+            InteractionTick = 15,
+            InteractionTerminalTick = 16,
+            CapturedYaw = 1700,
+        });
 
         // Act
         packet.ApplyTo(ref target);
@@ -176,8 +217,47 @@ public class CharacterStatePacketTests
         Assert.Equal(42f, target.PX);       // wire field overwritten
         Assert.Equal((ushort)7, target.AirTimeTicks); // wire field overwritten
         Assert.Equal((ushort)9, target.HitstopTicks); // wire field overwritten (ADR-0012)
+        Assert.Equal((ushort)7, target.StateTicks);
+        Assert.Equal((ushort)4, target.ShieldDropTicks);
+        Assert.Equal(12UL, target.InteractionId);
+        Assert.Equal(13UL, target.InteractionPartnerId);
+        Assert.Equal((ushort)8, target.BlockStunTicks);
+        Assert.Equal((byte)DefenseBlockHitstopKind.ShieldContact, target.BlockHitstopKind);
+        Assert.Equal((ushort)17, target.AirDodgeRecoveryTicks);
+        Assert.Equal((byte)DefenseInteractionPhase.Captured, target.InteractionPhase);
+        Assert.Equal(14UL, target.LastTerminalInteractionId);
+        Assert.Equal(15u, target.InteractionTick);
+        Assert.Equal(16u, target.InteractionTerminalTick);
+        Assert.Equal((short)1700, target.CapturedYaw);
         Assert.Equal((ushort)500, target.AttackElapsedTicks); // non-wire field preserved
         Assert.Equal(3.5f, target.QueuedKBDirX);             // non-wire field preserved
+    }
+
+    [Fact]
+    public void DefenseActionStateCodes_AreAppendedAndRoundTrip()
+    {
+        Assert.Equal((byte)11, (byte)ActionState.Crouching);
+        var states = new[]
+        {
+            ActionState.Shielding,
+            ActionState.ShieldDrop,
+            ActionState.GrabAttempt,
+            ActionState.Grabbed,
+            ActionState.Throwing,
+            ActionState.AirDodgeStartup,
+            ActionState.AirDodgeMovement,
+            ActionState.AirDodgeRecovery,
+        };
+        for (int i = 0; i < states.Length; i++)
+        {
+            Assert.Equal((byte)(12 + i), (byte)states[i]);
+            var packet = CharacterStatePacket.FromState(new CharacterState { State = states[i], StateTicks = 7 });
+            byte[] buffer = new byte[CharacterStatePacket.Size];
+            packet.Serialize(buffer);
+            var restored = CharacterStatePacket.Deserialize(buffer).ToState();
+            Assert.Equal(states[i], restored.State);
+            Assert.Equal((ushort)7, restored.StateTicks);
+        }
     }
 
     [Fact]
@@ -217,10 +297,11 @@ public class CharacterStatePacketTests
         var buffer = new byte[CharacterStatePacket.Size];
         packet.Serialize(buffer);
 
-        Assert.Throws<ArgumentException>(() => CharacterStatePacket.Deserialize(buffer.AsSpan(0, 112)));
+        // A pre-defense protocol-v1 payload has the old size and must not be accepted.
+        Assert.Throws<ArgumentException>(() => CharacterStatePacket.Deserialize(buffer.AsSpan(0, 114)));
 
         var wrongVersion = (byte[])buffer.Clone();
-        wrongVersion[113] = 2;
+        wrongVersion[155] = 1;
         Assert.Throws<InvalidDataException>(() => CharacterStatePacket.Deserialize(wrongVersion));
     }
 }

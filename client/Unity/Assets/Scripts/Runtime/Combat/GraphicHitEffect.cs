@@ -12,6 +12,7 @@ namespace SlopArena.Client.Combat
         Medium,
         Heavy,
         Launch,
+        Block,
     }
 
     /// <summary>
@@ -56,6 +57,15 @@ namespace SlopArena.Client.Combat
             if (effect == null)
                 effect = CreateInstance();
             effect.Show(in hit, tier);
+        }
+        /// <summary>Temporary blue guard ripple; no damaging-hit VFX or SFX.</summary>
+        public static void SpawnBlock(Vector3 position)
+        {
+            var hit = new SpellResolver.HitResult
+            {
+                HitX = position.x, HitY = position.y, HitZ = position.z,
+            };
+            Spawn(in hit, ImpactTier.Block);
         }
 
         private static GraphicHitEffect CreateInstance()
@@ -117,6 +127,7 @@ namespace SlopArena.Client.Combat
                 ImpactTier.Light => 0.08f,
                 ImpactTier.Medium => 0.10f,
                 ImpactTier.Heavy => 0.13f,
+                ImpactTier.Block => 0.12f,
                 _ => 0.16f,
             };
             _endScale = tier switch
@@ -124,6 +135,7 @@ namespace SlopArena.Client.Combat
                 ImpactTier.Light => 1.15f,
                 ImpactTier.Medium => 1.4f,
                 ImpactTier.Heavy => 1.7f,
+                ImpactTier.Block => 1.35f,
                 _ => 2.05f,
             };
 
@@ -153,6 +165,7 @@ namespace SlopArena.Client.Combat
                 ImpactTier.Light => new Color(1f, 0.96f, 0.72f, 0.95f),
                 ImpactTier.Medium => new Color(1f, 0.76f, 0.24f, 0.98f),
                 ImpactTier.Heavy => new Color(1f, 0.33f, 0.08f, 1f),
+                ImpactTier.Block => new Color(0.25f, 0.8f, 1f, 0.9f),
                 _ => new Color(1f, 0.18f, 0.08f, 1f),
             };
             Color pale = new(1f, 0.98f, 0.88f, 0.92f);
@@ -188,6 +201,10 @@ namespace SlopArena.Client.Combat
                         0.13f, 0.025f, core);
                     AddRay(-launch.Perpendicular() * 0.16f, incoming * 1.35f - launch.Perpendicular() * 0.35f,
                         0.13f, 0.025f, core);
+                    break;
+                case ImpactTier.Block:
+                    AddRing(0.4f, 0.09f, 18, core);
+                    AddRing(0.2f, 0.04f, 14, pale);
                     break;
             }
 

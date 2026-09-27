@@ -123,30 +123,24 @@ public class FastFallTests
         TestHelpers.AssertNear(-Move.FastFallSpeed, frozen.GetState(1).VY, 0.001f);
     }
 
-    [Fact]
-    public void AcceptedJumpAndDash_ResetMovementInterruptions()
-    {
-        var jump = TestHelpers.PlayerState();
-        jump.PY = TestHelpers.GroundPY(Def);
-        jump.IsFastFalling = true;
-        jump.JumpFromSlide = true;
-        jump.SlideAttackCarryActive = true;
-        jump.CrouchSettled = true;
-        Simulation.SimulateTick(ref jump, Def, TestHelpers.Input(jump: true),
-            TestHelpers.TestArena(), out _, out bool jumpAccepted,
-            DownActionTuning.Default, false);
-        Assert.True(jumpAccepted);
-        Assert.False(jump.IsFastFalling);
-        Assert.False(jump.JumpFromSlide);
-        Assert.False(jump.SlideAttackCarryActive);
-        Assert.False(jump.CrouchSettled);
-
-        var dash = TestHelpers.PlayerState();
-        dash.PY = TestHelpers.GroundPY(Def);
-        dash.IsFastFalling = true;
-        Assert.True(Simulation.StartDash(ref dash, Move, 0f, 1f));
-        Assert.False(dash.IsFastFalling);
-    }
+[Fact]
+public void AcceptedJump_ResetsMovementInterruptions()
+{
+    var jump = TestHelpers.PlayerState();
+    jump.PY = TestHelpers.GroundPY(Def);
+    jump.IsFastFalling = true;
+    jump.JumpFromSlide = true;
+    jump.SlideAttackCarryActive = true;
+    jump.CrouchSettled = true;
+    Simulation.SimulateTick(ref jump, Def, TestHelpers.Input(jump: true),
+        TestHelpers.TestArena(), out _, out bool jumpAccepted,
+        DownActionTuning.Default, false);
+    Assert.True(jumpAccepted);
+    Assert.False(jump.IsFastFalling);
+    Assert.False(jump.JumpFromSlide);
+    Assert.False(jump.SlideAttackCarryActive);
+    Assert.False(jump.CrouchSettled);
+}
 
     [Fact]
     public void AcceptedHit_ResetsFastFallAndInterruptionFlags()

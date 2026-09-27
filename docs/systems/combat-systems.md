@@ -17,8 +17,8 @@ Every move is a fixed-timeline entry with authored stage timing, animation IDs, 
 
 - Camera-relative 8-direction movement uses one ground Run tier; there is no selectable walk/sprint split.
 - Jump and double jump use the character's movement definition. ShortHop is release-timed during the opening jump window.
-- FastFall requires a fresh Down press while already descending; it sets and latches the configured downward speed until landing or interruption. Release preserves the latch; ascent/apex and locked/owned presses are discarded. Ordinary aerial attacks may coexist, but Hitstop, Hitstun, Dash, ledges and authored vertical motion prevent activation. FastFall overrides any active gravity window.
-- Dash is a short Shift-triggered burst used for approach and evasion. Its opening ticks provide DashInvincibility; the dash tail is vulnerable. Grounded Dash hard-stops on expiry, while aerial Dash preserves momentum.
+- FastFall requires a fresh Down press while already descending; it sets and latches the configured downward speed until landing or interruption. Release preserves the latch; ascent/apex and locked/owned presses are discarded. Ordinary aerial attacks may coexist, but Hitstop, Hitstun, ledges and authored vertical motion prevent activation. FastFall overrides any active gravity window.
+- Shield is a permanent, full-body grounded defense held with Left Shift / RT. It stops ordinary melee, projectile and explosion attacks from every direction, freezes combat facing, and enters a vulnerable 7-tick drop after release. Grab is C or the controller LB+RT chord.
 - LedgeHang is occupied and single-occupancy. Drop, ledge jump, and stand are explicit escapes.
 - Each ability entry can be limited to one use per flight. Landing resets air-use counters.
 - RecoveryMove is the per-character return-to-stage move. It is the only ordinary move that resets the FloatWindow mid-air.
@@ -40,7 +40,7 @@ preserves LastDir. Walk-off clears low posture without automatically fast-fallin
 
 SlideJump uses ordinary jump squat, ShortHop and resources. Its takeoff cap is 1.15×
 RunSpeed versus ordinary RunSpeed; caps never refill velocity or restore wall-blocked
-components. No late-Dash conversion exists.
+components. Grounded mobility uses normal movement; character-specific mobility stays in kit abilities.
 
 All four roster packages opt their grounded normals 1–4 into `allowSlideCarry`.
 Activation switches immediately to the attack pose, caps existing Slide momentum at
@@ -57,8 +57,7 @@ An accepted hit snapshots settlement and a valid authored/baked low pose before 
 cleanup. Ordinary formula launch receives a .90 multiplier on its final vector, after
 Hitstun calculation and before directional influence. Damage, Hitstop and Hitstun are
 unchanged. Deferred launch applies the captured factor once after Hitstop; late Down does
-not earn it and release does not revoke it. Replacement hits and Burst clear/replace the
-queue. Scripted force, direct velocity overrides, pulls and Burst shove are excluded.
+not earn it and release does not revoke it. Replacement hits and block contact clear/replace the queue. Scripted force, direct velocity overrides and pulls are excluded.
 
 Roster low postures use real static Humanoid poses and matching baked hurtboxes, not
 smaller stage capsules. Missing legacy low poses remain upright and cannot earn brace.
@@ -79,11 +78,11 @@ interruption or a crouched landing. These are scenario measurements, not balance
 
 SlopArena uses damage percent rather than a conventional health pool. A hit applies damage, then Knockback using the hit's profile and the victim's current percent. Profiles cover Light, Medium, Launcher, Kill, Spike, and explicit Custom values.
 
-- **Hitstun** is the victim's no-action duration after a hit. Inputs buffer according to the simulation rules; the victim's residual launch continues after Hitstun ends.
-- **Hitstop** freezes the attacker/victim pair briefly while the match clock continues. Knockback starts when the freeze ends.
-- **Combo Influence** is additive launch drift selected by the defender during Hitstop and Hitstun.
+- **Hitstun** is the victim's no-action duration after a damaging hit. Inputs buffer according to the simulation rules; residual launch continues after Hitstun ends.
+- **Hitstop** freezes the attacker/victim pair briefly on contact while the match clock continues. Block hitstop does not enter damaging-hit launch/DI logic.
+- **Block stun** locks a defender after a blocked contact for `clamp(ceil(0.6 × incoming damage) + 2, 4, 15)` ticks; overlaps retain the larger remaining duration.
+- **Shield drop** lasts 7 vulnerable ticks after release; release during block stun starts the full drop only when the stun expires.
 - **Clash** resolves simultaneous Interruptible hitboxes as mutual pushback and short stun instead of an arbitrary trade.
-- **Burst** is a long per-entity cooldown. Defensively it breaks Hitstun and knockback with recovery; offensively it cancels the user's Duration Lock and emits a fixed-knockback extender.
 
 Visual hit reactions, VFX, audio, and camera effects are presentation only. Damage and state transitions occur in Shared simulation.
 
@@ -93,8 +92,8 @@ A Duration Lock prevents action during an authored move commitment. The engine o
 
 - IASA lets an authored stage accept a new ability from its configured tick onward;
 - grounded normals also accept directional movement at that same pre-tick IASA boundary; movement cancels the current activation and its remaining hitboxes rather than steering an active attack;
-- explicit ability input takes priority over movement cancellation; hitstop, Hitstun, Burst recovery, and landing lag still block cancellation, and jumping retains its existing full-lock gate;
-- Hitstun, death, Burst, and simulation-owned overrides cancel active content through the cancellation path;
+- explicit ability input takes priority over movement cancellation; hitstop, Hitstun, block stun, and landing lag still block cancellation, and jumping retains its existing full-lock gate;
+- Hitstun, death, and simulation-owned overrides cancel active content through the cancellation path;
 - landing lag applies to an aerial move unless the landing tick is in its auto-cancel window;
 - a cancellation never depends on an authored cleanup operation that may not execute.
 
@@ -128,7 +127,7 @@ All roster normals (`ground.1–4` and `air.1–4`) enable target-facing rotatio
 ## Design rules
 
 - Give 3D attacks enough width, height, or depth to compensate for camera perspective, while preserving readable counterplay.
-- Telegraph high-damage F moves with a wind-up so Dash and Burst decisions matter.
+- Telegraph high-damage F moves with a wind-up so Shield and movement decisions matter.
 - Make aerial strength and recovery resources part of the fighter's tradeoff rather than granting every move unrestricted air use.
 - Keep move behavior deterministic, bounded, and expressible through engine-owned primitives.
 

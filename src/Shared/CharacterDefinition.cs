@@ -72,6 +72,8 @@ namespace SlopArena.Shared
         public float BoneYToWorldY(float capsuleCenterY, float boneLocalY)
             => capsuleCenterY - CapsuleHeight * 0.5f + HipHeight + boneLocalY;
         public float HurtboxRadius;
+        /// <summary>Cooked character-specific forward capture volume and paired placement anchors.</summary>
+        public CookedCaptureGeometry? CaptureGeometry;
 
         /// <summary>
         /// World-space offset from character position (legacy, used when no skeleton)
@@ -155,6 +157,12 @@ namespace SlopArena.Shared
         /// <summary>Optional static low-posture semantic bindings; absent content remains upright.</summary>
         public string CrouchAnim = "";
         public string SlideAnim = "";
+        /// <summary>Optional package-owned semantic defense animation bindings.</summary>
+        public string ShieldAnim = "";
+        public string GrabAnim = "";
+        public string GrabbedAnim = "";
+        public string ThrowForwardAnim = "";
+        public string AirDodgeAnim = "";
         /// <summary>Landing uses JumpAnim clip with this start offset (seconds). Default: 0.49f</summary>
         public float LandStartOffset = 0.49f;
         /// <summary>Per-clip overrides for non-default timeline/loop settings.</summary>

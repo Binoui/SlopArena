@@ -126,9 +126,73 @@ public static class CookedCharacterPackageLoader
         public static CookedCharacterPackage Parse(byte[] bytes)
         {
             using var doc=JsonDocument.Parse(bytes);var root=doc.RootElement;var mm=O(root.GetProperty("metadata"),"packageId","version","cookedSchemaVersion","compatibility");var api=O(mm["compatibility"],"runtimeApiMin","runtimeApiMax");var metadata=new CookedPackageMetadata(S(mm,"packageId"),S(mm,"version"),U(mm,"cookedSchemaVersion"),S(api,"runtimeApiMin"),S(api,"runtimeApiMax"));
-            var c=O(root.GetProperty("character"),"displayName","weight","movement","presentation","capsuleRadius","capsuleHeight","hipHeight","hurtboxRadius","hurtboxCapsules","hurtboxBoneDefs","attachmentBoneIds","presentationIds","capabilityRequirements","slots");var mv=O(c["movement"],"runSpeed","runAccelerationA","runAccelerationB","dashSpeed","airSpeedMax","airAccelStick","airAccelBase","jumpForce","shortHopForce","airJumpVMultiplier","airJumpHMultiplier","gravity","airFloatGravity","dashDurationTicks","dashCooldownTicks","groundFriction","airFriction","maxFallSpeed","fastFallSpeed","maxJumps","jumpSquatTicks","floatWindowTicks","rushTicks");
-            var movement=new CookedMovement(F(mv,"runSpeed"),F(mv,"runAccelerationA"),F(mv,"runAccelerationB"),F(mv,"dashSpeed"),F(mv,"airSpeedMax"),F(mv,"airAccelStick"),F(mv,"airAccelBase"),F(mv,"jumpForce"),F(mv,"shortHopForce"),F(mv,"airJumpVMultiplier"),F(mv,"airJumpHMultiplier"),F(mv,"gravity"),F(mv,"airFloatGravity"),U(mv,"dashDurationTicks"),U(mv,"dashCooldownTicks"),F(mv,"groundFriction"),F(mv,"airFriction"),F(mv,"maxFallSpeed"),F(mv,"fastFallSpeed"),B(mv,"maxJumps"),U(mv,"jumpSquatTicks"),U(mv,"floatWindowTicks"),U(mv,"rushTicks"));var pr=OOptional(c["presentation"],new[]{"tumble","crouch","slide"},"idle","run","dash","jump","fall","hitSmall","hitMedium","hitHard","tumble","crouch","slide","landStartOffsetSeconds","modelResourcePath","visualScale","hurtboxBoneScale","modelYOffset","modelSoleOffset","autoModelYOffset");var presentation=new CookedPresentation(S(pr,"idle"),S(pr,"run"),S(pr,"dash"),S(pr,"jump"),S(pr,"fall"),S(pr,"hitSmall"),S(pr,"hitMedium"),S(pr,"hitHard"),F(pr,"landStartOffsetSeconds"),S(pr,"modelResourcePath"),F(pr,"visualScale"),F(pr,"hurtboxBoneScale"),F(pr,"modelYOffset"),F(pr,"modelSoleOffset"),Bo(pr,"autoModelYOffset"),SO(pr,"tumble",""),SO(pr,"crouch",""),SO(pr,"slide",""));
-            var capsules=A(c["hurtboxCapsules"]).EnumerateArray().Select(x=>{var q=O(x,"startX","startY","startZ","endX","endY","endZ","radius");return new CookedHurtboxCapsule(F(q,"startX"),F(q,"startY"),F(q,"startZ"),F(q,"endX"),F(q,"endY"),F(q,"endZ"),F(q,"radius"));}).ToList();var bones=A(c["hurtboxBoneDefs"]).EnumerateArray().Select(x=>{var q=O(x,"boneId","offsetX","offsetY","offsetZ","radius");return new CookedHurtboxBone(S(q,"boneId"),F(q,"offsetX"),F(q,"offsetY"),F(q,"offsetZ"),F(q,"radius"));}).ToList();var attachments=A(c["attachmentBoneIds"]).EnumerateArray().Select(x=>x.ValueKind==JsonValueKind.String?x.GetString()!:throw new InvalidDataException("Attachment bone ID must be a string.")).ToList();var ids=A(c["presentationIds"]).EnumerateArray().Select(x=>x.ValueKind==JsonValueKind.String?x.GetString()!:throw new InvalidDataException("Presentation ID must be a string.")).ToList();var caps=A(c["capabilityRequirements"]).EnumerateArray().Select(x=>{var q=O(x,"capabilityId","capabilityVersion");return new CookedCapabilityRequirement(S(q,"capabilityId"),S(q,"capabilityVersion"));}).ToList();var slots=A(c["slots"]).EnumerateArray().Select(ParseSlot).ToList();var definition=new CookedCharacterDefinition(S(c,"displayName"),F(c,"weight"),movement,presentation,F(c,"capsuleRadius"),F(c,"capsuleHeight"),F(c,"hipHeight"),F(c,"hurtboxRadius"),capsules,bones,attachments,ids,caps,slots);var b=O(root.GetProperty("budget"),"slotCount","stageCount","operationCount","hitboxCount","projectileCount","capabilityCount","maxTimelineDurationTicks");var budget=new CookedBudget(I(b,"slotCount"),I(b,"stageCount"),I(b,"operationCount"),I(b,"hitboxCount"),I(b,"projectileCount"),I(b,"capabilityCount"),I(b,"maxTimelineDurationTicks"));return new CookedCharacterPackage(metadata,definition,budget,Array.Empty<CharacterDiagnostic>(),bytes);
+            var c = O(root.GetProperty("character"),
+                "displayName", "weight", "movement", "presentation", "capsuleRadius", "capsuleHeight",
+                "hipHeight", "hurtboxRadius", "captureGeometry", "hurtboxCapsules", "hurtboxBoneDefs",
+                "attachmentBoneIds", "presentationIds", "capabilityRequirements", "slots");
+            var mv = O(c["movement"], "runSpeed", "runAccelerationA", "runAccelerationB", "dashSpeed",
+                "airSpeedMax", "airAccelStick", "airAccelBase", "jumpForce", "shortHopForce",
+                "airJumpVMultiplier", "airJumpHMultiplier", "gravity", "airFloatGravity",
+                "dashDurationTicks", "dashCooldownTicks", "groundFriction", "airFriction",
+                "maxFallSpeed", "fastFallSpeed", "maxJumps", "jumpSquatTicks", "floatWindowTicks", "rushTicks");
+            var movement = new CookedMovement(F(mv, "runSpeed"), F(mv, "runAccelerationA"), F(mv, "runAccelerationB"),
+                F(mv, "dashSpeed"), F(mv, "airSpeedMax"), F(mv, "airAccelStick"), F(mv, "airAccelBase"),
+                F(mv, "jumpForce"), F(mv, "shortHopForce"), F(mv, "airJumpVMultiplier"), F(mv, "airJumpHMultiplier"),
+                F(mv, "gravity"), F(mv, "airFloatGravity"), U(mv, "dashDurationTicks"), U(mv, "dashCooldownTicks"),
+                F(mv, "groundFriction"), F(mv, "airFriction"), F(mv, "maxFallSpeed"), F(mv, "fastFallSpeed"),
+                B(mv, "maxJumps"), U(mv, "jumpSquatTicks"), U(mv, "floatWindowTicks"), U(mv, "rushTicks"));
+            var pr = OOptional(c["presentation"],
+                new[] { "tumble", "crouch", "slide", "shield", "grab", "grabbed", "throwForward", "airDodge" },
+                "idle", "run", "dash", "jump", "fall", "hitSmall", "hitMedium", "hitHard",
+                "tumble", "crouch", "slide", "shield", "grab", "grabbed", "throwForward", "airDodge",
+                "landStartOffsetSeconds", "modelResourcePath", "visualScale", "hurtboxBoneScale",
+                "modelYOffset", "modelSoleOffset", "autoModelYOffset");
+            var presentation = new CookedPresentation(
+                S(pr, "idle"), S(pr, "run"), S(pr, "dash"), S(pr, "jump"), S(pr, "fall"),
+                S(pr, "hitSmall"), S(pr, "hitMedium"), S(pr, "hitHard"), F(pr, "landStartOffsetSeconds"),
+                S(pr, "modelResourcePath"), F(pr, "visualScale"), F(pr, "hurtboxBoneScale"),
+                F(pr, "modelYOffset"), F(pr, "modelSoleOffset"), Bo(pr, "autoModelYOffset"),
+                SO(pr, "tumble", ""), SO(pr, "crouch", ""), SO(pr, "slide", ""),
+                SO(pr, "shield", ""), SO(pr, "grab", ""), SO(pr, "grabbed", ""),
+                SO(pr, "throwForward", ""), SO(pr, "airDodge", ""));
+            var capture = O(c["captureGeometry"], "reach", "width", "height", "offsetY", "attackerAnchor", "victimAnchor");
+            var attacker = O(capture["attackerAnchor"], "x", "y", "z");
+            var victim = O(capture["victimAnchor"], "x", "y", "z");
+            var captureGeometry = new CookedCaptureGeometry(
+                F(capture, "reach"), F(capture, "width"), F(capture, "height"), F(capture, "offsetY"),
+                new CaptureAnchor(F(attacker, "x"), F(attacker, "y"), F(attacker, "z")),
+                new CaptureAnchor(F(victim, "x"), F(victim, "y"), F(victim, "z")));
+            var capsules = A(c["hurtboxCapsules"]).EnumerateArray().Select(x =>
+            {
+                var q = O(x, "startX", "startY", "startZ", "endX", "endY", "endZ", "radius");
+                return new CookedHurtboxCapsule(F(q, "startX"), F(q, "startY"), F(q, "startZ"), F(q, "endX"), F(q, "endY"), F(q, "endZ"), F(q, "radius"));
+            }).ToList();
+            var bones = A(c["hurtboxBoneDefs"]).EnumerateArray().Select(x =>
+            {
+                var q = O(x, "boneId", "offsetX", "offsetY", "offsetZ", "radius");
+                return new CookedHurtboxBone(S(q, "boneId"), F(q, "offsetX"), F(q, "offsetY"), F(q, "offsetZ"), F(q, "radius"));
+            }).ToList();
+            var attachments = A(c["attachmentBoneIds"]).EnumerateArray()
+                .Select(x => x.ValueKind == JsonValueKind.String ? x.GetString()! : throw new InvalidDataException("Attachment bone ID must be a string."))
+                .ToList();
+            var ids = A(c["presentationIds"]).EnumerateArray()
+                .Select(x => x.ValueKind == JsonValueKind.String ? x.GetString()! : throw new InvalidDataException("Presentation ID must be a string."))
+                .ToList();
+            var caps = A(c["capabilityRequirements"]).EnumerateArray().Select(x =>
+            {
+                var q = O(x, "capabilityId", "capabilityVersion");
+                return new CookedCapabilityRequirement(S(q, "capabilityId"), S(q, "capabilityVersion"));
+            }).ToList();
+            var slots = A(c["slots"]).EnumerateArray().Select(ParseSlot).ToList();
+            var definition = new CookedCharacterDefinition(
+                S(c, "displayName"), F(c, "weight"), movement, presentation,
+                F(c, "capsuleRadius"), F(c, "capsuleHeight"), F(c, "hipHeight"),
+                F(c, "hurtboxRadius"), captureGeometry, capsules, bones, attachments, ids, caps, slots);
+            var b = O(root.GetProperty("budget"), "slotCount", "stageCount", "operationCount", "hitboxCount",
+                "projectileCount", "capabilityCount", "maxTimelineDurationTicks");
+            var budget = new CookedBudget(I(b, "slotCount"), I(b, "stageCount"), I(b, "operationCount"),
+                I(b, "hitboxCount"), I(b, "projectileCount"), I(b, "capabilityCount"), I(b, "maxTimelineDurationTicks"));
+            return new CookedCharacterPackage(metadata, definition, budget, Array.Empty<CharacterDiagnostic>(), bytes);
         }
         private static CookedSlotDefinition ParseSlot(JsonElement e){var q=OOptional(e,new[]{"aimMovement","aimAnimationId","allowSlideCarry"},"ordinal","id","isAir","name","description","iconId","behavior","aimMode","aimMovement","aimAnimationId","cooldownTicks","isRecoveryMove","preserveMomentumOnStart","allowSlideCarry","chargePool","timeline");var pool=q["chargePool"].ValueKind==JsonValueKind.Null?null:ParseChargePool(q["chargePool"]);var t=O(q["timeline"],"stages");return new CookedSlotDefinition(I(q,"ordinal"),S(q,"id"),Bo(q,"isAir"),S(q,"name"),S(q,"description"),S(q,"iconId"),(AuthoringAbilityBehavior)B(q,"behavior"),(AuthoringAimMode)B(q,"aimMode"),U(q,"cooldownTicks"),Bo(q,"isRecoveryMove"),Bo(q,"preserveMomentumOnStart"),new CookedTimeline(A(t,"stages").EnumerateArray().Select(ParseStage).ToList()),pool,(AuthoringAimMovementMode)BOrDefault(q,"aimMovement",0),q.TryGetValue("aimAnimationId",out var aa)&&aa.ValueKind==JsonValueKind.String?aa.GetString():null,BoOrDefault(q,"allowSlideCarry",false));}
         private static CookedChargePool ParseChargePool(JsonElement e){var q=O(e,"maxCharges","regenTicks");return new CookedChargePool(I(q,"maxCharges"),U(q,"regenTicks"));}

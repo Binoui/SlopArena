@@ -126,9 +126,10 @@ public class BotPolicyTests
     }
 
     [Fact]
-    public void FarOpponent_ApproachesWithWorldSpaceMovement_NoAttack()
+    public void FarOpponent_ApproachesWithWorldSpaceMovement_DespiteReservedBurstRecovery()
     {
         var self = Self();
+        self.BurstRecoveryTicks = ushort.MaxValue;
         var target = Opponent(z: 50f); // well beyond every resolved move envelope on +Z
 
         var input = Decide(self, target);
@@ -215,6 +216,54 @@ public class BotPolicyTests
         Assert.Equal(0, input.ActiveSlot);
         Assert.False(input.Dash);
         Assert.False(input.Jump);
+    }
+    [Fact]
+    public void ThreatenedBotUsesShieldInsteadOfGroundedDashWhenDefenseWins()
+    {
+        var self = Self();
+        LockNonAimSlots(ref self);
+        self.SetCooldown(AbilitySlots.A, 999);
+        var target = Opponent(z: 0.5f);
+        target.State = ActionState.Attacking;
+        bool shielded = false;
+        for (int seed = 0; seed < 64; seed++)
+        {
+            var memory = new BotMemory { Difficulty = CpuDifficulty.Hard };
+            Prime(memory, target);
+            var input = Policy.Decide(self, target, Def, new Random(seed), memory);
+            if (input.ShieldPressed)
+            {
+                shielded = true;
+                Assert.True(input.ShieldHeld);
+                Assert.Equal(0, input.ActiveSlot);
+            }
+            Assert.False(input.Dash);
+            Assert.False(input.Burst);
+        }
+        Assert.True(shielded, "No seeded decision selected shield against a grounded threat.");
+    }
+
+    [Fact]
+    public void ShieldingBotHoldsDefenseOnlyWhileObservedOpponentThreatens()
+    {
+        var self = Self();
+        self.State = ActionState.Shielding;
+        var target = Opponent(z: 0.5f);
+        target.State = ActionState.Attacking;
+        var memory = new BotMemory { Difficulty = CpuDifficulty.Hard };
+        Prime(memory, target);
+
+        var input = Policy.Decide(self, target, Def, new Random(42), memory);
+
+        Assert.True(input.ShieldHeld);
+        Assert.False(input.ShieldPressed);
+        Assert.False(input.Dash);
+        Assert.False(input.Burst);
+
+        target.State = ActionState.Idle;
+        Prime(memory, target); // decision uses the delayed observation, not the live target
+        input = Policy.Decide(self, target, Def, new Random(42), memory);
+        Assert.False(input.ShieldHeld);
     }
 
     [Fact]

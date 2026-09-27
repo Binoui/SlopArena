@@ -11,7 +11,7 @@ using SlopArena.Shared;
 namespace SlopArena.MovementReport;
 
 /// <summary>
-/// Movement data sheet (issue #150): measures run / dash / jump / double jump / short hop /
+/// Movement data sheet (issue #150): measures run / shield / jump / double jump / short hop /
 /// air drift / fall / fast fall / stop / reversal for every character from the REAL
 /// ServerSimulation (MovementProbe) and renders a side-by-side comparison table +
 /// per-character curves + stage-relative reads + a Melee reference comparison.
@@ -137,7 +137,7 @@ internal static class Program
         sb.AppendLine("# Movement data sheet — measured from the real sim (issue #150)");
         sb.AppendLine();
         sb.AppendLine($"> Generated {generated} · scripted inputs on the real ServerSimulation (60 Hz tick). ");
-        sb.AppendLine("> Run: hold right from standstill. Dash: one dash press. Jump: full jump (held past the short-hop ");
+        sb.AppendLine("> Run: hold right from standstill. Shield: raise at cruise and hold. Jump: full jump (held past the short-hop ");
         sb.AppendLine("> window). Short hop: press + release inside the window. Double jump: jump edge at first apex. ");
         sb.AppendLine("> Drift: stick held through the full hop. Fall: spawned airborne at 50 m (float window skipped). ");
         sb.AppendLine("> Reversal: cruise right, then full opposite input (pivot skid + re-accel). Stop: release at cruise. ");
@@ -168,8 +168,7 @@ internal static class Program
             sb.AppendLine();
             sb.AppendLine($"- **Run**: {m.Run.MaxSpeed:F1} m/s (authored {m.Authored.RunSpeed:F0})"
                 + (m.Run.Note.Length > 0 ? $" — {m.Run.Note}" : $"; time-to-max {m.Run.TimeToMaxTicks + 1} ticks, {m.Run.DistanceToMax:F2} m"));
-            sb.AppendLine($"- **Dash**: {m.Dash.DurationTicks} ticks, {m.Dash.TotalDistance:F2} m = {Pct(m.Dash.TotalDistance / stageWidth)}, actionable on tick {m.Dash.ActionableTick} "
-                + $"(hard stop; authored {m.Authored.DashSpeed:F0} m/s for {m.Authored.DashDurationTicks} ticks)");
+            sb.AppendLine($"- **Shield**: stops in {m.Shield.StopTicks} tick(s), {m.Shield.StopDistance:F2} m brake distance; held for {m.Shield.HoldTicks} ticks");
             sb.AppendLine($"- **Jump**: apex {m.Jump.ApexHeight:F2} m at {m.Jump.TimeToApexTicks} ticks, airtime {m.Jump.AirtimeTicks / 60f:F2} s, "
                 + $"full-hop drift {m.Jump.HorizontalDistance:F2} m = {Pct(m.Jump.HorizontalDistance / stageWidth)}; running jump carries {m.RunningJump.HorizontalDistance:F2} m");
             sb.AppendLine($"- **Short hop**: apex {m.ShortHop.ApexHeight:F2} m, airtime {m.ShortHop.AirtimeTicks / 60f:F2} s "
@@ -183,8 +182,7 @@ internal static class Program
                 + $"from jump apex {m.Fall.FastFallFromJumpTicks / 60f:F2} s (natural {m.Jump.AirtimeTicks / 60f:F2} s full hop)");
             sb.AppendLine($"- **Reversal** (cruise → opposite cruise): {m.Reversal.ReversalTicks / 60f:F2} s, "
                 + $"{m.Reversal.Displacement:F2} m covered (pivot skid + re-accel)");
-            sb.AppendLine($"- **Stop** (cruise → standstill): {m.Stop.StopTicks / 60f:F2} s, {m.Stop.StopDistance:F2} m; "
-                + $"dash+stop commit = {Pct((m.Dash.TotalDistance + m.Stop.StopDistance) / stageWidth)} of stage");
+            sb.AppendLine($"- **Stop** (cruise → standstill): {m.Stop.StopTicks / 60f:F2} s, {m.Stop.StopDistance:F2} m");
             sb.AppendLine();
         }
         // The comparison rows are shared with the HTML renderer; strip the styling spans.
@@ -203,7 +201,7 @@ internal static class Program
         sb.AppendLine();
         sb.AppendLine("What the numbers mean, per character (computed from the measured values above):");
         sb.AppendLine();
-        foreach (var line in RosterLines(all, stageWidth))
+        foreach (var line in RosterLines(all))
             sb.AppendLine("- " + line);
         sb.AppendLine();
         sb.AppendLine($"- **Too fast?** Run crosses {stageWidth:F0} m in "
@@ -224,8 +222,7 @@ internal static class Program
 
     /// <summary>Deterministic per-character reads: rank each metric, surface the standout
     /// and the weakest for every character.</summary>
-    private static List<string> RosterLines(List<(CharacterDefinition Def, MovementProbe.CharacterMovement M)> all,
-        float stageWidth)
+    private static List<string> RosterLines(List<(CharacterDefinition Def, MovementProbe.CharacterMovement M)> all)
     {
         var lines = new List<string>();
         foreach (var (def, m) in all)
@@ -239,18 +236,16 @@ internal static class Program
                 if (ReferenceEquals(best, m)) s.Add(metric);
                 if (ReferenceEquals(worst, m)) w.Add(metric);
             }
-            Rank("longest dash", x => x.M.Dash.TotalDistance);
             Rank("highest jump", x => x.M.Jump.ApexHeight);
             Rank("fastest run", x => x.M.Run.MaxSpeed);
             Rank("longest airtime", x => x.M.DoubleJump.AirtimeTicks);
             Rank("largest air drift", x => x.M.Jump.DriftSpeedMax);
             Rank("safest stop", x => -x.M.Stop.StopDistance);
-            Rank("largest stage share per dash", x => x.M.Dash.TotalDistance / stageWidth);
             var airGround = m.Jump.DriftSpeedMax / m.Run.MaxSpeed;
             var minAir = all.OrderBy(x => x.M.Jump.DriftSpeedMax / x.M.Run.MaxSpeed).First().M;
             if (ReferenceEquals(minAir, m)) w.Add("most ground-dominant (lowest air/run)");
-            string read = $"**{def.DisplayName}**: run {m.Run.MaxSpeed:F0} m/s, dash {m.Dash.TotalDistance:F1} m "
-                + $"({Pct(m.Dash.TotalDistance / stageWidth)} of stage), jump {m.Jump.ApexHeight:F2} m, "
+            string read = $"**{def.DisplayName}**: run {m.Run.MaxSpeed:F0} m/s, shield stops in {m.Shield.StopTicks} tick(s) "
+                + $"and holds for {m.Shield.HoldTicks} ticks, jump {m.Jump.ApexHeight:F2} m, "
                 + $"air/run {Pct(airGround)}, stop {m.Stop.StopDistance:F1} m.";
             if (s.Count > 0) read += $" Best at: {string.Join(", ", s)}.";
             if (w.Count > 0) read += $" Weakest at: {string.Join(", ", w)}.";
@@ -286,7 +281,6 @@ internal static class Program
         var sh = all.Select(x => (float)x.M.ShortHop.AirtimeTicks / 60f).ToArray();
         var ff = all.Select(x => x.M.Fall.FastFallSpeed / x.M.Fall.MaxFallSpeed).ToArray();
         var ar = all.Select(x => x.M.Jump.DriftSpeedMax / x.M.Run.MaxSpeed).ToArray();
-        var dr = all.Select(x => x.M.Dash.TotalDistance / (x.M.Dash.DurationTicks / 60f) / x.M.Run.MaxSpeed).ToArray();
         var stop = all.Select(x => (float)x.M.Stop.StopTicks / 60f).ToArray();
         var rev = all.Select(x => (float)x.M.Reversal.ReversalTicks / 60f).ToArray();
         var sq = all.Select(x => (float)x.M.Authored.JumpSquatTicks).ToArray();
@@ -299,10 +293,8 @@ internal static class Program
             new("Short/full jump force", Rng("{0:F2}", ratio), "≈ 0.58 (derived)", "Melee-shaped (0.7 was the pre-audit value)"),
             new("Fast fall / fall", Rng("{0:F2}", ff), "1.14–1.26 (Fox 3.4/2.8 … Puff 1.6/1.3)", "Melee-shaped, adopted (audit §3.4)"),
             new("Air speed / run", Rng("{0:F2}", ar), "0.38 Fox – 0.5 Marth – 1.23 Puff", "upper-mid band — air slower than ground, Melee norm"),
-            new("Dash speed / run", Rng("{0:F2}", dr), "0.8–1.5× (initial dash vs run)", "top of Melee band"),
             new("Stop from run", Rng("{0:F2} s", stop), "Fox 27.5 f, Marth 30 f, Puff 12 f", "SA brakes faster than Fox/Marth"),
-            new("Reversal (cruise→cruise)", Rng("{0:F2} s", rev), "dash-dance pivot ≈ 10–15 f between dashes", "SA pivot 2–3× slower — no dash-dance (cooldown)"),
-            new("Dash cooldown", "44–60 t", "none — dash-dance is core", "the big deviation (ADR-0020 kept it)"),
+            new("Reversal (cruise→cruise)", Rng("{0:F2} s", rev), "direction-change pivot", "SA pivot 2–3× slower"),
         };
     }
 
@@ -326,7 +318,7 @@ internal static class Program
         sb.AppendLine("</style></head><body>");
         sb.AppendLine("<h1>Movement data sheet</h1>");
         sb.AppendLine($"<div class=\"meta\">Generated {generated} &middot; scripted inputs on the real ServerSimulation (60 Hz). ");
-        sb.AppendLine("Run: hold right &middot; Dash: one press &middot; Jump: full jump &middot; Short hop: press + release &middot; ");
+        sb.AppendLine("Run: hold right &middot; Shield: raise at cruise and hold &middot; Jump: full jump &middot; Short hop: press + release &middot; ");
         sb.AppendLine("Double jump: edge at first apex &middot; Fall: 50 m drop (natural / fast fall) &middot; Reversal: cruise → opposite input &middot; Stop: release.<br>");
         sb.AppendLine($"Stage-relative rows: real baked <b>{stageName}</b> ({stageWidth:F1} m wide). Measured <em>effective</em> behavior — not authored constants; authored in <span class=\"note\">orange</span>.</div>");
 
@@ -344,7 +336,7 @@ internal static class Program
 
         // Roster read + Melee comparison
         sb.AppendLine("<h2>Roster read</h2><div class=\"verdict\">");
-        foreach (var line in RosterLines(all, stageWidth)) sb.AppendLine($"<p>{line}</p>");
+        foreach (var line in RosterLines(all)) sb.AppendLine($"<p>{line}</p>");
         sb.AppendLine($"<p><b>Too fast?</b> Run crosses {stageWidth:F0} m in "
             + string.Join(" / ", all.Select(x => $"{Escape(x.Def.DisplayName)} {stageWidth / x.M.Run.MaxSpeed:F2} s")) + ". "
             + $"Full-hop airtime {string.Join(" / ", all.Select(x => $"{x.M.Jump.AirtimeTicks / 60f:F2} s"))} vs ~{ReactionTime} s reaction "
@@ -368,9 +360,7 @@ internal static class Program
             Add(sb, "Run max speed", $"{m.Run.MaxSpeed:F1} m/s <span class=\"note\">(authored {m.Authored.RunSpeed:F0})</span>");
             Add(sb, "Run time-to-max", m.Run.Note.Length > 0 ? "instant — tick 1 <span class=\"note\">(rush kick-off, no ramp)</span>"
                 : $"{m.Run.TimeToMaxTicks + 1} ticks, {m.Run.DistanceToMax:F2} m");
-            Add(sb, "Dash", $"{m.Dash.DurationTicks} ticks &middot; {m.Dash.TotalDistance:F2} m = {Pct(m.Dash.TotalDistance / stageWidth)} of stage &middot; actionable tick {m.Dash.ActionableTick} "
-                + $"<span class=\"note\">(authored {m.Authored.DashSpeed:F0} m/s &times; {m.Authored.DashDurationTicks} ticks)</span>");
-            Add(sb, "Dash + stop commit", $"{m.Dash.TotalDistance + m.Stop.StopDistance:F2} m = {Pct((m.Dash.TotalDistance + m.Stop.StopDistance) / stageWidth)} of stage (whiff-punish range)");
+            Add(sb, "Shield", $"brakes in {m.Shield.StopTicks} tick(s) &middot; {m.Shield.StopDistance:F2} m &middot; held {m.Shield.HoldTicks} ticks");
             Add(sb, "Jump", $"apex {m.Jump.ApexHeight:F2} m at {m.Jump.TimeToApexTicks} ticks &middot; airtime {m.Jump.AirtimeTicks / 60f:F2} s &middot; "
                 + $"full-hop drift {m.Jump.HorizontalDistance:F2} m = {Pct(m.Jump.HorizontalDistance / stageWidth)} of stage");
             Add(sb, "Short hop", $"apex {m.ShortHop.ApexHeight:F2} m &middot; airtime {m.ShortHop.AirtimeTicks / 60f:F2} s &middot; "
@@ -388,7 +378,7 @@ internal static class Program
 
             sb.AppendLine("<div class=\"curves\">");
             Chart(sb, "Run — speed vs tick", ToPts(m.Run.Curve, c => c.Speed), null);
-            Chart(sb, "Dash — distance vs tick", ToPts(m.Dash.Curve, c => c.PosX), null);
+            Chart(sb, "Shield — speed vs tick", ToPts(m.Shield.Curve, c => c.Speed), null);
             Chart(sb, "Jump — height vs tick", ToPts(m.Jump.Curve, c => c.PosY - groundY), null);
             Chart(sb, "Short hop — height vs tick", ToPts(m.ShortHop.Curve, c => c.PosY - groundY), null);
             Chart(sb, "Double jump — height vs tick", ToPts(m.DoubleJump.Curve, c => c.PosY - groundY), null);
@@ -471,13 +461,10 @@ internal static class Program
         Row_("Run time-to-max", x => x.M.Run.TimeToMaxTicks <= 2 ? "instant <span class=\"note\">(rush kick-off)</span>"
             : $"{x.M.Run.TimeToMaxTicks + 1} ticks");
         Row_("Run cross-stage time (s)", x => $"{stageWidth / x.M.Run.MaxSpeed:F2}");
-        Row_("Dash duration (ticks)", x => $"{x.M.Dash.DurationTicks} {Note(x.M, x.M.Authored.DashDurationTicks)}");
-        Row_("Dash distance (m)", x => F(x.M.Dash.TotalDistance));
-        Row_("Dash % of stage", x => $"{Pct(x.M.Dash.TotalDistance / stageWidth)}");
-        Row_("Dash+stop commit % of stage", x => $"{Pct((x.M.Dash.TotalDistance + x.M.Stop.StopDistance) / stageWidth)}");
-        Row_("Dash actionable (tick)", x => $"{x.M.Dash.ActionableTick}");
+        Row_("Shield stop ticks", x => $"{x.M.Shield.StopTicks}");
+        Row_("Shield hold ticks", x => $"{x.M.Shield.HoldTicks}");
         Row_("Jump squat (ticks)", x => $"{x.M.Authored.JumpSquatTicks}");
-        Row_("Dash-dance window (ticks)", x => $"{x.M.Authored.RushTicks} <span class=\"note\">(rush, on standstill / redirect)</span>");
+        Row_("Rush redirect window (ticks)", x => $"{x.M.Authored.RushTicks} <span class=\"note\">(rush, on standstill / redirect)</span>");
         Row_("Jump apex (m)", x => F(x.M.Jump.ApexHeight));
         Row_("Jump time-to-apex (ticks)", x => $"{x.M.Jump.TimeToApexTicks}");
         Row_("Jump airtime (s)", x => $"{x.M.Jump.AirtimeTicks / 60f:F2}");
