@@ -1,4 +1,5 @@
 using System;
+using SlopArena.Client.Network;
 using UnityEngine;
 using UnityEngine.UIElements;
 using UnityEngine.SceneManagement;
@@ -47,6 +48,11 @@ namespace SlopArena.Client.UI
 
         private FrontendShellIdentityView? _identity;
         private FrontendFocusRouter? _focusRouter;
+        private Button? _navHome;
+        private Button? _navTraining;
+        private Button? _navOffline;
+        private Button? _navOnline;
+        private ChatSession? _navSession;
 
         private static FrontendController? _instance;
         private static FrontendPage? _pendingPage;
@@ -92,6 +98,8 @@ namespace SlopArena.Client.UI
 
         private void OnDestroy()
         {
+            if (_navSession != null)
+                _navSession.Changed -= RenderNavigation;
             if (_instance == this)
                 _instance = null;
         }
@@ -103,8 +111,76 @@ namespace SlopArena.Client.UI
             _focusRouter = GetComponent<FrontendFocusRouter>();
             _identity?.Bind(_shell);
             _focusRouter?.Bind(_shell);
+            BindNavigation();
             Show(_pendingPage ?? FrontendPage.Home);
             _pendingPage = null;
+        }
+
+        private void Update()
+        {
+            if (_navSession == null && ChatSession.Instance is { } session)
+            {
+                _navSession = session;
+                _navSession.Changed += RenderNavigation;
+                RenderNavigation();
+            }
+        }
+
+        private void BindNavigation()
+        {
+            var bar = _shell?.TopBar;
+            _navHome = bar?.Q<Button>("shell-wordmark");
+            _navTraining = bar?.Q<Button>("shell-nav-training");
+            _navOffline = bar?.Q<Button>("shell-nav-offline");
+            _navOnline = bar?.Q<Button>("shell-nav-online");
+            if (_navHome != null) _navHome.clicked += NavigateHome;
+            if (_navTraining != null) _navTraining.clicked += () => StartMode(GameMode.Training);
+            if (_navOffline != null) _navOffline.clicked += () => StartMode(GameMode.Solo);
+            if (_navOnline != null) _navOnline.clicked += () => StartMode(GameMode.PvP);
+        }
+
+        private void NavigateHome()
+        {
+            if (UiModalState.Presented || _current == FrontendPage.Home)
+                return;
+            if (_current == FrontendPage.ServerBrowser
+                || (_current == FrontendPage.FighterSelect
+                    && MatchConfig.Mode is GameMode.Solo or GameMode.Training))
+                _currentContext?.InvokeBackAction();
+        }
+
+        public static void StartMode(GameMode mode)
+        {
+            if (_instance == null || _instance._current != FrontendPage.Home
+                || _instance._identity is not { ModeGateClosed: false } || UiModalState.Presented)
+                return;
+            MatchConfig.Mode = mode;
+            MatchConfig.IsHost = mode != GameMode.PvP;
+            Show(mode == GameMode.PvP ? FrontendPage.ServerBrowser : FrontendPage.FighterSelect);
+        }
+
+        private void RenderNavigation()
+        {
+            bool home = _current == FrontendPage.Home;
+            bool canPlay = home && _identity is { ModeGateClosed: false };
+            bool canReturnHome = _currentContext?.BackAction != null
+                && (_current == FrontendPage.ServerBrowser
+                    || (_current == FrontendPage.FighterSelect
+                        && MatchConfig.Mode is GameMode.Solo or GameMode.Training));
+            _navHome?.SetEnabled(home || canReturnHome);
+            _navTraining?.SetEnabled(canPlay);
+            _navOffline?.SetEnabled(canPlay);
+            _navOnline?.SetEnabled(canPlay);
+
+            bool inSetupOrResults = _current is FrontendPage.FighterSelect or FrontendPage.StageSelect
+                or FrontendPage.Results;
+            bool online = _current is FrontendPage.ServerBrowser or FrontendPage.LobbyRoom
+                || (inSetupOrResults && MatchConfig.Mode == GameMode.PvP);
+            bool training = inSetupOrResults && MatchConfig.Mode == GameMode.Training;
+            bool offline = inSetupOrResults && MatchConfig.Mode == GameMode.Solo;
+            _navTraining?.EnableInClassList("shell-nav-tab--selected", training);
+            _navOffline?.EnableInClassList("shell-nav-tab--selected", offline);
+            _navOnline?.EnableInClassList("shell-nav-tab--selected", online);
         }
 
         /// <summary>
@@ -203,6 +279,7 @@ namespace SlopArena.Client.UI
             if (_generation != generationAtMount || _current != page)
                 return;
             PageChanged?.Invoke(page);
+            RenderNavigation();
         }
 
         private GameObject PageObject(FrontendPage page) => page switch

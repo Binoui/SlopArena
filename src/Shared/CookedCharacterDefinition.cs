@@ -60,6 +60,7 @@ public sealed class CookedCharacterDefinition
     public float CapsuleHeight { get; }
     public float HipHeight { get; }
     public float HurtboxRadius { get; }
+    public float ShieldRadius { get; }
     public CookedCaptureGeometry CaptureGeometry { get; }
     public IReadOnlyList<CookedHurtboxCapsule> HurtboxCapsules { get; }
     public IReadOnlyList<CookedHurtboxBone> HurtboxBoneDefs { get; }
@@ -77,6 +78,7 @@ public sealed class CookedCharacterDefinition
         float capsuleHeight,
         float hipHeight,
         float hurtboxRadius,
+        float shieldRadius,
         CookedCaptureGeometry captureGeometry,
         IReadOnlyList<CookedHurtboxCapsule> hurtboxCapsules,
         IReadOnlyList<CookedHurtboxBone> hurtboxBoneDefs,
@@ -93,6 +95,7 @@ public sealed class CookedCharacterDefinition
         CapsuleHeight = capsuleHeight;
         HipHeight = hipHeight;
         HurtboxRadius = hurtboxRadius;
+        ShieldRadius = shieldRadius;
         CaptureGeometry = captureGeometry;
         HurtboxCapsules = Copy(hurtboxCapsules);
         HurtboxBoneDefs = Copy(hurtboxBoneDefs);
@@ -111,6 +114,7 @@ public sealed record CookedMovement(
     float RunAccelerationA,
     float RunAccelerationB,
     float DashSpeed,
+    float AirDodgeSpeed,
     float AirSpeedMax,
     float AirAccelStick,
     float AirAccelBase,

@@ -123,6 +123,8 @@ Start with the [documentation map](docs/README.md), then read:
 
 Issues, design feedback, code, art, documentation, and testing are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request. This project uses the [MIT license](LICENSE) and follows the [Code of Conduct](CODE_OF_CONDUCT.md).
 
+Thank you to the artists and developers behind the assets and tools used here. See [Credits](CREDITS.md) for their names and work.
+
 ## AI usage
 
 SlopArena uses agent-assisted development and generated art as practical tools. Contributions remain reviewed project work: determinism, licensing, gameplay correctness, and maintainability matter more than how an asset or patch was produced.

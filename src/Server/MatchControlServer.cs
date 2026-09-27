@@ -277,7 +277,7 @@ namespace SlopArena.Server
             if (result.ServerSteamId is not null)
             {
                 var steamResponse = Encoding.UTF8.GetBytes(
-                    $"{{\"matchId\":\"{result.MatchId}\",\"serverSteamId\":\"{result.ServerSteamId}\",\"virtualPort\":0,\"protocolVersion\":2,\"content\":{MatchContentHandleMapCodec.Serialize(result.Content!)},\"contentHash\":\"{result.ContentHash}\"}}");
+                    $"{{\"matchId\":\"{result.MatchId}\",\"serverSteamId\":\"{result.ServerSteamId}\",\"virtualPort\":0,\"protocolVersion\":{SteamMatchDescriptor.CurrentProtocolVersion},\"content\":{MatchContentHandleMapCodec.Serialize(result.Content!)},\"contentHash\":\"{result.ContentHash}\"}}");
                 await ctx.Response.OutputStream.WriteAsync(steamResponse);
             }
             else

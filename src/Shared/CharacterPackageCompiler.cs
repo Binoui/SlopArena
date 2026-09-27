@@ -30,7 +30,9 @@ public sealed class CharacterCompileResult
 
 public static class CharacterPackageCompiler
 {
-    private const ushort SchemaVersion = 1;
+    private const ushort ManifestSchemaVersion = 1;
+    private const ushort AuthoringSchemaVersion = 3;
+    private const ushort CookedSchemaVersion = 3;
     private const string RuntimeApiMin = "1.2.0";
     private const string RuntimeApiMax = "1.x";
     private static readonly string[] CanonicalSlots = CanonicalSlotProjection.All
@@ -92,8 +94,8 @@ public static class CharacterPackageCompiler
         var m = source.Manifest;
         var c = source.Character;
         if (m == null || c == null) { d.Error("schema.missing", "source", "Manifest and character are required."); return; }
-        if (m.ManifestSchemaVersion != SchemaVersion) d.Error("schema.unsupported", "manifest.manifestSchemaVersion", "Only manifest schema version 1 is supported.");
-        if (c.AuthoringSchemaVersion != SchemaVersion) d.Error("schema.unsupported", "character.authoringSchemaVersion", "Only authoring schema version 1 is supported.");
+        if (m.ManifestSchemaVersion != ManifestSchemaVersion) d.Error("schema.unsupported", "manifest.manifestSchemaVersion", "Only manifest schema version 1 is supported.");
+        if (c.AuthoringSchemaVersion != AuthoringSchemaVersion) d.Error("schema.unsupported", "character.authoringSchemaVersion", "Only authoring schema version 3 is supported.");
         ValidateId(m.PackageId, "manifest.packageId", d);
         if (string.IsNullOrWhiteSpace(m.Version) || !IsSemVer(m.Version)) d.Error("value.out-of-range", "manifest.version", "Version must be SemVer 2.0 text.");
         foreach (var field in new[] { (m.Creator, "manifest.creator"), (m.License, "manifest.license"), (m.Attribution, "manifest.attribution") }) if (string.IsNullOrWhiteSpace(field.Item1)) d.Error("value.out-of-range", field.Item2, "Value must be non-empty.");
@@ -115,6 +117,8 @@ public static class CharacterPackageCompiler
         }
         if (capabilityCount > CookedBudget.MaxCapabilityRequirements) d.Error("budget.exceeded", "character.capabilityRequirements", "Capability requirement budget exceeded.");
         ValidateFinite(c, d);
+        if (c.ShieldRadius <= 0f || c.ShieldRadius <= c.CapsuleHeight * 0.5f)
+            d.Error("value.out-of-range", "character.shieldRadius", "Shield radius must be positive and greater than half capsule height.");
         ValidateCaptureGeometry(c.CaptureGeometry, d);
         ValidateIds(c, d);
         var explicitSlots = new Dictionary<string, CharacterSlotSource>(StringComparer.Ordinal);
@@ -146,7 +150,7 @@ public static class CharacterPackageCompiler
         }
         if (resolved.Count != CanonicalSlots.Length) d.Error("reference.unresolved", "character.slots", "Not all canonical slots resolve.");
         if (d.HasErrors) return;
-        var metadata = new CookedPackageMetadata(m.PackageId, m.Version, SchemaVersion, RuntimeApiMin, RuntimeApiMax);
+        var metadata = new CookedPackageMetadata(m.PackageId, m.Version, CookedSchemaVersion, RuntimeApiMin, RuntimeApiMax);
         var definition = new CookedCharacterDefinition(
             c.DisplayName,
             c.Weight,
@@ -156,6 +160,7 @@ public static class CharacterPackageCompiler
             c.CapsuleHeight,
             c.HipHeight,
             c.HurtboxRadius,
+            c.ShieldRadius,
             CookCaptureGeometry(c.CaptureGeometry),
             c.HurtboxCapsules.Select(x => new CookedHurtboxCapsule(x.StartX, x.StartY, x.StartZ, x.EndX, x.EndY, x.EndZ, x.Radius)).ToList(),
             c.HurtboxBoneDefs.Select(x => new CookedHurtboxBone(x.BoneId, x.OffsetX, x.OffsetY, x.OffsetZ, x.Radius)).ToList(),
@@ -434,14 +439,13 @@ public static class CharacterPackageCompiler
         else if (!c.PresentationIds.Contains(id, StringComparer.Ordinal))
             d.Error("reference.unresolved", "character.operation.parameters.explosionPresentationId", "Presentation ID is not declared.");
     }
-
-
     private static void ValidateFinite(CharacterAuthoringDocument c, DiagnosticBag d)
     {
-        var floats = new List<float> { c.Weight, c.CapsuleRadius, c.CapsuleHeight, c.HipHeight, c.HurtboxRadius, c.Presentation.LandStartOffsetSeconds, c.Presentation.VisualScale, c.Presentation.HurtboxBoneScale, c.Presentation.ModelYOffset, c.Presentation.ModelSoleOffset };
+        var floats = new List<float> { c.Weight, c.CapsuleRadius, c.CapsuleHeight, c.HipHeight, c.HurtboxRadius, c.ShieldRadius, c.Movement.AirDodgeSpeed, c.Presentation.LandStartOffsetSeconds, c.Presentation.VisualScale, c.Presentation.HurtboxBoneScale, c.Presentation.ModelYOffset, c.Presentation.ModelSoleOffset };
         floats.AddRange(c.HurtboxCapsules.SelectMany(x => new[] { x.StartX, x.StartY, x.StartZ, x.EndX, x.EndY, x.EndZ, x.Radius }));
         floats.AddRange(c.HurtboxBoneDefs.SelectMany(x => new[] { x.OffsetX, x.OffsetY, x.OffsetZ, x.Radius }));
         foreach (var value in floats) if (float.IsNaN(value) || float.IsInfinity(value)) d.Error("value.non-finite", "character", "Numeric value must be finite.");
+        if (c.Movement.AirDodgeSpeed <= 0f) d.Error("value.out-of-range", "character.movement.airDodgeSpeed", "Air-dodge speed must be greater than zero.");
     }
     private static void ValidateCaptureGeometry(CharacterCaptureGeometrySource? geometry, DiagnosticBag d)
     {
@@ -579,7 +583,7 @@ public static class CharacterPackageCompiler
         _ => throw new InvalidDataException("Unknown capability parameters.")
     };
 
-    private static CookedMovement CookMovement(CharacterMovementSource x) => new(x.RunSpeed, x.RunAccelerationA, x.RunAccelerationB, x.DashSpeed, x.AirSpeedMax, x.AirAccelStick, x.AirAccelBase, x.JumpForce, x.ShortHopForce, x.AirJumpVMultiplier, x.AirJumpHMultiplier, x.Gravity, x.AirFloatGravity, x.DashDurationTicks, x.DashCooldownTicks, x.GroundFriction, x.AirFriction, x.MaxFallSpeed, x.FastFallSpeed, x.MaxJumps, x.JumpSquatTicks, x.FloatWindowTicks, x.RushTicks);
+    private static CookedMovement CookMovement(CharacterMovementSource x) => new(x.RunSpeed, x.RunAccelerationA, x.RunAccelerationB, x.DashSpeed, x.AirDodgeSpeed, x.AirSpeedMax, x.AirAccelStick, x.AirAccelBase, x.JumpForce, x.ShortHopForce, x.AirJumpVMultiplier, x.AirJumpHMultiplier, x.Gravity, x.AirFloatGravity, x.DashDurationTicks, x.DashCooldownTicks, x.GroundFriction, x.AirFriction, x.MaxFallSpeed, x.FastFallSpeed, x.MaxJumps, x.JumpSquatTicks, x.FloatWindowTicks, x.RushTicks);
     private static CookedPresentation CookPresentation(CharacterPresentationSource x)
         => new(x.Idle, x.Run, x.Dash, x.Jump, x.Fall, x.HitSmall, x.HitMedium, x.HitHard,
             x.LandStartOffsetSeconds, x.ModelResourcePath, x.VisualScale, x.HurtboxBoneScale,
@@ -597,7 +601,7 @@ public static class CharacterPackageCompiler
         {
             writer.WriteStartObject();
             writer.WritePropertyName("metadata"); writer.WriteStartObject(); writer.WriteString("packageId", metadata.PackageId); writer.WriteString("version", metadata.Version); writer.WriteNumber("cookedSchemaVersion", metadata.CookedSchemaVersion); writer.WritePropertyName("compatibility"); writer.WriteStartObject(); writer.WriteString("runtimeApiMin", metadata.RuntimeApiMin); writer.WriteString("runtimeApiMax", metadata.RuntimeApiMax); writer.WriteEndObject(); writer.WriteEndObject();
-            writer.WritePropertyName("character"); writer.WriteStartObject(); writer.WriteString("displayName", definition.DisplayName); Number(writer, "weight", definition.Weight); WriteMovement(writer, definition.Movement); WritePresentation(writer, definition.Presentation); Number(writer, "capsuleRadius", definition.CapsuleRadius); Number(writer, "capsuleHeight", definition.CapsuleHeight); Number(writer, "hipHeight", definition.HipHeight); Number(writer, "hurtboxRadius", definition.HurtboxRadius);
+            writer.WritePropertyName("character"); writer.WriteStartObject(); writer.WriteString("displayName", definition.DisplayName); Number(writer, "weight", definition.Weight); WriteMovement(writer, definition.Movement); WritePresentation(writer, definition.Presentation); Number(writer, "capsuleRadius", definition.CapsuleRadius); Number(writer, "capsuleHeight", definition.CapsuleHeight); Number(writer, "hipHeight", definition.HipHeight); Number(writer, "hurtboxRadius", definition.HurtboxRadius); Number(writer, "shieldRadius", definition.ShieldRadius);
             WriteCaptureGeometry(writer, definition.CaptureGeometry);
             writer.WritePropertyName("hurtboxCapsules"); writer.WriteStartArray(); foreach (var x in definition.HurtboxCapsules) { writer.WriteStartObject(); Number(writer, "startX", x.StartX); Number(writer, "startY", x.StartY); Number(writer, "startZ", x.StartZ); Number(writer, "endX", x.EndX); Number(writer, "endY", x.EndY); Number(writer, "endZ", x.EndZ); Number(writer, "radius", x.Radius); writer.WriteEndObject(); } writer.WriteEndArray();
             writer.WritePropertyName("hurtboxBoneDefs"); writer.WriteStartArray(); foreach (var x in definition.HurtboxBoneDefs.OrderBy(x => x.BoneId, StringComparer.Ordinal)) { writer.WriteStartObject(); writer.WriteString("boneId", x.BoneId); Number(writer, "offsetX", x.OffsetX); Number(writer, "offsetY", x.OffsetY); Number(writer, "offsetZ", x.OffsetZ); Number(writer, "radius", x.Radius); writer.WriteEndObject(); } writer.WriteEndArray();
@@ -610,7 +614,7 @@ public static class CharacterPackageCompiler
         return stream.ToArray();
     }
 
-    private static void WriteMovement(Utf8JsonWriter w, CookedMovement x) { w.WritePropertyName("movement"); w.WriteStartObject(); Number(w, "runSpeed", x.RunSpeed); Number(w, "runAccelerationA", x.RunAccelerationA); Number(w, "runAccelerationB", x.RunAccelerationB); Number(w, "dashSpeed", x.DashSpeed); Number(w, "airSpeedMax", x.AirSpeedMax); Number(w, "airAccelStick", x.AirAccelStick); Number(w, "airAccelBase", x.AirAccelBase); Number(w, "jumpForce", x.JumpForce); Number(w, "shortHopForce", x.ShortHopForce); Number(w, "airJumpVMultiplier", x.AirJumpVMultiplier); Number(w, "airJumpHMultiplier", x.AirJumpHMultiplier); Number(w, "gravity", x.Gravity); Number(w, "airFloatGravity", x.AirFloatGravity); w.WriteNumber("dashDurationTicks", x.DashDurationTicks); w.WriteNumber("dashCooldownTicks", x.DashCooldownTicks); Number(w, "groundFriction", x.GroundFriction); Number(w, "airFriction", x.AirFriction); Number(w, "maxFallSpeed", x.MaxFallSpeed); Number(w, "fastFallSpeed", x.FastFallSpeed); w.WriteNumber("maxJumps", x.MaxJumps); w.WriteNumber("jumpSquatTicks", x.JumpSquatTicks); w.WriteNumber("floatWindowTicks", x.FloatWindowTicks); w.WriteNumber("rushTicks", x.RushTicks); w.WriteEndObject(); }
+    private static void WriteMovement(Utf8JsonWriter w, CookedMovement x) { w.WritePropertyName("movement"); w.WriteStartObject(); Number(w, "runSpeed", x.RunSpeed); Number(w, "runAccelerationA", x.RunAccelerationA); Number(w, "runAccelerationB", x.RunAccelerationB); Number(w, "dashSpeed", x.DashSpeed); Number(w, "airDodgeSpeed", x.AirDodgeSpeed); Number(w, "airSpeedMax", x.AirSpeedMax); Number(w, "airAccelStick", x.AirAccelStick); Number(w, "airAccelBase", x.AirAccelBase); Number(w, "jumpForce", x.JumpForce); Number(w, "shortHopForce", x.ShortHopForce); Number(w, "airJumpVMultiplier", x.AirJumpVMultiplier); Number(w, "airJumpHMultiplier", x.AirJumpHMultiplier); Number(w, "gravity", x.Gravity); Number(w, "airFloatGravity", x.AirFloatGravity); w.WriteNumber("dashDurationTicks", x.DashDurationTicks); w.WriteNumber("dashCooldownTicks", x.DashCooldownTicks); Number(w, "groundFriction", x.GroundFriction); Number(w, "airFriction", x.AirFriction); Number(w, "maxFallSpeed", x.MaxFallSpeed); Number(w, "fastFallSpeed", x.FastFallSpeed); w.WriteNumber("maxJumps", x.MaxJumps); w.WriteNumber("jumpSquatTicks", x.JumpSquatTicks); w.WriteNumber("floatWindowTicks", x.FloatWindowTicks); w.WriteNumber("rushTicks", x.RushTicks); w.WriteEndObject(); }
     private static void WritePresentation(Utf8JsonWriter w, CookedPresentation x)
     {
         w.WritePropertyName("presentation");

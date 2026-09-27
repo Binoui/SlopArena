@@ -12,6 +12,43 @@ namespace SlopArena.Shared
     public class SpellResolver
     {
         private readonly List<Hitbox> _hitboxes = new();
+        private readonly List<EntityData> _orderedEntities = new();
+        private readonly ContactDistanceComparer _contactDistance = new();
+
+        private sealed class ContactDistanceComparer : IComparer<EntityData>
+        {
+            public float X, Y, Z;
+
+            private float SurfaceDistance(in EntityData entity)
+            {
+                float ux = entity.EndX - entity.PosX;
+                float uy = entity.EndY - entity.PosY;
+                float uz = entity.EndZ - entity.PosZ;
+                float lengthSq = ux * ux + uy * uy + uz * uz;
+                float t = lengthSq > 0.000001f
+                    ? Math.Clamp(((X - entity.PosX) * ux + (Y - entity.PosY) * uy
+                        + (Z - entity.PosZ) * uz) / lengthSq, 0f, 1f)
+                    : 0f;
+                float dx = X - entity.PosX - ux * t;
+                float dy = Y - entity.PosY - uy * t;
+                float dz = Z - entity.PosZ - uz * t;
+                return MathF.Sqrt(dx * dx + dy * dy + dz * dz) - entity.Radius;
+            }
+
+            public int Compare(EntityData first, EntityData second)
+            {
+                int result = SurfaceDistance(in first).CompareTo(SurfaceDistance(in second));
+                if (result != 0) return result;
+                result = first.Id.CompareTo(second.Id);
+                if (result != 0) return result;
+                result = first.PosX.CompareTo(second.PosX);
+                if (result != 0) return result;
+                result = first.PosY.CompareTo(second.PosY);
+                if (result != 0) return result;
+                result = first.PosZ.CompareTo(second.PosZ);
+                return result != 0 ? result : first.Radius.CompareTo(second.Radius);
+            }
+        }
 
         /// <summary>
         /// Projectile deactivation events this tick (for explosion spawning).
@@ -84,6 +121,8 @@ namespace SlopArena.Shared
             /// </summary>
             public float EndX, EndY, EndZ;
             public ushort InvincibilityTicks;
+            /// <summary>Shared shield collision surface, distinct from body/grab hurtboxes.</summary>
+            public bool ShieldSurface;
             public bool Active;
         }
 
@@ -266,10 +305,28 @@ namespace SlopArena.Shared
                 bool pulse = !hb.IgnoresEntities
                     && (!isZone || (hb.AgeTicks % hb.RehitIntervalTicks == 0));
 
+                List<EntityData> candidates = entities;
+                if (pulse && entities.Count > 1)
+                {
+                    bool hasShield = false;
+                    foreach (var entity in entities)
+                        if (entity.ShieldSurface) { hasShield = true; break; }
+                    if (hasShield)
+                    {
+                        _orderedEntities.Clear();
+                        _orderedEntities.AddRange(entities);
+                        _contactDistance.X = prevX;
+                        _contactDistance.Y = prevY;
+                        _contactDistance.Z = prevZ;
+                        _orderedEntities.Sort(_contactDistance);
+                        candidates = _orderedEntities;
+                    }
+                }
+
                 if (pulse)
                 {
                     // Check collision against each entity
-                    foreach (var entity in entities)
+                    foreach (var entity in candidates)
                     {
                         if (!entity.Active) continue;
                         if (!hb.CanHitOwner && entity.Id == hb.OwnerId) continue;
@@ -279,7 +336,15 @@ namespace SlopArena.Shared
                         float dist = 0f, dx = 0f, dy = 0f, dz = 0f;
                         float hitX = 0f, hitY = 0f, hitZ = 0f;
 
-                        if (hb.Shape == HitboxShape.Capsule || entity.Shape == HitboxShape.Capsule)
+                        bool shieldSweep = entity.ShieldSurface && hb.Shape == HitboxShape.Sphere
+                            && SweptShieldContact(in hb, in entity, prevX, prevY, prevZ,
+                                out dist, out dx, out dy, out dz, out hitX, out hitY, out hitZ);
+
+                        if (shieldSweep)
+                        {
+                            hit = true;
+                        }
+                        else if (hb.Shape == HitboxShape.Capsule || entity.Shape == HitboxShape.Capsule)
                         {
                             hit = CapsuleCollision(hb, entity, out dist, out dx, out dy, out dz,
                                 out hitX, out hitY, out hitZ);
@@ -311,6 +376,10 @@ namespace SlopArena.Shared
                                 }
                             }
                         }
+
+                        if (hit && entity.ShieldSurface && !shieldSweep)
+                            ShieldSurfaceContact(in hb, in entity, prevX, prevY, prevZ,
+                                dist, dx, dy, dz, out hitX, out hitY, out hitZ);
 
                         if (hit)
                         {
@@ -387,6 +456,62 @@ namespace SlopArena.Shared
             }
 
             return results;
+        }
+
+        private static bool SweptShieldContact(in Hitbox hb, in EntityData shield,
+            float prevX, float prevY, float prevZ,
+            out float dist, out float dx, out float dy, out float dz,
+            out float hitX, out float hitY, out float hitZ)
+        {
+            dist = dx = dy = dz = hitX = hitY = hitZ = 0f;
+            float vx = hb.X - prevX, vy = hb.Y - prevY, vz = hb.Z - prevZ;
+            float travelSq = vx * vx + vy * vy + vz * vz;
+            if (travelSq < 0.000001f) return false;
+            float ox = prevX - shield.PosX, oy = prevY - shield.PosY, oz = prevZ - shield.PosZ;
+            float reach = hb.Radius + shield.Radius;
+            float c = ox * ox + oy * oy + oz * oz - reach * reach;
+            float t = 0f;
+            if (c > 0f)
+            {
+                float b = ox * vx + oy * vy + oz * vz;
+                float discriminant = b * b - travelSq * c;
+                if (discriminant < 0f) return false;
+                t = (-b - MathF.Sqrt(discriminant)) / travelSq;
+                if (t < 0f || t > 1f) return false;
+            }
+            float centerX = prevX + vx * t, centerY = prevY + vy * t,
+                centerZ = prevZ + vz * t;
+            dx = shield.PosX - centerX; dy = shield.PosY - centerY; dz = shield.PosZ - centerZ;
+            dist = MathF.Sqrt(dx * dx + dy * dy + dz * dz);
+            ShieldSurfaceContact(in hb, in shield, prevX, prevY, prevZ,
+                dist, dx, dy, dz, out hitX, out hitY, out hitZ);
+            return true;
+        }
+
+        private static void ShieldSurfaceContact(in Hitbox hb, in EntityData shield,
+            float prevX, float prevY, float prevZ, float dist, float dx, float dy, float dz,
+            out float hitX, out float hitY, out float hitZ)
+        {
+            if (dist > 0.0001f)
+            {
+                float scale = shield.Radius / dist;
+                hitX = shield.PosX - dx * scale;
+                hitY = shield.PosY - dy * scale;
+                hitZ = shield.PosZ - dz * scale;
+                return;
+            }
+            float nx = prevX - shield.PosX, ny = prevY - shield.PosY, nz = prevZ - shield.PosZ;
+            float lengthSq = nx * nx + ny * ny + nz * nz;
+            if (lengthSq < 0.000001f)
+            {
+                nx = -hb.VX; ny = -hb.VY; nz = -hb.VZ;
+                lengthSq = nx * nx + ny * ny + nz * nz;
+            }
+            if (lengthSq < 0.000001f) { nx = 0f; ny = 0f; nz = 1f; lengthSq = 1f; }
+            float radiusScale = shield.Radius / MathF.Sqrt(lengthSq);
+            hitX = shield.PosX + nx * radiusScale;
+            hitY = shield.PosY + ny * radiusScale;
+            hitZ = shield.PosZ + nz * radiusScale;
         }
 
         /// <summary>

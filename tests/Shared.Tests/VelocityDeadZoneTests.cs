@@ -3,30 +3,9 @@ using System.Collections.Generic;
 
 namespace SlopArena.Shared.Tests;
 
-public class DashTests
+public class VelocityDeadZoneTests
 {
     private static readonly CharacterDefinition MankiDef = TestHelpers.MankiDef;
-    private static readonly CharacterDefinition FightGuyDef = TestHelpers.FightGuyDef;
-
-    [Fact]
-    public void AerialDash_HardStopsAtExpiry()
-    {
-        var sim = TestHelpers.MakeSim();
-        var state = TestHelpers.PlayerState(50f, 50f);
-        state.PY = 5f;
-        state.IsGrounded = false;
-        TestHelpers.RegisterPlayer(sim, FightGuyDef, state);
-
-        sim.Tick(new Dictionary<ulong, InputState> { { 1, TestHelpers.Input(dash: true, moveX: 1f) } });
-
-        for (int i = 0; i <= FightGuyDef.Movement.DashDurationTicks; i++)
-            sim.Tick(new Dictionary<ulong, InputState> { { 1, default(InputState) } });
-        var s = sim.GetState(1);
-        Assert.False(s.IsGrounded, "should still be airborne");
-        float residual = System.MathF.Sqrt(s.VX * s.VX + s.VZ * s.VZ);
-        Assert.True(residual < 0.001f,
-            $"aerial dash should hard-stop at expiry, got residual velocity {residual:F3}");
-    }
 
     [Fact]
     public void VelocityDeadZone_GroundFriction_SnapsSubthresholdToZero()

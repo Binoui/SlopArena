@@ -4,6 +4,13 @@ using System.IO;
 
 namespace SlopArena.Shared
 {
+    public enum TargetLockMode : byte
+    {
+        Never = 0,
+        Always = 1,
+        OnHit = 2,
+    }
+
     /// <summary>
     /// Input state for one tick of simulation.
     /// Pure C# — no Godot types; this is the serialized input payload.
@@ -12,7 +19,7 @@ namespace SlopArena.Shared
     {
         public bool Up, Down, DownPressed, Left, Right;
         public bool Jump, Dash, Burst;
-        // Dash is legacy airborne-only until #253. Burst is a reserved inert wire bit.
+        // Dash remains a legacy wire bit; ShieldPressed owns fresh air-dodge input.
         /// <summary>Logical shield/air-dodge control held this tick.</summary>
         public bool ShieldHeld;
         /// <summary>Fresh logical defense press edge; simulation chooses ground shield or air dodge.</summary>
@@ -26,16 +33,17 @@ namespace SlopArena.Shared
         /// </summary>
         public bool JumpHeld;
         /// <summary>
-        /// LMB facing snap (ADR-0017, issue #126): one-tick edge set on the LMB press —
-        /// the sim snaps <c>FacingYaw</c> to the camera azimuth (<c>AimYaw</c>) when the
-        /// input gate allows, and exits a persistent target lock (ADR-0018) when accepted.
+        /// LMB facing snap (ADR-0017, issue #126): one-tick edge set on the LMB press.
+        /// The sim snaps <c>FacingYaw</c> to the camera azimuth (<c>AimYaw</c>) when the
+        /// input gate allows; it does not disengage target lock.
         /// </summary>
         public bool FaceToCamera;
-        /// <summary>
-        /// RMB target-lock toggle (ADR-0018, issue #127): one-tick edge set on the RMB
-        /// press. The sim toggles sim-authoritative <c>CharacterState.LockOn</c>.
-        /// </summary>
+        /// <summary>RMB target-lock toggle edge; simulation owns <c>CharacterState.LockOn</c>.</summary>
         public bool ToggleLock;
+        /// <summary>Explicit retarget edge; Shared selects the closest eligible enemy.</summary>
+        public bool RetargetPressed;
+        /// <summary>Saved automatic target-lock policy for this input tick.</summary>
+        public TargetLockMode LockMode;
         public float MoveX, MoveY;
         /// <summary>
         /// 0 = none, 1 = LMB, 2 = RMB, 3 = Q, 4 = E, 5 = R, 6 = F
@@ -59,17 +67,16 @@ namespace SlopArena.Shared
         public float WarpSpeed;
         public float WarpAttackRange;
 
-        /// <summary>21 bytes: 20-byte input payload plus the protocol version.</summary>
+        /// <summary>22 bytes: 21-byte input payload plus the protocol version.</summary>
         /// <remarks>
-        /// Flags byte (byte 8): 1=Up, 2=Down, 4=Left, 8=Right, 0x10=Jump, 0x20=legacy airborne Dash,
+        /// Flags byte (byte 8): 1=Up, 2=Down, 4=Left, 8=Right, 0x10=Jump, 0x20=legacy Dash,
         /// 0x40=retired Burst (reserved, inert), 0x80=IsAiming.
-        /// Flags2 byte (byte 19): 1=JumpHeld (ADR-0016 short hop, issue #116),
-        /// 2=FaceToCamera (ADR-0017 LMB facing snap, issue #126), 4=ToggleLock
-        /// (ADR-0018 RMB target-lock toggle, issue #127), 8=DownPressed,
-        /// 0x10=ShieldHeld, 0x20=ShieldPressed, 0x40=GrabPressed.
-        /// Byte 20 is the exact SimulationProtocol version.
+        /// Flags2 byte (byte 19): 1=JumpHeld, 2=FaceToCamera, 4=ToggleLock,
+        /// 8=DownPressed, 0x10=ShieldHeld, 0x20=ShieldPressed, 0x40=GrabPressed,
+        /// 0x80=RetargetPressed. Byte 20 is TargetLockMode; byte 21 is the exact
+        /// SimulationProtocol version.
         /// </remarks>
-        public const int Size = 21;
+        public const int Size = 22;
 
         public void Write(Span<byte> buf)
         {
@@ -102,21 +109,26 @@ namespace SlopArena.Shared
             if (ShieldPressed) flags2 |= 0x20;
             if (GrabPressed) flags2 |= 0x40;
             if (DownPressed) flags2 |= 8;
+            if (RetargetPressed) flags2 |= 0x80;
             buf[19] = flags2;
-            buf[20] = SimulationProtocol.Version;
-        }
+            buf[20] = (byte)LockMode;
+            buf[21] = SimulationProtocol.Version;
 
+        }
         public static InputState Deserialize(ReadOnlySpan<byte> buf)
         {
             if (buf.Length != Size)
                 throw new ArgumentException($"Input payload must be exactly {Size} bytes.", nameof(buf));
-            if (buf[20] != SimulationProtocol.Version)
-                throw new InvalidDataException($"Unsupported input protocol version {buf[20]}.");
+            if (buf[21] != SimulationProtocol.Version)
+                throw new InvalidDataException($"Unsupported input protocol version {buf[21]}.");
+            if (buf[20] > (byte)TargetLockMode.OnHit)
+                throw new InvalidDataException($"Unsupported target lock mode {buf[20]}.");
 
             var input = new InputState
             {
                 MoveX = BitConverter.Int32BitsToSingle(BinaryPrimitives.ReadInt32LittleEndian(buf)),
                 MoveY = BitConverter.Int32BitsToSingle(BinaryPrimitives.ReadInt32LittleEndian(buf.Slice(4))),
+                LockMode = (TargetLockMode)buf[20],
             };
             byte flags = buf[8];
             input.Up = (flags & 1) != 0;
@@ -140,6 +152,7 @@ namespace SlopArena.Shared
             input.ShieldPressed = (buf[19] & 0x20) != 0;
             input.GrabPressed = (buf[19] & 0x40) != 0;
             input.DownPressed = (buf[19] & 8) != 0;
+            input.RetargetPressed = (buf[19] & 0x80) != 0;
             return input;
         }
     }

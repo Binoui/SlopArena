@@ -83,7 +83,7 @@ public static class CookedCharacterPackageLoader
         {
             var m=ParseManifest(copied[CharacterPackageAssembler.ManifestPath]);
             if(m.PackageId!=requirement!.PackageId||m.Version!=requirement.Version||m.CookedContentHash!=requirement.CookedContentHash||m.PackageHash!=requirement.PackageHash) d.Add(Error("package.identity.mismatch","manifest","Package identity does not match the requested requirement."));
-            if(m.CookedSchemaVersion!=1||(m.RuntimeApiMin!="1.0.0"&&m.RuntimeApiMin!="1.1.0"&&m.RuntimeApiMin!="1.2.0")||m.RuntimeApiMax!="1.x") d.Add(Error("package.compatibility.unsupported","manifest","Cooked package schema/API is not supported."));
+            if(m.CookedSchemaVersion!=3||(m.RuntimeApiMin!="1.0.0"&&m.RuntimeApiMin!="1.1.0"&&m.RuntimeApiMin!="1.2.0")||m.RuntimeApiMax!="1.x") d.Add(Error("package.compatibility.unsupported","manifest","Cooked package schema/API is not supported."));
             if(m.Dependencies.Count!=0) d.Add(Error("package.dependencies.unsupported","manifest.dependencies","Unresolved package dependencies are not supported."));
             foreach(var c in m.Capabilities) if(c.CapabilityVersion!="1"||!CharacterPackageCompiler.IsTrustedCapability(c.CapabilityId)) d.Add(Error("package.capability.unsupported",c.CapabilityId,"Cooked capability is not supported by this runtime."));
             var package=RuntimeParser.Parse(copied[CharacterPackageAssembler.RuntimePath]);
@@ -128,15 +128,15 @@ public static class CookedCharacterPackageLoader
             using var doc=JsonDocument.Parse(bytes);var root=doc.RootElement;var mm=O(root.GetProperty("metadata"),"packageId","version","cookedSchemaVersion","compatibility");var api=O(mm["compatibility"],"runtimeApiMin","runtimeApiMax");var metadata=new CookedPackageMetadata(S(mm,"packageId"),S(mm,"version"),U(mm,"cookedSchemaVersion"),S(api,"runtimeApiMin"),S(api,"runtimeApiMax"));
             var c = O(root.GetProperty("character"),
                 "displayName", "weight", "movement", "presentation", "capsuleRadius", "capsuleHeight",
-                "hipHeight", "hurtboxRadius", "captureGeometry", "hurtboxCapsules", "hurtboxBoneDefs",
+                "hipHeight", "hurtboxRadius", "shieldRadius", "captureGeometry", "hurtboxCapsules", "hurtboxBoneDefs",
                 "attachmentBoneIds", "presentationIds", "capabilityRequirements", "slots");
-            var mv = O(c["movement"], "runSpeed", "runAccelerationA", "runAccelerationB", "dashSpeed",
+            var mv = O(c["movement"], "runSpeed", "runAccelerationA", "runAccelerationB", "dashSpeed", "airDodgeSpeed",
                 "airSpeedMax", "airAccelStick", "airAccelBase", "jumpForce", "shortHopForce",
                 "airJumpVMultiplier", "airJumpHMultiplier", "gravity", "airFloatGravity",
                 "dashDurationTicks", "dashCooldownTicks", "groundFriction", "airFriction",
                 "maxFallSpeed", "fastFallSpeed", "maxJumps", "jumpSquatTicks", "floatWindowTicks", "rushTicks");
             var movement = new CookedMovement(F(mv, "runSpeed"), F(mv, "runAccelerationA"), F(mv, "runAccelerationB"),
-                F(mv, "dashSpeed"), F(mv, "airSpeedMax"), F(mv, "airAccelStick"), F(mv, "airAccelBase"),
+                F(mv, "dashSpeed"), F(mv, "airDodgeSpeed"), F(mv, "airSpeedMax"), F(mv, "airAccelStick"), F(mv, "airAccelBase"),
                 F(mv, "jumpForce"), F(mv, "shortHopForce"), F(mv, "airJumpVMultiplier"), F(mv, "airJumpHMultiplier"),
                 F(mv, "gravity"), F(mv, "airFloatGravity"), U(mv, "dashDurationTicks"), U(mv, "dashCooldownTicks"),
                 F(mv, "groundFriction"), F(mv, "airFriction"), F(mv, "maxFallSpeed"), F(mv, "fastFallSpeed"),
@@ -184,10 +184,15 @@ public static class CookedCharacterPackageLoader
                 return new CookedCapabilityRequirement(S(q, "capabilityId"), S(q, "capabilityVersion"));
             }).ToList();
             var slots = A(c["slots"]).EnumerateArray().Select(ParseSlot).ToList();
+            float capsuleHeight = F(c, "capsuleHeight");
+            float shieldRadius = F(c, "shieldRadius");
+            if (float.IsNaN(shieldRadius) || float.IsInfinity(shieldRadius)
+                || shieldRadius <= 0f || shieldRadius <= capsuleHeight * 0.5f)
+                throw new InvalidDataException("Shield radius must be finite, positive, and greater than half capsule height.");
             var definition = new CookedCharacterDefinition(
                 S(c, "displayName"), F(c, "weight"), movement, presentation,
-                F(c, "capsuleRadius"), F(c, "capsuleHeight"), F(c, "hipHeight"),
-                F(c, "hurtboxRadius"), captureGeometry, capsules, bones, attachments, ids, caps, slots);
+                F(c, "capsuleRadius"), capsuleHeight, F(c, "hipHeight"),
+                F(c, "hurtboxRadius"), shieldRadius, captureGeometry, capsules, bones, attachments, ids, caps, slots);
             var b = O(root.GetProperty("budget"), "slotCount", "stageCount", "operationCount", "hitboxCount",
                 "projectileCount", "capabilityCount", "maxTimelineDurationTicks");
             var budget = new CookedBudget(I(b, "slotCount"), I(b, "stageCount"), I(b, "operationCount"),

@@ -255,7 +255,7 @@ public class LandingLagTests : KitScenarioTests
 
     /// <summary>
     /// The lock is a hard no-input window once the aerial's own anim lock is gone: the
-    /// aerial ends at t39, the lag (applied t27) holds until t45 — so jump/dash presses at
+    /// aerial ends at t39, the lag (applied t27) holds until t45 — so jump/dodge presses at
     /// t41/t42 are dropped, and a jump press after the expiry (t46) goes through.
     /// </summary>
     [Fact]
@@ -265,7 +265,7 @@ public class LandingLagTests : KitScenarioTests
         {
             0 => new InputState { ActiveSlot = AbilitySlots.Slot1 },
             41 => new InputState { Jump = true },
-            42 => new InputState { Dash = true },
+            42 => new InputState { ShieldPressed = true },
             46 => new InputState { Jump = true },
             _ => default,
         });
@@ -273,7 +273,6 @@ public class LandingLagTests : KitScenarioTests
         // Aerial ended t39; the lag is still live at t41/t42 and drops both presses.
         Assert.Equal(ActionState.Idle, states[42].State);
         Assert.True(states[42].LandingLagTicks > 0);
-        Assert.Equal((ushort)0, states[43].DashDurationTicks);
 
         // Lag expired at the start of t45: the t46 jump goes through.
         Assert.Equal(ActionState.JumpSquat, states[47].State);

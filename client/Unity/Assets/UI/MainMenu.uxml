@@ -1,40 +1,17 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
-    <!-- Home page fragment (issues #219/#220). Mounted into the
-         FrontendShell hosts: page-header → PageHeaderHost,
-         page-body → PageBodyHost, page-actions → PageActionsHost. The
-         roster art is decorative; identity presentation and mode-button
-         gating live in the shared shell identity surface (issue #220). -->
+    <!-- Home is a visual landing page; the shared top bar owns mode actions. -->
     <ui:VisualElement name="page-frag">
-        <ui:VisualElement name="page-header" class="page-section menu-header-section">
-            <ui:VisualElement name="menu-title-wrap" class="menu-title-wrap">
-                <ui:VisualElement name="menu-title-face" class="menu-title-face">
-                    <ui:Label name="title" text="SLOP" class="menu-title" />
-                    <ui:Label text="ARENA" class="menu-title menu-title--arena" />
+        <ui:ScrollView name="page-body" class="page-section menu-body-section" mode="Vertical" horizontal-scroller-visibility="Hidden">
+            <ui:VisualElement class="menu-layout">
+                <ui:VisualElement name="menu-info" class="menu-info" picking-mode="Ignore">
+                    <ui:VisualElement class="menu-info-header">
+                        <ui:Label text="SLOPARENA" class="menu-info-heading" />
+                        <ui:Label text="PLAYTEST" class="menu-info-index" />
+                    </ui:VisualElement>
+                    <ui:Label text="WELCOME TO THE PLAYTEST" class="menu-info-declaration" />
+                    <ui:Label text="Thanks for playing SlopArena. Choose a mode above and jump in." class="menu-info-copy" />
                 </ui:VisualElement>
             </ui:VisualElement>
-            <ui:VisualElement class="menu-title-rule" />
-            <ui:Label text="AWKWARD FIGHTERS. QUESTIONABLE IDEAS." class="menu-tagline" />
-            <ui:Label text="Pick a way in. The hard part is choosing who gets blamed for the rematch." class="menu-copy" />
-            <ui:VisualElement name="menu-showcase" class="menu-showcase" picking-mode="Ignore">
-                <ui:Label name="menu-roster-count" class="menu-showcase-count" />
-                <ui:VisualElement name="menu-roster-art" class="menu-roster-art" picking-mode="Ignore" />
-            </ui:VisualElement>
-        </ui:VisualElement>
-        <ui:VisualElement name="page-body" class="page-section menu-body-section">
-            <ui:VisualElement name="menu-actions" class="menu-actions">
-                <ui:VisualElement class="menu-action-item">
-                    <ui:Button name="btn-multiplayer" text="PLAY ONLINE" class="menu-action menu-action--primary" />
-                </ui:VisualElement>
-                <ui:VisualElement class="menu-action-item">
-                    <ui:Button name="btn-solo" text="SOLO VS CPU" class="menu-action menu-action--secondary" />
-                </ui:VisualElement>
-                <ui:VisualElement class="menu-action-item">
-                    <ui:Button name="btn-training" text="TRAINING" class="menu-action menu-action--paper" />
-                </ui:VisualElement>
-            </ui:VisualElement>
-        </ui:VisualElement>
-        <ui:VisualElement name="page-actions" class="page-section menu-actions-section">
-            <ui:Label text="SLOPARENA // DESKTOP DEMO" class="menu-version" />
-        </ui:VisualElement>
+        </ui:ScrollView>
     </ui:VisualElement>
 </ui:UXML>

@@ -12,10 +12,9 @@ namespace SlopArena.Shared.Rollback
     public static class ActionStateClassifier
     {
         public static bool IsPredictable(ActionState state) => state is
-            ActionState.Idle or ActionState.Dashing or ActionState.JumpSquat or
-            ActionState.AirDodging or ActionState.Run or ActionState.Sliding or
-            ActionState.Crouching or ActionState.Shielding or ActionState.ShieldDrop or
-            ActionState.GrabAttempt or ActionState.AirDodgeStartup or
+            ActionState.Idle or ActionState.JumpSquat or ActionState.Run or
+            ActionState.Sliding or ActionState.Crouching or ActionState.Shielding or
+            ActionState.ShieldDrop or ActionState.GrabAttempt or
             ActionState.AirDodgeMovement or ActionState.AirDodgeRecovery;
 
         /// <summary>State-aware opponent classification. Hitstop is excluded because

@@ -3,6 +3,8 @@
 **Status:** Accepted — 2026-08-12 (user decision; engine ticket #127)
 **Deciders:** @Binoui
 
+**Superseded controls (2026-09-27):** The original default-off RMB toggle and 10 m disengagement describe the earlier implementation. The current Gameplay preference offers Always auto-lock (default), Never auto-lock, and Auto-lock on hit (dealing or receiving a damaging hit). Locked targets remain sticky within 20 m; a separate retarget action chooses the nearest valid enemy. Explicit lock-off persists until reenabling, and LMB facing snap no longer turns lock off. The passive movement-facing behavior from the 2026-08-17 amendment remains.
+
 ## Context
 
 The engine already has a soft-lock system: `ProcessTargetLock` resolves a target every tick (client screen-center preference, nearest-enemy fallback within 20m), stores it in `CharacterState.TargetEntityId`, and **during attack stages with `UseTargetLock=true`** lerps facing toward it (`RotateTowardTarget`/`TrackingStrength`). Most normals already opt in. The client renders the target (`TargetIndicator`) and the resolver already re-picks on target death.

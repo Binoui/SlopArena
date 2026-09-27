@@ -385,7 +385,6 @@ public void Knockback_DoesNotTunnelThroughThinWall()
 
         Assert.False(state.IsGrounded);
         Assert.True(state.PX > 2f);
-        Assert.True(state.LedgeRegrabLockTicks > 0);
     }
     [Fact]
     public void Riftwalk_UsesStageResolverForRecoveryDisplacement()

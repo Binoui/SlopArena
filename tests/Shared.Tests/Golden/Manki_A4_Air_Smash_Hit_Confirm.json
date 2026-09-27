@@ -23,20 +23,22 @@
     "JumpsLeft": 2
   },
   "PlayerFinal": {
-    "State": 10,
     "FacingYaw": 1.5707964,
     "PX": -0.3,
-    "PY": 0.75,
+    "PY": -13.733341,
     "PZ": 1.3113417E-08,
+    "VY": -13.5,
+    "AirTimeTicks": 110,
     "JumpsLeft": 2
   },
   "NpcFinal": {
-    "State": 10,
     "FacingYaw": -1.5707963,
     "PX": 7.5494065,
-    "PY": 0.75,
+    "PY": -0.48144323,
     "PZ": -1.6601835E-07,
+    "VY": -11.322081,
     "DamagePercent": 13,
+    "AirTimeTicks": 66,
     "JumpsLeft": 2
   }
 }

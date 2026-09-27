@@ -87,7 +87,7 @@ public class AbilityLifecycleTests
     }
 
     [Fact]
-    public void MankiQ_MidHold_DashAndJumpBlocked()
+    public void MankiQ_MidHold_ShieldPressAndJumpBlocked()
     {
         var sim = TestHelpers.MakeSim();
         var state = TestHelpers.PlayerState();
@@ -99,12 +99,11 @@ public class AbilityLifecycleTests
         for (int i = 0; i < 9; i++)
             sim.Tick(new() { { 1, aim } });
 
-        // Fixed aim blocks normal movement; ActionState.Aiming also owns jump/dash.
-        sim.Tick(new() { { 1, new InputState { ActiveSlot = AbilitySlots.A, IsAiming = true, MoveY = 1f, Jump = true, Dash = true } } });
+        // Fixed aim owns the action and rejects a fresh defense edge and jump.
+        sim.Tick(new() { { 1, new InputState { ActiveSlot = AbilitySlots.A, IsAiming = true, MoveY = 1f, Jump = true, ShieldPressed = true } } });
         var s = sim.GetState(1);
         Assert.Equal(ActionState.Aiming, s.State);
         Assert.Equal((byte)AbilitySlots.A, s.AttackSlot);
-        Assert.Equal((ushort)0, s.DashDurationTicks);
         Assert.Equal((byte)2, s.JumpsLeft);
     }
 

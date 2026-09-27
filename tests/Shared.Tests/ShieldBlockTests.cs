@@ -32,6 +32,30 @@ public sealed class ShieldBlockTests
         return sim;
     }
 
+    private static ServerSimulation ManualBubbleSimulation(out CharacterDefinition def)
+    {
+        def = new CharacterDefinition
+        {
+            CapsuleRadius = 0.3f,
+            CapsuleHeight = 1.5f,
+            ShieldRadius = 1.05f,
+            HurtboxCapsules = new[]
+            {
+                new HurtboxCapsule(0f, -0.65f, 0f, 0f, 0.65f, 0f, 0.3f),
+            },
+            Movement = new MovementStats { Gravity = 20f, GroundFriction = 8f, MaxFallSpeed = 20f },
+        };
+        var sim = new ServerSimulation(TestHelpers.TestArena());
+        var attacker = TestHelpers.PlayerState(-2f);
+        attacker.PY = 0.75f;
+        var defender = TestHelpers.PlayerState();
+        defender.EntityId = DefenderId;
+        defender.PY = 0.75f;
+        sim.RegisterEntity(AttackerId, def, attacker);
+        sim.RegisterEntity(DefenderId, def, defender);
+        return sim;
+    }
+
     private static Hitbox Contact(
         in CharacterState defender,
         float damage = 5f,
@@ -142,6 +166,177 @@ public sealed class ShieldBlockTests
 
         Assert.Equal(ActionState.Shielding, sim.GetState(DefenderId).State);
         Assert.True(Assert.Single(sim.LastTickHits).Blocked);
+    }
+
+    [Theory]
+    [InlineData(0.9f, 0f, 0f)]
+    [InlineData(-0.9f, 0f, 0f)]
+    [InlineData(0f, 0f, 0.9f)]
+    [InlineData(0f, 0f, -0.9f)]
+    [InlineData(0f, 1.02f, 0f)]
+    public void ShieldBubbleBlocksContactOutsideOrdinaryHurtboxes(float x, float y, float z)
+    {
+        var sim = ManualBubbleSimulation(out var def);
+        var defender = sim.GetState(DefenderId);
+        var hitbox = Contact(in defender, xOffset: x, yOffset: y, zOffset: z);
+        hitbox.Radius = 0.02f;
+        sim.Resolver.Spawn(hitbox);
+
+        sim.Tick(ShieldInput());
+
+        var blocked = Assert.Single(sim.LastTickHits);
+        Assert.True(blocked.Blocked);
+        Assert.Equal((ushort)0, sim.GetState(DefenderId).DamagePercent);
+        float dx = blocked.HitX - defender.PX;
+        float dy = blocked.HitY - defender.PY;
+        float dz = blocked.HitZ - defender.PZ;
+        float radius = MathF.Sqrt(dx * dx + dy * dy + dz * dz);
+        Assert.InRange(radius, def.ShieldRadius - 0.001f, def.ShieldRadius + 0.001f);
+        float incomingLength = MathF.Sqrt(x * x + y * y + z * z);
+        Assert.Equal(defender.PX + x / incomingLength * def.ShieldRadius, blocked.HitX, 3);
+        Assert.Equal(defender.PY + y / incomingLength * def.ShieldRadius, blocked.HitY, 3);
+        Assert.Equal(defender.PZ + z / incomingLength * def.ShieldRadius, blocked.HitZ, 3);
+        var ripple = Assert.Single(sim.GetPresentationEvents(clear: true));
+        Assert.Equal(blocked.HitX, ripple.WorldX, 3);
+        Assert.Equal(blocked.HitY, ripple.WorldY, 3);
+        Assert.Equal(blocked.HitZ, ripple.WorldZ, 3);
+    }
+
+    [Fact]
+    public void BlockEventRetainsFirstShieldImpactBeforePushback()
+    {
+        var sim = ManualBubbleSimulation(out var def);
+        var defender = sim.GetState(DefenderId);
+        var projectile = Contact(in defender, damage: 3f, xOffset: -2f);
+        projectile.Radius = 0.1f;
+        projectile.VX = 120f;
+        sim.Resolver.Spawn(projectile);
+
+        sim.Tick(ShieldInput());
+
+        var hit = Assert.Single(sim.LastTickHits);
+        var presentation = Assert.Single(sim.GetPresentationEvents(clear: true));
+        Assert.True(hit.Blocked);
+        Assert.True(sim.GetState(DefenderId).PX > defender.PX);
+        Assert.Equal(defender.PX - def.ShieldRadius, hit.HitX, 3);
+        Assert.Equal(hit.HitX, presentation.WorldX, 3);
+        Assert.Equal(hit.HitY, presentation.WorldY, 3);
+        Assert.Equal(hit.HitZ, presentation.WorldZ, 3);
+    }
+
+    [Fact]
+    public void UnshieldedFighterDoesNotGainBubbleReach()
+    {
+        var sim = ManualBubbleSimulation(out _);
+        var defender = sim.GetState(DefenderId);
+        var hitbox = Contact(in defender, xOffset: 0.9f);
+        hitbox.Radius = 0.02f;
+        sim.Resolver.Spawn(hitbox);
+
+        sim.Tick(new Dictionary<ulong, InputState>());
+
+        Assert.Empty(sim.LastTickHits);
+        Assert.Equal((ushort)0, sim.GetState(DefenderId).DamagePercent);
+    }
+
+    [Fact]
+    public void MissingBodyPoseCannotDisableActiveShieldSurface()
+    {
+        var sim = ManualBubbleSimulation(out var def);
+        def.HurtboxCapsules = Array.Empty<HurtboxCapsule>();
+        var defender = sim.GetState(DefenderId);
+        var hitbox = Contact(in defender, xOffset: 0.9f);
+        hitbox.Radius = 0.02f;
+        sim.Resolver.Spawn(hitbox);
+
+        sim.Tick(ShieldInput());
+
+        Assert.True(Assert.Single(sim.LastTickHits).Blocked);
+        Assert.Empty(sim.GetLastEntityData());
+    }
+
+    [Fact]
+    public void ProjectileImpactsBubbleSurfaceBeforeBodyAndExplosionBlocksOnce()
+    {
+        var sim = ManualBubbleSimulation(out var def);
+        var defender = sim.GetState(DefenderId);
+        var projectile = Contact(in defender, damage: 3f, xOffset: -1.25f);
+        projectile.Radius = 0.1f;
+        projectile.VX = 12f;
+        projectile.Explosion = new ProjectileExplosion
+        {
+            Radius = 0.5f, Damage = 8f,
+            Knockback = new KnockbackData
+            {
+                Profile = KnockbackProfile.Custom, Angle = 0,
+                BaseKnockback = 1f, KnockbackGrowth = 2f,
+            },
+            DurationTicks = 2,
+        };
+        sim.Resolver.Spawn(projectile);
+        sim.Tick(ShieldInput());
+        var block = Assert.Single(sim.LastTickHits);
+        Assert.True(block.Blocked);
+        Assert.InRange(block.HitX - defender.PX,
+            -def.ShieldRadius - 0.001f,
+            -def.ShieldRadius + 0.001f);
+        Assert.Single(sim.Resolver.GetActiveHitboxes());
+
+        sim.Tick(ShieldInput());
+        Assert.True(Assert.Single(sim.LastTickHits).Blocked);
+        Assert.Empty(sim.Resolver.GetActiveHitboxes());
+    }
+
+    [Fact]
+    public void ShieldBubbleEndsWithShieldDropAndDoesNotBlockOutsideItsRadius()
+    {
+        var sim = ManualBubbleSimulation(out _);
+        sim.Tick(ShieldInput());
+        var defender = sim.GetState(DefenderId);
+        var outside = Contact(in defender, xOffset: 1.3f);
+        outside.Radius = 0.02f;
+        outside.DurationTicks = 1;
+        sim.Resolver.Spawn(outside);
+        sim.Tick(ShieldInput());
+        Assert.Empty(sim.LastTickHits);
+
+        var beforeDrop = sim.GetState(DefenderId);
+        var outerOnly = Contact(in beforeDrop, xOffset: 0.9f);
+        outerOnly.Radius = 0.02f;
+        outerOnly.DurationTicks = 1;
+        sim.Resolver.Spawn(outerOnly);
+        sim.Tick(new Dictionary<ulong, InputState>());
+        Assert.Equal(ActionState.ShieldDrop, sim.GetState(DefenderId).State);
+        Assert.Empty(sim.LastTickHits);
+
+        var vulnerable = sim.GetState(DefenderId);
+        var bodyHit = Contact(in vulnerable);
+        bodyHit.DurationTicks = 1;
+        sim.Resolver.Spawn(bodyHit);
+        sim.Tick(new Dictionary<ulong, InputState>());
+        Assert.False(Assert.Single(sim.LastTickHits).Blocked);
+        Assert.True(sim.GetState(DefenderId).DamagePercent > 0);
+    }
+
+    [Fact]
+    public void ProjectileHitsCloserUnshieldedFighterBeforeFartherShield()
+    {
+        var sim = ManualBubbleSimulation(out var def);
+        var other = TestHelpers.PlayerState(1.2f);
+        other.EntityId = 101;
+        other.PY = def.CapsuleHeight * 0.5f;
+        sim.RegisterEntity(101, def, other);
+        var shielded = sim.GetState(DefenderId);
+        var projectile = Contact(in shielded, damage: 3f, xOffset: 1.28f);
+        projectile.Radius = 0.12f;
+        projectile.VX = -13.8f; // End at x=1.05: both surfaces overlap, closer fighter first.
+        sim.Resolver.Spawn(projectile);
+
+        sim.Tick(ShieldInput());
+
+        Assert.Equal((ushort)0, sim.GetState(DefenderId).DamagePercent);
+        Assert.Equal((ushort)3, sim.GetState(101).DamagePercent);
+        Assert.Equal(101UL, Assert.Single(sim.LastTickHits).TargetEntityId);
     }
 
     [Theory]

@@ -23,6 +23,7 @@ namespace SlopArena.Shared
         public float RunAccelerationA;      // m/s² stick coefficient (Run accel = A·|stick| + B)
         public float RunAccelerationB;      // m/s² base
         public float DashSpeed;
+        public float AirDodgeSpeed;         // m/s
         public float AirSpeedMax;           // m/s
         public float AirAccelStick;         // m/s²
         public float AirAccelBase;          // m/s²
@@ -72,6 +73,8 @@ namespace SlopArena.Shared
         public float BoneYToWorldY(float capsuleCenterY, float boneLocalY)
             => capsuleCenterY - CapsuleHeight * 0.5f + HipHeight + boneLocalY;
         public float HurtboxRadius;
+        /// <summary>World-space shield sphere radius in meters.</summary>
+        public float ShieldRadius;
         /// <summary>Cooked character-specific forward capture volume and paired placement anchors.</summary>
         public CookedCaptureGeometry? CaptureGeometry;
 

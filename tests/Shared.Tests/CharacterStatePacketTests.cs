@@ -237,46 +237,100 @@ public class CharacterStatePacketTests
     public void DefenseActionStateCodes_AreAppendedAndRoundTrip()
     {
         Assert.Equal((byte)11, (byte)ActionState.Crouching);
-        var states = new[]
+        var states = new (ActionState State, byte WireValue)[]
         {
-            ActionState.Shielding,
-            ActionState.ShieldDrop,
-            ActionState.GrabAttempt,
-            ActionState.Grabbed,
-            ActionState.Throwing,
-            ActionState.AirDodgeStartup,
-            ActionState.AirDodgeMovement,
-            ActionState.AirDodgeRecovery,
+            (ActionState.Shielding, 12),
+            (ActionState.ShieldDrop, 13),
+            (ActionState.GrabAttempt, 14),
+            (ActionState.Grabbed, 15),
+            (ActionState.Throwing, 16),
+            (ActionState.AirDodgeMovement, 18),
+            (ActionState.AirDodgeRecovery, 19),
         };
-        for (int i = 0; i < states.Length; i++)
+        foreach (var (state, wireValue) in states)
         {
-            Assert.Equal((byte)(12 + i), (byte)states[i]);
-            var packet = CharacterStatePacket.FromState(new CharacterState { State = states[i], StateTicks = 7 });
+            var packet = CharacterStatePacket.FromState(new CharacterState { State = state, StateTicks = 7 });
             byte[] buffer = new byte[CharacterStatePacket.Size];
             packet.Serialize(buffer);
             var restored = CharacterStatePacket.Deserialize(buffer).ToState();
-            Assert.Equal(states[i], restored.State);
+            Assert.Equal(wireValue, packet.CurrentActionState);
+            Assert.Equal(state, restored.State);
             Assert.Equal((ushort)7, restored.StateTicks);
         }
     }
 
-    [Fact]
-    public void RoundTrip_LockOn_Flag()
+    [Theory]
+    [InlineData(ActionState.AirDodgeMovement, (byte)18, (ushort)0, (ushort)4)]
+    [InlineData(ActionState.AirDodgeRecovery, (byte)19, (ushort)12, (ushort)0)]
+    public void AirDodgePhasePacket_RoundTripsStateDirectionAndTimers(
+        ActionState state, byte wireValue, ushort recovery, ushort invincibility)
     {
-        // LockOn (ADR-0018) rides the packet for the client lock indicator.
-        var original = new CharacterState { LockOn = true };
+        var original = new CharacterState
+        {
+            State = state,
+            StateTicks = 9,
+            DashDirX = -0.6f,
+            DashDirZ = 0.8f,
+            AirDodgeRecoveryTicks = recovery,
+            InvincibilityTicks = invincibility,
+            AirDodgesLeft = 0,
+        };
+
+        var packet = CharacterStatePacket.FromState(original);
+        byte[] buffer = new byte[CharacterStatePacket.Size];
+        packet.Serialize(buffer);
+        var restored = CharacterStatePacket.Deserialize(buffer).ToState();
+
+        Assert.Equal(wireValue, packet.CurrentActionState);
+        Assert.Equal(state, restored.State);
+        Assert.Equal(original.StateTicks, restored.StateTicks);
+        Assert.Equal(original.DashDirX, restored.DashDirX);
+        Assert.Equal(original.DashDirZ, restored.DashDirZ);
+        Assert.Equal(original.AirDodgeRecoveryTicks, restored.AirDodgeRecoveryTicks);
+        Assert.Equal(original.InvincibilityTicks, restored.InvincibilityTicks);
+        Assert.Equal(original.AirDodgesLeft, restored.AirDodgesLeft);
+    }
+
+    [Fact]
+    public void RoundTrip_LockStateAndTargetId()
+    {
+        // Lock state and selected target participate in rollback reconstruction.
+        var original = new CharacterState { LockOn = true, TargetEntityId = 100 };
         var packet = CharacterStatePacket.FromState(original);
         byte[] buffer = new byte[CharacterStatePacket.Size];
         packet.Serialize(buffer);
         var restored = CharacterStatePacket.Deserialize(buffer).ToState();
 
         Assert.True(restored.LockOn);
+        Assert.False(restored.AutoLockSuppressed);
+        Assert.Equal(100UL, restored.TargetEntityId);
 
-        // And it must survive ApplyTo (LocalTrack patch path), not just ToState
+        // ApplyTo is the LocalTrack patch path and must preserve lock state and target.
         var target = new CharacterState();
         CharacterStatePacket.FromState(original).ApplyTo(ref target);
         Assert.True(target.LockOn);
+        Assert.False(target.AutoLockSuppressed);
+        Assert.Equal(100UL, target.TargetEntityId);
+
     }
+    [Fact]
+    public void RoundTrip_AutoLockSuppression()
+    {
+        var original = new CharacterState { AutoLockSuppressed = true };
+        var packet = CharacterStatePacket.FromState(original);
+        byte[] buffer = new byte[CharacterStatePacket.Size];
+        packet.Serialize(buffer);
+        var restored = CharacterStatePacket.Deserialize(buffer).ToState();
+
+        Assert.False(restored.LockOn);
+        Assert.True(restored.AutoLockSuppressed);
+
+        var target = new CharacterState();
+        packet.ApplyTo(ref target);
+        Assert.False(target.LockOn);
+        Assert.True(target.AutoLockSuppressed);
+    }
+
 
     [Fact]
     public void RoundTrip_AnimIndex_NonZero()
@@ -293,6 +347,7 @@ public class CharacterStatePacketTests
     [Fact]
     public void Deserialize_RejectsTruncatedLegacyAndWrongVersionPayloads()
     {
+        Assert.Equal((byte)4, SimulationProtocol.Version);
         var packet = CharacterStatePacket.FromState(default);
         var buffer = new byte[CharacterStatePacket.Size];
         packet.Serialize(buffer);
@@ -301,7 +356,7 @@ public class CharacterStatePacketTests
         Assert.Throws<ArgumentException>(() => CharacterStatePacket.Deserialize(buffer.AsSpan(0, 114)));
 
         var wrongVersion = (byte[])buffer.Clone();
-        wrongVersion[155] = 1;
+        wrongVersion[163] = 3;
         Assert.Throws<InvalidDataException>(() => CharacterStatePacket.Deserialize(wrongVersion));
     }
 }

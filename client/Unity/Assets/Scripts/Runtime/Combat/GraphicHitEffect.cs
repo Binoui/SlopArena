@@ -50,22 +50,25 @@ namespace SlopArena.Client.Combat
         }
 
         public static void Spawn(in SpellResolver.HitResult hit, ImpactTier tier)
+            => Spawn(in hit, tier, Vector3.zero);
+
+        private static void Spawn(in SpellResolver.HitResult hit, ImpactTier tier, Vector3 surfaceNormal)
         {
             GraphicHitEffect effect = null;
             while (Pool.Count > 0 && effect == null)
                 effect = Pool.Pop();
             if (effect == null)
                 effect = CreateInstance();
-            effect.Show(in hit, tier);
+            effect.Show(in hit, tier, surfaceNormal);
         }
         /// <summary>Temporary blue guard ripple; no damaging-hit VFX or SFX.</summary>
-        public static void SpawnBlock(Vector3 position)
+        public static void SpawnBlock(Vector3 position, Vector3 surfaceNormal)
         {
             var hit = new SpellResolver.HitResult
             {
                 HitX = position.x, HitY = position.y, HitZ = position.z,
             };
-            Spawn(in hit, ImpactTier.Block);
+            Spawn(in hit, ImpactTier.Block, surfaceNormal);
         }
 
         private static GraphicHitEffect CreateInstance()
@@ -98,7 +101,7 @@ namespace SlopArena.Client.Combat
             return _sharedMaterial;
         }
 
-        private void Show(in SpellResolver.HitResult hit, ImpactTier tier)
+        private void Show(in SpellResolver.HitResult hit, ImpactTier tier, Vector3 surfaceNormal)
         {
             if (_renderCamera == null)
                 _renderCamera = UnityEngine.Camera.main;
@@ -106,7 +109,10 @@ namespace SlopArena.Client.Combat
                 _renderCamera = Object.FindFirstObjectByType<UnityEngine.Camera>();
 
             transform.position = new Vector3(hit.HitX, hit.HitY, hit.HitZ);
-            transform.rotation = _renderCamera != null ? _renderCamera.transform.rotation : Quaternion.identity;
+            transform.rotation = tier == ImpactTier.Block && surfaceNormal.sqrMagnitude > 0.000001f
+                ? Quaternion.LookRotation(surfaceNormal, Mathf.Abs(surfaceNormal.y) > 0.95f
+                    ? Vector3.forward : Vector3.up)
+                : _renderCamera != null ? _renderCamera.transform.rotation : Quaternion.identity;
             transform.localScale = Vector3.one * 0.72f;
 
             Vector3 launch = ResolveLaunch(in hit);

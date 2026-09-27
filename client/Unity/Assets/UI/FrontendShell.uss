@@ -227,10 +227,76 @@
 }
 
 .shell-wordmark {
+    min-height: 40px;
+    padding-left: 0;
+    padding-right: 0;
+    border-width: 0;
+    background-color: transparent;
     color: rgb(255, 200, 33);
     font-size: 20px;
     letter-spacing: 3px;
     -unity-font-style: bold;
+    -unity-text-align: middle-center;
+}
+
+.shell-wordmark:hover, .shell-wordmark:focus { color: rgb(240, 238, 232); }
+
+.shell-nav {
+    flex-direction: row;
+    align-items: center;
+    flex-shrink: 1;
+    min-width: 0;
+    margin-left: 18px;
+}
+
+.shell-nav-tab {
+    min-width: 104px;
+    min-height: 42px;
+    margin-right: 4px;
+    padding-left: 10px;
+    padding-right: 10px;
+    border-left-width: 1px;
+    border-top-width: 1px;
+    border-right-width: 1px;
+    border-bottom-width: 4px;
+    border-left-color: rgb(13, 13, 20);
+    border-top-color: rgb(13, 13, 20);
+    border-right-color: rgb(13, 13, 20);
+    border-bottom-color: rgb(13, 13, 20);
+    background-color: rgb(36, 32, 43);
+    color: rgb(240, 238, 232);
+    font-size: 12px;
+    -unity-font-style: bold;
+    white-space: nowrap;
+}
+
+.shell-nav-tab--selected {
+    background-color: rgb(240, 238, 232);
+    border-bottom-color: rgb(224, 92, 42);
+    color: rgb(23, 19, 27);
+}
+
+.shell-nav-tab:hover, .shell-nav-tab:focus {
+    border-top-color: rgb(255, 200, 33);
+}
+
+.shell-nav-tab:disabled { opacity: 0.68; }
+
+.shell-settings {
+    min-height: 36px;
+    margin-left: 8px;
+    padding-left: 12px;
+    padding-right: 12px;
+    background-color: rgb(36, 32, 43);
+    color: rgb(240, 238, 232);
+    border-bottom-width: 3px;
+    border-bottom-color: rgb(224, 92, 42);
+    font-size: 12px;
+    -unity-font-style: bold;
+}
+
+.shell-settings:hover, .shell-settings:focus {
+    border-bottom-color: rgb(255, 200, 33);
 }
 
 .shell-page-context {
@@ -359,6 +425,39 @@
     font-size: 16px;
 }
 
+.frontend-shell--compact .shell-page-context { display: none; }
+.frontend-shell--compact .shell-nav { margin-left: 10px; }
+.frontend-shell--compact .shell-nav-tab {
+    min-width: 70px;
+    min-height: 36px;
+    margin-right: 2px;
+    padding-left: 6px;
+    padding-right: 6px;
+    font-size: 10px;
+}
+.frontend-shell--compact .shell-settings {
+    min-height: 32px;
+    margin-left: 4px;
+    padding-left: 7px;
+    padding-right: 7px;
+    font-size: 10px;
+}
+.frontend-shell--compact .shell-identity {
+    max-width: 160px;
+    margin-left: 6px;
+    font-size: 10px;
+    text-overflow: ellipsis;
+    overflow: hidden;
+}
+.frontend-shell--compact .shell-menu-trigger {
+    min-width: 76px;
+    min-height: 34px;
+    margin-left: 6px;
+    padding-left: 27px;
+    padding-right: 6px;
+    font-size: 10px;
+}
+
 .frontend-shell--compact .shell-workspace {
     padding-left: 16px;
     padding-right: 16px;
@@ -416,20 +515,12 @@
     min-height: 0;
 }
 
-.frontend-shell--roomy .chat-history {
+.frontend-shell .chat-history {
     min-height: 0;
 }
 
 
-.frontend-shell--compact .chat-header {
-    min-height: 28px;
-    padding-bottom: 4px;
-}
-
-.frontend-shell--compact .chat-title {
-    font-size: 13px;
-    margin-top: 0;
-}
+.frontend-shell--compact .chat-corner-actions { right: 24px; }
 
 
 .frontend-shell--compact .chat-tab {
@@ -466,12 +557,12 @@
     font-size: 10px;
 }
 
-/* Fit the presenter inside the 380×190 cell: the header actions share one
-   row, the history keeps a small scrolling floor (issue #219 density
-   handling). */
-.frontend-shell--compact .chat-header-actions {
+/* Fit the presenter inside its resizable cell: the history keeps a small
+   scrolling floor and the corner controls stay reachable. */
+.frontend-shell--compact .chat-corner-actions {
     flex-direction: row;
     align-items: center;
+    right: 24px;
 }
 
 .frontend-shell--compact .chat-history {
@@ -491,24 +582,8 @@
 
 /* Home */
 
-.menu-header-section {
-    flex-shrink: 0;
-    flex-direction: column;
-    align-items: flex-start;
-    position: relative;
-}
 
-.menu-header-section .menu-title-wrap {
-    min-height: 0;
-}
-
-/* Body content must never squash under overflow: fragments keep their
-   natural heights and the compact body scrolls instead (issue #219). */
-.menu-header-section .menu-title-rule,
-.menu-header-section .menu-tagline,
-.menu-header-section .menu-copy,
-.menu-body-section .menu-actions,
-.menu-body-section .menu-action-item,
+/* Repeated fighter and setup sections keep their intended size. */
 .char-select-frag .frag-header,
 .char-body-section .selection-copy,
 .char-summary-section,
@@ -516,145 +591,93 @@
     flex-shrink: 0;
 }
 
-.menu-header-section .menu-title {
-    font-size: 72px;
-    /* Baloo2's face metrics give ~3.2em line boxes; the glyph band sits in
-       the top half, so a fixed box height crops the dead leading instead
-       of reserving it (issue #219). */
-    height: 108px;
-    overflow: hidden;
+
+.menu-info {
+    flex-grow: 1;
+    flex-basis: 420px;
+    flex-shrink: 1;
+    min-width: 340px;
+    max-width: 850px;
+    margin-left: 24px;
+    padding: 20px 24px 24px;
+    background-color: rgb(13, 13, 20);
+    border-left-width: 3px;
+    border-top-width: 3px;
+    border-right-width: 3px;
+    border-bottom-width: 8px;
+    border-left-color: rgb(240, 238, 232);
+    border-top-color: rgb(240, 238, 232);
+    border-right-color: rgb(240, 238, 232);
+    border-bottom-color: rgb(224, 92, 42);
 }
 
-.frontend-shell--compact .menu-header-section .menu-title {
-    font-size: 56px;
-    height: 92px;
+.menu-info-header {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
 }
 
-.frontend-shell--compact .menu-tagline {
-    font-size: 16px;
-}
-
-.frontend-shell--compact .menu-copy {
-    font-size: 14px;
-}
-
-.menu-showcase {
-    position: absolute;
-    top: 16px;
-    right: 0;
-    width: 58%;
-    height: 390px;
-    align-items: stretch;
-}
-
-.menu-showcase-count {
-    margin-bottom: 10px;
+.menu-info-heading {
     color: rgb(255, 200, 33);
-    font-size: 13px;
+    font-size: 14px;
     letter-spacing: 2px;
     -unity-font-style: bold;
-    -unity-text-align: middle-right;
 }
 
-.menu-roster-art {
-    flex-grow: 1;
-    min-height: 0;
-    flex-direction: row;
-    align-items: stretch;
-}
-
-.menu-roster-card {
-    flex-grow: 1;
-    flex-basis: 0;
-    min-width: 0;
-    margin-left: 8px;
-    background-color: rgb(35, 30, 40);
-    border-bottom-width: 6px;
-    border-bottom-color: rgb(224, 92, 42);
-    overflow: hidden;
-}
-
-.menu-roster-portrait {
-    flex-grow: 1;
-    min-height: 0;
-    -unity-background-scale-mode: scale-and-crop;
-}
-
-.menu-roster-name {
-    min-height: 42px;
-    padding-left: 10px;
-    background-color: rgb(28, 25, 33);
-    color: rgb(240, 238, 232);
-    font-size: 16px;
+.menu-info-index {
+    color: rgb(196, 189, 197);
+    font-size: 11px;
     letter-spacing: 1px;
+}
+
+.menu-info-declaration {
+    margin-top: 14px;
+    color: rgb(240, 238, 232);
+    font-size: 37px;
     -unity-font-style: bold;
-    -unity-text-align: middle-left;
+    -unity-font-definition: url("../Fonts/Baloo2.asset");
+    white-space: normal;
 }
 
-.frontend-shell--compact .menu-showcase {
-    top: 12px;
-    height: 280px;
+.menu-info-copy {
+    max-width: 660px;
+    margin-top: 8px;
+    color: rgb(240, 238, 232);
+    font-size: 17px;
+    white-space: normal;
 }
 
-.frontend-shell--compact .menu-roster-name {
-    min-height: 32px;
-    font-size: 12px;
-}
 
 .menu-body-section {
     flex-grow: 1;
-    flex-direction: row;
-    align-items: flex-start;
+    min-height: 0;
     margin-top: 12px;
 }
 
-
-.menu-body-section .menu-actions {
-    width: 340px;
-    flex-shrink: 0;
-    flex-direction: column;
-    margin-top: 0;
+.menu-layout {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: flex-end;
 }
 
-.menu-body-section .menu-action-item {
-    min-height: 60px;
-    margin-top: 6px;
+
+
+
+
+
+.frontend-shell--compact .menu-info {
+    flex-grow: 1;
+    flex-basis: 400px;
+    min-width: 340px;
+    max-width: 850px;
+    margin-left: 0;
+    padding: 14px 16px;
 }
 
-.menu-body-section .menu-action {
-    min-height: 56px;
-}
+.frontend-shell--compact .menu-info-declaration { font-size: 28px; }
+.frontend-shell--compact .menu-info-copy { font-size: 14px; }
 
-.menu-actions-section {
-    flex-shrink: 0;
-}
-
-/* The quiet version label in the lower-right actions cell. */
-.menu-actions-section .menu-version {
-    color: rgb(183, 174, 184);
-    font-size: 12px;
-    letter-spacing: 1px;
-    white-space: nowrap;
-}
-
-.frontend-shell--compact .menu-body-section {
-    flex-direction: column;
-    overflow: auto;
-}
-
-.frontend-shell--compact .menu-body-section .menu-actions {
-    width: 100%;
-}
-
-.frontend-shell--compact .menu-action {
-    width: 280px;
-    min-height: 44px;
-}
-
-.frontend-shell--compact .menu-action-item {
-    min-height: 48px;
-    margin-top: 6px;
-}
 
 /* Fighter Select */
 

@@ -24,6 +24,8 @@ namespace SlopArena.Shared.Rollback
         private const int WindowCap = 30;
         private uint _localTick;
         private uint _lastAuthoritativeTick;
+        private ulong _lastTerminalInteractionId;
+        private uint _lastTerminalInteractionTick;
         private bool _coupledBarrier;
 
         public int CorrectionCount { get; private set; }
@@ -41,6 +43,8 @@ namespace SlopArena.Shared.Rollback
             _history.Clear();
             _localTick = 0;
             _lastAuthoritativeTick = 0;
+            _lastTerminalInteractionId = 0;
+            _lastTerminalInteractionTick = 0;
             _coupledBarrier = false;
             _history.Add((0, _sim.GetState(_entityId), default));
         }
@@ -70,19 +74,43 @@ namespace SlopArena.Shared.Rollback
         /// establish a barrier even when the local history contains an active ability.</summary>
         public void ReconcileWithServer(ServerEntityPacket packet)
         {
-            if (packet.Tick < _lastAuthoritativeTick) return;
             var authoritative = packet.State.ToState();
             authoritative.EntityId = _entityId;
+            bool hasTerminal = authoritative.LastTerminalInteractionId != 0 &&
+                authoritative.InteractionTerminalTick != 0;
+            bool newTerminal = hasTerminal &&
+                authoritative.InteractionTerminalTick >= _lastTerminalInteractionTick &&
+                authoritative.LastTerminalInteractionId != _lastTerminalInteractionId;
+            if (newTerminal)
+            {
+                _lastTerminalInteractionId = authoritative.LastTerminalInteractionId;
+                _lastTerminalInteractionTick = authoritative.InteractionTerminalTick;
+            }
+            if (hasTerminal && !newTerminal && packet.Tick <= _lastAuthoritativeTick)
+                return;
+
+            var current = _sim.GetState(_entityId);
+            bool terminal = newTerminal &&
+                (current.InteractionId == 0 ||
+                 current.InteractionId == authoritative.LastTerminalInteractionId) &&
+                (authoritative.InteractionId == 0 ||
+                 authoritative.InteractionId == authoritative.LastTerminalInteractionId);
+            if (newTerminal && !terminal)
+                return;
+
+            bool staleInteraction = authoritative.InteractionId != 0 &&
+                authoritative.InteractionId == _lastTerminalInteractionId;
+            if (staleInteraction) return;
+
             bool coupled = authoritative.InteractionId != 0 &&
                 (authoritative.State == ActionState.Grabbed ||
                  authoritative.State == ActionState.Throwing);
-            bool terminal = authoritative.LastTerminalInteractionId != 0 &&
-                authoritative.InteractionTerminalTick == packet.Tick;
             bool contact = authoritative.BlockStunTicks != 0 ||
                 authoritative.BlockHitstopKind != 0;
             if (coupled || terminal || contact || _coupledBarrier)
             {
-                _lastAuthoritativeTick = packet.Tick;
+                if (packet.Tick > _lastAuthoritativeTick)
+                    _lastAuthoritativeTick = packet.Tick;
                 _sim.ApplyAuthoritativeState(_entityId, authoritative);
                 _coupledBarrier = coupled;
                 _history.Clear();

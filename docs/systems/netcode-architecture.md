@@ -163,7 +163,7 @@ Send packet: entityId(8) + tick(4) + InputState(21) = 33 bytes
 |--------|---------|-----------------|------------------------------------|
 | 0-3    | float   | MoveX           | Horizontal analog input            |
 | 4-7    | float   | MoveY           | Vertical analog input              |
-| 8      | byte    | flags           | bit0:Up, 1:Down, 2:Left, 3:Right, 4:Jump, 5:Dash, 6:Burst (ADR-0014; formerly Crouch), 7:IsAiming |
+| 8      | byte    | flags           | bit0:Up, 1:Down, 2:Left, 3:Right, 4:Jump, 5:legacy Dash (reserved/inert; not an air-dodge edge), 6:retired Burst, 7:IsAiming |
 | 9      | byte    | ActiveSlot      | 0=none, 1=LMB, 2=RMB, 3=key"1", 4=E, 5=R, 6=F, 7-10=keys"2"-"5", 11=A (ADR-0016) |
 | 10-11  | short   | FacingYaw       | Degrees × 100 (movement-facing)    |
 | 12-13  | short   | AimYaw          | Degrees × 100 (combat-facing, reserved) |
@@ -171,12 +171,12 @@ Send packet: entityId(8) + tick(4) + InputState(21) = 33 bytes
 | 16-17  | ushort  | AimDistance     | cm (0-6500 = 0-65m)                |
 | 18     | byte    | TargetEntityId  | Client-selected target (0 = none)  |
 | 19     | byte    | flags2          | bit0: JumpHeld, bit1: FaceToCamera, bit2: ToggleLock, bit3: DownPressed, bit4: ShieldHeld, bit5: ShieldPressed, bit6: GrabPressed |
-| 20     | byte    | protocolVersion | `SimulationProtocol.Version = 2` |
+| 20     | byte    | protocolVersion | `SimulationProtocol.Version = 3` |
 
-`ShieldHeld` is a per-tick physical hold. `ShieldPressed` and `GrabPressed` are logical
-one-tick edges; the shared simulation selects shield versus air dodge using authoritative
-grounded state. A completed controller grab chord consumes the competing defense edge,
-not the held flag.
+`ShieldHeld` is the per-tick physical hold used for grounded shield. `ShieldPressed` is a
+fresh logical edge and the sole airborne dodge input; the simulation accepts it only while
+airborne. `GrabPressed` is also a one-tick edge. A completed controller grab chord consumes
+the competing defense edge without clearing the physical hold.
 
 Total: 33 bytes (8 + 4 + 21). Validate the exact envelope and supported version before
 endpoint registration or reconnect/countdown side effects. This is a coordinated cutover,
@@ -218,7 +218,7 @@ versus airborne dodge from authoritative state; client-side chord binding emits
 | 16-19  | float   | VelocityX                   | World velocity X                   |
 | 20-23  | float   | VelocityY                   | World velocity Y                   |
 | 24-27  | float   | VelocityZ                   | World velocity Z                   |
-| 28     | byte    | CurrentActionState          | 0-11 remain stable; 12 Shielding, 13 ShieldDrop, 14 GrabAttempt, 15 Grabbed, 16 Throwing, 17 AirDodgeStartup, 18 AirDodgeMovement, 19 AirDodgeRecovery |
+| 28     | byte    | CurrentActionState          | 0, 2-4, 6-16 stable; 1, 5, 17 reserved; 18 AirDodgeMovement, 19 AirDodgeRecovery |
 | 29     | byte    | IsGrounded                  | 0 or 1                             |
 | 30-31  | ushort  | StateDurationFrames         | Remaining ticks in current state   |
 | 32     | byte    | AttackSlot                  | 0=none, 1-11 (ADR-0016 slot layout)|
@@ -231,14 +231,14 @@ versus airborne dodge from authoritative state; client-side chord binding emits
 | 45     | byte    | Deaths                       | Stock counter: stocks left = maxStocks - Deaths (issue #37) |
 | 46-47  | ushort  | DamagePercent                | Smash-style damage %, HUD display (issue #38) |
 | 48-69  | ushort×11| Cooldown0..10               | Per-slot cooldown ticks (ADR-0016: 11 slots), local HUD fills (issue #38) |
-| 70-71  | ushort  | AirTimeTicks                | Fall-ramp gravity timer (D10/ADR-0011) |
-| 72-73  | ushort  | DashDurationTicks            | Remaining dash ticks (D10)         |
-| 74-77  | float   | DashDirX                    | Dash direction X (D10)             |
-| 78-81  | float   | DashDirZ                    | Dash direction Z (D10)             |
-| 82-83  | ushort  | DashCooldownTicks            | Dash cooldown remaining (D10)      |
+| 70-71  | ushort  | AirTimeTicks                | FloatWindow gravity timer |
+| 72-73  | ushort  | DashDurationTicks            | Reserved legacy universal-dash timer; not the air-dodge phase timer |
+| 74-77  | float   | DashDirX                    | AirDodgeMovement direction X, captured from facing |
+| 78-81  | float   | DashDirZ                    | AirDodgeMovement direction Z, captured from facing |
+| 82-83  | ushort  | DashCooldownTicks            | Reserved legacy universal-dash cooldown |
 | 84     | byte    | AirDodgesLeft                | Remaining air dodges (D10)         |
 | 85     | byte    | JumpsLeft                    | Remaining jumps (D10)              |
-| 86-87  | ushort  | InvincibilityTicks           | Post-respawn/dash invincibility (D10) |
+| 86-87  | ushort  | InvincibilityTicks           | Air-dodge/respawn invincibility (D10) |
 | 88-89  | ushort  | RushTicks                    | Rush window remaining (ADR-0020)   |
 | 90-93  | float   | LastDirX                    | Last input direction X (D10)       |
 | 94-97  | float   | LastDirZ                    | Last input direction Z (D10)       |
@@ -263,12 +263,13 @@ versus airborne dodge from authoritative state; client-side chord binding emits
 | 147-150| uint    | InteractionTerminalTick      | Authoritative terminal outcome tick |
 | 151-152| short   | CapturedYaw                  | Grab facing snapshot, signed degrees × 100 |
 | 153-154| ushort  | AirDodgeRecoveryTicks         | Grounded commitment left after an air-dodge landing |
-| 155    | byte    | ProtocolVersion              | `SimulationProtocol.Version = 2` |
+| 155    | byte    | ProtocolVersion              | `SimulationProtocol.Version = 3` |
 
 **Packet sizes:** `CharacterStatePacket` is 156 bytes. `ServerEntityPacket` is 168 bytes
 before its mandatory relay marker, 169 bytes without input and 190 bytes with input.
-Input remains 21 bytes. Protocol-v1 state/input payloads are rejected; deploy client and
-server together.
+Input remains 21 bytes. Pre-v3 state/input payloads are rejected. Steam admission also
+uses protocol version 3; coordinate the Master server's `protocolVersion` with GameServer
+and clients for this cutover.
 
 **The server sends ALL states to every client.** Clients ignore the ones that don't concern them. No routing overhead.
 

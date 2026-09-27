@@ -26,10 +26,8 @@ namespace SlopArena.Shared.Abilities;
 /// spike, no knockback, no cooldown. The lifecycle therefore runs off _ticks against the
 /// durations cached at OnStart, and nothing else.
 ///
-/// For the same reason the input lock is set one tick LONGER than the ability: TickTimers
-/// decrements AnimLockTicks before TickAbilities runs, so a lock of exactly N is already 0
-/// on ability tick N — and a player holding dash on the detonation tick would StartDash,
-/// leave Attacking, and lose the blast on the last frame of a 540-tick cooldown.
+/// The input lock lasts one tick longer than the ability so the final detonation
+/// resolves before an ordinary action can take over.
 ///
 /// ── Why the drag may be a velocity write but the detonation may not ──
 /// The drag writes VX/VZ on other entities directly, which is only legal because its pulse
@@ -56,19 +54,6 @@ namespace SlopArena.Shared.Abilities;
 /// Escape is a real out and is deliberately not defended against: both the drag pulses and
 /// the detonation are radius-gated by the same instance, so a target that leaves keeps the
 /// tick damage already dealt and takes nothing else. No tether, no re-capture.
-///
-/// ── Jump is NOT gated on the lock (engine-wide, out of this class's hands) ──
-/// The +1 on AnimLockTicks closes the dash-cancel hole, because StartDash is gated on
-/// AnimLockTicks == 0 (Simulation.cs:252). Jump is NOT: the jump branch at
-/// Simulation.cs:220 tests only HitstunTicks, JumpsLeft and JumpSquat. Pressing jump on any
-/// tick of this ability — including the detonation tick — sets State = JumpSquat, and the
-/// next TickAbilities drops the instance without OnEnd (ServerSimulation.cs:143-150) while
-/// still charging the full 540-tick cooldown. So "Nilus is locked in place for the whole
-/// ability" above is true for movement input and dash, and FALSE for jump.
-/// An earlier pull ability had the identical hole, so gating jump on AnimLockTicks would
-/// change the feel of every committed ability on the roster and is an owner decision, not a bug fix.
-/// F_JumpCancelsTheUltAtFullCooldownCost pins the current behaviour so that a future gate
-/// shows up as a failing test rather than a silent feel change.
 ///
 /// Params: windup_ticks, drag_duration_ticks, drag_radius, drag_force,
 /// drag_interval_ticks, drag_damage, detonation_damage, detonation_kb_angle,

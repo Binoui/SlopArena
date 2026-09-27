@@ -1,0 +1,27 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
+    <ui:Style src="SettingsOverlay.uss" />
+    <ui:VisualElement name="settings-overlay" class="sa-settings-cover">
+        <ui:VisualElement name="settings-poster" class="sa-settings-poster">
+            <ui:VisualElement class="sa-settings-header">
+                <ui:Label text="SETTINGS" class="sa-settings-title" />
+                <ui:Label text="SLOPARENA / OPTIONS" class="sa-settings-mark" />
+            </ui:VisualElement>
+            <ui:VisualElement class="sa-settings-tabs">
+                <ui:Button name="settings-tab-audio" text="AUDIO" class="sa-settings-tab" />
+                <ui:Button name="settings-tab-controls" text="CONTROLS" class="sa-settings-tab" />
+                <ui:Button name="settings-tab-video" text="VIDEO" class="sa-settings-tab" />
+                <ui:Button name="settings-tab-gameplay" text="GAMEPLAY" class="sa-settings-tab" />
+                <ui:Button name="settings-tab-accessibility" text="ACCESSIBILITY" class="sa-settings-tab" />
+            </ui:VisualElement>
+            <ui:ScrollView name="settings-scroll" class="sa-settings-scroll" mode="Vertical" horizontal-scroller-visibility="Hidden">
+                <ui:VisualElement name="settings-body" class="sa-settings-body" />
+            </ui:ScrollView>
+            <ui:Label name="settings-status" class="sa-settings-status" />
+            <ui:VisualElement class="sa-settings-footer">
+                <ui:Button name="settings-reset" text="RESET ALL SETTINGS" class="sa-settings-action" />
+                <ui:VisualElement class="sa-settings-spacer" />
+                <ui:Button name="settings-back" text="BACK" class="sa-settings-action sa-settings-action--primary" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

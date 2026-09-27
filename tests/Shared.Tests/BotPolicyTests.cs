@@ -138,7 +138,6 @@ public class BotPolicyTests
         Assert.Equal(0f, input.MoveX);
         Assert.Equal(1f, input.MoveY);
         Assert.Equal(0, input.ActiveSlot); // out of perceived range → no attack
-        Assert.False(input.Dash);
         Assert.False(input.Jump);
     }
 
@@ -200,7 +199,6 @@ public class BotPolicyTests
         var input = Decide(self, target);
 
         Assert.Equal(0, input.ActiveSlot);
-        Assert.False(input.Dash);
         Assert.False(input.Jump);
     }
 
@@ -214,11 +212,10 @@ public class BotPolicyTests
         var input = Decide(self, target);
 
         Assert.Equal(0, input.ActiveSlot);
-        Assert.False(input.Dash);
         Assert.False(input.Jump);
     }
     [Fact]
-    public void ThreatenedBotUsesShieldInsteadOfGroundedDashWhenDefenseWins()
+    public void ThreatenedBotUsesShieldWhenDefenseWins()
     {
         var self = Self();
         LockNonAimSlots(ref self);
@@ -237,7 +234,6 @@ public class BotPolicyTests
                 Assert.True(input.ShieldHeld);
                 Assert.Equal(0, input.ActiveSlot);
             }
-            Assert.False(input.Dash);
             Assert.False(input.Burst);
         }
         Assert.True(shielded, "No seeded decision selected shield against a grounded threat.");
@@ -257,7 +253,6 @@ public class BotPolicyTests
 
         Assert.True(input.ShieldHeld);
         Assert.False(input.ShieldPressed);
-        Assert.False(input.Dash);
         Assert.False(input.Burst);
 
         target.State = ActionState.Idle;
@@ -293,7 +288,8 @@ public class BotPolicyTests
         Assert.Equal(a.MoveX, b.MoveX);
         Assert.Equal(a.MoveY, b.MoveY);
         Assert.Equal(a.AimYaw, b.AimYaw);
-        Assert.Equal(a.Dash, b.Dash);
+        Assert.Equal(a.ShieldHeld, b.ShieldHeld);
+        Assert.Equal(a.ShieldPressed, b.ShieldPressed);
         Assert.Equal(a.Jump, b.Jump);
     }
 
@@ -311,7 +307,6 @@ public class BotPolicyTests
         Assert.Equal(0, input.ActiveSlot);
         Assert.Equal(0, input.AimYaw);
         Assert.False(input.FaceToCamera);
-        Assert.False(input.Dash);
         Assert.False(input.Jump);
     }
 
@@ -339,7 +334,8 @@ public class BotPolicyTests
             Assert.Equal(oldInput.MoveX, changedInput.MoveX);
             Assert.Equal(oldInput.MoveY, changedInput.MoveY);
             Assert.Equal(oldInput.ActiveSlot, changedInput.ActiveSlot);
-            Assert.Equal(oldInput.Dash, changedInput.Dash);
+            Assert.Equal(oldInput.ShieldHeld, changedInput.ShieldHeld);
+            Assert.Equal(oldInput.ShieldPressed, changedInput.ShieldPressed);
             Assert.Equal(oldInput.Jump, changedInput.Jump);
             Assert.Equal(oldInput.AimYaw, changedInput.AimYaw);
             Assert.Equal(oldInput.FaceToCamera, changedInput.FaceToCamera);
@@ -350,7 +346,8 @@ public class BotPolicyTests
         bool changed = oldAtBoundary.MoveX != changedAtBoundary.MoveX
             || oldAtBoundary.MoveY != changedAtBoundary.MoveY
             || oldAtBoundary.ActiveSlot != changedAtBoundary.ActiveSlot
-            || oldAtBoundary.Dash != changedAtBoundary.Dash
+            || oldAtBoundary.ShieldHeld != changedAtBoundary.ShieldHeld
+            || oldAtBoundary.ShieldPressed != changedAtBoundary.ShieldPressed
             || oldAtBoundary.Jump != changedAtBoundary.Jump;
         Assert.True(changed, "opponent change did not become observable at the delay boundary");
     }
@@ -780,28 +777,23 @@ public class BotPolicyTests
     }
 
     [Fact]
-    public void LedgeHang_UsesLegalStageSideExit()
+    public void OffstageBesideEdge_RecoversInsteadOfWaitingForDisabledGrab()
     {
         var arena = RecoveryArena();
+        arena.MaxX = 8f;
         var def = TestHelpers.FightGuyDef;
-        var state = TestHelpers.PlayerState(x: 7.2f);
-        state.PY = TestHelpers.GroundPY(def);
-        state.VY = -1f;
-        state.IsGrounded = false;
-        var sim = TestHelpers.MakeSim(arena);
-        sim.RegisterEntity(1, def, state);
-        sim.RegisterEntity(100, def, TestHelpers.NpcState(x: 20f));
-        for (int tick = 0; tick < 30 && sim.GetState(1).State != ActionState.LedgeHang; tick++)
-            sim.Tick(new Dictionary<ulong, InputState> { [1] = default, [100] = default });
-
-        Assert.Equal(ActionState.LedgeHang, sim.GetState(1).State);
+        var self = TestHelpers.PlayerState(x: 7.2f);
+        self.PY = TestHelpers.GroundPY(def);
+        self.VY = -1f;
+        self.IsGrounded = false;
+        self.JumpsLeft = 0;
+        var target = TestHelpers.NpcState(x: 20f);
         var memory = new BotMemory { Difficulty = CpuDifficulty.Hard };
-        var input = Policy.Decide(sim.GetState(1), sim.GetState(100), def,
-            new Random(0), memory, arena);
-        Assert.True(input.MoveX < -0.5f, "ledge exit did not move toward stage");
-        sim.Tick(new Dictionary<ulong, InputState> { [1] = input, [100] = default });
-        Assert.NotEqual(ActionState.LedgeHang, sim.GetState(1).State);
-        Assert.True(sim.GetState(1).IsGrounded);
+
+        var input = Policy.Decide(self, target, def, new Random(0), memory, arena);
+
+        Assert.True(input.MoveX < -0.5f, "bot must steer back onto the stage");
+        Assert.Equal(AbilitySlots.E, input.ActiveSlot);
     }
 
     [Fact]

@@ -88,8 +88,17 @@ A permanent, full-body defensive state entered by holding Defense (Left Shift / 
 _Avoid_: directional block
 
 **LedgeHang**:
-The occupied hanging state at a ledge (ADR-0020 §4). Grab is briefly invincible with full refresh on re-grab; no auto-getup — the fighter hangs until it acts. Escapes: S = drop, jump = ledge jump, W = stand. Single-occupancy (ledgehog): a second grab fails and the would-be grabber falls past.
+Disabled for the friends demo: the Shared simulation does not enter this state on an edge approach. Fighters fall past ledges and must recover onto a stage surface. The old state value and packet fields remain reserved for compatibility; ADR-0020 §4 records the earlier design, not the current demo rule.
 _Avoid_: ledge grab (the action), edge hang, tether
+
+**Forward Air Dodge**:
+A fresh airborne Defense press commits to ten ticks of facing-locked horizontal
+movement, with invulnerability for the first five ticks, then twenty ticks of
+vulnerable recovery. It spends one air dodge until a genuine landing or respawn.
+It retains ordinary gravity and cannot turn, attack, jump or shield-cancel
+before recovery ends. Landing ends movement but not remaining commitment;
+ledge grabs cannot interrupt recovery while disabled.
+_Avoid_: air dash, directional dodge, wavedash
 
 **RecoveryMove**:
 The per-character dedicated upward/diagonal burst used to return to the stage after being knocked out — one Slot per kit, long cooldown. The only move that resets the FloatWindow; normal air attacks no longer do (ADR-0015).
@@ -161,7 +170,7 @@ A sequence of attacks that maintains pressure while leaving the defender opportu
 _Avoid_: true combo, guaranteed follow-up
 
 **Stage Recovery**:
-The return from offstage to a stage surface or LedgeHang. It can combine normal movement, jumps, and a character's RecoveryMove or other kit mobility.
+The return from offstage to a stage surface. It can combine normal movement, jumps, and a character's RecoveryMove or other kit mobility; ledge grabs are disabled for the demo.
 _Avoid_: attack recovery, RecoveryMove (when referring to the whole return)
 
 **Stage-side Edgeguarding**:
@@ -277,7 +286,7 @@ An opponent rendered from received state rather than local re-simulation while i
 _Avoid_: unpredicted entity, fallback display, snap-only entity
 
 **Predictable ActionState**:
-An action whose movement can be reproduced from confirmed state and exact input history. Idle, legacy airborne Dashing, JumpSquat, Run, Sliding, Crouching, Shielding, ShieldDrop, GrabAttempt and air-dodge phases qualify only without active Hitstop, block-hitstop or a coupled interaction.
+An action whose movement can be reproduced from confirmed state and exact input history. Idle, JumpSquat, Run, Sliding, Crouching, Shielding, ShieldDrop, GrabAttempt and the forward air-dodge movement/recovery phases qualify only without active Hitstop, block-hitstop or a coupled interaction.
 _Avoid_: safe state, simple state, movement state
 
 **Complex ActionState**:

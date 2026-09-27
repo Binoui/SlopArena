@@ -5,19 +5,9 @@ using Xunit;
 namespace SlopArena.Shared.Tests;
 
 /// <summary>
-/// Persistent target lock (ADR-0018 / issue #127): RMB edge toggles sim-authoritative
-/// LockOn. The lock is PASSIVE — it keeps the resolved target fresh (for attack-stage
-/// auto-face, the client lock camera + indicator) but does NOT steer facing while
-/// moving: the fighter keeps normal movement facing (runs where it runs, sticky air
-/// facing) and only turns toward the target during attacks (per-stage
-/// RotateTowardTarget). The lock disengages on toggle-off, target beyond lock range
-/// (10m), or an accepted LMB facing snap, and the owner's LockOn resets on death
-/// (fresh respawn state). Target death re-targets through the resolver.
-///
-/// The golden scenarios pin lock lifecycle (LockOn, snap, deaths); range disengagement
-/// and movement continuation are asserted behaviorally below.
-/// Facing angles are deliberately excluded from the golden schema, so steering is asserted
-/// behaviorally in companion tests.
+/// Explicit and automatic target locking are resolved in Shared. Locks retain a valid
+/// target within 20m; user retarget selects the nearest eligible enemy. LMB facing snap
+/// never exits lock, and owner death resets the lock.
 /// </summary>
 public class TargetLockTests : KitScenarioTests
 {
@@ -41,8 +31,8 @@ public class TargetLockTests : KitScenarioTests
     [Fact]
     public void LockOn_Disengages_OutOfRange_AndMovementContinues()
     {
-        // Range is a behavioral boundary: once the target exceeds 10m, LockOn clears,
-        // but the player's ordinary ground movement continues without interruption.
+        // The 20m boundary is behavioral: once the selected target exceeds it, LockOn
+        // clears while ordinary ground movement continues.
         var sim = TestHelpers.MakeSim(TestHelpers.TestArena());
         sim.RegisterEntity(1, Def, TestHelpers.PlayerState() with { PY = Gpy });
         sim.RegisterEntity(100, Def, TestHelpers.NpcState(0f, 3f) with { PY = Gpy });
@@ -60,9 +50,8 @@ public class TargetLockTests : KitScenarioTests
             {
                 disengaged = true;
                 disengagedX = state.PX;
-                Assert.Equal(100UL, state.TargetEntityId);
-                Assert.True(state.PX * state.PX + 9f > 100f,
-                    $"lock cleared before the target exceeded 10m: x={state.PX:F3}");
+                Assert.True(state.PX * state.PX + 9f > 400f,
+                    $"lock cleared before the target exceeded 20m: x={state.PX:F3}");
             }
         }
 
@@ -75,13 +64,12 @@ public class TargetLockTests : KitScenarioTests
 
 
     [Fact]
-    public void Golden_LockOn_LmbSnapExitsLock()
+    public void Golden_LockOn_LmbSnapKeepsLock()
     {
-        // Locked at t0; LMB facing snap at t10 (AimYaw 18000 = PI, away from the NPC).
-        // The snap is accepted (idle, unlocked gates) → LockOn clears and facing snaps.
+        // Locked at t0; LMB facing snap at t10 changes facing without clearing LockOn.
         AssertGoldenScenario(new KitScenario
         {
-            Name = "Target Lock LMB Exits Lock",
+            Name = "Target Lock LMB Snap Keeps Lock",
             Def = Def,
             Setup = () => TestHelpers.PlayerState() with { PY = Gpy, FacingYaw = 0f },
             Inputs = new InputSequence()
@@ -119,6 +107,131 @@ public class TargetLockTests : KitScenarioTests
             SnapshotTick = 60,
             TotalTicks = 120,
         });
+    }
+
+    [Fact]
+    public void AutoLock_AlwaysAcquiresAndToggleOffStaysSuppressedUntilReenabled()
+    {
+        var sim = TestHelpers.MakeSim(TestHelpers.TestArena());
+        sim.RegisterEntity(1, Def, TestHelpers.PlayerState() with { PY = Gpy });
+        sim.RegisterEntity(100, Def, TestHelpers.NpcState(0f, 4f) with { PY = Gpy });
+        sim.RegisterEntity(101, Def, TestHelpers.NpcState(0f, 2f) with { PY = Gpy });
+
+        sim.Tick(new() { { 1, new InputState { LockMode = TargetLockMode.Always, TargetEntityId = 100 } } });
+        Assert.True(sim.GetState(1).LockOn);
+        Assert.Equal(100UL, sim.GetState(1).TargetEntityId);
+
+        sim.Tick(new() { { 1, new InputState { LockMode = TargetLockMode.Always, TargetEntityId = 101, ToggleLock = true } } });
+        Assert.False(sim.GetState(1).LockOn);
+        Assert.True(sim.GetState(1).AutoLockSuppressed);
+
+        sim.Tick(new() { { 1, new InputState { LockMode = TargetLockMode.Always } } });
+        Assert.False(sim.GetState(1).LockOn);
+
+        sim.Tick(new() { { 1, new InputState { LockMode = TargetLockMode.Always, TargetEntityId = 101, ToggleLock = true } } });
+        Assert.True(sim.GetState(1).LockOn);
+        Assert.False(sim.GetState(1).AutoLockSuppressed);
+        Assert.Equal(101UL, sim.GetState(1).TargetEntityId);
+    }
+
+    [Fact]
+    public void NeverModeIsManualAndRetargetChoosesClosestEligibleEnemy()
+    {
+        var sim = TestHelpers.MakeSim(TestHelpers.TestArena());
+        sim.RegisterEntity(1, Def, TestHelpers.PlayerState() with { PY = Gpy });
+        sim.RegisterEntity(100, Def, TestHelpers.NpcState(0f, 4f) with { PY = Gpy });
+        sim.RegisterEntity(101, Def, TestHelpers.NpcState(0f, 2f) with { PY = Gpy });
+
+        sim.Tick(new() { { 1, default } });
+        Assert.False(sim.GetState(1).LockOn);
+
+        sim.Tick(new() { { 1, new InputState { ToggleLock = true, TargetEntityId = 100 } } });
+        Assert.True(sim.GetState(1).LockOn);
+        Assert.Equal(100UL, sim.GetState(1).TargetEntityId);
+
+        sim.Tick(new() { { 1, new InputState { TargetEntityId = 101 } } });
+        Assert.Equal(100UL, sim.GetState(1).TargetEntityId);
+
+        sim.Tick(new() { { 1, new InputState { RetargetPressed = true, TargetEntityId = 100 } } });
+        Assert.True(sim.GetState(1).LockOn);
+        Assert.Equal(101UL, sim.GetState(1).TargetEntityId);
+    }
+    [Fact]
+    public void ClientTargetSelection_IsValidatedBeforeLockAcquisition()
+    {
+        var sim = TestHelpers.MakeSim(TestHelpers.TestArena());
+        sim.RegisterEntity(1, Def, TestHelpers.PlayerState() with { PY = Gpy });
+        sim.RegisterEntity(100, Def, TestHelpers.NpcState(0f, 2f) with { PY = Gpy });
+
+        sim.Tick(new() { { 1, new InputState { ToggleLock = true, TargetEntityId = 1 } } });
+
+        Assert.True(sim.GetState(1).LockOn);
+        Assert.Equal(100UL, sim.GetState(1).TargetEntityId);
+    }
+
+
+    private static void SpawnContact(ServerSimulation sim, in CharacterState defender)
+    {
+        sim.Resolver.Spawn(new Hitbox
+        {
+            X = defender.PX,
+            Y = defender.PY,
+            Z = defender.PZ,
+            EndX = defender.PX,
+            EndY = defender.PY,
+            EndZ = defender.PZ,
+            Radius = 0.45f,
+            Shape = HitboxShape.Sphere,
+            Damage = 5f,
+            BaseKnockback = 2f,
+            KnockbackGrowth = 3f,
+            StunTicks = 20,
+            DurationTicks = 20,
+            OwnerId = 1,
+            ActivationId = 17,
+            AttackSlot = 1,
+        });
+    }
+
+    [Fact]
+    public void OnHitModeLocksBothParticipantsOnConfirmedDamagingContact()
+    {
+        var sim = TestHelpers.MakeSim(TestHelpers.TestArena());
+        sim.RegisterEntity(1, Def, TestHelpers.PlayerState(-2f, 0f) with { PY = Gpy });
+        sim.RegisterEntity(100, Def, TestHelpers.NpcState(0f, 0f) with { PY = Gpy });
+        SpawnContact(sim, sim.GetState(100));
+
+        sim.Tick(new()
+        {
+            { 1, new InputState { LockMode = TargetLockMode.OnHit } },
+            { 100, new InputState { LockMode = TargetLockMode.OnHit } },
+        });
+
+        Assert.True(sim.GetState(1).LockOn);
+        Assert.Equal(100UL, sim.GetState(1).TargetEntityId);
+        Assert.True(sim.GetState(100).LockOn);
+        Assert.Equal(1UL, sim.GetState(100).TargetEntityId);
+        Assert.True(sim.GetState(100).DamagePercent > 0);
+    }
+
+    [Fact]
+    public void OnHitModeDoesNotLockOnBlockedContact()
+    {
+        var sim = TestHelpers.MakeSim(TestHelpers.TestArena());
+        sim.RegisterEntity(1, Def, TestHelpers.PlayerState(-2f, 0f) with { PY = Gpy });
+        sim.RegisterEntity(100, Def, TestHelpers.NpcState(0f, 0f) with { PY = Gpy });
+        SpawnContact(sim, sim.GetState(100));
+
+        sim.Tick(new()
+        {
+            { 1, new InputState { LockMode = TargetLockMode.OnHit } },
+            { 100, new InputState { LockMode = TargetLockMode.OnHit, ShieldHeld = true } },
+        });
+
+        Assert.False(sim.GetState(1).LockOn);
+        Assert.False(sim.GetState(100).LockOn);
+        Assert.True(sim.LastTickHits[0].Blocked);
+        Assert.Equal((ushort)0, sim.GetState(100).DamagePercent);
     }
 
     // ────────────────────────── Behavioral ──────────────────────────
@@ -294,7 +407,7 @@ public class TargetLockTests : KitScenarioTests
     }
 
     [Fact]
-    public void LmbSnap_ExitsLock_AndFacesCamera()
+    public void LmbSnap_KeepsLock_AndFacesCamera()
     {
         var arena = TestHelpers.TestArena();
         var sim = TestHelpers.MakeSim(arena);
@@ -308,12 +421,11 @@ public class TargetLockTests : KitScenarioTests
 
         sim.Tick(new() { { 1, new InputState { FaceToCamera = true, AimYaw = 18000 } } });
         var snapped = sim.GetState(1);
-        Assert.False(snapped.LockOn, "accepted LMB snap exits the lock");
+        Assert.True(snapped.LockOn, "accepted LMB snap must not exit the lock");
         TestHelpers.AssertNear(MathF.PI, snapped.FacingYaw, 1e-4f);
 
-        // Lock stays off afterwards
         for (int i = 0; i < 30; i++) sim.Tick(new() { { 1, default } });
-        Assert.False(sim.GetState(1).LockOn);
+        Assert.True(sim.GetState(1).LockOn);
     }
 
     [Fact]
@@ -338,24 +450,32 @@ public class TargetLockTests : KitScenarioTests
     }
 
     [Fact]
-    public void OwnerDeath_ResetsLockOn()
+    public void OwnerDeath_ResetsLockState()
     {
-        // LockOn resets on the OWNER's death: the respawned state is fresh (ADR-0018).
+        // Respawn starts fresh even when the previous lock was explicitly suppressed.
         // Spawn the player at Z=-1 — just off the 200x200 heightmap grid (origin 0,0),
         // so the below-floor force-snap doesn't rescue it: it falls freely into the
-        // void and dies (blast Deaths=1). In-bounds below-floor spawns snap to the
-        // floor instead (Simulation ground collision) and never reach the blast line.
+        // void and dies (blast Deaths=1).
         var sim = TestHelpers.MakeSim(DeathArena());
-        var player = TestHelpers.PlayerState(0f, -1f) with { PY = -25f, IsGrounded = false, FacingYaw = 0f };
+        var player = TestHelpers.PlayerState(0f, -1f) with
+        {
+            PY = -25f,
+            IsGrounded = false,
+            FacingYaw = 0f,
+            LockOn = true,
+            AutoLockSuppressed = true,
+            TargetEntityId = 100,
+        };
         sim.RegisterEntity(1, Def, player);
         sim.RegisterEntity(100, Def, TestHelpers.NpcState(0f, 3f) with { PY = Gpy });
 
-        sim.Tick(new() { { 1, new InputState { ToggleLock = true } } }); // lock on, then dies (void)
+        sim.Tick(new() { { 1, default } });
         for (int i = 0; i < 5; i++) sim.Tick(new() { { 1, default } });
 
         var state = sim.GetState(1);
         Assert.Equal((byte)1, state.Deaths);
         Assert.False(state.LockOn, "fresh respawn state has the lock off");
+        Assert.False(state.AutoLockSuppressed, "fresh respawn clears the manual suppression latch");
     }
 
     [Fact]

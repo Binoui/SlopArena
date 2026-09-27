@@ -307,6 +307,7 @@ internal static class MatchContentInternals
     {
         string json = CharacterContentSerializer.Serialize(source.Class.ToString().ToLowerInvariant(), source);
         var clone = CharacterContentSerializer.Load(json);
+        clone.CaptureGeometry = source.CaptureGeometry;
         if (source.CookedSlots != null)
             clone.CookedSlots = new ReadOnlyCollection<CookedSlotDefinition>(new List<CookedSlotDefinition>(source.CookedSlots));
         for (int i = 0; i < AbilitySlots.Count; i++)

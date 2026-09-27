@@ -1,4 +1,5 @@
 using System;
+using SlopArena.Shared;
 using System.Collections.Generic;
 using SlopArena.Client.Input;
 using UnityEngine;
@@ -26,6 +27,7 @@ namespace SlopArena.Client.UI
         [Serializable]
         private sealed class SettingsPayload
         {
+            public static SettingsPayload Defaults => new SettingsPayload();
             public int version = 1;
             public float master = 100f;
             public float music = 70f;
@@ -49,7 +51,7 @@ namespace SlopArena.Client.UI
             public float targetOpacity = 100f;
             public float screenShake = 100f;
             public bool reducedFlashing;
-            public static SettingsPayload Defaults => new SettingsPayload();
+            public int targetLockMode = (int)TargetLockMode.Always;
         }
 
         public static ClientSettingsService Instance
@@ -87,7 +89,7 @@ namespace SlopArena.Client.UI
         public float TargetOpacity => _settings.targetOpacity / 100f;
         public float ScreenShake => _settings.screenShake / 100f;
         public bool ReducedFlashing => _settings.reducedFlashing;
-
+        public TargetLockMode AutoLockMode => (TargetLockMode)_settings.targetLockMode;
         public AudioMixerGroup? FindBus(string name)
         {
             if (_mixer == null) _mixer = Resources.Load<AudioMixer>("Settings/SlopArena");
@@ -202,9 +204,15 @@ namespace SlopArena.Client.UI
         public void SetInvertCameraHorizontal(bool value) { _settings.invertCameraHorizontal = value; ChangedAndApply(); }
         public void SetInvertCameraVertical(bool value) { _settings.invertCameraVertical = value; ChangedAndApply(); }
         public void SetNetworkStats(int value) { _settings.networkStats = Mathf.Clamp(value, 0, 2); ChangedAndApply(); }
-        public void SetTargetOpacity(float value) { _settings.targetOpacity = Mathf.Clamp(Mathf.Round(value), 20f, 100f); ChangedAndApply(); }
-        public void SetScreenShake(float value) { _settings.screenShake = Mathf.Clamp(Mathf.Round(value), 0f, 100f); ChangedAndApply(); }
+        public void SetTargetOpacity(float percent) { _settings.targetOpacity = Mathf.Clamp(Mathf.Round(percent), 20f, 100f); ChangedAndApply(); }
+        public void SetScreenShake(float percent) { _settings.screenShake = Clamp(percent); ChangedAndApply(); }
         public void SetReducedFlashing(bool value) { _settings.reducedFlashing = value; ChangedAndApply(); }
+        public void SetAutoLockMode(TargetLockMode value)
+        {
+            _settings.targetLockMode = value is TargetLockMode.Never or TargetLockMode.Always or TargetLockMode.OnHit
+                ? (int)value : (int)TargetLockMode.Always;
+            ChangedAndApply();
+        }
 
         public void ResetControls()
         {
@@ -269,6 +277,10 @@ namespace SlopArena.Client.UI
                 _settings.uiScale = _settings.uiScale is 80 or 90 or 100 or 110 or 120 or 130 or 140 ? _settings.uiScale : 100;
                 _settings.networkStats = Mathf.Clamp(_settings.networkStats, 0, 2);
                 _settings.targetOpacity = ValidRange(_settings.targetOpacity, 100f, 20f, 100f);
+                if (_settings.targetLockMode != (int)TargetLockMode.Never &&
+                    _settings.targetLockMode != (int)TargetLockMode.Always &&
+                    _settings.targetLockMode != (int)TargetLockMode.OnHit)
+                    _settings.targetLockMode = (int)TargetLockMode.Always;
                 _settings.screenShake = ValidRange(_settings.screenShake, 100f, 0f, 100f);
                 if (_settings.displayMode < 0 || _settings.displayMode > (int)FullScreenMode.ExclusiveFullScreen)
                     _settings.displayMode = (int)Screen.fullScreenMode;

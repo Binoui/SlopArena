@@ -1,63 +1,35 @@
 # SlopArena Art and Asset Conventions
 
-This document covers visual direction, asset production, naming, licensing, and repository hygiene. Gameplay architecture belongs in [Architecture Overview](../architecture-overview.md), [Combat Systems](../systems/combat-systems.md), and [Ability Architecture](../systems/ability-architecture.md).
+This document covers character art, imported assets, animation bindings, and repository hygiene. For the game's graphic identity, follow the [Visual Language](../design/visual-language.md); for stage composition, follow [Stage Concepts](../design/stage-concepts.md). Gameplay authority belongs in [Architecture Overview](../architecture-overview.md) and [Combat Systems](../systems/combat-systems.md).
 
 ## Visual direction
 
-The broader graphic identity for UI, menus, results, web, trailers, Workshop surfaces, and presentation copy is defined by the [SlopArena Visual Language](../design/visual-language.md). This document defines the complementary 3D character and asset conventions.
-
-SlopArena uses Pixel8r2-style 3D pixel art:
-
-- three-tone cell shading with hard highlight, midtone, and shadow bands;
-- dark outlines and readable silhouettes;
-- a limited, high-contrast palette with one signature color per fighter;
-- flat matte materials rather than photorealistic PBR;
-- enough visual exaggeration to read a move from a camera view.
-
-The target is an arcade-fighter silhouette, not Roblox blockiness, generic low-poly cubes, realistic rendering, or chibi proportions.
+Readability comes first: a fighter's silhouette, pose, weapon, and attack tell must work from the gameplay camera. Keep character identity clear against stage dressing and UI. The admitted roster and stages mix authored and licensed low-poly art; there is no universal pixel-art, three-tone shader, or outline requirement. Use each character's approved presentation brief and the shared visual language rather than imposing one material style on every asset.
 
 ## Character source assets
 
-- Model in a clean T-pose for reliable rigging.
-- Keep the mesh complete: no floating parts, embedded weapons, props, or particle effects.
-- Use Unity VFX and bone-attached props for presentation elements.
-- Prefer a Mixamo-compatible humanoid rig for ordinary fighters. Preserve the standard `mixamorig:` names when using that rig.
-- Keep meshes economical; personality comes from silhouette, palette, pose, and motion more than polygon count.
-- Fix orientation, root motion, and bone naming in the source asset. Do not hide a source transform mistake with runtime remapping.
+- Preserve a clean rest pose and an importable rig; validate the actual Avatar and bound clips rather than assuming every fighter uses `mixamorig:` bones.
+- Keep models, textures, animations, and weapon or prop sources attributable to their original creators. Separate attachable weapons and VFX from the base mesh when the character design calls for it.
+- Fix orientation, scale, root motion, and bone mapping at import or in the source asset; do not conceal a broken source transform with a gameplay-only correction.
+- Keep geometry and effects legible from the gameplay camera. Verify retargeting and attachments on the actual character rig.
 
-The supported authoring formats and import settings are project/toolchain concerns. Check the current Unity package workflow before choosing FBX, GLB, or another source format.
+The [character import guide](../characters/adding-a-new-character.md) owns the current package, clip binding, inspect, and cook workflow. Do not infer rights or gameplay behavior from a source file format.
 
-## Animation naming
+## Animation identity and bindings
 
-Use lowercase semantic IDs with dots for package identity, for example:
-
-```text
-anim.idle
-anim.run
-anim.jump
-anim.fall
-anim.dash
-anim.hit-light
-anim.attack-1
-```
-
-Package animation IDs are stable semantic references. The package asset catalog binds each ID to an imported clip and deterministic pose track. Do not make a filename, Unity path, vendor name, or generated catalog entry the gameplay identity.
-
-Use clear movement, damage, and move names. Keep one semantic ID per meaning; renaming an ID is an explicit source-and-catalog refactor, not an informal string edit.
+Package semantic IDs such as `anim.kistu.g1` and `anim.bonk.a2` identify the intended animation. `character.json` references those IDs, and `CharacterAssetCatalog.asset` binds each to an imported clip and deterministic pose track. Filenames, Unity paths, pack names, and generated catalogs are not persisted move identities. Keep the ID and binding in sync when replacing a clip.
 
 ## Package asset ownership
 
-New character assets are owned by the package under `client/Unity/Assets/CharacterPackages/<package>/` and are bound through `CharacterAssetCatalog.asset`. The Unity cook stage produces runtime bindings and pose data from the exact imported assets. Generated cooked output belongs under `content-cooked/` and is immutable for a match.
+Each character package under `client/Unity/Assets/CharacterPackages/<package>/` owns its authoring definition, metadata, and Unity asset catalog. Imported rigs and clips may be kept in ignored local art directories such as `Assets/Art/Characters/<name>/`; the package catalog binds the exact assets. The Unity cook writes bindings and pose data under `content-cooked/`. Cooked match content is immutable for a match, but cooking an imported asset does not change its license.
 
-Runtime gameplay does not load raw authoring assets directly. Presentation resolves semantic IDs through generated package bindings and plays clips through Animancer.
+Runtime gameplay does not load raw authoring JSON. Unity presentation resolves semantic IDs through generated bindings and plays clips through Animancer. Keep vendor-dependent art out of public source when its terms do not allow redistribution; do not treat a successful cook as proof of publication rights.
 
-## Third-party and licensed assets
+## Third-party assets and credits
 
-Do not commit purchased or non-redistributable source assets. Keep local source under an ignored directory such as `/mnt/storage`, or import it from the valid original package. Commit only project-owned adaptations that the repository may legally redistribute.
+Thank creators in [Credits](../../CREDITS.md). Record source links, versions, license terms, asset usage, and required notices in the [maintainer asset notes](../assets/credits-and-licenses.md). The `creator`, `license`, and `attribution` fields in `package.json` describe the character package; they do not relicense imported models, clips, effects, or audio.
 
-Record required attribution and license metadata in the package manifest. A built-in or Workshop package must not expose a private vendor asset through a public path or capability ID. See the accepted content decisions in [`docs/README.md`](../README.md#accepted-adrs).
-
-Optional Asset Store dependencies remain local and ignored. A fresh checkout must still compile when an optional visual dependency is absent.
+Keep purchased and restricted source packs out of Git, including Unity Asset Store imports and their raw art. The project also has ignored **required** local dependencies such as Animancer; a fresh checkout is not a complete visual or build environment. Check the actual build and tracked cooked artifacts before saying licensed work is absent from a distribution. See the accepted content boundary in [ADR 0022](../adr/0022-workshop-first-content-architecture.md).
 
 ## Readability and presentation
 

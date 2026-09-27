@@ -20,8 +20,7 @@ namespace SlopArena.Shared.Rollback
         private readonly List<TimelinePresentationEvent> _acceptedPresentationEvents = new();
         private readonly HashSet<PresentationEventKey> _seenPresentationEvents = new();
         private readonly Dictionary<ulong, uint> _latestPacketTick = new();
-        private readonly Dictionary<ulong, uint> _terminalTick = new();
-        private readonly Dictionary<ulong, ulong> _terminalIdentity = new();
+        private readonly HashSet<ulong> _terminalInteractions = new(); // Match-unique IDs stay ended across later snapshots.
         private readonly Dictionary<ulong, ServerEntityPacket> _pendingCompanions = new();
         private const uint CompanionWindow = 30;
 
@@ -74,15 +73,44 @@ namespace SlopArena.Shared.Rollback
             foreach (var packet in packets)
             {
                 var state = packet.State.ToState();
+                bool localReconciled = false;
+                if (state.LastTerminalInteractionId != 0 &&
+                    state.InteractionTerminalTick != 0)
+                {
+                    ulong terminalId = state.LastTerminalInteractionId;
+                    if (_terminalInteractions.Add(terminalId) && _pendingCompanions.Count > 0)
+                    {
+                        var stale = new List<ulong>();
+                        foreach (var pending in _pendingCompanions)
+                            if (pending.Value.State.InteractionId == terminalId)
+                                stale.Add(pending.Key);
+                        foreach (var id in stale) _pendingCompanions.Remove(id);
+                    }
+
+                    if (packet.EntityId == _selfId)
+                    {
+                        _local.ReconcileWithServer(packet);
+                        localReconciled = true;
+                    }
+                    else if (state.InteractionId == 0 &&
+                        GetState(packet.EntityId).InteractionId == terminalId)
+                    {
+                        _predicted.StopTracking(packet.EntityId);
+                        state.EntityId = packet.EntityId;
+                        _rawTrackLatest[packet.EntityId] = state;
+                    }
+                }
+
                 if (_latestPacketTick.TryGetValue(packet.EntityId, out uint last) &&
                     packet.Tick <= last) continue;
+                _latestPacketTick[packet.EntityId] = packet.Tick;
+
                 if (state.InteractionId != 0 &&
-                    _terminalTick.TryGetValue(packet.EntityId, out uint ended) &&
-                    packet.Tick <= ended &&
-                    _terminalIdentity[packet.EntityId] == state.InteractionId)
+                    _terminalInteractions.Contains(state.InteractionId))
                     continue;
+
                 // An opponent's capture can arrive before the self packet. Do not
-                // present a one-sided pair; keep only the newest bounded snapshot.
+                // present a one-sided pair; keep the newest bounded snapshot.
                 if (packet.EntityId != _selfId && state.InteractionId != 0 &&
                     state.InteractionPartnerId == _selfId &&
                     (state.State == ActionState.Grabbed || state.State == ActionState.Throwing))
@@ -96,28 +124,11 @@ namespace SlopArena.Shared.Rollback
                     }
                 }
 
-                _latestPacketTick[packet.EntityId] = packet.Tick;
-                if (state.LastTerminalInteractionId != 0 &&
-                    state.InteractionTerminalTick != 0 &&
-                    (!_terminalTick.TryGetValue(packet.EntityId, out uint previous) ||
-                     state.InteractionTerminalTick > previous))
-                {
-                    _terminalTick[packet.EntityId] = state.InteractionTerminalTick;
-                    _terminalIdentity[packet.EntityId] = state.LastTerminalInteractionId;
-                    _pendingCompanions.Remove(packet.EntityId);
-                    if (packet.EntityId == _selfId)
-                    {
-                        var stale = new List<ulong>();
-                        foreach (var pending in _pendingCompanions)
-                            if (pending.Value.State.InteractionId == state.LastTerminalInteractionId)
-                                stale.Add(pending.Key);
-                        foreach (var id in stale) _pendingCompanions.Remove(id);
-                    }
-                }
-
+                _pendingCompanions.Remove(packet.EntityId);
                 if (packet.EntityId == _selfId)
                 {
-                    _local.ReconcileWithServer(packet);
+                    if (!localReconciled)
+                        _local.ReconcileWithServer(packet);
                     if (state.InteractionId != 0 &&
                         _pendingCompanions.TryGetValue(state.InteractionPartnerId, out var companion))
                     {
@@ -127,14 +138,12 @@ namespace SlopArena.Shared.Rollback
                             companionState.InteractionPartnerId == _selfId &&
                             (!_latestPacketTick.TryGetValue(companion.EntityId, out uint newest) ||
                              newest <= companion.Tick) &&
-                            (!_terminalTick.TryGetValue(companion.EntityId, out uint endedAt) ||
-                             endedAt < companionState.InteractionTick))
+                            !_terminalInteractions.Contains(companionState.InteractionId))
                         {
                             _pendingCompanions.Remove(state.InteractionPartnerId);
                             _predicted.StopTracking(companion.EntityId);
                             companionState.EntityId = companion.EntityId;
                             _rawTrackLatest[companion.EntityId] = companionState;
-                            _latestPacketTick[companion.EntityId] = companion.Tick;
                         }
                     }
                     continue;
@@ -160,7 +169,8 @@ namespace SlopArena.Shared.Rollback
             }
             var expired = new List<ulong>();
             foreach (var pending in _pendingCompanions)
-                if (_localTick > pending.Value.Tick + CompanionWindow)
+                if (_localTick >= pending.Value.Tick &&
+                    _localTick - pending.Value.Tick > CompanionWindow)
                     expired.Add(pending.Key);
             foreach (var id in expired) _pendingCompanions.Remove(id);
         }

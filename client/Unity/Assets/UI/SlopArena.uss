@@ -52,7 +52,6 @@
 }
 
 .flow-title,
-.menu-title,
 .char-name,
 .direct-connect-title {
     -unity-font-definition: url("../Fonts/Baloo2.asset");
@@ -90,8 +89,7 @@
 .btn-primary,
 .btn-secondary,
 .btn-hot,
-.btn-back,
-.menu-action {
+.btn-back {
     border-radius: 0;
     border-width: 2px;
     border-color: rgb(13, 13, 20);
@@ -108,17 +106,6 @@
     transition-property: translate, background-color, border-color;
 }
 
-.menu-action:hover,
-.menu-action:focus {
-    border-color: rgb(240, 238, 232);
-    translate: 0 -2px;
-}
-
-.menu-action:disabled {
-    background-color: rgb(83, 77, 91);
-    border-color: rgb(83, 77, 91);
-    color: rgb(165, 158, 168);
-}
 
 .btn-primary {
     background-color: rgb(255, 200, 33);
@@ -133,8 +120,7 @@
 
 .btn-primary:active,
 .btn-secondary:active,
-.btn-hot:active,
-.menu-action:active {
+.btn-hot:active {
     translate: 0 3px;
 }
 
@@ -197,103 +183,6 @@
 
 
 
-.menu-title-wrap {
-    position: relative;
-    margin-top: 18px;
-    min-height: 312px;
-    flex-direction: column;
-    align-items: flex-start;
-    rotate: -2deg;
-}
-
-.menu-title-face {
-    position: relative;
-    flex-direction: column;
-    align-items: flex-start;
-}
-
-.menu-title {
-    color: rgb(240, 238, 232);
-    font-size: 148px;
-    letter-spacing: -4px;
-    height: 180px;
-    -unity-text-align: middle-left;
-    text-shadow: 7px 7px 0 rgb(224, 92, 42);
-}
-
-
-.menu-title--arena {
-    margin-top: -2px;
-    color: rgb(240, 238, 232);
-}
-
-.menu-title-rule {
-    width: 270px;
-    height: 10px;
-    margin-top: 12px;
-    border-width: 2px;
-    border-color: rgb(13, 13, 20);
-    background-color: rgb(255, 200, 33);
-}
-
-.menu-tagline {
-    margin-top: 14px;
-    color: rgb(255, 200, 33);
-    font-size: 20px;
-    letter-spacing: 1px;
-    -unity-font-style: bold;
-}
-
-.menu-copy {
-    max-width: 660px;
-    margin-top: 8px;
-    color: rgb(211, 204, 211);
-    font-size: 19px;
-    white-space: normal;
-}
-
-.menu-actions {
-    width: 100%;
-    margin-top: 20px;
-    flex-direction: column;
-    align-items: stretch;
-}
-
-.menu-action-item {
-    width: 100%;
-    min-height: 84px;
-    margin-top: 10px;
-    flex-direction: row;
-    align-items: center;
-}
-
-.menu-action {
-    width: 330px;
-    min-height: 80px;
-    flex-shrink: 0;
-    -unity-text-align: middle-left;
-    font-size: 20px;
-}
-
-.menu-action--primary {
-    background-color: rgb(255, 200, 33);
-}
-
-.menu-action--secondary {
-    background-color: rgb(240, 238, 232);
-}
-
-.menu-action--paper {
-    background-color: rgb(224, 92, 42);
-    color: rgb(23, 19, 27);
-}
-
-
-.menu-version {
-    color: rgb(183, 174, 184);
-    font-size: 14px;
-    letter-spacing: 1px;
-}
 
 
 .browser-layout {

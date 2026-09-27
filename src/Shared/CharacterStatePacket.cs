@@ -51,11 +51,13 @@ namespace SlopArena.Shared
             Cooldown6, Cooldown7, Cooldown8, Cooldown9, Cooldown10;
         /// <summary>Consecutive jump-held ticks (issue #116) — needed for byte-identical replay of a JumpSquat opponent.</summary>
         public byte JumpHeldTicks;
-        /// <summary>Persistent target lock state (ADR-0018, issue #127) — client lock indicator.</summary>
+        /// <summary>Persistent target lock state for the client lock indicator.</summary>
         public bool LockOn;
-        // ── D10: movement-resource fields (ADR-0011) — needed for PredictedTrack's
-        // rebuild-and-replay of Predictable ActionStates (Idle/Dashing/JumpSquat/AirDodging)
-        // to be byte-identical. None of these touch the ability-instance or hitbox layer.
+        /// <summary>Auto-lock suppression latch, replicated for rollback reconstruction.</summary>
+        public bool AutoLockSuppressed;
+        // Predictable ActionState fields carried for rollback. AirDodgeMovement uses
+        // DashDirX/Z as its captured forward direction; DashDurationTicks and
+        // DashCooldownTicks remain legacy wire fields and do not time or gate air dodge.
         public ushort AirTimeTicks;
         public ushort DashDurationTicks;
         public float DashDirX, DashDirZ;
@@ -79,8 +81,8 @@ namespace SlopArena.Shared
         public ushort BurstCooldownTicks;
         /// <summary>Reserved retired Burst wire field; never locks actions.</summary>
         public ushort BurstRecoveryTicks;
-        /// <summary>Ledge re-grab suppression (walk-off self-grab guard) — on-wire so the rollback
-        /// opponent track reproduces a walk-off exactly (off-wire it re-grabbed the ledge and wedged).</summary>
+        /// <summary>Reserved ledge re-grab timer field; kept in the versioned state packet
+        /// while automatic ledge grabs are disabled.</summary>
         public ushort LedgeRegrabLockTicks;
         /// <summary>Remaining landing-lag lock ticks. Authoritative so local and remote presentation/rollback tracks agree.</summary>
         public ushort LandingLagTicks;
@@ -95,8 +97,10 @@ namespace SlopArena.Shared
         public uint InteractionTerminalTick;
         public short CapturedYaw;
         public ushort AirDodgeRecoveryTicks;
-        /// <summary>156 bytes: fixed state fields, defense contract, movement flags, and protocol version.</summary>
-        public const int Size = 156;
+        /// <summary>Sticky target ID, required to replay lock acquisition deterministically.</summary>
+        public ulong TargetEntityId;
+        /// <summary>164 bytes: fixed state fields, target lock state and protocol version.</summary>
+        public const int Size = 164;
 
         /// <summary>Convert from CharacterState to serializable packet.</summary>
         public static CharacterStatePacket FromState(CharacterState s, uint tick = 0)
@@ -136,6 +140,7 @@ namespace SlopArena.Shared
                 Cooldown10 = s.Cooldown10,
                 JumpHeldTicks = s.JumpHeldTicks,
                 LockOn = s.LockOn,
+                AutoLockSuppressed = s.AutoLockSuppressed,
                 AirTimeTicks = s.AirTimeTicks,
                 DashDurationTicks = s.DashDurationTicks,
                 DashDirX = s.DashDirX,
@@ -170,6 +175,7 @@ namespace SlopArena.Shared
                 InteractionTerminalTick = s.InteractionTerminalTick,
                 CapturedYaw = s.CapturedYaw,
                 AirDodgeRecoveryTicks = s.AirDodgeRecoveryTicks,
+                TargetEntityId = s.TargetEntityId,
             };
         }
  
@@ -209,6 +215,7 @@ namespace SlopArena.Shared
                 Cooldown10 = Cooldown10,
                 JumpHeldTicks = JumpHeldTicks,
                 LockOn = LockOn,
+                AutoLockSuppressed = AutoLockSuppressed,
                 AirTimeTicks = AirTimeTicks,
                 DashDurationTicks = DashDurationTicks,
                 DashDirX = DashDirX,
@@ -243,6 +250,7 @@ namespace SlopArena.Shared
                 InteractionTerminalTick = InteractionTerminalTick,
                 CapturedYaw = CapturedYaw,
                 AirDodgeRecoveryTicks = AirDodgeRecoveryTicks,
+                TargetEntityId = TargetEntityId,
             };
         }
 
@@ -308,8 +316,8 @@ namespace SlopArena.Shared
             if (CrouchSettled) movementFlags |= 0x08;
             if (QueuedCrouchBrace) movementFlags |= 0x10;
             if (InPostHitstunFlight) movementFlags |= 0x20;
+            if (AutoLockSuppressed) movementFlags |= 0x40;
             buffer[112] = movementFlags;
-            BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(113, 2), ShieldDropTicks);
             BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(115, 2), BlockStunTicks);
             buffer[117] = BlockHitstopKind;
             buffer[118] = InteractionPhase;
@@ -320,15 +328,16 @@ namespace SlopArena.Shared
             BinaryPrimitives.WriteUInt32LittleEndian(buffer.Slice(147, 4), InteractionTerminalTick);
             BinaryPrimitives.WriteInt16LittleEndian(buffer.Slice(151, 2), CapturedYaw);
             BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(153, 2), AirDodgeRecoveryTicks);
-            buffer[155] = SimulationProtocol.Version;
+            BinaryPrimitives.WriteUInt64LittleEndian(buffer.Slice(155, 8), TargetEntityId);
+            buffer[163] = SimulationProtocol.Version;
         }
 
         public static CharacterStatePacket Deserialize(ReadOnlySpan<byte> buffer)
         {
             if (buffer.Length != Size)
                 throw new ArgumentException($"State payload must be exactly {Size} bytes.", nameof(buffer));
-            if (buffer[155] != SimulationProtocol.Version)
-                throw new InvalidDataException($"Unsupported state protocol version {buffer[155]}.");
+            if (buffer[163] != SimulationProtocol.Version)
+                throw new InvalidDataException($"Unsupported state protocol version {buffer[163]}.");
             var packet = new CharacterStatePacket();
             packet.TickNumber = BinaryPrimitives.ReadUInt32LittleEndian(buffer.Slice(0, 4));
             packet.PositionX = BitConverter.Int32BitsToSingle(BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(4, 4)));
@@ -387,6 +396,7 @@ namespace SlopArena.Shared
             packet.CrouchSettled = (movementFlags & 0x08) != 0;
             packet.QueuedCrouchBrace = (movementFlags & 0x10) != 0;
             packet.InPostHitstunFlight = (movementFlags & 0x20) != 0;
+            packet.AutoLockSuppressed = (movementFlags & 0x40) != 0;
             packet.ShieldDropTicks = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(113, 2));
             packet.BlockStunTicks = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(115, 2));
             packet.BlockHitstopKind = buffer[117];
@@ -398,6 +408,7 @@ namespace SlopArena.Shared
             packet.InteractionTerminalTick = BinaryPrimitives.ReadUInt32LittleEndian(buffer.Slice(147, 4));
             packet.CapturedYaw = BinaryPrimitives.ReadInt16LittleEndian(buffer.Slice(151, 2));
             packet.AirDodgeRecoveryTicks = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(153, 2));
+            packet.TargetEntityId = BinaryPrimitives.ReadUInt64LittleEndian(buffer.Slice(155, 8));
             return packet;
         }
 
@@ -432,7 +443,7 @@ namespace SlopArena.Shared
             s.Cooldown9 = Cooldown9; s.Cooldown10 = Cooldown10;
             s.JumpHeldTicks = JumpHeldTicks;
             s.LockOn = LockOn;
-            s.AirTimeTicks = AirTimeTicks;
+            s.AutoLockSuppressed = AutoLockSuppressed;
             s.DashDurationTicks = DashDurationTicks;
             s.DashDirX = DashDirX; s.DashDirZ = DashDirZ;
             s.DashCooldownTicks = DashCooldownTicks;
@@ -464,6 +475,7 @@ namespace SlopArena.Shared
             s.InteractionTerminalTick = InteractionTerminalTick;
             s.CapturedYaw = CapturedYaw;
             s.AirDodgeRecoveryTicks = AirDodgeRecoveryTicks;
+            s.TargetEntityId = TargetEntityId;
         }
     }
 }

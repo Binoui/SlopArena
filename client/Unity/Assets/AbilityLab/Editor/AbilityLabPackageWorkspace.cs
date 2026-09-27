@@ -374,6 +374,11 @@ public sealed class AbilityLabPackageWorkspace
         => !HasPackage
             ? Fail("workspace.missing", "workspace", "No package is open.")
             : ApplyEdit(CharacterPackageSourceCodec.ReplaceMovement(new CharacterPackageSource(Manifest, Draft), value));
+    public bool ReplaceCaptureGeometry(CharacterCaptureGeometrySource value)
+        => !HasPackage
+            ? Fail("workspace.missing", "workspace", "No package is open.")
+            : ApplyEdit(CharacterPackageSourceCodec.ReplaceCaptureGeometry(
+                new CharacterPackageSource(Manifest, Draft), value));
 
     public bool ReplacePresentation(CharacterPresentationSource value)
         => !HasPackage

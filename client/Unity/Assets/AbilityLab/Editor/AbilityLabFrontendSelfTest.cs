@@ -45,13 +45,13 @@ public static class AbilityLabFrontendSelfTest
                 moveSelector == null || moveList == null || groundAirSelector == null || diagnosticsPanel == null ||
                 !ReferenceEquals(groundAirSelector.parent, moveSelector) ||
                 !ReferenceEquals(moveList.parent, moveSelector) ||
-                moveList.childCount != 8 ||
+                moveList.childCount != 9 ||
                 diagnosticsPanel.Query<Label>().ToList().Any(label => label.text == "No diagnostics.") ||
                 (diagnosticsPanel.childCount == 0 && diagnosticsPanel.style.display != DisplayStyle.None) ||
                 !packageSelector.choices.Any(choice => choice.Contains("FightGuy", StringComparison.Ordinal)) ||
                 !packageSelector.value.Contains("FightGuy", StringComparison.Ordinal) ||
                 !moveList.Query<Button>().ToList().Select(button => button.text)
-                    .SequenceEqual(new[] { "1", "2", "3", "4", "Q", "E", "R", "F" }) ||
+                    .SequenceEqual(new[] { "1", "2", "3", "4", "Q", "E", "R", "F", "Grab" }) ||
                 rowLabels.Count == 0 ||
                 !rowLabels.Any(label => label == "Hitbox" || label == "Projectile" || label == "Presentation" ||
                     label == "Capability" || label == "Velocity" || label == "Aim" || label == "Complete") ||
@@ -307,6 +307,32 @@ public static class AbilityLabFrontendSelfTest
             Refresh(window);
             if (!windowWorkspace.OpenPackage("Assets/CharacterPackages/fightguy"))
                 throw new InvalidOperationException("FightGuy package could not be restored after Manki presentation tests.");
+            Refresh(window);
+            var grabButton = root.Q<Button>("selected-grab");
+            if (grabButton == null)
+                throw new InvalidOperationException("Ground move selector does not offer Grab.");
+            float originalReach = windowWorkspace.Draft.CaptureGeometry.Reach;
+            InvokeButton(grabButton);
+            var grabReach = root.Q<VisualElement>("inspector").Query<FloatField>().ToList()
+                .FirstOrDefault(field => field.label == "Reach");
+            if (grabReach == null || lab.ShowHitboxes ||
+                root.Q<VisualElement>("move-timeline").style.display != DisplayStyle.None)
+                throw new InvalidOperationException("Grab did not open its numeric geometry inspector without move hitboxes.");
+            float editedReach = originalReach + 0.05f;
+            grabReach.value = editedReach;
+            if (Mathf.Abs(windowWorkspace.Draft.CaptureGeometry.Reach - editedReach) > 0.0001f ||
+                windowWorkspace.LiveDraftPackage == null ||
+                Mathf.Abs(windowWorkspace.LiveDraftPackage.Definition.CaptureGeometry.Reach - editedReach) > 0.0001f)
+                throw new InvalidOperationException("Grab reach edit did not update the authoritative draft preview.");
+            windowWorkspace.Undo();
+            Refresh(window);
+            if (Mathf.Abs(windowWorkspace.Draft.CaptureGeometry.Reach - originalReach) > 0.0001f)
+                throw new InvalidOperationException("Grab edit did not participate in workspace undo.");
+            InvokeButton(root.Q<Button>("selected-ground-1"));
+            if (!lab.ShowHitboxes ||
+                root.Q<VisualElement>("move-timeline").style.display == DisplayStyle.None)
+                throw new InvalidOperationException("Returning to a move did not restore its hitboxes and timeline.");
+
             Refresh(window);
 
             if (!sourceWorkspace.OpenPackage("Assets/CharacterPackages/fightguy") ||

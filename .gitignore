@@ -209,6 +209,12 @@ client/Unity/Assets/Plugins/**/NuGet/.nuget-installed.json
 !client/Unity/Assets/CharacterPackages/kistu/Animations/kistu_crouch.anim
 *.png
 !client/Unity/Assets/UI/MenuGear.png
+!client/Unity/Assets/UI/HUDNormalDiamond.png
+!client/Unity/Assets/UI/HUDSpecialDiamond.png
+!client/Unity/Assets/UI/HUDSlotBase.png
+# Local Kenney prompt sheets, atlas maps, and Unity-generated metadata.
+client/Unity/Assets/Resources/InputPrompts/
+client/Unity/Assets/Resources/InputPrompts.meta
 *.tga
 *.jpg
 *.jpeg

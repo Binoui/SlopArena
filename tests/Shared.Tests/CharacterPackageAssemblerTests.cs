@@ -32,6 +32,40 @@ public sealed class CharacterPackageAssemblerTests
     }
 
     [Fact]
+    public void CookedLoader_RoundTripsShieldRadiusThroughVerifiedPackage()
+    {
+        var assembled = AssembleFixture();
+        var requirement = new MatchContentPackageRequirement(
+            "fightguy", "0.0.0-dev", assembled.CookedContentHash, assembled.PackageHash);
+        var loaded = CookedCharacterPackageLoader.LoadFiles(Files(assembled), requirement);
+
+        Assert.True(loaded.IsValid, string.Join("\n", loaded.Diagnostics.Select(x => x.Message)));
+        Assert.Equal(1.05f, loaded.Package!.Definition.ShieldRadius);
+        Assert.Equal(1.05f, loaded.ToCharacterDefinition(CharacterClass.FightGuy).ShieldRadius);
+    }
+    [Fact]
+    public void CookedLoader_RejectsPreviousSchemaVersion()
+    {
+        var current = Compile();
+        var oldMetadata = current.Metadata with { CookedSchemaVersion = 2 };
+        byte[] oldRuntime = Encoding.UTF8.GetBytes(
+            Encoding.UTF8.GetString(current.CanonicalBytes)
+                .Replace("\"cookedSchemaVersion\":3", "\"cookedSchemaVersion\":2", StringComparison.Ordinal));
+        var oldPackage = new CookedCharacterPackage(
+            oldMetadata, current.Definition, current.Budget, current.Diagnostics, oldRuntime);
+        var assembled = CharacterPackageAssembler.Assemble(BuildInput(
+            oldPackage, Array.Empty<PackageDependencySource>(),
+            Array.Empty<CookedCapabilityRequirement>(), Array.Empty<CharacterDiagnostic>()));
+        Assert.True(assembled.IsValid, string.Join("\n", assembled.Diagnostics.Select(x => x.Message)));
+
+        var requirement = new MatchContentPackageRequirement(
+            "fightguy", "0.0.0-dev", assembled.CookedContentHash, assembled.PackageHash);
+        var loaded = CookedCharacterPackageLoader.LoadFiles(Files(assembled), requirement);
+        Assert.False(loaded.IsValid);
+        Assert.Contains(loaded.Diagnostics, x => x.Code == "package.compatibility.unsupported");
+        Assert.Null(loaded.Package);
+    }
+    [Fact]
     public void Verify_RejectsMissingExtraAndTamperedPayloads()
     {
         var result = AssembleFixture();
@@ -273,7 +307,7 @@ public sealed class CharacterPackageAssemblerTests
             WriteString(poses, name); WriteUInt32(poses, 1); WriteUInt32(poses, 0); WriteUInt32(poses, 0); WriteUInt32(poses, 0);
         }
         return new CharacterPackageAssemblyInput(
-            package.Metadata.PackageId, package.Metadata.Version, "Binoui", "MIT", "SlopArena", 1,
+            package.Metadata.PackageId, package.Metadata.Version, "Binoui", "MIT", "SlopArena", 3,
             package.Metadata.CookedSchemaVersion, package.Metadata.RuntimeApiMin, package.Metadata.RuntimeApiMax, sourceHash,
             dependencies, capabilities, "test-cooker", "test-unity", 1, "SKEL", 1, 60, warnings,
             package.CanonicalBytes, poses.ToArray(), Encoding.UTF8.GetBytes(binding.ToString()), package);

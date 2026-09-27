@@ -3,11 +3,11 @@ namespace SlopArena.Shared
     public enum ActionState : byte
     {
         Idle = 0,
-        Dashing = 1,
+        // Wire code 1 is reserved for the retired universal dash.
         Hitstun = 2,
         Sliding = 3,
         Attacking = 4,
-        AirDodging = 5,
+        // Wire code 5 is reserved.
         JumpSquat = 6,
         Warping = 7,
         /// <summary>Hold-to-aim phase (Kistu E): ability active, movement unlocked, jump/dash blocked.</summary>
@@ -21,7 +21,7 @@ namespace SlopArena.Shared
         GrabAttempt = 14,
         Grabbed = 15,
         Throwing = 16,
-        AirDodgeStartup = 17,
+        // Wire code 17 is reserved to preserve the phase wire codes.
         AirDodgeMovement = 18,
         AirDodgeRecovery = 19
     }

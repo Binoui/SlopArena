@@ -80,8 +80,7 @@ namespace SlopArena.Client.World
             public CharacterDefinition Def;
             public BotMemory Memory = new();
             public System.Random Rng;
-            public float SpawnX;
-            public float SpawnZ;
+            public SpawnPoint Spawn;
             public byte LastDeaths;
         }
         private ushort _soloCountdownTicks;
@@ -147,8 +146,7 @@ namespace SlopArena.Client.World
                 Rng = new System.Random(),
                 Memory = new BotMemory(),
                 Def = _npcEntry.Definition,
-                SpawnX = _npcs.Count * 2f,
-                SpawnZ = 0f,
+                Spawn = NextNpcSpawn(),
             };
             slot.Memory.Difficulty = CurrentNpcDifficulty;
             if (!SpawnNpcSlot(slot))
@@ -191,6 +189,11 @@ namespace SlopArena.Client.World
                 return;
             }
             Debug.Log($"[TrainingMatch] Loaded arena: {arenaPath} — {arena.CollisionTriangles?.Length ?? 0} tris, heightmap={arena.Heightmap.Width}x{arena.Heightmap.Height}");
+            if (arena.SpawnPoints == null || arena.SpawnPoints.Length < 2)
+            {
+                Debug.LogError($"[TrainingMatch] Arena '{arenaName}' needs at least two authored spawn points for local play.");
+                return;
+            }
             SpawnStageVisual(arena);
 
             // Wire sim debug logging to Unity console
@@ -233,7 +236,7 @@ namespace SlopArena.Client.World
                 return;
 
             // Player spawn
-            var pSpawn = arena.SpawnPoints.Length > 0 ? arena.SpawnPoints[0] : new SpawnPoint();
+            var pSpawn = arena.SpawnPoints[0];
             _bridge.RegisterEntity(PlayerEntityId, playerDef, new CharacterState
             {
                 PX = pSpawn.X, PY = pSpawn.Y, PZ = pSpawn.Z,
@@ -242,14 +245,14 @@ namespace SlopArena.Client.World
             }, playerEntry.BakedAnimation);
             _playerRenderer.transform.position = new Vector3(pSpawn.X, pSpawn.Y, pSpawn.Z);
 
-            // First NPC keeps entity id 100 at the fixed spawn (capture harness + Solo).
+            // Keep the scene-placed first NPC renderer (capture harness + Solo);
+            // its position and facing come from the selected stage's second spawn.
             var first = new NpcSlot
             {
                 Id = NpcEntityId,
-                Renderer = _npcRenderer, // scene-placed dummy when present
+                Renderer = _npcRenderer,
                 Def = npcDef,
-                SpawnX = 0f,
-                SpawnZ = 0f,
+                Spawn = NextNpcSpawn(),
                 Rng = new System.Random(),
             };
             first.Memory.Difficulty = BotDifficultyProfile.Normalize(
@@ -297,20 +300,24 @@ namespace SlopArena.Client.World
             return list;
         }
 
+        private SpawnPoint NextNpcSpawn()
+            => _arenaDef.SpawnPoints[1 + _npcs.Count % (_arenaDef.SpawnPoints.Length - 1)];
+
         private bool SpawnNpcSlot(NpcSlot slot)
         {
             if (slot.Renderer == null)
                 slot.Renderer = new GameObject($"Npc{slot.Id}").AddComponent<PlayerRenderer>();
             if (!SetupRenderer(slot.Renderer, _npcEntry, _arenaDef, slot.Id, false))
                 return false;
-            slot.Renderer.transform.position = new Vector3(slot.SpawnX, 5f, slot.SpawnZ);
+            var spawn = slot.Spawn;
+            slot.Renderer.transform.position = new Vector3(spawn.X, spawn.Y, spawn.Z);
             _bridge.RegisterEntity(slot.Id, slot.Def, new CharacterState
             {
-                PX = slot.SpawnX, PY = 5f, PZ = slot.SpawnZ,
-                FacingYaw = Mathf.PI,
+                PX = spawn.X, PY = spawn.Y, PZ = spawn.Z,
+                FacingYaw = spawn.Yaw,
                 JumpsLeft = slot.Def.Movement.MaxJumps,
             }, _npcEntry.BakedAnimation);
-            _bridge.SetRespawnPosition(slot.Id, slot.SpawnX, 5f, slot.SpawnZ, Mathf.PI);
+            _bridge.SetRespawnPosition(slot.Id, spawn.X, spawn.Y, spawn.Z, spawn.Yaw);
             return true;
         }
 

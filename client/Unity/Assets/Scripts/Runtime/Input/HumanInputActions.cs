@@ -19,6 +19,9 @@ namespace SlopArena.Client.Input
         private static float _defaultDeadzone = -1f;
         private static bool _capturing;
 
+        public static int BindingRevision { get; private set; }
+        public static bool LastUsedGamepad { get; private set; }
+
         [Serializable]
         private sealed class BindingOverridesJson { public BindingOverrideJson[] bindings; }
         [Serializable]
@@ -40,7 +43,7 @@ namespace SlopArena.Client.Input
         {
             "MoveUp", "MoveDown", "MoveLeft", "MoveRight", "MoveStick", "Jump", "Down",
             "Shield", "Grab", "Slot1", "Slot2", "Slot3", "Slot4", "SlotA", "SlotE", "SlotR", "SlotF",
-            "SpecialModifier", "FaceToCamera", "ToggleLock", "Pause"
+            "SpecialModifier", "FaceToCamera", "ToggleLock", "Retarget", "Pause"
         };
 
         public static void Initialize(string overridesJson)
@@ -67,6 +70,7 @@ namespace SlopArena.Client.Input
                 catch (Exception ex) { Debug.LogWarning($"[Input] Ignoring invalid binding overrides: {ex.Message}"); }
             }
             if (wasEnabled) _map.Enable();
+            BindingRevision++;
         }
 
         public static void ResetOverrides()
@@ -76,6 +80,7 @@ namespace SlopArena.Client.Input
             _map.Disable();
             _asset!.RemoveAllBindingOverrides();
             if (wasEnabled) _map.Enable();
+            BindingRevision++;
         }
 
         public static int BindingIndex(string actionName, string group)
@@ -120,7 +125,11 @@ namespace SlopArena.Client.Input
                         action.ApplyBindingOverride(bindingIndex, new InputBinding { overridePath = priorOverride });
                         completed(null, $"Already bound to {conflict}; choose another control.");
                     }
-                    else completed(path, null);
+                    else
+                    {
+                        BindingRevision++;
+                        completed(path, null);
+                    }
                     FinishCapture(op);
                 })
                 .OnCancel(op => { completed(null, null); FinishCapture(op); });
@@ -178,10 +187,23 @@ namespace SlopArena.Client.Input
         private static void EnsureCreated()
         {
             if (_asset != null) return;
+            Actions.Clear();
             _defaultDeadzone = Mathf.Clamp(InputSystem.settings.defaultDeadzoneMin, 0.05f, 0.5f);
             _asset = ScriptableObject.CreateInstance<InputActionAsset>();
             _map = new InputActionMap("Gameplay");
             _asset.AddActionMap(_map);
+            _map.actionTriggered += context =>
+            {
+                if (!context.performed || context.action.name is "MouseLook" or "Zoom") return;
+                if (context.control.device is Gamepad)
+                {
+                    if (context.action.name is "MoveStick" or "StickLook" &&
+                        context.ReadValue<Vector2>().sqrMagnitude < 0.09f) return;
+                    LastUsedGamepad = true;
+                }
+                else if (context.control.device is Keyboard or Mouse)
+                    LastUsedGamepad = false;
+            };
             AddButton("MoveUp", "<Keyboard>/w");
             AddButton("MoveDown", "<Keyboard>/s");
             AddButton("MoveLeft", "<Keyboard>/a");
@@ -205,6 +227,7 @@ namespace SlopArena.Client.Input
             Actions.Add("SpecialModifier", modifier);
             AddButton("FaceToCamera", "<Mouse>/leftButton", "<Gamepad>/leftStickPress");
             AddButton("ToggleLock", "<Mouse>/rightButton", "<Gamepad>/rightStickPress");
+            AddButton("Retarget", "<Keyboard>/tab", "<Gamepad>/dpad/right");
             AddButton("Pause", "<Keyboard>/escape", "<Gamepad>/start");
             AddValue("MoveStick", "<Gamepad>/leftStick", "Vector2");
             AddValue("MouseLook", "<Mouse>/delta", "Vector2");

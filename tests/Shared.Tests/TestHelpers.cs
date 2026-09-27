@@ -89,7 +89,7 @@ public static class TestHelpers
     /// <summary>
     /// Create a minimal input state, defaulting all fields to 0/false.
     /// </summary>
-    public static InputState Input(byte activeSlot = 0, bool jump = false, bool dash = false,
+    public static InputState Input(byte activeSlot = 0, bool jump = false,
         float moveX = 0f, float moveY = 0f, bool aiming = false, ushort aimDistance = 0,
         bool jumpHeld = false, bool down = false)
     {
@@ -98,7 +98,6 @@ public static class TestHelpers
             ActiveSlot = activeSlot,
             Jump = jump,
             JumpHeld = jumpHeld,
-            Dash = dash,
             Down = down,
             MoveX = moveX,
             MoveY = moveY,
@@ -221,6 +220,7 @@ public static class TestHelpers
                 DisplayName = src.DisplayName,
                 CapsuleRadius = src.CapsuleRadius,
                 CapsuleHeight = src.CapsuleHeight,
+                ShieldRadius = src.ShieldRadius,
                 HurtboxRadius = src.HurtboxRadius,
                 Movement = src.Movement,
                 LMB = src.LMB,
@@ -356,6 +356,7 @@ public static class TestHelpers
             DisplayName = src.DisplayName,
             CapsuleRadius = src.CapsuleRadius,
             CapsuleHeight = src.CapsuleHeight,
+            ShieldRadius = src.ShieldRadius,
             HurtboxRadius = src.HurtboxRadius,
             HipHeight = src.HipHeight,
             Movement = mov,

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using SlopArena.Client.Input;
+using SlopArena.Shared;
 using UnityEngine;
 using UnityEngine.UIElements;
 
@@ -12,8 +13,7 @@ namespace SlopArena.Client.UI
         private const string Audio = "AUDIO";
         private const string Controls = "CONTROLS";
         private const string Gameplay = "GAMEPLAY";
-        private static readonly Color OptionText = new(0.94f, 0.95f, 0.98f, 1f);
-        private static readonly Color BindingText = new(0.76f, 0.80f, 0.88f, 1f);
+        private static VisualTreeAsset? _layout;
         private static int _closedFrame = -1;
         private VisualElement? _surface;
         private VisualElement? _host;
@@ -54,6 +54,13 @@ namespace SlopArena.Client.UI
         public void Open(VisualElement host, Action? onClose = null)
         {
             if (_open) return;
+            _layout ??= Resources.Load<VisualTreeAsset>("UI/SettingsOverlay");
+            if (_layout == null)
+            {
+                Debug.LogError("[Settings] Missing UI/SettingsOverlay layout.");
+                return;
+            }
+
             Active = this;
             _host = host;
             _originalPickingMode = host.pickingMode;
@@ -63,47 +70,26 @@ namespace SlopArena.Client.UI
             _restoreFocus = host.panel?.focusController.focusedElement as VisualElement;
             FindFirstObjectByType<InputController>()?.RequireReleaseBeforeHumanInput();
 
-            _surface = new VisualElement { name = "settings-overlay" };
+            _surface = _layout.CloneTree();
+            var packSkin = Resources.Load<StyleSheet>("UI/LocalPack/PackSkin");
+            if (packSkin != null) _surface.styleSheets.Add(packSkin);
             _surface.style.position = Position.Absolute;
-            _surface.style.left = 0; _surface.style.right = 0; _surface.style.top = 0; _surface.style.bottom = 0;
-            _surface.style.alignItems = Align.Center; _surface.style.justifyContent = Justify.Center;
-            _surface.style.backgroundColor = new Color(0f, 0f, 0f, 0.78f);
-            var panel = new VisualElement();
-            panel.style.width = 760; panel.style.maxHeight = Length.Percent(92);
-            panel.style.paddingLeft = 24; panel.style.paddingRight = 24; panel.style.paddingTop = 20; panel.style.paddingBottom = 20;
-            panel.style.backgroundColor = new Color(0.09f, 0.09f, 0.11f, 1f);
-            var title = new Label("SETTINGS"); title.style.fontSize = 28; title.style.unityFontStyleAndWeight = FontStyle.Bold; title.style.color = Color.white;
-            panel.Add(title);
-
-            var categories = new VisualElement();
-            categories.style.flexDirection = FlexDirection.Row;
-            categories.style.marginTop = 12; categories.style.marginBottom = 12;
+            _surface.style.left = 0; _surface.style.right = 0;
+            _surface.style.top = 0; _surface.style.bottom = 0;
+            _body = _surface.Q<VisualElement>("settings-body");
+            _status = _surface.Q<Label>("settings-status");
             foreach (var name in new[] { Audio, Controls, "VIDEO", Gameplay, "ACCESSIBILITY" })
             {
-                var category = new Button(() => SelectCategory(name)) { text = name };
-                category.SetEnabled(true);
-                StyleButton(category);
-                category.style.marginRight = 5;
-                categories.Add(category);
+                var tab = _surface.Q<Button>($"settings-tab-{name.ToLowerInvariant()}");
+                tab.clicked += () => SelectCategory(name);
             }
-            panel.Add(categories);
-            var scroll = new ScrollView { name = "settings-scroll" };
-            scroll.style.flexGrow = 1;
-            _body = new VisualElement();
-            scroll.Add(_body);
-            panel.Add(scroll);
-            _status = new Label(); _status.style.color = new Color(1f, 0.75f, 0.35f); _status.style.marginTop = 6;
-            panel.Add(_status);
-            var reset = new Button(AskReset) { text = "RESET ALL SETTINGS" };
-            StyleButton(reset);
-            reset.style.height = 38; reset.style.marginTop = 8;
-            panel.Add(reset);
-            var back = new Button(HandleBack) { text = "BACK" }; back.style.height = 42; back.style.marginTop = 10;
-            StyleButton(back);
-            panel.Add(back);
+            var reset = _surface.Q<Button>("settings-reset");
+            reset.clicked += AskReset;
+            var back = _surface.Q<Button>("settings-back");
+            back.clicked += HandleBack;
             _surface.RegisterCallback<ClickEvent>(_ => UISFX.PlayClick());
             _surface.RegisterCallback<NavigationCancelEvent>(OnNavigationCancel);
-            _surface.Add(panel); host.Add(_surface);
+            host.Add(_surface);
             UiModalState.Push();
             SelectCategory(_category);
             back.Focus();
@@ -126,18 +112,31 @@ namespace SlopArena.Client.UI
             else if (category == "ACCESSIBILITY") BuildAccessibility(_body);
             else BuildGameplay(_body);
             ApplyReadableContrast(_body);
+            _surface?.Query<Button>().ForEach(tab =>
+            {
+                if (tab.name == null || !tab.name.StartsWith("settings-tab-", StringComparison.Ordinal)) return;
+                tab.EnableInClassList("sa-settings-tab--selected",
+                    tab.name == $"settings-tab-{category.ToLowerInvariant()}");
+            });
         }
 
         private static void BuildAudio(VisualElement root)
         {
             var settings = ClientSettingsService.Instance;
-            AddSlider(root, "Master Volume", settings.Master, 0f, 100f, settings.SetMaster);
-            AddSlider(root, "Music Volume", settings.Music, 0f, 100f, settings.SetMusic);
-            AddSlider(root, "SFX Volume", settings.Sfx, 0f, 100f, settings.SetSfx);
-            AddSlider(root, "UI Volume", settings.Ui, 0f, 100f, settings.SetUi);
+            var columns = new VisualElement();
+            columns.AddToClassList("sa-settings-columns");
+            var left = new VisualElement();
+            left.AddToClassList("sa-settings-column");
+            left.AddToClassList("sa-settings-column--first");
+            var right = new VisualElement();
+            right.AddToClassList("sa-settings-column");
+            AddSlider(left, "Master Volume", settings.Master, 0f, 100f, settings.SetMaster);
+            AddSlider(left, "Music Volume", settings.Music, 0f, 100f, settings.SetMusic);
+            AddSlider(right, "SFX Volume", settings.Sfx, 0f, 100f, settings.SetSfx);
+            AddSlider(right, "UI Volume", settings.Ui, 0f, 100f, settings.SetUi);
+            columns.Add(left); columns.Add(right); root.Add(columns);
             var mute = new Toggle("Mute When Unfocused") { value = settings.MuteWhenUnfocused };
-            var muteLabel = mute.Q<Label>();
-            if (muteLabel != null) muteLabel.style.color = OptionText;
+            mute.AddToClassList("sa-settings-toggle");
             mute.RegisterValueChangedCallback(evt => settings.SetMuteWhenUnfocused(evt.newValue));
             root.Add(mute);
         }
@@ -148,8 +147,7 @@ namespace SlopArena.Client.UI
             _device = new DropdownField("Device",
                 new System.Collections.Generic.List<string> { "Keyboard", "Mouse", "Controller" },
                 _deviceName == "Mouse" ? 1 : _deviceName == "Controller" ? 2 : 0);
-            var deviceLabel = _device.Q<Label>();
-            if (deviceLabel != null) deviceLabel.style.color = OptionText;
+            _device.AddToClassList("sa-settings-field");
             _device.RegisterValueChangedCallback(evt => { _deviceName = evt.newValue; SelectCategory(Controls); });
             root.Add(_device);
             if (_deviceName == "Controller")
@@ -157,10 +155,12 @@ namespace SlopArena.Client.UI
                 foreach (var action in new[]
                          {
                              "MoveStick", "Slot1", "Slot2", "Slot3", "Slot4", "SpecialModifier",
-                             "Jump", "Down", "Shield", "FaceToCamera", "ToggleLock", "Pause"
+                             "Jump", "Down", "Shield", "FaceToCamera", "ToggleLock", "Retarget", "Pause"
                          })
                     AddBindingRow(root, action, ActionLabel(action, controller: true));
-                root.Add(new Label("Specials: hold Special Modifier + Normal button. Grab: hold Special Modifier + RT."));
+                var help = new Label("Specials: hold Special Modifier + Normal button. Grab: hold Special Modifier + RT.");
+                help.AddToClassList("sa-settings-note");
+                root.Add(help);
             }
             else
             {
@@ -169,8 +169,7 @@ namespace SlopArena.Client.UI
             }
             AddSlider(root, "Stick Deadzone", settings.StickDeadzone, 5f, 50f, settings.SetStickDeadzone);
             var vibration = new Toggle("Vibration") { value = settings.Vibration };
-            var vibrationLabel = vibration.Q<Label>();
-            if (vibrationLabel != null) vibrationLabel.style.color = OptionText;
+            vibration.AddToClassList("sa-settings-toggle");
             vibration.RegisterValueChangedCallback(evt => settings.SetVibration(evt.newValue));
             root.Add(vibration);
             var reset = new Button(() =>
@@ -187,11 +186,15 @@ namespace SlopArena.Client.UI
             var group = SelectedGroup;
             int index = HumanInputActions.BindingIndex(action, group);
             var row = new VisualElement();
-            row.style.flexDirection = FlexDirection.Row; row.style.alignItems = Align.Center; row.style.marginBottom = 4;
-            var name = new Label(label); name.style.flexGrow = 1; name.style.color = OptionText; row.Add(name);
+            row.AddToClassList("sa-settings-binding-row");
+            var name = new Label(label);
+            name.AddToClassList("sa-settings-row-label");
+            row.Add(name);
             var current = new Label(HumanInputActions.BindingLabel(action, group));
-            current.style.width = 110; current.style.color = BindingText; row.Add(current);
+            current.AddToClassList("sa-settings-binding-current");
+            row.Add(current);
             var bind = new Button(() => BeginCapture(action, label)) { text = "REMAP" };
+            bind.AddToClassList("sa-settings-action");
             bind.SetEnabled(index >= 0);
             row.Add(bind);
             root.Add(row);
@@ -228,7 +231,7 @@ namespace SlopArena.Client.UI
             "MoveUp" => "Move Forward", "MoveDown" => "Move Back", "MoveLeft" => "Move Left", "MoveRight" => "Move Right",
             "MoveStick" => "Analog Move Stick",
             "Down" => "Down (Crouch / Slide / Fast Fall)", "FaceToCamera" => "Face to Camera",
-            "ToggleLock" => "Target Lock", "Pause" => "Pause",
+            "ToggleLock" => "Target Lock", "Retarget" => "Retarget Target", "Pause" => "Pause",
             "Slot1" => controller ? "Normal 1" : "Action 1",
             "Slot2" => controller ? "Normal 2" : "Action 2",
             "Slot3" => controller ? "Normal 3" : "Action 3",
@@ -255,17 +258,32 @@ namespace SlopArena.Client.UI
             stats.RegisterValueChangedCallback(evt => settings.SetNetworkStats(statsChoices.IndexOf(evt.newValue)));
             root.Add(stats);
             var network = new Label("Network stats appear in the match HUD. Ping requires a live gameplay-server connection.");
-            network.style.color = BindingText;
+            network.AddToClassList("sa-settings-note");
             root.Add(network);
             AddSlider(root, "Screen Shake", settings.ScreenShake * 100f, 0f, 100f, settings.SetScreenShake);
+            var lockChoices = new List<string> { "Never", "Always", "On Hit" };
+            var lockModes = new[] { TargetLockMode.Never, TargetLockMode.Always, TargetLockMode.OnHit };
+            var lockMode = new DropdownField("Auto Target Lock", lockChoices,
+                Array.IndexOf(lockModes, settings.AutoLockMode));
+            lockMode.RegisterValueChangedCallback(evt =>
+                settings.SetAutoLockMode(lockModes[lockChoices.IndexOf(evt.newValue)]));
+            root.Add(lockMode);
         }
         private static void AddSlider(VisualElement root, string label, float value, float min, float max, Action<float> setter)
         {
-            var row = new VisualElement(); row.style.marginBottom = 12;
-            var title = new Label($"{label}: {Mathf.RoundToInt(value)}%"); title.style.color = Color.white; row.Add(title);
+            var row = new VisualElement();
+            row.AddToClassList("sa-settings-row");
+            var title = new Label(label.ToUpperInvariant());
+            title.AddToClassList("sa-settings-row-label");
+            row.Add(title);
             var slider = new Slider(min, max) { value = value };
-            slider.RegisterValueChangedCallback(evt => { setter(evt.newValue); title.text = $"{label}: {Mathf.RoundToInt(evt.newValue)}%"; });
-            row.Add(slider); root.Add(row);
+            slider.AddToClassList("sa-settings-slider");
+            row.Add(slider);
+            var amount = new Label($"{Mathf.RoundToInt(value)}%");
+            amount.AddToClassList("sa-settings-value");
+            row.Add(amount);
+            slider.RegisterValueChangedCallback(evt => { setter(evt.newValue); amount.text = $"{Mathf.RoundToInt(evt.newValue)}%"; });
+            root.Add(row);
         }
         private static void BuildAccessibility(VisualElement root)
         {
@@ -279,50 +297,14 @@ namespace SlopArena.Client.UI
             reduced.RegisterValueChangedCallback(evt => settings.SetReducedFlashing(evt.newValue));
             root.Add(reduced);
             var explanation = new Label("Reduces transient graphic hit rings and rays. Other visual effects may still flash.");
-            explanation.style.color = BindingText;
+            explanation.AddToClassList("sa-settings-note");
             root.Add(explanation);
         }
         private static void ApplyReadableContrast(VisualElement root)
         {
-            root.Query<TextElement>().ForEach(text => text.style.color = OptionText);
-            root.Query<DropdownField>().ForEach(field =>
-            {
-                field.style.color = OptionText;
-                field.style.backgroundColor = new Color(0.16f, 0.17f, 0.20f, 1f);
-                field.style.borderLeftWidth = 1;
-                field.style.borderRightWidth = 1;
-                field.style.borderTopWidth = 1;
-                field.style.borderBottomWidth = 1;
-                var border = new Color(0.48f, 0.50f, 0.56f, 1f);
-                field.style.borderLeftColor = border;
-                field.style.borderRightColor = border;
-                field.style.borderTopColor = border;
-                field.style.borderBottomColor = border;
-            });
-            root.Query<Toggle>().ForEach(toggle =>
-            {
-                toggle.style.color = OptionText;
-                var label = toggle.Q<Label>();
-                if (label != null) label.style.color = OptionText;
-            });
-            root.Query<Button>().ForEach(StyleButton);
-        }
-
-        private static void StyleButton(Button button)
-        {
-            button.style.color = OptionText;
-            button.style.backgroundColor = new Color(0.20f, 0.21f, 0.25f, 1f);
-            button.style.borderLeftWidth = 1;
-            button.style.borderRightWidth = 1;
-            button.style.borderTopWidth = 1;
-            button.style.borderBottomWidth = 1;
-            var border = new Color(0.48f, 0.50f, 0.56f, 1f);
-            button.style.borderLeftColor = border;
-            button.style.borderRightColor = border;
-            button.style.borderTopColor = border;
-            button.style.borderBottomColor = border;
-            var label = button.Q<Label>();
-            if (label != null) label.style.color = OptionText;
+            root.Query<DropdownField>().ForEach(field => field.AddToClassList("sa-settings-field"));
+            root.Query<Toggle>().ForEach(toggle => toggle.AddToClassList("sa-settings-toggle"));
+            root.Query<Button>().ForEach(button => button.AddToClassList("sa-settings-action"));
         }
 
         private void AskReset()
@@ -331,18 +313,19 @@ namespace SlopArena.Client.UI
             if (_resetConfirmation != null || _surface == null) return;
             _resetFocus = _surface.panel?.focusController.focusedElement as VisualElement;
             _resetConfirmation = new VisualElement();
-            _resetConfirmation.style.position = Position.Absolute;
-            _resetConfirmation.style.left = 0; _resetConfirmation.style.right = 0;
-            _resetConfirmation.style.top = 0; _resetConfirmation.style.bottom = 0;
-            _resetConfirmation.style.alignItems = Align.Center; _resetConfirmation.style.justifyContent = Justify.Center;
-            _resetConfirmation.style.backgroundColor = new Color(0f, 0f, 0f, 0.8f);
+            _resetConfirmation.AddToClassList("sa-settings-confirmation");
             var box = new VisualElement();
-            box.style.paddingLeft = 24; box.style.paddingRight = 24; box.style.paddingTop = 20; box.style.paddingBottom = 20;
-            var label = new Label("Reset all settings to defaults?"); label.style.color = OptionText; box.Add(label);
-            box.Add(new Button(ConfirmReset) { text = "RESET" });
-            box.Add(new Button(CancelReset) { text = "CANCEL" });
-            ApplyReadableContrast(box);
-            _resetConfirmation.Add(box); _surface.Add(_resetConfirmation); box.Q<Button>()?.Focus();
+            box.AddToClassList("sa-settings-confirmation-card");
+            var label = new Label("Reset all settings to defaults?");
+            label.AddToClassList("sa-settings-confirmation-title");
+            box.Add(label);
+            var actions = new VisualElement();
+            actions.AddToClassList("sa-settings-confirmation-actions");
+            actions.Add(new Button(ConfirmReset) { text = "RESET" });
+            actions.Add(new Button(CancelReset) { text = "CANCEL" });
+            ApplyReadableContrast(actions);
+            box.Add(actions);
+            _resetConfirmation.Add(box); _surface.Add(_resetConfirmation); actions.Q<Button>()?.Focus();
         }
 
         private void CancelReset()
@@ -402,21 +385,23 @@ namespace SlopArena.Client.UI
             };
             Screen.SetResolution(resolution.width, resolution.height, targetMode);
             var box = new VisualElement();
-            box.style.position = Position.Absolute;
-            box.style.left = 0; box.style.right = 0; box.style.top = 0; box.style.bottom = 0;
-            box.style.alignItems = Align.Center; box.style.justifyContent = Justify.Center;
-            box.style.backgroundColor = new Color(0f, 0f, 0f, 0.85f);
+            box.AddToClassList("sa-settings-confirmation");
             var panel = new VisualElement();
+            panel.AddToClassList("sa-settings-confirmation-card");
             _displayCountdown = new Label();
+            _displayCountdown.AddToClassList("sa-settings-confirmation-title");
             panel.Add(_displayCountdown);
-            panel.Add(new Button(() => ConfirmDisplay(targetMode, resolution.width, resolution.height)) { text = "KEEP" });
-            panel.Add(new Button(RevertDisplay) { text = "REVERT" });
+            var actions = new VisualElement();
+            actions.AddToClassList("sa-settings-confirmation-actions");
+            actions.Add(new Button(() => ConfirmDisplay(targetMode, resolution.width, resolution.height)) { text = "KEEP" });
+            actions.Add(new Button(RevertDisplay) { text = "REVERT" });
+            ApplyReadableContrast(actions);
+            panel.Add(actions);
             box.Add(panel);
             _resetConfirmation = box;
             _surface?.Add(box);
             _displayDeadline = Time.unscaledTime + 15f;
-            panel.Q<Button>()?.Focus();
-            ApplyReadableContrast(box);
+            actions.Q<Button>()?.Focus();
         }
 
         private void ConfirmDisplay(FullScreenMode mode, int width, int height)

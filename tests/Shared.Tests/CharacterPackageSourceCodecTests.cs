@@ -51,11 +51,14 @@ public sealed class CharacterPackageSourceCodecTests
     public void FightGuy_RoundTripsDeterministically()
     {
         var first = CharacterPackageSourceCodec.Load(Fixture("package.json"), Fixture("character.json"));
-        Assert.True(first.IsValid, string.Join("\n", first.Diagnostics));
-        var second = CharacterPackageSourceCodec.Load(CharacterPackageSourceCodec.SerializeManifest(first.Source!.Manifest), CharacterPackageSourceCodec.SerializeCharacter(first.Source.Character));
+        Assert.Equal(11f, first.Source!.Character.Movement.AirDodgeSpeed);
+        Assert.Equal(1.05f, first.Source.Character.ShieldRadius);
+        var second = CharacterPackageSourceCodec.Load(CharacterPackageSourceCodec.SerializeManifest(first.Source.Manifest), CharacterPackageSourceCodec.SerializeCharacter(first.Source.Character));
         Assert.True(second.IsValid);
         Assert.Equal(CharacterPackageSourceCodec.SerializeManifest(first.Source.Manifest), CharacterPackageSourceCodec.SerializeManifest(second.Source!.Manifest));
         Assert.Equal(CharacterPackageSourceCodec.SerializeCharacter(first.Source.Character), CharacterPackageSourceCodec.SerializeCharacter(second.Source.Character));
+        Assert.Equal(11f, second.Source.Character.Movement.AirDodgeSpeed);
+        Assert.Equal(1.05f, second.Source.Character.ShieldRadius);
     }
 
     [Fact]
@@ -88,6 +91,28 @@ public sealed class CharacterPackageSourceCodecTests
         character.Remove("captureGeometry");
         var missing = CharacterPackageSourceCodec.Load(Fixture("package.json"), character.ToJsonString());
         Assert.Contains(missing.Diagnostics, x => x.Code == "schema.missing" && x.Path == "character.captureGeometry");
+    }
+
+    [Fact]
+    public void EditingGrabGeometryUpdatesCookedCaptureWithoutChangingMoveSlots()
+    {
+        var parsed = CharacterPackageSourceCodec.Load(Fixture("package.json"), Fixture("character.json"));
+        Assert.True(parsed.IsValid);
+        var source = parsed.Source!;
+        var geometry = source.Character.CaptureGeometry with
+        {
+            Reach = 0.93f,
+            Width = 0.81f,
+            VictimAnchor = source.Character.CaptureGeometry.VictimAnchor with { Z = 0.52f },
+        };
+        var edited = CharacterPackageSourceCodec.ReplaceCaptureGeometry(source, geometry);
+        Assert.True(edited.IsValid, string.Join("\n", edited.Diagnostics));
+
+        var compiled = CharacterPackageCompiler.Compile(edited.Source!, CharacterCookProfile.TrustedBuiltIn);
+        Assert.DoesNotContain(compiled.Diagnostics, d => d.Severity == CharacterDiagnosticSeverity.Error);
+        Assert.Equal(0.93f, compiled.CookedPackage!.Definition.CaptureGeometry.Reach);
+        Assert.Equal(0.81f, compiled.CookedPackage.Definition.CaptureGeometry.Width);
+        Assert.Equal(0.52f, compiled.CookedPackage.Definition.CaptureGeometry.VictimAnchor.Z);
     }
 
     [Fact]
@@ -326,9 +351,13 @@ public sealed class CharacterPackageSourceCodecTests
         string package = Fixture("package.json").Replace("\"dependencies\": []", "\"dependencies\": [], \"id\": \"legacy\"");
         var result = CharacterPackageSourceCodec.Load(package, Fixture("character.json"));
         Assert.Contains(result.Diagnostics, x => x.Code == "source.identity-forbidden");
-        string unsupported = Fixture("character.json").Replace("\"authoringSchemaVersion\": 1", "\"authoringSchemaVersion\": 2");
+        string unsupported = Fixture("character.json").Replace("\"authoringSchemaVersion\": 3", "\"authoringSchemaVersion\": 2");
         result = CharacterPackageSourceCodec.Load(Fixture("package.json"), unsupported);
         Assert.Contains(result.Diagnostics, x => x.Code == "schema.unsupported");
+        var missingTuning = JsonNode.Parse(Fixture("character.json"))!.AsObject();
+        missingTuning["movement"]!.AsObject().Remove("airDodgeSpeed");
+        result = CharacterPackageSourceCodec.Load(Fixture("package.json"), missingTuning.ToJsonString());
+        Assert.Contains(result.Diagnostics, x => x.Code == "schema.missing" && x.Path == "character.movement.airDodgeSpeed");
     }
 
     [Fact]

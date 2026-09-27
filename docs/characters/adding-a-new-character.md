@@ -22,6 +22,12 @@ The starter values are editable defaults, not approved gameplay balance. Replace
 the character's approved kit data before roster admission. Import package-local source assets
 with their `.meta` files. Record licensing and stop if a source asset is not redistributable.
 
+`character.json` uses `authoringSchemaVersion: 3`. Author a positive finite
+`movement.airDodgeSpeed` independently of the historical `dashSpeed`; it is
+the forward air dodge's horizontal speed for ten simulation ticks. The
+current admitted fighters use 11 m/s except Kistu at 12.1 m/s. Older source
+and cooked schema versions cannot be admitted without migration and a recook.
+
 ## 2. Validate and bind assets
 
 For generated-model cleanup or an existing-model replacement, follow the
@@ -48,12 +54,29 @@ instead of subtracting the sampled hips; other tracks retain their existing conv
 Absent legacy bindings remain upright and cannot enable CrouchBrace. Never fabricate
 duck protection with a shrunken hurtbox or a runtime offset.
 
+Every package also authors a finite `shieldRadius` in meters, greater than
+half its `capsuleHeight`. Shared uses that sphere for shielded attack contact,
+centered on the capsule origin; the held VFX uses exactly the same radius.
+Choose a radius that encloses the character's defense pose without hiding
+the fighter. The value is cooked and hashed, not a Unity collider setting.
+
 Every package must define `captureGeometry` in `character.json`: positive `reach`,
 `width`, and `height`, a vertical `offsetY`, and local-space `attackerAnchor` and
-`victimAnchor` positions in meters. Local +Z is fighter-forward. These values are
-authoritative package content and flow through validation, cooking, and hashes; never
-edit generated `character.runtime.json` as their source. The initial built-in values
-are placeholders for the defense implementation spike, not final geometry or balance.
+`victimAnchor` positions in meters. Local +Z is fighter-forward. Keep the capture volume
+short and grounded around the character's authored body size; place both anchors at
+plausible torso height and forward of the character origin. The per-character values
+are authoritative package content and flow through validation, cooking, and hashes;
+never edit generated `character.runtime.json` as their source.
+
+Ability Lab exposes the same `captureGeometry` under **Moves → Ground → Grab** as
+numeric volume and restraint-anchor fields, with a Scene-view wire preview.
+Grab is an editor-only selector, not a seventeenth canonical ability slot.
+Changes participate in workspace undo and live draft validation; **Save** crosses
+the normal package cook boundary. The active in-match grab Gizmo reads the
+cooked value, never a separate Inspector copy.
+
+For PvP, verify the cooked result and refresh the admitted roster pin after
+saving; the transient Ability Lab preview does not change a pinned match.
 
 The defense presentation roles are `presentation.shield`, `grab`, `grabbed`,
 `throwForward`, and `airDodge`. They may be empty until real clips are authored. Once a

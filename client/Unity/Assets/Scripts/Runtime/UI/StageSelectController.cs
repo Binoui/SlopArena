@@ -14,8 +14,8 @@ namespace SlopArena.Client.UI
     /// the participant summary in the lower-right summary cell, and the
     /// selected-stage label plus start action outside the conversation cell.
     /// The stage registry remains file-driven; this screen owns only
-    /// presentation and the existing start-match flow. Training does not
-    /// route through stage select (issue #211).
+    /// presentation and the existing start-match flow. Training uses this
+    /// picker before launching its local match.
     /// </summary>
     public class StageSelectController : MonoBehaviour, IFrontendPageController
     {
@@ -52,10 +52,13 @@ namespace SlopArena.Client.UI
             _lblWaiting = _context.Q<Label>("lbl-waiting");
             _playerCards = _context.Q<VisualElement>("player-cards-area");
 
-            _roomMode = ClientSession.SelectedOnlineMode == ClientSession.OnlineSelection.Room;
+            _roomMode = MatchConfig.Mode == GameMode.PvP &&
+                ClientSession.SelectedOnlineMode == ClientSession.OnlineSelection.Room;
             bool isOnline = MatchConfig.Mode == GameMode.PvP;
+            bool isTraining = MatchConfig.Mode == GameMode.Training;
             bool isHost = _roomMode ? false : !isOnline || ClientSession.IsLobbyHost;
-            SetModeChrome(_roomMode ? "ROOM // SELECT ARENA" : isOnline ? "ONLINE // SELECT STAGE" : "SOLO // SELECT STAGE",
+            SetModeChrome(_roomMode ? "ROOM // SELECT ARENA" : isOnline ? "ONLINE // SELECT STAGE" :
+                isTraining ? "TRAINING // SELECT STAGE" : "SOLO // SELECT STAGE",
                 _roomMode ? "ROOM PREPARATION  /  ARENA" : "STEP 2 OF 2  /  STAGE");
             _context.Q<Label>("subtitle").text = _roomMode
                 ? (isHost ? "CHOOSE THE ROOM ARENA" : "THE ROOM LEADER WILL CHOOSE THE ARENA")
@@ -68,7 +71,8 @@ namespace SlopArena.Client.UI
             if (_btnConfirm != null)
             {
                 _btnConfirm.style.display = DisplayStyle.None;
-                _btnConfirm.text = _roomMode ? "CONFIRM ARENA" : isOnline ? "START MATCH" : "START SOLO";
+                _btnConfirm.text = _roomMode ? "CONFIRM ARENA" : isOnline ? "START MATCH" :
+                    isTraining ? "ENTER TRAINING" : "START SOLO";
             }
             if (_lblWaiting != null)
             {
@@ -86,7 +90,7 @@ namespace SlopArena.Client.UI
             int stageCount = 0;
             foreach (var arena in ArenaRegistry.All)
             {
-                if (arena.Name == "training") continue;
+                if (arena.Name == "training" && !isTraining) continue;
                 string? baked = BakedContentPaths.ResolveArena(arena.Name);
                 if (baked == null) continue;
                 var arenaOpt = ArenaBinaryFormat.LoadFromFile(baked);
@@ -115,8 +119,16 @@ namespace SlopArena.Client.UI
                 card.Add(swatch);
                 card.Add(label);
                 card.SetEnabled(isHost);
-                _grid?.Add(card);
-                firstStageButton ??= card;
+                if (isTraining && arena.Name == "training")
+                {
+                    _grid?.Insert(0, card);
+                    firstStageButton = card;
+                }
+                else
+                {
+                    _grid?.Add(card);
+                    firstStageButton ??= card;
+                }
                 stageCount++;
             }
 
@@ -142,6 +154,10 @@ namespace SlopArena.Client.UI
                 _grid?.Q<VisualElement>($"stage-{MatchConfig.ArenaName}") != null)
             {
                 SelectStage(MatchConfig.ArenaName);
+            }
+            else if (isTraining && firstStageButton != null)
+            {
+                SelectStage(firstStageButton.name.Substring("stage-".Length));
             }
 
             var btnBack = _context.Q<Button>("btn-back");
@@ -575,6 +591,13 @@ namespace SlopArena.Client.UI
                 return;
             }
 
+            if (MatchConfig.Mode == GameMode.Training)
+            {
+                _playerCards.Add(BuildPlayerCard(
+                    "P1", "YOU", MatchConfig.PlayerClass, "READY", true, true));
+                return;
+            }
+
             if (MatchConfig.Mode == GameMode.Solo)
             {
                 _playerCards.Add(BuildPlayerCard(
@@ -678,7 +701,7 @@ namespace SlopArena.Client.UI
             }
 
             MatchConfig.ArenaName = _selectedArena;
-            if (MatchConfig.Mode == GameMode.Solo)
+            if (MatchConfig.Mode != GameMode.PvP)
             {
                 SceneManager.LoadScene("Arena_Offline");
                 return;

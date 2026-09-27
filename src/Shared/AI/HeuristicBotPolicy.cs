@@ -134,8 +134,7 @@ public sealed class HeuristicBotPolicy
             return true;
         if (HasSupportAt(state.PX, state.PY, state.PZ, in arena))
             return false;
-        return !Simulation.FindLedge(state, arena, _recoveryCapsuleHeight * 0.5f,
-            out _, out _, out _, out _, out _);
+        return true;
     }
 
     private bool IsOffstage(in CpuObservation state, in ArenaDefinition arena,

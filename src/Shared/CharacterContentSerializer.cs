@@ -26,6 +26,7 @@ public static class CharacterContentSerializer
         public float CapsuleHeight;
         public float HipHeight;
         public float HurtboxRadius;
+        public float ShieldRadius;
         public HurtboxCapsule[]? HurtboxCapsules;
         public HurtboxBoneDef[]? HurtboxBoneDefs;
         public string? BakedDataPath;
@@ -98,7 +99,7 @@ public static class CharacterContentSerializer
             CapsuleHeight = document.CapsuleHeight,
             HipHeight = document.HipHeight,
             HurtboxRadius = document.HurtboxRadius,
-            HurtboxCapsules = document.HurtboxCapsules,
+            ShieldRadius = document.ShieldRadius,
             HurtboxBoneDefs = document.HurtboxBoneDefs,
             BakedDataPath = document.BakedDataPath ?? "",
             ModelResourcePath = document.ModelResourcePath ?? "",
@@ -181,7 +182,7 @@ public static class CharacterContentSerializer
             CapsuleHeight = definition.CapsuleHeight,
             HipHeight = definition.HipHeight,
             HurtboxRadius = definition.HurtboxRadius,
-            HurtboxCapsules = definition.HurtboxCapsules,
+            ShieldRadius = definition.ShieldRadius,
             HurtboxBoneDefs = definition.HurtboxBoneDefs,
             BakedDataPath = definition.BakedDataPath,
             ModelResourcePath = definition.ModelResourcePath,

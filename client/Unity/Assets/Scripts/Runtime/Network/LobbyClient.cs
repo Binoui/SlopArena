@@ -134,7 +134,7 @@ namespace SlopArena.Client.Network
 
         /// <param name="masterServerUrl">Master server base URL (e.g. http://localhost:5000).</param>
         /// <param name="authToken">Guest JWT to send as bearer auth on the connection.</param>
-        /// <param name="protocolVersion">2 for Steam-authenticated play; 0 for explicit Editor development guests.</param>
+        /// <param name="protocolVersion">4 for Steam-authenticated play; 0 for explicit Editor development guests.</param>
         public LobbyClient(string masterServerUrl, string authToken)
             : this(masterServerUrl, () => authToken, SteamMatchDescriptor.CurrentProtocolVersion)
         {

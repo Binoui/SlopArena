@@ -36,8 +36,10 @@ public class RollbackConvergenceTests
         var h = Harness(delayTicks: 2, dropEvery: 5);
         for (int t = 0; t < 240; t++)
         {
-            InputState in1 = TestHelpers.Input(moveX: 1f, jump: t == 20, dash: t == 40);
-            InputState in2 = TestHelpers.Input(moveX: -1f, jump: t == 30, dash: t == 50);
+            InputState in1 = TestHelpers.Input(moveX: 1f, jump: t == 20, jumpHeld: t >= 20 && t < 40);
+            in1.ShieldHeld = in1.ShieldPressed = t == 40;
+            InputState in2 = TestHelpers.Input(moveX: -1f, jump: t == 30, jumpHeld: t >= 30 && t < 50);
+            in2.ShieldHeld = in2.ShieldPressed = t == 50;
             h.Step(in1, in2);
         }
         for (int t = 0; t < 8; t++) h.Step(default, default); // flush RTT window

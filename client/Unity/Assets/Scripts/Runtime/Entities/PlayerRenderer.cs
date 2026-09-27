@@ -52,11 +52,11 @@ namespace SlopArena.Client.Entities
         private static readonly Dictionary<ActionState, Color> StateColors = new()
         {
             { ActionState.Idle,       new Color(1f, 1f, 1f, 0.8f) },       // white
-            { ActionState.Dashing,    new Color(0f, 1f, 1f, 0.8f) },       // cyan
             { ActionState.Hitstun,    new Color(1f, 0.2f, 0.2f, 0.8f) },   // red
             { ActionState.Sliding,    new Color(0.5f, 0.5f, 0.5f, 0.8f) }, // gray
             { ActionState.Attacking,  new Color(1f, 0.6f, 0f, 0.8f) },     // orange
-            { ActionState.AirDodging, new Color(1f, 0.8f, 0f, 0.8f) },     // yellow
+            { ActionState.AirDodgeMovement, new Color(1f, 0.8f, 0f, 0.8f) }, // yellow
+            { ActionState.AirDodgeRecovery, new Color(1f, 0.8f, 0f, 0.8f) }, // yellow
             { ActionState.JumpSquat,  new Color(0.8f, 0.3f, 1f, 0.8f) },   // purple
             { ActionState.Aiming,     new Color(0.3f, 1f, 1f, 0.8f) },     // cyan-light
             { ActionState.Run,        new Color(0f, 1f, 1f, 0.8f) },       // cyan
@@ -108,6 +108,7 @@ namespace SlopArena.Client.Entities
         [SerializeField] private float _modelVisualScale = 1f;
         private CharacterDefinition? _charDef;
         private GameObject _modelInstance;
+        private GameObject _shieldInstance;
         private bool _reportedModelRootDrift;
 
         // The simulation owns the entity root. Animation may pose the model,
@@ -212,8 +213,54 @@ namespace SlopArena.Client.Entities
             ReplaceModel(prefab, _modelName, _modelVisualScale);
         }
 
+
+        private void HideShield()
+        {
+            if (_shieldInstance == null) return;
+            _shieldInstance.SetActive(false);
+            if (Application.isPlaying)
+                Destroy(_shieldInstance);
+            else
+                DestroyImmediate(_shieldInstance);
+            _shieldInstance = null;
+        }
+
+        private void UpdateShield(CharacterState state)
+        {
+            if (state.State != ActionState.Shielding || _charDef == null)
+            {
+                HideShield();
+                return;
+            }
+
+            if (_shieldInstance == null)
+            {
+                GameObject prefab = Resources.Load<GameObject>("VFX/ShieldGuard");
+                if (prefab == null) return;
+                _shieldInstance = Instantiate(prefab, transform);
+                _shieldInstance.name = "ShieldGuard";
+                foreach (var collider in _shieldInstance.GetComponentsInChildren<Collider>(true))
+                    collider.enabled = false;
+                foreach (var renderer in _shieldInstance.GetComponentsInChildren<Renderer>(true))
+                {
+                    renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                    if (renderer.sharedMaterial == null || !renderer.sharedMaterial.HasProperty("_Opacity_Global"))
+                        continue;
+                    var properties = new MaterialPropertyBlock();
+                    renderer.GetPropertyBlock(properties);
+                    properties.SetFloat("_Opacity_Global", 0.35f);
+                    renderer.SetPropertyBlock(properties);
+                }
+            }
+
+            Transform shield = _shieldInstance.transform;
+            shield.localPosition = new Vector3(0f, -_modelYOffset, 0f);
+            shield.localRotation = Quaternion.identity;
+            shield.localScale = Vector3.one * (2f * _charDef.ShieldRadius);
+        }
         private void ReplaceModel(GameObject prefab, string modelName, float visualScale)
         {
+            HideShield();
             for (int i = transform.childCount - 1; i >= 0; i--)
             {
                 var child = transform.GetChild(i).gameObject;
@@ -318,7 +365,7 @@ namespace SlopArena.Client.Entities
         private bool _hasAppliedState;
         private byte _lastPresentedDeaths;
         private bool _hasPresentedDeaths;
-        private MovementFeedbackEffect _dashTrail;
+        private MovementFeedbackEffect _airDodgeTrail;
         private MovementFeedbackEffect _respawnInvincibilityEffect;
         private bool _respawnInvincibilityActive;
         private ulong _activeAccentWindowSignature;
@@ -423,10 +470,11 @@ namespace SlopArena.Client.Entities
 
         private void OnDisable()
         {
-            if (_dashTrail != null)
+            HideShield();
+            if (_airDodgeTrail != null)
             {
-                _dashTrail.EndDashTrail();
-                _dashTrail = null;
+                _airDodgeTrail.EndDashTrail();
+                _airDodgeTrail = null;
             }
             if (_respawnInvincibilityEffect != null)
             {
@@ -522,7 +570,7 @@ namespace SlopArena.Client.Entities
                 // Normal movement: snap directly (60Hz is fast enough)
                 transform.position = targetPos;
             }
-            UpdateDashFeedback(state, targetPos);
+            UpdateAirDodgeFeedback(state, targetPos);
             if (!stockTransition)
                 EmitMovementFeedback(state, targetPos);
             UpdateRespawnInvincibility(state, targetPos);
@@ -553,6 +601,7 @@ namespace SlopArena.Client.Entities
             UpdateAnimationState(state);
             MaintainTumbleLoop();
 
+            UpdateShield(state);
             _lastState = state;
             _hasAppliedState = true;
             if (!_hasPresentedDeaths)
@@ -609,26 +658,26 @@ namespace SlopArena.Client.Entities
             CharacterClass.Nilus => new Color(0.72f, 0.36f, 1f, 0.95f),
         };
 
-        private void UpdateDashFeedback(CharacterState state, Vector3 position)
+        private void UpdateAirDodgeFeedback(CharacterState state, Vector3 position)
         {
-            if (state.State != ActionState.Dashing)
+            if (state.State != ActionState.AirDodgeMovement)
             {
-                if (_dashTrail != null)
+                if (_airDodgeTrail != null)
                 {
-                    _dashTrail.EndDashTrail();
-                    _dashTrail = null;
+                    _airDodgeTrail.EndDashTrail();
+                    _airDodgeTrail = null;
                 }
                 return;
             }
 
-            Vector3 dashDirection = new(state.DashDirX, 0f, state.DashDirZ);
-            if (dashDirection.sqrMagnitude < 0.001f)
-                dashDirection = new Vector3(state.VX, 0f, state.VZ);
-            Vector3 trailDirection = -dashDirection;
-            if (_dashTrail == null)
-                _dashTrail = MovementFeedbackEffect.BeginDashTrail(position, trailDirection);
+            Vector3 airDodgeDirection = new(state.DashDirX, 0f, state.DashDirZ);
+            if (airDodgeDirection.sqrMagnitude < 0.001f)
+                airDodgeDirection = new Vector3(state.VX, 0f, state.VZ);
+            Vector3 trailDirection = -airDodgeDirection;
+            if (_airDodgeTrail == null)
+                _airDodgeTrail = MovementFeedbackEffect.BeginDashTrail(position, trailDirection);
             else
-                _dashTrail.FollowDashTrail(position, trailDirection);
+                _airDodgeTrail.FollowDashTrail(position, trailDirection);
         }
 
         private void EmitMovementFeedback(CharacterState state, Vector3 position)
@@ -901,9 +950,9 @@ namespace SlopArena.Client.Entities
 
             float hSpeed = new Vector3(state.VX, 0f, state.VZ).magnitude;
 
-            // ── Combat (Attacking / Dashing / Hitstun) ──
+            // ── Action animation state (Attacking / AirDodgeMovement / Hitstun) ──
             bool isCombat = state.State == ActionState.Attacking
-                || state.State == ActionState.Dashing
+                || state.State == ActionState.AirDodgeMovement
                 || state.State == ActionState.Hitstun;
 
             // ── Hitstun animation (always, even during extrapolation guard) ──
@@ -1212,13 +1261,17 @@ namespace SlopArena.Client.Entities
                         PlayAbilityAnim(state, spec, state.ComboStage);
                     }
                 }
-                else if (state.State == ActionState.Dashing)
+                else if (state.State == ActionState.AirDodgeMovement)
                 {
-                    if (TryGetAnimation(_charDef.DashAnim, out var clip, out _))
+                    string airDodgeAnim = string.IsNullOrEmpty(_charDef.AirDodgeAnim)
+                        ? _charDef.DashAnim
+                        : _charDef.AirDodgeAnim;
+                    if (TryGetAnimation(airDodgeAnim, out var clip, out _))
                     {
-                        float dashAnimSpeed = GetAnimSpeedFromDuration(_charDef.DashAnim, _charDef.Movement.DashDurationTicks);
-                        var dashState = _animancer.Play(clip, 0f);
-                        dashState.Speed = dashAnimSpeed;
+                        float dodgeAnimSpeed = GetAnimSpeedFromDuration(
+                            airDodgeAnim, DefenseConfig.AirDodgeMovementTicks);
+                        var dodgeState = _animancer.Play(clip, 0f);
+                        dodgeState.Speed = dodgeAnimSpeed;
                     }
                 }
             }
@@ -1582,6 +1635,7 @@ namespace SlopArena.Client.Entities
         /// </summary>
         public void ResetAnimationState()
         {
+            HideShield();
             _animancer.Stop();
             _wasGrounded = true;
             _lastAnimState = default;
@@ -1654,6 +1708,29 @@ namespace SlopArena.Client.Entities
             float halfH = Mathf.Max(_capsuleHeight * 0.5f - _capsuleRadius, 0f);
             Vector3 top = capCenter + Vector3.up * halfH;
             Vector3 bot = capCenter - Vector3.up * halfH;
+
+            // Cooked capture volume in simulation space; only the orange phase can connect.
+            if (_lastState.State == ActionState.GrabAttempt
+                && _lastState.InteractionPhase == (byte)DefenseInteractionPhase.Attempt
+                && _charDef?.CaptureGeometry is { } capture)
+            {
+                int activeEnd = DefenseConfig.GrabWhiffRecoveryTicks + DefenseConfig.GrabActiveTicks;
+                bool active = _lastState.StateTicks > DefenseConfig.GrabWhiffRecoveryTicks
+                    && _lastState.StateTicks <= activeEnd
+                    && _lastState.IsGrounded && _lastState.HitstopTicks == 0
+                    && _lastState.VX * _lastState.VX + _lastState.VZ * _lastState.VZ <= 0.0025f;
+                Gizmos.color = active ? new Color(1f, 0.25f, 0.05f, 0.95f)
+                    : _lastState.StateTicks > activeEnd ? new Color(1f, 0.8f, 0.1f, 0.7f)
+                    : new Color(0.7f, 0.7f, 0.7f, 0.35f);
+                Matrix4x4 previous = Gizmos.matrix;
+                Vector3 origin = new(_lastState.PX, _lastState.PY + capture.OffsetY, _lastState.PZ);
+                Gizmos.matrix = Matrix4x4.TRS(origin,
+                    Quaternion.Euler(0f, _lastState.CapturedYaw * 0.01f, 0f), Vector3.one);
+                Gizmos.DrawWireCube(new Vector3(0f, 0f, capture.Reach * 0.5f),
+                    new Vector3(capture.Width, capture.Height, capture.Reach));
+                Gizmos.matrix = previous;
+                Gizmos.color = stateColor;
+            }
         }
 
         /// <summary>DIAG: name of the currently playing clip, or "none".</summary>

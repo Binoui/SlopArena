@@ -49,7 +49,7 @@ should count accepted contacts, not gaps between hitboxes whose active windows m
 
 Choose tests that cover the changed boundary:
 
-- movement, jump, Dash, ledge, and air-use behavior;
+- movement, jump, forward air dodge, ledge, and air-use behavior;
 - hitbox/projectile geometry and collision;
 - Hitstun, Hitstop, Knockback, Combo Influence, Clash, and Burst;
 - cooked timeline execution, typed operations, capability admission, interruption, and presentation events;

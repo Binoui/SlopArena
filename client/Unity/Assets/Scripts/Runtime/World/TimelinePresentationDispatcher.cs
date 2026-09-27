@@ -44,7 +44,7 @@ namespace SlopArena.Client.World
 
         public void Register(ulong entityId, PlayerRenderer renderer, CharacterAnimationCatalog catalog)
         {
-            if (renderer == null || catalog == null)
+            if (renderer == null)
             {
                 _entries.Remove(entityId);
                 return;
@@ -69,8 +69,21 @@ namespace SlopArena.Client.World
                 if (!_seenEvents.Add(presentationEvent.Key)) continue;
                 if (presentationEvent.Source == PresentationEventSource.BlockContact)
                 {
-                    GraphicHitEffect.SpawnBlock(
-                        new Vector3(presentationEvent.WorldX, presentationEvent.WorldY, presentationEvent.WorldZ));
+                    Vector3 contact = new(presentationEvent.WorldX, presentationEvent.WorldY, presentationEvent.WorldZ);
+                    Vector3 normal = Vector3.zero;
+                    if (_entries.TryGetValue(presentationEvent.EntityId, out Entry shieldOwner)
+                        && shieldOwner.Renderer != null && shieldOwner.Renderer.CharacterDef != null)
+                    {
+                        PlayerRenderer fighter = shieldOwner.Renderer;
+                        Vector3 center = fighter.transform.position - Vector3.up * fighter.ModelYOffset;
+                        Vector3 outward = contact - center;
+                        if (outward.sqrMagnitude > 0.000001f)
+                        {
+                            normal = outward.normalized;
+                            contact = center + normal * fighter.CharacterDef.ShieldRadius;
+                        }
+                    }
+                    GraphicHitEffect.SpawnBlock(contact, normal);
                     continue;
                 }
                 if (!_entries.TryGetValue(presentationEvent.EntityId, out Entry entry)) continue;

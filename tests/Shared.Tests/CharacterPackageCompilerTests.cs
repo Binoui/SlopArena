@@ -50,6 +50,56 @@ public sealed class CharacterPackageCompilerTests
     }
 
     [Fact]
+    public void AirDodgeSpeed_CooksAndAdaptsIndependentlyFromDashSpeed()
+    {
+        var result = CompileCharacter(character => character["movement"]!["airDodgeSpeed"] = 12.5f);
+        Assert.NotNull(result.CookedPackage);
+        Assert.Equal(20f, result.CookedPackage!.Definition.Movement.DashSpeed);
+        Assert.Equal(12.5f, result.CookedPackage.Definition.Movement.AirDodgeSpeed);
+        var runtime = CookedCharacterRuntimeAdapter.ToCharacterDefinition(result.CookedPackage);
+        Assert.Equal(12.5f, runtime.Movement.AirDodgeSpeed);
+        Assert.Contains("\"airDodgeSpeed\":12.5", System.Text.Encoding.UTF8.GetString(result.CookedPackage.CanonicalBytes));
+
+        AssertError(CompileCharacter(character => character["movement"]!["airDodgeSpeed"] = 0f), "value.out-of-range");
+        AssertError(CompileCharacter(character => character["movement"]!["airDodgeSpeed"] = -1f), "value.out-of-range");
+    }
+
+    [Fact]
+    public void ShieldRadius_CooksAndAdaptsExactly_AndRejectsInvalidGeometry()
+    {
+        var compiled = CompileCharacter();
+        Assert.NotNull(compiled.CookedPackage);
+        Assert.Equal(1.05f, compiled.CookedPackage!.Definition.ShieldRadius);
+        var runtime = CookedCharacterRuntimeAdapter.ToCharacterDefinition(compiled.CookedPackage);
+        Assert.Equal(1.05f, runtime.ShieldRadius);
+        Assert.Contains("\"shieldRadius\":1.05", System.Text.Encoding.UTF8.GetString(compiled.CookedPackage.CanonicalBytes));
+
+        AssertError(CompileCharacter(character => character["shieldRadius"] = 0f), "value.out-of-range");
+        AssertError(CompileCharacter(character => character["shieldRadius"] = -1f), "value.out-of-range");
+        AssertError(CompileCharacter(character => character["shieldRadius"] = 0.85f), "value.out-of-range");
+        AssertError(CompileCharacter(character => character.Remove("shieldRadius")), "schema.missing");
+        var source = CharacterPackageSourceCodec.Load(Fixture("package.json"), Fixture("character.json")).Source!;
+        var nonFinite = source with { Character = source.Character with { ShieldRadius = float.PositiveInfinity } };
+        AssertError(CharacterPackageCompiler.Compile(nonFinite, CharacterCookProfile.TrustedBuiltIn), "value.non-finite");
+    }
+    [Fact]
+    public void ShieldRadius_IsPreservedForEveryPackageFighter()
+    {
+        foreach (var (packageId, expected) in new[]
+        {
+            ("fightguy", 1.05f), ("kistu", 1.05f), ("bonk", 1.05f), ("manki", 0.95f),
+        })
+        {
+            var result = CharacterPackageCompiler.Compile(
+                File.ReadAllText(FindRepoFile($"client/Unity/Assets/CharacterPackages/{packageId}/package.json")),
+                File.ReadAllText(FindRepoFile($"client/Unity/Assets/CharacterPackages/{packageId}/character.json")),
+                CharacterCookProfile.TrustedBuiltIn);
+            Assert.NotNull(result.CookedPackage);
+            Assert.Equal(expected, result.CookedPackage!.Definition.ShieldRadius);
+            Assert.Equal(expected, CookedCharacterRuntimeAdapter.ToCharacterDefinition(result.CookedPackage).ShieldRadius);
+        }
+    }
+    [Fact]
     public void CaptureGeometryAndDefenseRoles_CookDeterministicallyIntoContent()
     {
         var baseline = CompileCharacter();
@@ -301,7 +351,7 @@ public sealed class CharacterPackageCompilerTests
     [Fact]
     public void LegacyAndFutureSchemasFailClosed()
     {
-        AssertError(CompileCharacter(x => x["authoringSchemaVersion"] = 2), "schema.unsupported");
+        AssertError(CompileCharacter(x => x["authoringSchemaVersion"] = 1), "schema.unsupported");
         AssertError(CompileCharacter(x => x.Remove("authoringSchemaVersion")), "schema.missing");
         AssertError(CompileCharacter(x => { x["schemaVersion"] = 1; x["id"] = "fightguy"; x["class"] = "FightGuy"; }), "schema.unsupported");
         var manifest = JsonNode.Parse(Fixture("package.json"))!.AsObject();

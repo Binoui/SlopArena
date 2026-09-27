@@ -50,16 +50,16 @@ public class KistuDashSlashTests
     }
 
     [Fact]
-    public void R_AimPhase_BlocksJumpAndDash()
+    public void R_AimPhase_BlocksJumpAndDodge()
     {
         var sim = MakeSim();
         sim.Tick(new() { { 1, new InputState { ActiveSlot = 5, IsAiming = true } } });
         for (int i = 0; i < 10; i++)
-            sim.Tick(new() { { 1, new InputState { IsAiming = true, Jump = true, Dash = true } } });
+            sim.Tick(new() { { 1, new InputState { IsAiming = true, Jump = true, ShieldPressed = i == 0 } } });
         var s = sim.GetState(1);
-        Assert.Equal(ActionState.Aiming, s.State);    // not JumpSquat / Dashing
+        Assert.Equal(ActionState.Aiming, s.State);    // not JumpSquat / AirDodgeMovement
         Assert.Equal((byte)2, s.JumpsLeft);           // jump never consumed
-        Assert.Equal((ushort)0, s.DashDurationTicks); // dash never started
+        Assert.Equal((byte)1, s.AirDodgesLeft);       // defense edge never consumed
     }
 
     [Fact]

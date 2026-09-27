@@ -1,0 +1,21 @@
+# Credits
+
+Thank you to the creators whose work helps make SlopArena possible.
+
+## Art, animation, and UI
+
+- **[Grruzam](https://assetstore.unity.com/publishers/20882)** — [Powerful Sword Pack (Great Sword + Katana)](https://assetstore.unity.com/packages/3d/animations/powerful-sword-pack-great-sword-katana-183324) for Kistu and Bonk; [Fighter Pack](https://assetstore.unity.com/packages/3d/animations/fighter-pack-can-be-used-with-my-other-packs-201900) for fighter animations.
+- **[JustCreate](https://assetstore.unity.com/packages/3d/environments/low-poly-mega-bundle-275844)** — Low Poly Mega Bundle environment art.
+- **[Jean Moreno / JMO Assets](https://assetstore.unity.com/packages/vfx/particles/cartoon-fx-remaster-free-109565)** — Cartoon FX Remaster Free visual effects.
+- **[SR Studios Kerala](https://assetstore.unity.com/packages/vfx/shaders/shield-shader-free-349218)** — Shield Shader FREE visual effect adapted for the shared held shield.
+- **[Kenney](https://kenney.nl/assets/input-prompts)** — Input Prompts keyboard and controller icons.
+- **[Lynda Mc Donald / LoudEyes Games](https://loudeyes.itch.io/battle-royale-fps-game-ui-asset-pack)** — FPS UI Pack assets used in the UI.
+
+## Tools and technology
+
+- **[Kybernetik](https://assetstore.unity.com/packages/tools/animation/animancer-pro-v8-293522)** — Animancer animation playback.
+- **[Riley Labrecque](https://github.com/rlabrecque/Steamworks.NET)** — Steamworks.NET.
+
+## Music
+
+Music generated for SlopArena using [Google Gemini's Lyria](https://deepmind.google/models/lyria/).

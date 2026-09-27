@@ -13,15 +13,15 @@ public sealed class SteamMatchRoutingWireTests
     [Fact]
     public void JoinFrame_BindsMatchVersionAndContent_AndAckBindsEntity()
     {
-        var descriptor = new SteamMatchDescriptor(Match, 90293421017699331UL, 0, 2, Digest,
+        var descriptor = new SteamMatchDescriptor(Match, 90293421017699331UL, 0, 3, Digest,
             DateTimeOffset.UtcNow.AddSeconds(60));
         var join = SteamGameplayWire.CreateJoin(descriptor);
         Assert.True(SteamGameplayWire.TryParseJoin(join, out var parsedMatch, out var parsedDigest));
         Assert.Equal(Match, parsedMatch);
         Assert.Equal(Digest, parsedDigest);
-        join[38] = 1; // Wrong protocol version.
+        join[37] = 2; // Previous protocol version.
         Assert.False(SteamGameplayWire.TryParseJoin(join, out _, out _));
-        join[38] = 0;
+        join[37] = 3;
         join[39] = (byte)'z'; // Noncanonical content hash.
         Assert.False(SteamGameplayWire.TryParseJoin(join, out _, out _));
         Assert.False(SteamGameplayWire.TryParseJoin(join.AsSpan(0, join.Length - 1), out _, out _));
@@ -37,11 +37,13 @@ public sealed class SteamMatchRoutingWireTests
     public void Descriptor_ParsesLosslessServerIdentityAndRejectsIncompatibleRoute()
     {
         const string json = """
-            {"transport":"steam-p2p","matchId":"11111111-2222-3333-4444-555555555555","serverSteamId":"90293421017699331","virtualPort":0,"protocolVersion":2,"contentHash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","admissionExpiresAtUtc":"2026-09-26T12:00:00Z"}
+            {"transport":"steam-p2p","matchId":"11111111-2222-3333-4444-555555555555","serverSteamId":"90293421017699331","virtualPort":0,"protocolVersion":4,"contentHash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","admissionExpiresAtUtc":"2026-09-26T12:00:00Z"}
             """;
         using var document = JsonDocument.Parse(json);
         Assert.True(SteamMatchDescriptor.TryParse(document.RootElement, out var descriptor));
-        Assert.Equal(90293421017699331UL, descriptor!.ServerSteamId);
+        using var previousVersion = JsonDocument.Parse(json.Replace("\"protocolVersion\":4", "\"protocolVersion\":3"));
+
+        Assert.False(SteamMatchDescriptor.TryParse(previousVersion.RootElement, out _));
         using var wrongPort = JsonDocument.Parse(json.Replace("\"virtualPort\":0", "\"virtualPort\":1"));
         Assert.False(SteamMatchDescriptor.TryParse(wrongPort.RootElement, out _));
         using var numericIdentity = JsonDocument.Parse(json.Replace("\"90293421017699331\"", "90293421017699331"));
@@ -49,13 +51,15 @@ public sealed class SteamMatchRoutingWireTests
     }
 
     [Fact]
-    public void ProtocolTwoStart_RejectsDuplicateRosterOrMissingDeadline()
+    public void ProtocolFourStart_RejectsDuplicateRosterOrMissingDeadline()
     {
         const string json = """
-            {"matchId":"11111111-2222-3333-4444-555555555555","arenaName":"slop_court","players":[{"steamId":76561198000000001,"characterClass":"Manki","entityId":1},{"steamId":76561198000000002,"characterClass":"Bonk","entityId":2}],"protocolVersion":2,"virtualPort":0,"catalogHash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","admissionExpiresAtUtc":"2026-09-26T12:00:00Z"}
+            {"matchId":"11111111-2222-3333-4444-555555555555","arenaName":"slop_court","players":[{"steamId":76561198000000001,"characterClass":"Manki","entityId":1},{"steamId":76561198000000002,"characterClass":"Bonk","entityId":2}],"protocolVersion":4,"virtualPort":0,"catalogHash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","admissionExpiresAtUtc":"2026-09-26T12:00:00Z"}
             """;
         using var valid = JsonDocument.Parse(json);
         Assert.NotNull(MatchStartRequestCodec.TryParse(valid.RootElement));
+        using var previousVersion = JsonDocument.Parse(json.Replace("\"protocolVersion\":4", "\"protocolVersion\":3"));
+        Assert.Null(MatchStartRequestCodec.TryParse(previousVersion.RootElement));
         using var duplicate = JsonDocument.Parse(json.Replace("76561198000000002", "76561198000000001"));
         Assert.Null(MatchStartRequestCodec.TryParse(duplicate.RootElement));
         using var noDeadline = JsonDocument.Parse(json.Replace(",\"admissionExpiresAtUtc\":\"2026-09-26T12:00:00Z\"", ""));
@@ -90,9 +94,7 @@ public sealed class SteamMatchRoutingWireTests
             content = contentDocument.RootElement,
             descriptor = new
             {
-                transport = "steam-p2p", matchId = Match,
-                serverSteamId = "90293421017699331", virtualPort = 0,
-                protocolVersion = 2, contentHash,
+                protocolVersion = 4, contentHash,
                 admissionExpiresAtUtc = DateTimeOffset.Parse("2026-09-26T12:00:00Z")
             }
         };

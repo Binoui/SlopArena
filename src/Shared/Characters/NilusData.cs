@@ -31,13 +31,17 @@ public static partial class CharacterRegistry
             CapsuleRadius = 0.33f,
             CapsuleHeight = 1.65f,
             HipHeight = 0.8f,
+            ShieldRadius = 1.025f,
             HurtboxRadius = 1f,
+            CaptureGeometry = new CookedCaptureGeometry(0.75f, 0.65f, 1.1f, 0.55f,
+                new CaptureAnchor(0f, 0.55f, 0.23f), new CaptureAnchor(0f, 0.55f, 0.39f)),
             Movement = new MovementStats
             {
                 RunSpeed = 13f,
                 RunAccelerationA = 20f,
                 RunAccelerationB = 12f,
                 DashSpeed = 21f,
+                AirDodgeSpeed = 11.55f,
                 AirSpeedMax = 7.0f,
                 AirAccelStick = 17f,
                 AirAccelBase = 3.4f,

@@ -1,9 +1,10 @@
 {
-  "Scenario": "Target Lock LMB Exits Lock",
+  "Scenario": "Target Lock LMB Snap Keeps Lock",
   "TickCount": 120,
   "PlayerSnap": {
     "FacingYaw": 3.1415927,
     "PY": 0.75,
+    "LockOn": true,
     "JumpsLeft": 2,
     "IsGrounded": true
   },
@@ -16,6 +17,7 @@
   "PlayerFinal": {
     "FacingYaw": 3.1415927,
     "PY": 0.75,
+    "LockOn": true,
     "JumpsLeft": 2,
     "IsGrounded": true
   },

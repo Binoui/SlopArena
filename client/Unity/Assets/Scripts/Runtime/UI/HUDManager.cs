@@ -4,6 +4,7 @@ using SlopArena.Shared;
 using SlopArena.Client.Input;
 using SlopArena.Client.Network;
 using UnityEngine;
+using UnityEngine.InputSystem;
 using UnityEngine.UIElements;
 
 namespace SlopArena.Client.UI
@@ -17,7 +18,7 @@ namespace SlopArena.Client.UI
     ///    Camera.WorldToScreenPoint → RuntimePanelUtils.ScreenToPanel. Panels are
     ///    built at runtime from the roster, so 1v1, 2/3/4-player PvP all adapt
     ///    with no per-count UXML variants.
-    ///  • Action bar — the local player's canonical abilities 1–4/A/E/R/F.
+    ///  • Kit diamonds — local normals 1–4 and specials A/E/R/F.
     ///    Labels use effective Input System bindings; cooldown data remains read-only.
     ///
     /// Juice: cooldown-ready pulse (1.15x / 0.15s) + white flash,
@@ -71,6 +72,9 @@ namespace SlopArena.Client.UI
             public readonly VisualElement Cooldown;
             public readonly Label Timer;
             public readonly Label Key;
+            public readonly Image Modifier;
+            public readonly Image Button;
+            public readonly Label Plus;
             public readonly VisualElement Flash;
             public ushort MaxCooldown;
             public ushort PrevCooldown;
@@ -85,6 +89,11 @@ namespace SlopArena.Client.UI
                 Cooldown = root.Q<VisualElement>(cooldownName);
                 Timer = root.Q<Label>(timerName);
                 Key = root.Q<Label>(keyName);
+                Modifier = root.Q<Image>(root.name + "-modifier");
+                Button = root.Q<Image>(root.name + "-button");
+                Plus = root.Q<Label>(root.name + "-plus");
+                Modifier.scaleMode = ScaleMode.ScaleToFit;
+                Button.scaleMode = ScaleMode.ScaleToFit;
                 Flash = root.Q<VisualElement>(flashName);
             }
         }
@@ -104,7 +113,7 @@ namespace SlopArena.Client.UI
         }
 
         /// <summary>
-        /// The action bar's ability slots, in doc §2 order: abilities 1-4 then A/E/R/F.
+        /// The kit diamonds' ability slots, in doc §2 order: normals 1–4 then specials A/E/R/F.
         /// SlotIndex is the AbilitySlots/cooldown index (key "1" = 2 … key "A" = 10).
         /// LMB/RMB remain utility controls, and the former extra key position is outside the
         /// canonical action grid, so neither is shown as an ability slot.
@@ -155,7 +164,7 @@ namespace SlopArena.Client.UI
         private UnityEngine.Camera _camera;
         private VisualElement _overheadLayer;
         private VisualElement _billboardLayer;
-        private VisualElement _actionBar;
+        private VisualElement _kitDiamonds;
         public VisualElement TargetingRoot
             => _uiDocument != null
                 ? _uiDocument.rootVisualElement.Q<VisualElement>("target-lock-indicator")
@@ -167,6 +176,9 @@ namespace SlopArena.Client.UI
         private readonly Dictionary<ulong, OverheadPanel> _billboardPanels = new();
 
         private ActionSlot[] _abilitySlots = Array.Empty<ActionSlot>();
+        private InputPromptAtlas _promptAtlas;
+        private int _seenBindingRevision = -1;
+        private bool _showGamepadPrompts;
 
         // AttackSlot (1-based ActiveSlot) is the authoritative "just cast" signal for
         // abilities — it fires on press for every slot, including 0-cooldown normals.
@@ -208,7 +220,7 @@ namespace SlopArena.Client.UI
             root.Add(_networkStatsLabel);
             _overheadLayer = root.Q<VisualElement>("overhead-layer");
             _billboardLayer = root.Q<VisualElement>("player-billboard");
-            _actionBar = root.Q<VisualElement>("action-bar");
+            _kitDiamonds = root.Q<VisualElement>("kit-diamonds");
 
             // Rebuild player panels from the roster (badge color by roster position).
             _overheadLayer?.Clear();
@@ -235,13 +247,13 @@ namespace SlopArena.Client.UI
                 _billboardLayer?.Add(billboard.Root);
             }
 
-            SetupActionBar();
+            SetupKitDiamonds();
 
-            if (_actionBar != null)
-                _actionBar.style.display = _localEntityId != 0 ? DisplayStyle.Flex : DisplayStyle.None;
+            if (_kitDiamonds != null)
+                _kitDiamonds.style.display = _localEntityId != 0 ? DisplayStyle.Flex : DisplayStyle.None;
         }
 
-        private void SetupActionBar()
+        private void SetupKitDiamonds()
         {
             if (_uiDocument == null) return;
             var root = _uiDocument.rootVisualElement;
@@ -256,8 +268,60 @@ namespace SlopArena.Client.UI
                     $"{d.Name}-cooldown", $"{d.Name}-timer", $"{d.Name}-key", $"{d.Name}-flash");
             }
 
-            for (int i = 0; i < AbilitySlotDefs.Length; i++)
-                _abilitySlots[i].Key.text = HumanInputActions.BindingLabel(AbilitySlotDefs[i].Action, HumanInputActions.KeyboardGroup);
+            _promptAtlas ??= new InputPromptAtlas();
+            UpdateBindingPrompts();
+        }
+
+        private void UpdateBindingPrompts()
+        {
+            _showGamepadPrompts = HumanInputActions.LastUsedGamepad && Gamepad.current != null;
+            _seenBindingRevision = HumanInputActions.BindingRevision;
+            string group = _showGamepadPrompts ? HumanInputActions.GamepadGroup : HumanInputActions.KeyboardGroup;
+            string modifierLabel = _showGamepadPrompts
+                ? HumanInputActions.BindingLabel("SpecialModifier", group) : null;
+            string modifierPath = _showGamepadPrompts
+                ? BindingPath("SpecialModifier", group) : null;
+
+            for (int i = 0; i < _abilitySlots.Length; i++)
+            {
+                var slot = _abilitySlots[i];
+                string action = _showGamepadPrompts && i >= 4
+                    ? AbilitySlotDefs[i - 4].Action : AbilitySlotDefs[i].Action;
+                string label = HumanInputActions.BindingLabel(action, group);
+                string path = BindingPath(action, group);
+                bool chord = _showGamepadPrompts && i >= 4;
+                bool hasButton = _showGamepadPrompts
+                    ? _promptAtlas.TryXbox(path, out var buttonGlyph)
+                    : _promptAtlas.TryKeyboard(path, label, out buttonGlyph);
+                InputPromptAtlas.Glyph modifierGlyph = default;
+                bool hasModifier = chord && _promptAtlas.TryXbox(modifierPath, out modifierGlyph);
+                bool useImages = hasButton && (!chord || hasModifier);
+
+                slot.Modifier.style.display = useImages && chord ? DisplayStyle.Flex : DisplayStyle.None;
+                slot.Plus.style.display = useImages && chord ? DisplayStyle.Flex : DisplayStyle.None;
+                slot.Button.style.display = useImages ? DisplayStyle.Flex : DisplayStyle.None;
+                slot.Key.style.display = useImages ? DisplayStyle.None : DisplayStyle.Flex;
+                if (useImages)
+                {
+                    if (chord) SetPromptImage(slot.Modifier, modifierGlyph);
+                    SetPromptImage(slot.Button, buttonGlyph);
+                }
+                else
+                    slot.Key.text = chord && modifierLabel != "Unbound" && label != "Unbound"
+                        ? $"{modifierLabel} + {label}" : label;
+            }
+        }
+
+        private static string BindingPath(string action, string group)
+        {
+            int index = HumanInputActions.BindingIndex(action, group);
+            return index < 0 ? null : HumanInputActions.Get(action).bindings[index].effectivePath;
+        }
+
+        private static void SetPromptImage(Image image, InputPromptAtlas.Glyph glyph)
+        {
+            image.image = glyph.Texture;
+            image.uv = glyph.Uv;
         }
 
         private OverheadPanel BuildOverheadPanel(HudPlayer p, int colorIndex)
@@ -485,7 +549,7 @@ namespace SlopArena.Client.UI
             foreach (var kv in _billboardPanels)
                 UpdatePanel(kv.Value, _getState(kv.Key));
 
-            // Action bar — local player only.
+            // Kit diamonds — local player only.
             if (_localEntityId != 0)
             {
                 var state = _getState(_localEntityId);
@@ -562,6 +626,10 @@ namespace SlopArena.Client.UI
         private void Update()
         {
             float dt = Time.unscaledDeltaTime;
+            if (_abilitySlots.Length > 0 &&
+                (_seenBindingRevision != HumanInputActions.BindingRevision ||
+                 _showGamepadPrompts != (HumanInputActions.LastUsedGamepad && Gamepad.current != null)))
+                UpdateBindingPrompts();
             UpdateNetworkStats();
 
             for (int i = 0; i < _abilitySlots.Length; i++) TickSlotJuice(_abilitySlots[i], dt);

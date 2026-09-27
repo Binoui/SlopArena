@@ -4,13 +4,19 @@
     <ui:VisualElement name="frontend-shell" class="frontend-shell">
         <ui:VisualElement name="shell-backdrop" class="shell-backdrop" picking-mode="Ignore" />
         <ui:VisualElement name="shell-top-bar" class="shell-top-bar">
-            <ui:Label name="shell-wordmark" text="SLOPARENA" class="shell-wordmark" />
+            <ui:Button name="shell-wordmark" text="SLOPARENA" tooltip="Home" class="shell-wordmark" />
+            <ui:VisualElement name="shell-nav" class="shell-nav">
+                <ui:Button name="shell-nav-online" text="ONLINE" class="shell-nav-tab" />
+                <ui:Button name="shell-nav-training" text="TRAINING" class="shell-nav-tab" />
+                <ui:Button name="shell-nav-offline" text="SOLO" class="shell-nav-tab" />
+            </ui:VisualElement>
             <ui:Label name="shell-page-context" text="" class="shell-page-context" />
             <ui:VisualElement name="shell-top-bar-spacer" class="shell-top-bar-spacer" />
             <ui:Label name="shell-topbar-hint" text="" class="shell-topbar-hint" picking-mode="Ignore" />
             <!-- Shared identity entry (issue #220): name plus true social
                  connection status; activating it opens the shared identity
                  surface. -->
+            <ui:Button name="shell-settings" text="SETTINGS" class="shell-settings" />
             <ui:Button name="shell-identity" text="" class="shell-identity" />
             <ui:Button name="shell-menu-trigger" text="MENU" tooltip="Open menu (Esc / Start)" class="shell-menu-trigger">
                 <ui:VisualElement class="shell-menu-gear" picking-mode="Ignore" />

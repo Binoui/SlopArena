@@ -3,8 +3,8 @@ using Xunit;
 namespace SlopArena.Shared.Tests;
 
 /// <summary>
-/// Downlink per-entity envelope: entityId(8) + tick(4) + CharacterStatePacket(156)
-/// + hasInput(1) + InputState(21) when the server consumed input that tick.
+/// Downlink per-entity envelope: entityId(8) + tick(4) + CharacterStatePacket(164)
+/// + hasInput(1) + InputState(22) when the server consumed input that tick.
 /// </summary>
 public class ServerEntityPacketTests
 {
@@ -31,6 +31,7 @@ public class ServerEntityPacketTests
             Deaths = 2,
             DamagePercent = 87,
             LockOn = true,
+            TargetEntityId = 100,
             LandingLagTicks = 18,
             IsFastFalling = true,
             JumpFromSlide = true,
@@ -70,6 +71,8 @@ public class ServerEntityPacketTests
         AimPitch = 9000,
         AimDistance = 6500,
         TargetEntityId = 7,
+        RetargetPressed = true,
+        LockMode = TargetLockMode.OnHit,
     };
 
     [Fact]
@@ -111,6 +114,8 @@ public class ServerEntityPacketTests
         Assert.Equal(statePacket.DamagePercent, restored.State.DamagePercent);
         Assert.Equal(statePacket.LandingLagTicks, restored.State.LandingLagTicks);
         Assert.True(restored.State.LockOn);
+        Assert.False(restored.State.AutoLockSuppressed);
+        Assert.Equal(100UL, restored.State.TargetEntityId);
         Assert.True(restored.State.IsFastFalling);
         Assert.True(restored.State.JumpFromSlide);
         Assert.True(restored.State.SlideAttackCarryActive);
@@ -137,6 +142,8 @@ public class ServerEntityPacketTests
         Assert.Equal(input.AimPitch, restored.Input.AimPitch);
         Assert.Equal(input.AimDistance, restored.Input.AimDistance);
         Assert.Equal(input.TargetEntityId, restored.Input.TargetEntityId);
+        Assert.Equal(input.RetargetPressed, restored.Input.RetargetPressed);
+        Assert.Equal(input.LockMode, restored.Input.LockMode);
     }
 
     [Fact]
@@ -187,14 +194,14 @@ public class ServerEntityPacketTests
     [Fact]
     public void SizeConstants_AssertWireLayout()
     {
-        // Downlink max packet: 8 entityId + 4 tick + 156 state + 1 marker + 21 input.
+        // Downlink max packet: 8 entityId + 4 tick + 164 state + 1 marker + 22 input.
         Assert.Equal(8 + 4 + CharacterStatePacket.Size, ServerEntityPacket.BaseSize);
-        Assert.Equal(168, ServerEntityPacket.BaseSize);
+        Assert.Equal(176, ServerEntityPacket.BaseSize);
         Assert.Equal(1 + InputState.Size, ServerEntityPacket.RelaySize);
-        Assert.Equal(22, ServerEntityPacket.RelaySize);
-        Assert.Equal(190, ServerEntityPacket.MaxSize);
-        Assert.Equal(169, ServerEntityPacket.NoInputSize);
-        Assert.Equal(21, InputState.Size);
+        Assert.Equal(23, ServerEntityPacket.RelaySize);
+        Assert.Equal(199, ServerEntityPacket.MaxSize);
+        Assert.Equal(177, ServerEntityPacket.NoInputSize);
+        Assert.Equal(22, InputState.Size);
     }
 
     [Fact]
@@ -219,15 +226,31 @@ public class ServerEntityPacketTests
     }
 
     [Fact]
-    public void InputState_Roundtrips_FaceToCamera_And_ToggleLock_Bits()
+    public void InputState_LegacyDashBitDoesNotAliasShieldPressed()
     {
-        // flags2 bits 2 (LMB facing snap, ADR-0017) and 4 (RMB lock toggle, ADR-0018)
-        // must survive the wire — they drive sim-authoritative facing/lock state that
-        // rollback replay depends on. Bit 1 (JumpHeld) must coexist.
+        Span<byte> buffer = stackalloc byte[InputState.Size];
+
+        new InputState { Dash = true }.Write(buffer);
+        var restoredDash = InputState.Deserialize(buffer);
+        Assert.True(restoredDash.Dash);
+        Assert.False(restoredDash.ShieldPressed);
+
+        new InputState { ShieldPressed = true }.Write(buffer);
+        var restoredShieldPress = InputState.Deserialize(buffer);
+        Assert.False(restoredShieldPress.Dash);
+        Assert.True(restoredShieldPress.ShieldPressed);
+    }
+
+
+    [Fact]
+    public void InputState_Roundtrips_FaceToCamera_LockPolicy_AndRetargetBits()
+    {
         var input = new InputState
         {
             FaceToCamera = true,
             ToggleLock = true,
+            RetargetPressed = true,
+            LockMode = TargetLockMode.OnHit,
             JumpHeld = true,
         };
         Span<byte> buf = stackalloc byte[InputState.Size];
@@ -236,23 +259,38 @@ public class ServerEntityPacketTests
 
         Assert.True(restored.FaceToCamera);
         Assert.True(restored.ToggleLock);
+        Assert.True(restored.RetargetPressed);
+        Assert.Equal(TargetLockMode.OnHit, restored.LockMode);
         Assert.True(restored.JumpHeld);
+        Assert.Equal((byte)TargetLockMode.OnHit, buf[20]);
+        Assert.Equal(SimulationProtocol.Version, buf[21]);
 
-        // Defaults decode as off
         Span<byte> cleanBuf = stackalloc byte[InputState.Size];
         default(InputState).Write(cleanBuf);
         var restoredClean = InputState.Deserialize(cleanBuf);
         Assert.False(restoredClean.FaceToCamera);
         Assert.False(restoredClean.ToggleLock);
+        Assert.False(restoredClean.RetargetPressed);
+        Assert.Equal(TargetLockMode.Never, restoredClean.LockMode);
+        Assert.Equal((byte)TargetLockMode.Never, cleanBuf[20]);
         Assert.False(restoredClean.JumpHeld);
+
+        Span<byte> alwaysBuf = stackalloc byte[InputState.Size];
+        new InputState { LockMode = TargetLockMode.Always }.Write(alwaysBuf);
+        Assert.Equal((byte)1, alwaysBuf[20]);
+        Assert.Equal(TargetLockMode.Always, InputState.Deserialize(alwaysBuf).LockMode);
     }
+
     [Fact]
-    public void CodecBoundaries_RejectTruncationVersionAndRelayMismatch()
+    public void CodecBoundaries_RejectTruncationVersionLockModeAndRelayMismatch()
     {
         var input = new byte[InputState.Size];
         default(InputState).Write(input);
         Assert.Throws<ArgumentException>(() => InputState.Deserialize(input.AsSpan(0, InputState.Size - 1)));
-        input[20] = 1;
+        input[21] = 2;
+        Assert.Throws<InvalidDataException>(() => InputState.Deserialize(input));
+        default(InputState).Write(input);
+        input[20] = 3;
         Assert.Throws<InvalidDataException>(() => InputState.Deserialize(input));
 
         var packet = new ServerEntityPacket

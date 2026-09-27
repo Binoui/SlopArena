@@ -53,7 +53,7 @@ namespace SlopArena.Shared
         public ushort DamagePercent;    // 0-999, Smash-style % (increases when hit, knockback scales with it)
         public byte JumpsLeft;
         public byte AirDodgesLeft;
-        /// <summary>Ticks since last actionable event (attack, dash, jump, hit, landing). Drives FallRamp gravity.</summary>
+        /// <summary>Airborne ticks since the last gravity-window reset; selects ordinary FloatWindow gravity.</summary>
         public ushort AirTimeTicks;
         /// <summary>
         /// Consecutive ticks the jump key has been held (issue #116 / ADR-0016). Reset when
@@ -82,21 +82,15 @@ namespace SlopArena.Shared
 
         public byte Deaths;              // match death counter, server authority
 
-        /// <summary>
-        /// ── Dash ──
-        /// </summary>
+        /// <summary>Legacy universal Dash timers retained in the versioned state packet;
+        /// no input path consumes them after the forward air-dodge cutover.</summary>
         public ushort DashCooldownTicks;
-        /// <summary>
-        /// remaining dash ticks
-        /// </summary>
         public ushort DashDurationTicks;
-        /// <summary>Direction is also used by forward air dodge while an air-dodge state is active.</summary>
+        /// <summary>Facing snapshot direction used while forward air dodge is moving.</summary>
         public float DashDirX, DashDirZ;
 
-        /// <summary>
-        /// ── Invincibility (dash, respawn) ──
-        /// </summary>
-        public ushort InvincibilityTicks; // remaining ticks of invincibility
+        /// <summary>Remaining respawn, ledge, or forward air-dodge invulnerability ticks.</summary>
+        public ushort InvincibilityTicks;
 
         /// <summary>
         /// ── Combo / Attack ──
@@ -222,10 +216,8 @@ namespace SlopArena.Shared
         /// the Rush kick-off window has expired.
         /// </summary>
         public ushort RushTicks;
-        /// <summary>Re-grab lockout after a voluntary ledge drop (S-drop) or a walk-off.
-        /// Prevents an immediate re-grab so those escapes actually fall. On-wire
-        /// (CharacterStatePacket) so the rollback opponent track reproduces it exactly.
-        /// Self-expires (TickTimers) and only delays a re-grab.</summary>
+        /// <summary>Reserved ledge re-grab timer; retained in the versioned state packet
+        /// while automatic ledge grabs are disabled.</summary>
         public ushort LedgeRegrabLockTicks;
 
         /// <summary>
@@ -243,14 +235,14 @@ namespace SlopArena.Shared
         /// <summary>Soft-lock target entity ID. 0 = none.</summary>
         public ulong TargetEntityId;
         /// <summary>
-        /// Persistent target lock (ADR-0018, issue #127): sim-authoritative toggle set
-        /// from the client's RMB edge bit. While true, <c>ProcessTargetLock</c> lerps
-        /// facing toward the resolved target every tick — ground and air, outside
-        /// attacks too. Cleared by toggle-off, target beyond lock range, an accepted
-        /// LMB facing snap (ADR-0017), or death (fresh respawn state). ON THE WIRE —
-        /// the client reads it for the lock indicator.
+        /// Persistent target lock state, set by explicit toggle or automatic policy.
         /// </summary>
         public bool LockOn;
+        /// <summary>
+        /// An explicit toggle-off suppresses automatic reacquisition until a manual
+        /// toggle-on or retarget request. Rollback state packet carries this flag.
+        /// </summary>
+        public bool AutoLockSuppressed;
 
         /// <summary>
         /// <summary>

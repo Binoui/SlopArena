@@ -6,25 +6,12 @@
 
         <ui:VisualElement name="chat-collapsed" class="chat-collapsed">
             <ui:Button name="chat-open" text="CHAT" class="chat-open" />
-            <ui:Label name="chat-status-collapsed" class="chat-status" />
             <ui:Label name="chat-unread" class="chat-unread" />
         </ui:VisualElement>
 
-        <!-- Compact menu presentation (issue #220): no big CHAT title, no
-             permanent rename form, no per-line mute buttons, no persistent
-             member list. Channel row, history, composer; directory and
-             conversation management behind the explicit DIRECT view and the
-             expanded surface. Identity lives in the shared shell surface. -->
+        <!-- The shell owns account identity. This presenter owns chat channels,
+             conversation state and its compact/expanded presentation. -->
         <ui:VisualElement name="chat-panel" class="chat-panel">
-            <ui:VisualElement class="chat-header">
-                <ui:Label name="chat-title-header" text="CHAT" class="chat-title" />
-                <ui:Label name="chat-status-header" class="chat-status chat-status--header" />
-                <ui:VisualElement class="chat-header-actions">
-                    <ui:Button name="chat-identity" text="IDENTITY" class="chat-close" />
-                    <ui:Button name="chat-expand" text="EXPAND" class="chat-close" />
-                    <ui:Button name="chat-close" text="MINIMIZE" class="chat-close" />
-                </ui:VisualElement>
-            </ui:VisualElement>
 
             <ui:VisualElement name="chat-main" class="chat-main">
                 <ui:VisualElement class="chat-tabs">
@@ -39,15 +26,31 @@
                         <ui:Button name="directory-refresh" text="REFRESH PLAYERS" class="chat-action chat-action--small" />
                         <ui:Label name="online-feedback" class="chat-feedback" />
                         <ui:ScrollView name="online-list" class="online-list" horizontal-scroller-visibility="Hidden" />
-                        <ui:ScrollView name="chat-history" class="chat-history" vertical-scroller-visibility="Auto" horizontal-scroller-visibility="Hidden" />
+                        <ui:ScrollView name="chat-history" class="chat-history" vertical-scroller-visibility="Auto" horizontal-scroller-visibility="Hidden">
+                            <ui:Label name="history-feedback" class="chat-feedback chat-feedback--in-history" />
+                        </ui:ScrollView>
                         <ui:Button name="chat-newest" text="RETURN TO NEWEST" class="chat-newest" />
                         <ui:VisualElement class="chat-compose">
                             <ui:TextField name="chat-draft" placeholdertext="Message literally…" class="chat-draft" />
                             <ui:Button name="chat-send" text="SEND" class="chat-action chat-action--primary" />
                         </ui:VisualElement>
-                        <ui:Label name="history-feedback" class="chat-feedback" />
                     </ui:VisualElement>
                 </ui:VisualElement>
+            </ui:VisualElement>
+            <ui:VisualElement name="chat-corner-actions" class="chat-corner-actions">
+                <ui:Button name="chat-expand" tooltip="Expand chat" class="chat-icon-button">
+                    <ui:VisualElement class="chat-icon-expand" picking-mode="Ignore">
+                        <ui:VisualElement class="chat-icon-expand-corner chat-icon-expand-corner--top" picking-mode="Ignore" />
+                        <ui:VisualElement class="chat-icon-expand-corner chat-icon-expand-corner--bottom" picking-mode="Ignore" />
+                    </ui:VisualElement>
+                </ui:Button>
+                <ui:Button name="chat-close" tooltip="Minimize chat" class="chat-icon-button">
+                    <ui:VisualElement name="chat-close-icon" class="chat-icon-minimize" picking-mode="Ignore" />
+                </ui:Button>
+            </ui:VisualElement>
+            <ui:VisualElement name="chat-resize-grip" class="chat-resize-grip" tooltip="Drag to resize chat">
+                <ui:VisualElement class="chat-resize-mark" picking-mode="Ignore" />
+                <ui:VisualElement class="chat-resize-mark chat-resize-mark--second" picking-mode="Ignore" />
             </ui:VisualElement>
         </ui:VisualElement>
     </ui:VisualElement>

@@ -77,6 +77,116 @@ public class RollbackSimulatorTests
     }
 
     [Fact]
+    public void AirDodgeSnapshot_ReplaysInvulnerabilityMovementAndRecoveryBoundaries()
+    {
+        var arena = TestHelpers.TestArena();
+        var def = TestHelpers.MankiDef;
+        var airborne = TestHelpers.PlayerState(x: 10f);
+        airborne.PY = TestHelpers.GroundPY(def) + 10f;
+        airborne.VX = airborne.VY = airborne.VZ = 0f;
+        airborne.IsGrounded = false;
+        airborne.JumpsLeft = 0;
+        airborne.AirDodgesLeft = 1;
+        airborne.FacingYaw = 0f;
+
+        var authority = TestHelpers.MakeSim(arena);
+        authority.RegisterEntity(OpponentId, def, airborne);
+        var dodgeInput = new InputState { ShieldHeld = true, ShieldPressed = true };
+        authority.Tick(new Dictionary<ulong, InputState> { [OpponentId] = dodgeInput });
+        var accepted = authority.GetState(OpponentId);
+        Assert.Equal(ActionState.AirDodgeMovement, accepted.State);
+        Assert.Equal((ushort)5, accepted.InvincibilityTicks);
+        Assert.Equal((byte)0, accepted.AirDodgesLeft);
+        Assert.Equal(0f, accepted.DashDirX);
+        Assert.Equal(1f, accepted.DashDirZ);
+
+        var authoritativePacket = new ServerEntityPacket
+        {
+            EntityId = OpponentId,
+            Tick = 1,
+            State = CharacterStatePacket.FromState(accepted, tick: 1),
+            HasInput = true,
+            Input = dodgeInput,
+        };
+        var bytes = new byte[ServerEntityPacket.MaxSize];
+        authoritativePacket.Serialize(bytes);
+        var decodedPacket = ServerEntityPacket.Deserialize(bytes);
+
+        var reference = TestHelpers.MakeSim(arena);
+        reference.RegisterEntity(OpponentId, def, accepted);
+        var referenceInput = new Dictionary<ulong, InputState> { [OpponentId] = default };
+
+        CharacterState ReconstructAt(uint replayTicks)
+        {
+            var rollback = new SlopArena.Shared.Rollback.RollbackSimulator(arena, SelfId);
+            var self = TestHelpers.PlayerState(x: -10f);
+            self.PY = TestHelpers.GroundPY(def);
+            self.IsGrounded = true;
+            rollback.RegisterEntity(SelfId, def, self);
+            rollback.RegisterEntity(OpponentId, def, accepted);
+
+            var localInput = new Dictionary<ulong, InputState> { [SelfId] = default };
+            for (uint tick = 0; tick < replayTicks + 1; tick++)
+                rollback.Tick(localInput);
+            rollback.IngestOpponentBatch(new[] { decodedPacket });
+            return rollback.GetState(OpponentId);
+        }
+
+        for (uint replayTicks = 1; replayTicks <= 30; replayTicks++)
+        {
+            reference.Tick(referenceInput);
+            if (replayTicks is not (4 or 5 or 9 or 10 or 29 or 30))
+                continue;
+
+            var expected = reference.GetState(OpponentId);
+            var actual = ReconstructAt(replayTicks);
+            Assert.Equal(expected.State, actual.State);
+            Assert.Equal(expected.StateTicks, actual.StateTicks);
+            Assert.Equal(expected.IsGrounded, actual.IsGrounded);
+            Assert.Equal(expected.PX, actual.PX);
+            Assert.Equal(expected.PY, actual.PY);
+            Assert.Equal(expected.PZ, actual.PZ);
+            Assert.Equal(expected.VX, actual.VX);
+            Assert.Equal(expected.VY, actual.VY);
+            Assert.Equal(expected.VZ, actual.VZ);
+            Assert.Equal(expected.DashDirX, actual.DashDirX);
+            Assert.Equal(expected.DashDirZ, actual.DashDirZ);
+            Assert.Equal(expected.AirTimeTicks, actual.AirTimeTicks);
+            Assert.Equal(expected.InvincibilityTicks, actual.InvincibilityTicks);
+            Assert.Equal(expected.AirDodgesLeft, actual.AirDodgesLeft);
+            Assert.Equal(expected.AirDodgeRecoveryTicks, actual.AirDodgeRecoveryTicks);
+
+            switch (replayTicks)
+            {
+                case 4:
+                    Assert.Equal(ActionState.AirDodgeMovement, actual.State);
+                    Assert.Equal((ushort)1, actual.InvincibilityTicks);
+                    Assert.True(actual.PZ > accepted.PZ);
+                    break;
+                case 5:
+                    Assert.Equal(ActionState.AirDodgeMovement, actual.State);
+                    Assert.Equal((ushort)0, actual.InvincibilityTicks);
+                    break;
+                case 9:
+                    Assert.Equal(ActionState.AirDodgeMovement, actual.State);
+                    break;
+                case 10:
+                    Assert.Equal(ActionState.AirDodgeRecovery, actual.State);
+                    Assert.Equal((ushort)20, actual.AirDodgeRecoveryTicks);
+                    break;
+                case 29:
+                    Assert.Equal(ActionState.AirDodgeRecovery, actual.State);
+                    Assert.Equal((ushort)1, actual.AirDodgeRecoveryTicks);
+                    break;
+                case 30:
+                    Assert.Equal(ActionState.Idle, actual.State);
+                    Assert.Equal((ushort)0, actual.AirDodgeRecoveryTicks);
+                    break;
+            }
+        }
+    }
+
+    [Fact]
     public void ReconcileSelf_RoutesToLocalTrack_IncrementsCorrectionCount()
     {
         var arena = TestHelpers.TestArena();

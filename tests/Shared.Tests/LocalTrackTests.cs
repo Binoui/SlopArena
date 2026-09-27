@@ -37,6 +37,55 @@ public class LocalTrackTests
         Assert.Equal(referenceResult.State, localResult.State);
     }
 
+    [Fact]
+    public void AirDodgeSelfCorrectionReplaysCapturedDirectionAndRecovery()
+    {
+        var arena = TestHelpers.TestArena();
+        var def = TestHelpers.MankiDef;
+        var initial = TestHelpers.PlayerState() with
+        {
+            PX = 10f, PY = 20f, PZ = 10f, IsGrounded = false,
+            FacingYaw = 0f, AirDodgesLeft = 1,
+        };
+        var track = new SlopArena.Shared.Rollback.LocalTrack(arena, SelfId);
+        track.RegisterEntity(def, initial);
+        var authority = TestHelpers.MakeSim(arena);
+        authority.RegisterEntity(SelfId, def, initial);
+
+        CharacterState corrected = default;
+        for (int tick = 1; tick <= 20; tick++)
+        {
+            var input = new InputState
+            {
+                ShieldPressed = tick == 1, MoveY = tick % 2 == 0 ? -1f : 1f,
+                FaceToCamera = tick > 1, AimYaw = 18000,
+            };
+            track.Tick(input);
+            authority.Tick(new Dictionary<ulong, InputState> { [SelfId] = input });
+            if (tick == 3)
+            {
+                corrected = authority.GetState(SelfId);
+                corrected.PZ += 0.5f;
+                authority.GetAllStates()[SelfId] = corrected;
+            }
+        }
+        track.ReconcileWithServer(new ServerEntityPacket
+        {
+            EntityId = SelfId, Tick = 3, State = CharacterStatePacket.FromState(corrected),
+        });
+
+        var expected = authority.GetState(SelfId);
+        var actual = track.GetState();
+        Assert.Equal(ActionState.AirDodgeRecovery, actual.State);
+        Assert.Equal(expected.StateTicks, actual.StateTicks);
+        Assert.Equal(expected.AirDodgeRecoveryTicks, actual.AirDodgeRecoveryTicks);
+        Assert.Equal(expected.AirDodgesLeft, actual.AirDodgesLeft);
+        Assert.Equal(expected.InvincibilityTicks, actual.InvincibilityTicks);
+        TestHelpers.AssertNear(expected.PZ, actual.PZ);
+        TestHelpers.AssertNear(expected.VZ, actual.VZ);
+        TestHelpers.AssertNear(expected.DashDirZ, actual.DashDirZ);
+    }
+
 
     [Theory]
     [InlineData("slide-stop", 28)]
@@ -220,4 +269,24 @@ public class LocalTrackTests
 
         Assert.Null(ex);
     }
+
+    [Fact]
+    public void SyncOpponentMirror_CoupledStateDoesNotAuthoritativelyLinkSelf()
+    {
+        var track = new SlopArena.Shared.Rollback.LocalTrack(TestHelpers.TestArena(), SelfId);
+        track.RegisterEntity(TestHelpers.MankiDef, TestHelpers.PlayerState());
+        var opponent = TestHelpers.PlayerState(x: 5f);
+        opponent.State = ActionState.Throwing;
+        opponent.InteractionId = 72;
+        opponent.InteractionPartnerId = SelfId;
+        opponent.InteractionTick = 1;
+        track.SyncOpponentMirror(OpponentId, TestHelpers.MankiDef, opponent);
+
+        track.Tick(default);
+
+        Assert.Equal((ulong)0, track.GetState().InteractionId);
+        Assert.NotEqual(ActionState.Grabbed, track.GetState().State);
+        Assert.NotEqual(ActionState.Throwing, track.GetState().State);
+    }
+
 }

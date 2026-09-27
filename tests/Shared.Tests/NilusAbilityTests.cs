@@ -1169,42 +1169,7 @@ public class NilusAbilityTests
     }
 
     /// <summary>
-    /// The input lock must outlast the ability by one tick. TickTimers decrements
-    /// AnimLockTicks (Simulation.cs:405) before TickAbilities runs, so a lock of exactly 132
-    /// is already 0 on ability tick 132 — and a player still holding dash would StartDash on
-    /// the detonation tick, leave Attacking, and have the instance discarded
-    /// (ServerSimulation.cs:143) one tick short of the blast. Losing the payoff of a 540-tick
-    /// cooldown to your own movement input is not an acceptable failure mode for an ult.
-    /// </summary>
-    [Fact]
-    public void F_HoldingDashThroughTheUltCannotCancelTheDetonation()
-    {
-        var sim = SimWithPlayer();
-        var npc = TestHelpers.NpcState(0f, 5f);
-        npc.PY = GroundPY;
-        TestHelpers.RegisterNpc(sim, Def, npc);
-
-        var mashing = TestHelpers.Input(dash: true);
-        mashing.MoveY = 1f;
-
-        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 6) }, { 100, default } });   // tick 1
-        for (int i = 0; i < 131; i++) sim.Tick(new() { { 1, mashing }, { 100, default } }); // → tick 132
-
-        var hit = sim.GetState(100);
-        Assert.Equal((ushort)36, hit.DamagePercent);       // 6 drag pulses + the detonation
-        Assert.Equal((ushort)12, hit.HitstopTicks);        // blast freeze (ADR-0012), receiver-only
-        TestHelpers.AssertNear(0f, sim.GetState(1).PZ, 0.3f);
-
-        // Freeze expires — the blast launch lands.
-        for (int i = 0; i < 12; i++) sim.Tick(new() { { 1, mashing }, { 100, default } });
-        var launched = sim.GetState(100);
-        Assert.Equal(ActionState.Hitstun, launched.State);
-        Assert.True(launched.KVZ > 1f, $"the blast still has to land, got KVZ={launched.KVZ:F2}");
-    }
-
-    /// <summary>
-    /// Jump is now gated on <c>AnimLockTicks == 0</c> (Simulation.cs:220), same as dash.
-    /// Pressing jump during Event Horizon keeps Nilus in Attacking and the detonation fires.
+    /// Jump cannot interrupt Event Horizon while its ability lock is active.
     /// </summary>
     [Fact]
     public void F_JumpIsBlocked_DuringEventHorizon()

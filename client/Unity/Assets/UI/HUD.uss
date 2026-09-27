@@ -1,5 +1,5 @@
 /* SlopArena broadcast HUD — underground fight-poster prototype.
-   Match state owns the lower third; the local kit is a separate utility strip. */
+   The local kit uses two ability diamonds below the match readouts. */
 
 .hud-root {
     flex-grow: 1;
@@ -253,39 +253,49 @@
     -unity-font-style: bold;
 }
 
-/* Icon-first local kit. Keys are reminders; art and cooldown state own the tile. */
-.action-bar {
+/* Local kit: four normal slots on orange, four special slots on blue. */
+.kit-diamonds {
     position: absolute;
     left: 0;
     right: 0;
-    bottom: 9px;
-    height: 48px;
+    bottom: 10px;
+    height: 200px;
     flex-direction: row;
     justify-content: center;
-    align-items: flex-end;
+    align-items: center;
 }
 
 .slot-group {
-    flex-direction: row;
-    padding: 2px;
+    position: relative;
+    width: 200px;
+    height: 200px;
     margin: 0 5px;
-    background-color: rgba(13, 13, 20, 0.84);
+    -unity-background-scale-mode: scale-to-fit;
+}
+
+.normal-diamond {
+    background-image: url("HUDNormalDiamond.png");
+}
+
+.special-diamond {
+    background-image: url("HUDSpecialDiamond.png");
 }
 
 .slot {
-    position: relative;
-    width: 44px;
-    height: 44px;
-    margin: 0 1px;
-    overflow: hidden;
-    align-items: center;
-    justify-content: center;
-    background-color: #24202b;
-    border-bottom-width: 3px;
-    border-bottom-color: #625c6b;
+    position: absolute;
+    width: 70px;
+    height: 70px;
+    overflow: visible;
+    background-image: url("HUDSlotBase.png");
+    -unity-background-scale-mode: scale-to-fit;
     transition-property: scale, translate;
     transition-duration: 0.12s;
 }
+
+.slot-top    { left: 65px; top: 14px; }
+.slot-right  { left: 116px; top: 65px; }
+.slot-bottom { left: 65px; top: 116px; }
+.slot-left   { left: 14px; top: 65px; }
 
 .slot.ready-pulse {
     scale: 1.1;
@@ -298,17 +308,26 @@
 }
 
 .slot.locked {
-    opacity: 0.2;
+    opacity: 0.35;
+}
+
+.slot-content {
+    position: absolute;
+    left: 6px;
+    right: 6px;
+    top: 6px;
+    bottom: 6px;
+    overflow: hidden;
+    border-radius: 50%;
 }
 
 .slot-icon-inner {
     position: absolute;
-    left: 1px;
-    top: 1px;
-    right: 1px;
-    bottom: 1px;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
     -unity-background-scale-mode: scale-to-fit;
-    background-color: rgba(240, 238, 232, 0.05);
 }
 
 .slot-flash {
@@ -343,8 +362,8 @@
     position: absolute;
     left: 0;
     right: 0;
-    top: 30%;
-    font-size: 13px;
+    top: 18px;
+    font-size: 16px;
     -unity-font-style: bold;
     -unity-text-align: middle-center;
     -unity-text-outline-width: 1px;
@@ -352,18 +371,45 @@
     color: #f0eee8;
 }
 
-.slot-key-label {
+.slot-prompt {
     position: absolute;
-    left: 2px;
-    bottom: 2px;
-    min-width: 10px;
-    height: 10px;
-    padding: 0 1px;
-    font-size: 6px;
+    left: -10px;
+    top: -8px;
+    width: 90px;
+    height: 24px;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+}
+
+.slot-prompt-image {
+    display: none;
+    width: 23px;
+    height: 23px;
+    -unity-background-scale-mode: scale-to-fit;
+}
+
+.slot-prompt-plus {
+    display: none;
+    margin: 0 1px;
+    font-size: 12px;
+    -unity-font-style: bold;
+    color: #f0eee8;
+    -unity-text-outline-width: 2px;
+    -unity-text-outline-color: #19131b;
+}
+
+.slot-key-label {
+    min-width: 32px;
+    max-width: 90px;
+    height: 19px;
+    padding: 0 2px;
+    font-size: 11px;
     -unity-font-style: bold;
     -unity-text-align: middle-center;
-    color: #19131b;
-    background-color: rgba(240, 238, 232, 0.88);
+    color: #f0eee8;
+    background-color: #19131b;
+    border-radius: 10px;
 }
 
 

@@ -6,9 +6,10 @@ public class ActionStateClassifierTests
 {
     [Theory]
     [InlineData(ActionState.Idle, true)]
-    [InlineData(ActionState.Dashing, true)]
+    [InlineData((ActionState)1, false)]
     [InlineData(ActionState.JumpSquat, true)]
-    [InlineData(ActionState.AirDodging, true)]
+    [InlineData(ActionState.AirDodgeMovement, true)]
+    [InlineData(ActionState.AirDodgeRecovery, true)]
     [InlineData(ActionState.Run, true)]
     [InlineData(ActionState.Attacking, false)]
     [InlineData(ActionState.Aiming, false)]   // depends on the ServerAbility instance (release detection)

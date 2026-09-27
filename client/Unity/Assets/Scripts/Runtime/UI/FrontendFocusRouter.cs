@@ -90,10 +90,16 @@ namespace SlopArena.Client.UI
             _regionFocus[(int)UiRegion.Page] = null;
             if (_region == UiRegion.TopBar)
                 _regionBeforeTopBar = UiRegion.Page;
-            _region = UiRegion.Page;
+            _region = page == FrontendPage.Home ? UiRegion.TopBar : UiRegion.Page;
             _chatRootResolved = false;
             ApplyRegionFocusability();
             UpdateHints();
+            if (page == FrontendPage.Home)
+                _shell?.TopBar?.schedule.Execute(() =>
+                {
+                    if (FrontendController.CurrentPage == FrontendPage.Home && !UiModalState.Presented)
+                        FocusRegionDefault(UiRegion.TopBar);
+                }).StartingIn(0);
         }
 
         private void Update()
@@ -158,11 +164,9 @@ namespace SlopArena.Client.UI
             // Escape closes it before any region switch (issue #220).
             if (ChatOverlay.IsExpandedSocialOpen)
                 return;
-            UiRegion target = _region switch
-            {
-                UiRegion.Page => UiRegion.Social,
-                _ => UiRegion.Page
-            };
+            UiRegion target = FrontendController.CurrentPage == FrontendPage.Home
+                ? (_region == UiRegion.Social ? UiRegion.TopBar : UiRegion.Social)
+                : _region == UiRegion.Page ? UiRegion.Social : UiRegion.Page;
             SetActiveRegion(target, focusTarget: true);
             UISFX.PlayClick();
         }
@@ -181,13 +185,10 @@ namespace SlopArena.Client.UI
             if (!key && !pad)
                 return;
             if (_region == UiRegion.TopBar)
-            {
-                SetActiveRegion(_regionBeforeTopBar, focusTarget: true);
-            }
+                SetActiveRegion(FrontendController.CurrentPage == FrontendPage.Home
+                    ? UiRegion.Social : _regionBeforeTopBar, focusTarget: true);
             else
-            {
                 SetActiveRegion(UiRegion.TopBar, focusTarget: true);
-            }
             UISFX.PlayClick();
         }
 
@@ -356,6 +357,8 @@ namespace SlopArena.Client.UI
                 SetActiveRegion(UiRegion.Social, focusTarget: false);
                 return;
             }
+            if (FrontendController.CurrentPage == FrontendPage.Home)
+                return; // Home has no page-owned controls; the logo and modes own navigation.
             bool inPage = shell.PageContentRoot != null && shell.PageContentRoot.Contains(target);
             bool changed = _region != UiRegion.Page;
             SetActiveRegion(UiRegion.Page, focusTarget: false);
@@ -516,8 +519,10 @@ namespace SlopArena.Client.UI
             if (!show)
                 return;
             _regionHint.text = _region == UiRegion.Page ? "Q/Y // SOCIAL" : "Q/Y // PAGE";
-            // The chip floats just above the reserved cell so it never covers
-            // the composer or the history feedback (issue #219).
+            // The chip floats just above the reserved shell cell so it never
+            // covers the composer or the history feedback (issue #219). The
+            // hint resolves only against the shell cell; gameplay has no
+            // FocusRouter instance.
             _regionHint.style.top = -24;
             _regionHint.style.bottom = StyleKeyword.Auto;
             _regionHint.style.left = 0;
@@ -563,7 +568,8 @@ namespace SlopArena.Client.UI
         {
             if (ChatOverlay.IsExpandedSocialOpen)
                 return;
-            SetActiveRegion(UiRegion.Page, focusTarget: true);
+            SetActiveRegion(FrontendController.CurrentPage == FrontendPage.Home
+                ? UiRegion.TopBar : UiRegion.Page, focusTarget: true);
         }
 
         /// <summary>
@@ -573,7 +579,8 @@ namespace SlopArena.Client.UI
         public void NotifyModalClosed()
         {
             if (_region == UiRegion.TopBar && !ChatOverlay.IsExpandedSocialOpen)
-                SetActiveRegion(_regionBeforeTopBar, focusTarget: true);
+                SetActiveRegion(FrontendController.CurrentPage == FrontendPage.Home
+                    ? UiRegion.TopBar : _regionBeforeTopBar, focusTarget: true);
             ApplyRegionFocusability();
             UpdateHints();
         }

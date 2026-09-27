@@ -96,6 +96,16 @@ There are no reports, bans, moderation dashboard, or durable account-blocking sy
 
 Use one shared chat interface across menus, Training, Room Lobby, fights, results, and rematches. Preserve the existing [visual language](visual-language.md); this task does not authorize a redesign of unrelated menus or HUD elements.
 
+The presenter reuses one `ChatOverlay` across Frontend and gameplay hosts. It has no
+title header: Expand and Minimize icons sit immediately left of the top-right resize
+grip, and the active direct conversation is named on its DIRECT tab. Identity stays in
+the shell, while connection and send failures render as a line inside the message
+history instead of below the composer. Dragging the frame's corner saves one shared
+physical width/height in PlayerPrefs and reapplies it across scenes and launches,
+clamped to each host's usable viewport. The menu chat keeps its bottom-left cell;
+gameplay chat anchors to the left side of the HUD. Match entry still closes
+interactive chat so retained presentation preferences never bypass input gating.
+
 Expanded chat has separate Global and Server tabs, plus a Direct area with a conversation list. Keep the active destination visible beside the composer. Server Chat keeps the `SERVER CHAT` label and is available from the shared chat UI, including Room Lobby, only while Room membership is active. Do not silently redirect a draft when its Room or recipient becomes unavailable.
 
 During combat, show a small fading feed of clearly labeled Global/Server messages authorized for the current Room. Apply the three-line/eight-second defaults without covering stocks, damage, move indicators, or other critical combat information.

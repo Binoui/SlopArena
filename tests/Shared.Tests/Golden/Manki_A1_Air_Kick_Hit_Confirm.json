@@ -23,11 +23,12 @@
     "JumpsLeft": 2
   },
   "PlayerFinal": {
-    "State": 10,
     "FacingYaw": 1.5707964,
     "PX": -0.3,
-    "PY": 0.75,
+    "PY": -6.083332,
     "PZ": 1.3113417E-08,
+    "VY": -13.5,
+    "AirTimeTicks": 76,
     "JumpsLeft": 2
   },
   "NpcFinal": {

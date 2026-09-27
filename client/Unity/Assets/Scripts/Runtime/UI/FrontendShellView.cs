@@ -47,6 +47,8 @@ namespace SlopArena.Client.UI
         private bool _densityBound;
         private bool _densityGeometryApplied;
         private float _lastPanelScale;
+        private float _preferredCellWidthPx;
+        private float _preferredCellHeightPx;
 
         /// <summary>The stable shell root; null before the document binds.</summary>
         public VisualElement? Root => _root;
@@ -117,6 +119,8 @@ namespace SlopArena.Client.UI
             _settingsButton = documentRoot.Q<Button>("shell-menu-settings");
             var quitButton = documentRoot.Q<Button>("shell-menu-quit");
             var menuTrigger = documentRoot.Q<Button>("shell-menu-trigger");
+            var settingsTopButton = documentRoot.Q<Button>("shell-settings");
+            if (settingsTopButton != null) settingsTopButton.clicked += OpenSettingsFromTopBar;
             if (menuTrigger != null) menuTrigger.clicked += ToggleMenu;
             if (_resumeButton != null) _resumeButton.clicked += CloseMenu;
             if (_settingsButton != null) _settingsButton.clicked += OpenSettings;
@@ -131,6 +135,8 @@ namespace SlopArena.Client.UI
                 enabled = false;
                 return;
             }
+            var packSkin = Resources.Load<StyleSheet>("UI/LocalPack/PackSkin");
+            if (packSkin != null) _topBar?.styleSheets.Add(packSkin);
 
             // The page content region spans the three page hosts; the social
             // cell sits inside the workspace too, so region operations must
@@ -204,8 +210,17 @@ namespace SlopArena.Client.UI
             float requestedScale = ClientSettingsService.Instance.UiScale / 100f;
             float spacing = (_compact ? 16f : 24f) * requestedScale / scale;
             float barHeight = (_compact ? 56f : 64f) * requestedScale / scale;
-            float cellWidth = (_compact ? 380f : 480f) * requestedScale / scale;
-            float cellHeight = (_compact ? 190f : 230f) * requestedScale / scale;
+            float defaultCellWidthPx = _compact ? 380f : 480f;
+            float defaultCellHeightPx = _compact ? 190f : 230f;
+            float availableWidthPx = _root.contentRect.width * scale / requestedScale;
+            float availableHeightPx = _root.contentRect.height * scale / requestedScale;
+            float maxWidthPx = Mathf.Max(120f, Mathf.Min(960f, availableWidthPx - 2f * (_compact ? 16f : 24f)));
+            float maxHeightPx = Mathf.Max(120f, Mathf.Min(availableHeightPx * 0.65f,
+                availableHeightPx - (_compact ? 56f : 64f) - 2f * (_compact ? 16f : 24f)));
+            float cellWidth = Mathf.Clamp(_preferredCellWidthPx > 0f ? _preferredCellWidthPx : defaultCellWidthPx,
+                Mathf.Min(300f, maxWidthPx), maxWidthPx) * requestedScale / scale;
+            float cellHeight = Mathf.Clamp(_preferredCellHeightPx > 0f ? _preferredCellHeightPx : defaultCellHeightPx,
+                Mathf.Min(180f, maxHeightPx), maxHeightPx) * requestedScale / scale;
             float topGap = (_compact ? 10f : 16f) * requestedScale / scale;
             float cellGap = (_compact ? 16f : 20f) * requestedScale / scale;
 
@@ -224,14 +239,26 @@ namespace SlopArena.Client.UI
                 _lowerRow.style.paddingBottom = spacing;
             }
 
-            _socialHost.style.width = cellWidth;
-            _socialHost.style.height = cellHeight;
-            _socialHost.style.marginRight = cellGap;
+            if (!_socialExpanded)
+            {
+                _socialHost.style.width = cellWidth;
+                _socialHost.style.height = cellHeight;
+                _socialHost.style.marginRight = cellGap;
+            }
             _densityGeometryApplied = true;
         }
 
         /// <summary>Whether the shell currently renders compact density.</summary>
         public bool IsCompact => _compact;
+
+        /// <summary>Set a shared physical chat size; zero restores density defaults.</summary>
+        public void SetSocialCellSize(float widthPx, float heightPx)
+        {
+            _preferredCellWidthPx = widthPx;
+            _preferredCellHeightPx = heightPx;
+            if (!_socialExpanded)
+                ApplyDensityGeometry();
+        }
 
         /// <summary>
         /// Removes mounted page sections. The social, expanded-social, top
@@ -312,7 +339,7 @@ namespace SlopArena.Client.UI
         {
             SetPageContext(page switch
             {
-                FrontendPage.Home => "HOME",
+                FrontendPage.Home => string.Empty,
                 FrontendPage.FighterSelect => "MATCH SETUP // FIGHTER SELECT",
                 FrontendPage.StageSelect => "MATCH SETUP // STAGE SELECT",
                 FrontendPage.Results => "RESULTS",
@@ -428,6 +455,15 @@ namespace SlopArena.Client.UI
                     _settingsButton?.Focus();
                 }
             });
+        }
+
+        private void OpenSettingsFromTopBar()
+        {
+            if (_settingsOverlay == null || _modalHost == null || _menuOpen || UiModalState.Presented
+                || FrontendController.Identity is { IsPresented: true })
+                return;
+            UISFX.PlayClick();
+            _settingsOverlay.Open(_modalHost);
         }
 
         private void QuitGame()

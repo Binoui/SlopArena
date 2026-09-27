@@ -13,5 +13,4 @@ public static class DefenseConfig
     public const ushort AirDodgeInvulnerabilityTicks = 5;
     public const ushort AirDodgeMovementTicks = 10;
     public const ushort AirDodgeRecoveryTicks = 20;
-    public const float AirDodgeSpeedMultiplier = 0.55f;
 }

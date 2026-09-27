@@ -3,7 +3,6 @@ using System.Linq;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UIElements;
-using UnityEngine.SceneManagement;
 using SlopArena.Shared;
 using SlopArena.Shared.AI;
 using SlopArena.Client.Network;
@@ -14,12 +13,11 @@ namespace SlopArena.Client.UI
     /// Fighter Select page (issue #219): a fragment mounted into the
     /// FrontendShell hosts — portrait grid and selection brief in the body,
     /// participant cards and CPU editing in the lower-right summary, and the
-    /// primary action outside the conversation cell. Training, Solo, and PvP
-    /// flows are unchanged:
+    /// primary action outside the conversation cell. Training and Solo use
+    /// the shared fighter and stage pickers:
     /// <list type="bullet">
-    /// <item><b>Training</b> — single-player: pick a character, click ENTER TRAINING,
-    /// launch the training scene directly.</item>
-    /// <item><b>Solo</b> — single-player: assign a player and CPU character,
+    /// <item><b>Training</b> — pick a character, then a stage before entering Training.</item>
+    /// <item><b>Solo</b> — assign a player and CPU character,
     /// choose a difficulty, then select a stage.</item>
     /// <item><b>PvP</b> — multiplayer via SignalR: all players pick simultaneously,
     /// lock in, and the host starts the match when everyone is locked in (min 2).</item>
@@ -115,7 +113,8 @@ namespace SlopArena.Client.UI
             if (_selected != CharacterClass.None)
                 SelectCharacter(_selected, _context);
 
-            if (ClientSession.SelectedOnlineMode == ClientSession.OnlineSelection.Room)
+            if (MatchConfig.Mode == GameMode.PvP &&
+                ClientSession.SelectedOnlineMode == ClientSession.OnlineSelection.Room)
                 InitRoom(_context);
             else if (MatchConfig.Mode == GameMode.PvP)
                 InitPvP(_context);
@@ -129,7 +128,7 @@ namespace SlopArena.Client.UI
         }
         private void InitTraining(FrontendPageContext context)
         {
-            SetModeChrome(context, "TRAINING // CHOOSE YOUR FIGHTER", "STEP 1 OF 1  /  FIGHTER");
+            SetModeChrome(context, "TRAINING // CHOOSE YOUR FIGHTER", "STEP 1 OF 2  /  FIGHTER");
             var rosterMeta = context.Q<Label>("roster-meta");
             if (rosterMeta != null)
                 rosterMeta.text = MenuRoster.Classes.Length == 0
@@ -144,13 +143,13 @@ namespace SlopArena.Client.UI
             if (selectButton != null)
             {
                 selectButton.style.display = DisplayStyle.Flex;
-                selectButton.text = "ENTER TRAINING";
+                selectButton.text = "SELECT STAGE";
                 selectButton.SetEnabled(MenuRoster.Classes.Length > 0);
                 selectButton.clicked += () =>
                 {
+                    if (_selected == CharacterClass.None) return;
                     MatchConfig.PlayerClass = _selected;
-                    MatchConfig.ArenaName = "training";
-                    SceneManager.LoadScene("Arena_Offline");
+                    FrontendController.Show(FrontendPage.StageSelect);
                 };
             }
 

@@ -294,7 +294,9 @@ public static class CharacterPackageAssembler
                 EnsureFields(metadata, new[] { "packageId", "version", "cookedSchemaVersion", "compatibility" }, RuntimePath + ".metadata", d);
                 if (HasObject(metadata, "compatibility"))
                     EnsureFields(metadata.GetProperty("compatibility"), new[] { "runtimeApiMin", "runtimeApiMax" }, RuntimePath + ".metadata.compatibility", d);
-                EnsureFieldsOptional(root.GetProperty("character"), new[] { "displayName", "weight", "movement", "presentation", "capsuleRadius", "capsuleHeight", "hipHeight", "hurtboxRadius", "captureGeometry", "hurtboxCapsules", "hurtboxBoneDefs", "attachmentBoneIds", "presentationIds", "capabilityRequirements", "slots" }, RuntimePath + ".character", d);
+                EnsureFieldsOptional(root.GetProperty("character"), new[] { "displayName", "weight", "movement", "presentation", "capsuleRadius", "capsuleHeight", "hipHeight", "hurtboxRadius", "shieldRadius", "captureGeometry", "hurtboxCapsules", "hurtboxBoneDefs", "attachmentBoneIds", "presentationIds", "capabilityRequirements", "slots" }, RuntimePath + ".character", d);
+                if (!root.GetProperty("character").TryGetProperty("shieldRadius", out _))
+                    d.Add(Error("package.runtime.schema", RuntimePath + ".character.shieldRadius", "Shield radius is required."));
                 if (HasObject(root.GetProperty("character"), "presentation"))
                     EnsureFields(root.GetProperty("character").GetProperty("presentation"), new[] { "idle", "run", "dash", "jump", "fall", "hitSmall", "hitMedium", "hitHard", "tumble", "crouch", "slide", "shield", "grab", "grabbed", "throwForward", "airDodge", "landStartOffsetSeconds", "modelResourcePath", "visualScale", "hurtboxBoneScale", "modelYOffset", "modelSoleOffset", "autoModelYOffset" }, RuntimePath + ".character.presentation", d);
                 if (!HasObject(root.GetProperty("character"), "captureGeometry"))

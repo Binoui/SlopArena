@@ -45,7 +45,8 @@ public sealed record CharacterAssetCatalogBindingSnapshot(string SemanticId, str
 
 public static class CharacterPackageSourceCodec
 {
-    private const ushort SchemaVersion = 1;
+    private const ushort ManifestSchemaVersion = 1;
+    private const ushort AuthoringSchemaVersion = 3;
     private static readonly JsonWriterOptions WriterOptions = new()
     {
         Encoder = JavaScriptEncoder.Default,
@@ -129,14 +130,14 @@ public static class CharacterPackageSourceCodec
             slots.Add(new CharacterSlotSource(id, suffix, "", "icon." + suffix.ToLowerInvariant(), AuthoringAbilityBehavior.MeleeCombo, AuthoringAimMode.None, 0, false, false, new CharacterTimelineSource(System.Array.Empty<CharacterStageSource>())));
         }
         return new CharacterPackageSource(
-            new PackageManifestSource(SchemaVersion, packageId, "0.0.0-dev", creator, license, attribution, System.Array.Empty<PackageDependencySource>()),
+            new PackageManifestSource(ManifestSchemaVersion, packageId, "0.0.0-dev", creator, license, attribution, System.Array.Empty<PackageDependencySource>()),
             new CharacterAuthoringDocument(
-                SchemaVersion, displayName, 0f,
+                AuthoringSchemaVersion, displayName, 0f,
                 new CharacterMovementSource(
-                    0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f,
+                    0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f, 0f,
                     0, 0, 0f, 0f, 0f, 0f, 0, 0, 0, 0),
                 new CharacterPresentationSource("", "", "", "", "", "", "", "", 0f),
-                0f, 0f, 0f, 0f,
+                0f, 0f, 0f, 0f, 1f,
                 new CharacterCaptureGeometrySource(0.9f, 0.7f, 1.2f, 0.6f,
                     new CaptureAnchorSource(0f, 0.6f, 0.3f),
                     new CaptureAnchorSource(0f, 0.6f, 0.45f)),
@@ -167,7 +168,7 @@ public static class CharacterPackageSourceCodec
             {
                 Weight = 100f,
                 Movement = new CharacterMovementSource(
-                    14f, 20f, 12f, 20f, 7.5f, 16f, 3.2f, 12f, 7.2f, 0.8f, 0.85f, 36f, 0f,
+                    14f, 20f, 12f, 20f, 11f, 7.5f, 16f, 3.2f, 12f, 7.2f, 0.8f, 0.85f, 36f, 0f,
                     20, 48, 8f, 6f, 48f, 58f, 2, 4, 35, 10),
                 Presentation = new CharacterPresentationSource(
                     "anim.idle", "anim.run", "anim.dash", "anim.jump", "anim.fall",
@@ -218,6 +219,14 @@ public static class CharacterPackageSourceCodec
             });
     public static CharacterSourceEditResult ReplaceMovement(CharacterPackageSource source, CharacterMovementSource value)
         => source == null || value == null ? CharacterSourceEditResult.Failure("edit.source.missing", "source", "Source and movement are required.") : CharacterSourceEditResult.Success(source with { Character = source.Character with { Movement = value } });
+    public static CharacterSourceEditResult ReplaceCaptureGeometry(
+        CharacterPackageSource source, CharacterCaptureGeometrySource value)
+        => source == null || value == null
+            ? CharacterSourceEditResult.Failure("edit.source.missing", "captureGeometry", "Source and capture geometry are required.")
+            : CharacterSourceEditResult.Success(source with
+            {
+                Character = source.Character with { CaptureGeometry = value }
+            });
     public static CharacterSourceEditResult ReplacePresentation(CharacterPackageSource source, CharacterPresentationSource value)
         => source == null || value == null ? CharacterSourceEditResult.Failure("edit.source.missing", "source", "Source and presentation are required.") : CharacterSourceEditResult.Success(source with { Character = source.Character with { Presentation = value } });
     public static CharacterSourceEditResult ReplaceSlot(CharacterPackageSource source, int slotIndex, CharacterSlotSource value)
@@ -436,6 +445,7 @@ public static class CharacterPackageSourceCodec
         Number(w, "capsuleHeight", x.CapsuleHeight);
         Number(w, "hipHeight", x.HipHeight);
         Number(w, "hurtboxRadius", x.HurtboxRadius);
+        Number(w, "shieldRadius", x.ShieldRadius);
         WriteCaptureGeometry(w, x.CaptureGeometry);
         w.WritePropertyName("hurtboxCapsules"); w.WriteStartArray(); foreach (var h in x.HurtboxCapsules ?? System.Array.Empty<HurtboxCapsuleSource>()) { w.WriteStartObject(); Number(w,"startX",h.StartX); Number(w,"startY",h.StartY); Number(w,"startZ",h.StartZ); Number(w,"endX",h.EndX); Number(w,"endY",h.EndY); Number(w,"endZ",h.EndZ); Number(w,"radius",h.Radius); w.WriteEndObject(); } w.WriteEndArray();
         w.WritePropertyName("hurtboxBoneDefs"); w.WriteStartArray(); foreach (var h in x.HurtboxBoneDefs ?? System.Array.Empty<HurtboxBoneSource>()) { w.WriteStartObject(); w.WriteString("boneId",h.BoneId); Number(w,"offsetX",h.OffsetX); Number(w,"offsetY",h.OffsetY); Number(w,"offsetZ",h.OffsetZ); Number(w,"radius",h.Radius); w.WriteEndObject(); } w.WriteEndArray();
@@ -445,7 +455,7 @@ public static class CharacterPackageSourceCodec
         w.WritePropertyName("aliases"); w.WriteStartArray(); foreach (var a in x.Aliases ?? System.Array.Empty<CharacterAliasSource>()) { w.WriteStartObject(); w.WriteString("from",a.From); w.WriteString("to",a.To); w.WriteEndObject(); } w.WriteEndArray();
         w.WriteEndObject();
     }
-    private static void WriteMovement(Utf8JsonWriter w, CharacterMovementSource x) { w.WritePropertyName("movement"); w.WriteStartObject(); Number(w,"runSpeed",x.RunSpeed); Number(w,"runAccelerationA",x.RunAccelerationA); Number(w,"runAccelerationB",x.RunAccelerationB); Number(w,"dashSpeed",x.DashSpeed); Number(w,"airSpeedMax",x.AirSpeedMax); Number(w,"airAccelStick",x.AirAccelStick); Number(w,"airAccelBase",x.AirAccelBase); Number(w,"jumpForce",x.JumpForce); Number(w,"shortHopForce",x.ShortHopForce); Number(w,"airJumpVMultiplier",x.AirJumpVMultiplier); Number(w,"airJumpHMultiplier",x.AirJumpHMultiplier); Number(w,"gravity",x.Gravity); Number(w,"airFloatGravity",x.AirFloatGravity); w.WriteNumber("dashDurationTicks",x.DashDurationTicks); w.WriteNumber("dashCooldownTicks",x.DashCooldownTicks); Number(w,"groundFriction",x.GroundFriction); Number(w,"airFriction",x.AirFriction); Number(w,"maxFallSpeed",x.MaxFallSpeed); Number(w,"fastFallSpeed",x.FastFallSpeed); w.WriteNumber("maxJumps",x.MaxJumps); w.WriteNumber("jumpSquatTicks",x.JumpSquatTicks); w.WriteNumber("floatWindowTicks",x.FloatWindowTicks); w.WriteNumber("rushTicks",x.RushTicks); w.WriteEndObject(); }
+    private static void WriteMovement(Utf8JsonWriter w, CharacterMovementSource x) { w.WritePropertyName("movement"); w.WriteStartObject(); Number(w,"runSpeed",x.RunSpeed); Number(w,"runAccelerationA",x.RunAccelerationA); Number(w,"runAccelerationB",x.RunAccelerationB); Number(w,"dashSpeed",x.DashSpeed); Number(w,"airDodgeSpeed",x.AirDodgeSpeed); Number(w,"airSpeedMax",x.AirSpeedMax); Number(w,"airAccelStick",x.AirAccelStick); Number(w,"airAccelBase",x.AirAccelBase); Number(w,"jumpForce",x.JumpForce); Number(w,"shortHopForce",x.ShortHopForce); Number(w,"airJumpVMultiplier",x.AirJumpVMultiplier); Number(w,"airJumpHMultiplier",x.AirJumpHMultiplier); Number(w,"gravity",x.Gravity); Number(w,"airFloatGravity",x.AirFloatGravity); w.WriteNumber("dashDurationTicks",x.DashDurationTicks); w.WriteNumber("dashCooldownTicks",x.DashCooldownTicks); Number(w,"groundFriction",x.GroundFriction); Number(w,"airFriction",x.AirFriction); Number(w,"maxFallSpeed",x.MaxFallSpeed); Number(w,"fastFallSpeed",x.FastFallSpeed); w.WriteNumber("maxJumps",x.MaxJumps); w.WriteNumber("jumpSquatTicks",x.JumpSquatTicks); w.WriteNumber("floatWindowTicks",x.FloatWindowTicks); w.WriteNumber("rushTicks",x.RushTicks); w.WriteEndObject(); }
     private static void WritePresentation(Utf8JsonWriter w, CharacterPresentationSource x)
     {
         w.WritePropertyName("presentation");
@@ -621,7 +631,7 @@ public static class CharacterPackageSourceCodec
         if (p.ContainsKey("id")) d.Error("source.identity-forbidden", "manifest.id", "Package identity belongs in package.json fields.");
         if (p.ContainsKey("class")) d.Error("source.class-forbidden", "manifest.class", "Character class is not part of the source contract.");
         var version = UShort(p, "manifestSchemaVersion", "manifest.manifestSchemaVersion", d);
-        if (version != SchemaVersion) d.Error("schema.unsupported", "manifest.manifestSchemaVersion", "Only manifest schema version 1 is supported.");
+        if (version != ManifestSchemaVersion) d.Error("schema.unsupported", "manifest.manifestSchemaVersion", "Only manifest schema version 1 is supported.");
         var packageId = String(p, "packageId", "manifest.packageId", d);
         var packageVersion = String(p, "version", "manifest.version", d);
         var creator = String(p, "creator", "manifest.creator", d);
@@ -648,12 +658,12 @@ public static class CharacterPackageSourceCodec
 
     private static CharacterAuthoringDocument ParseCharacter(JsonElement root, DiagnosticBag d)
     {
-        var p = ReadObject(root, "character", d, "authoringSchemaVersion", "displayName", "weight", "movement", "presentation", "capsuleRadius", "capsuleHeight", "hipHeight", "hurtboxRadius", "captureGeometry", "hurtboxCapsules", "hurtboxBoneDefs", "attachmentBoneIds", "presentationIds", "capabilityRequirements", "slots", "aliases", "schemaVersion", "id", "class");
+        var p = ReadObject(root, "character", d, "authoringSchemaVersion", "displayName", "weight", "movement", "presentation", "capsuleRadius", "capsuleHeight", "hipHeight", "hurtboxRadius", "shieldRadius", "captureGeometry", "hurtboxCapsules", "hurtboxBoneDefs", "attachmentBoneIds", "presentationIds", "capabilityRequirements", "slots", "aliases", "schemaVersion", "id", "class");
         if (p.ContainsKey("schemaVersion")) d.Error("schema.unsupported", "character.schemaVersion", "Legacy schemaVersion is not accepted.");
         if (p.ContainsKey("id")) d.Error("source.identity-forbidden", "character.id", "Character identity belongs in package.json.");
         if (p.ContainsKey("class")) d.Error("source.class-forbidden", "character.class", "Character class is not part of the source contract.");
         var version = UShort(p, "authoringSchemaVersion", "character.authoringSchemaVersion", d);
-        if (version != SchemaVersion) d.Error("schema.unsupported", "character.authoringSchemaVersion", "Only authoring schema version 1 is supported.");
+        if (version != AuthoringSchemaVersion) d.Error("schema.unsupported", "character.authoringSchemaVersion", "Only authoring schema version 3 is supported.");
         var displayName = String(p, "displayName", "character.displayName", d);
         var weight = Float(p, "weight", "character.weight", d);
         var movement = ParseMovement(p, d);
@@ -668,15 +678,15 @@ public static class CharacterPackageSourceCodec
         return new CharacterAuthoringDocument(version, displayName, weight, movement, presentation,
             Float(p, "capsuleRadius", "character.capsuleRadius", d), Float(p, "capsuleHeight", "character.capsuleHeight", d),
             Float(p, "hipHeight", "character.hipHeight", d), Float(p, "hurtboxRadius", "character.hurtboxRadius", d),
-            ParseCaptureGeometry(p, d), capsules, bones, attachmentBoneIds, presentationIds, capabilities, slots, aliases);
+            Float(p, "shieldRadius", "character.shieldRadius", d), ParseCaptureGeometry(p, d), capsules, bones, attachmentBoneIds, presentationIds, capabilities, slots, aliases);
     }
 
     private static CharacterMovementSource ParseMovement(Dictionary<string, JsonElement> parent, DiagnosticBag d)
     {
-        var p = Object(parent, "movement", "character.movement", d, "runSpeed", "runAccelerationA", "runAccelerationB", "dashSpeed", "airSpeedMax", "airAccelStick", "airAccelBase", "jumpForce", "shortHopForce", "airJumpVMultiplier", "airJumpHMultiplier", "gravity", "airFloatGravity", "dashDurationTicks", "dashCooldownTicks", "groundFriction", "airFriction", "maxFallSpeed", "fastFallSpeed", "maxJumps", "jumpSquatTicks", "floatWindowTicks", "rushTicks");
+        var p = Object(parent, "movement", "character.movement", d, "runSpeed", "runAccelerationA", "runAccelerationB", "dashSpeed", "airDodgeSpeed", "airSpeedMax", "airAccelStick", "airAccelBase", "jumpForce", "shortHopForce", "airJumpVMultiplier", "airJumpHMultiplier", "gravity", "airFloatGravity", "dashDurationTicks", "dashCooldownTicks", "groundFriction", "airFriction", "maxFallSpeed", "fastFallSpeed", "maxJumps", "jumpSquatTicks", "floatWindowTicks", "rushTicks");
         return new CharacterMovementSource(
             Float(p, "runSpeed", "character.movement.runSpeed", d), Float(p, "runAccelerationA", "character.movement.runAccelerationA", d), Float(p, "runAccelerationB", "character.movement.runAccelerationB", d),
-            Float(p, "dashSpeed", "character.movement.dashSpeed", d), Float(p, "airSpeedMax", "character.movement.airSpeedMax", d), Float(p, "airAccelStick", "character.movement.airAccelStick", d), Float(p, "airAccelBase", "character.movement.airAccelBase", d),
+            Float(p, "dashSpeed", "character.movement.dashSpeed", d), Float(p, "airDodgeSpeed", "character.movement.airDodgeSpeed", d), Float(p, "airSpeedMax", "character.movement.airSpeedMax", d), Float(p, "airAccelStick", "character.movement.airAccelStick", d), Float(p, "airAccelBase", "character.movement.airAccelBase", d),
             Float(p, "jumpForce", "character.movement.jumpForce", d), Float(p, "shortHopForce", "character.movement.shortHopForce", d), Float(p, "airJumpVMultiplier", "character.movement.airJumpVMultiplier", d), Float(p, "airJumpHMultiplier", "character.movement.airJumpHMultiplier", d),
             Float(p, "gravity", "character.movement.gravity", d), Float(p, "airFloatGravity", "character.movement.airFloatGravity", d), UShort(p, "dashDurationTicks", "character.movement.dashDurationTicks", d), UShort(p, "dashCooldownTicks", "character.movement.dashCooldownTicks", d),
             Float(p, "groundFriction", "character.movement.groundFriction", d), Float(p, "airFriction", "character.movement.airFriction", d), Float(p, "maxFallSpeed", "character.movement.maxFallSpeed", d), Float(p, "fastFallSpeed", "character.movement.fastFallSpeed", d),

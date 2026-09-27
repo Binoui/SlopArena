@@ -72,17 +72,6 @@
     translate: 0 -2px;
 }
 
-.chat-status {
-    max-width: 270px;
-    margin-right: 8px;
-    color: var(--chat-muted);
-    font-size: 12px;
-    letter-spacing: 1px;
-    -unity-font-style: bold;
-    -unity-text-align: middle-right;
-    white-space: normal;
-    overflow: hidden;
-}
 
 .chat-unread {
     display: none;
@@ -128,11 +117,24 @@
     text-overflow: ellipsis;
 }
 
+/* Gameplay anchors left: the compact strip and public feed follow the
+   frame instead of staying right-aligned inside it. */
+.chat-root--gameplay .chat-collapsed {
+    align-self: flex-start;
+    justify-content: flex-start;
+}
+.chat-root--gameplay .chat-public-feed {
+    right: auto;
+    left: 0;
+    align-items: flex-start;
+}
+
 .chat-panel {
     display: none;
     flex-grow: 1;
     min-height: 0;
     padding: 12px;
+    position: relative;
     flex-direction: column;
     background-color: rgba(13, 13, 20, 0.97);
     border-width: 2px;
@@ -147,25 +149,37 @@
     background-color: rgb(13, 13, 20);
 }
 
-.chat-header {
-    min-height: 50px;
+.chat-resize-grip {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 19px;
+    height: 19px;
+    border-width: 1px;
+    border-color: var(--chat-border);
+    background-color: var(--chat-surface);
+}
+.chat-resize-grip:hover { border-color: var(--chat-acid); }
+.chat-resize-mark {
+    position: absolute;
+    left: 2px;
+    top: 7px;
+    width: 13px;
+    height: 2px;
+    rotate: -45deg;
+    background-color: var(--chat-acid);
+}
+.chat-resize-mark--second { left: 6px; top: 11px; width: 8px; }
+.chat-root--expanded .chat-resize-grip { display: none; }
+
+.chat-corner-actions {
+    position: absolute;
+    top: 0;
+    right: 24px;
     flex-direction: row;
-    align-items: flex-start;
-    justify-content: space-between;
-    padding-bottom: 8px;
-    border-bottom-width: 2px;
-    border-bottom-color: var(--chat-acid);
+    align-items: center;
 }
 
-.chat-header-copy {
-    min-width: 0;
-    flex-grow: 1;
-    flex-basis: 0;
-    flex-shrink: 1;
-    align-items: flex-start;
-}
-
-.chat-eyebrow,
 .chat-section-label {
     color: var(--chat-acid);
     font-size: 10px;
@@ -173,29 +187,33 @@
     -unity-font-style: bold;
 }
 
-.chat-title {
-    max-width: 290px;
-    margin-top: 2px;
-    color: var(--chat-paper);
-    font-size: 22px;
-    letter-spacing: -0.5px;
-    -unity-font-definition: url("../../Fonts/Baloo2.asset");
-    -unity-font-style: bold;
-    white-space: normal;
-    overflow: hidden;
+.chat-icon-button {
+    width: 26px;
+    height: 26px;
+    min-height: 26px;
+    margin-left: 4px;
+    padding: 0;
+    align-items: center;
+    justify-content: center;
+    border-width: 1px;
+    border-color: var(--chat-border);
+    background-color: var(--chat-surface);
+}
+.chat-icon-button:hover, .chat-icon-button:focus { border-color: var(--chat-acid); }
+
+.chat-icon-expand { width: 14px; height: 14px; position: relative; }
+.chat-icon-expand-corner { position: absolute; width: 7px; height: 7px; border-color: var(--chat-paper); }
+.chat-icon-expand-corner--top { top: 0; left: 0; border-top-width: 2px; border-left-width: 2px; }
+.chat-icon-expand-corner--bottom { bottom: 0; right: 0; border-bottom-width: 2px; border-right-width: 2px; }
+.chat-icon-minimize { width: 14px; height: 2px; background-color: var(--chat-paper); }
+.chat-icon-minimize--collapse {
+    width: 12px;
+    height: 10px;
+    background-color: transparent;
+    border-width: 1px;
+    border-color: var(--chat-paper);
 }
 
-.chat-header-actions {
-    align-items: flex-end;
-}
-
-.chat-status--header {
-    max-width: 180px;
-    margin-right: 0;
-    margin-bottom: 4px;
-}
-
-.chat-close,
 .chat-action--small,
 .chat-newest,
 .chat-mute {
@@ -212,8 +230,6 @@
     -unity-text-align: middle-center;
 }
 
-.chat-close:hover,
-.chat-close:focus,
 .chat-action--small:hover,
 .chat-action--small:focus,
 .chat-newest:hover,
@@ -260,6 +276,12 @@
     letter-spacing: 0.4px;
     white-space: normal;
 }
+.chat-feedback--in-history {
+    margin-top: 8px;
+    padding: 6px;
+    color: var(--chat-orange);
+    font-size: 11px;
+}
 
 .chat-main {
     display: none;
@@ -286,31 +308,14 @@
     background-color: rgb(13, 13, 20);
 }
 
-.chat-panel--menu .chat-header {
-    min-height: 24px;
-    padding-bottom: 4px;
-    align-items: center;
-}
+.chat-panel--menu .chat-corner-actions { right: 24px; }
 
-.chat-panel--menu .chat-title {
-    font-size: 12px;
-    margin-top: 0;
-    letter-spacing: 2px;
-    -unity-font-definition: none;
-}
 
-.chat-panel--menu .chat-status--header {
-    max-width: 200px;
-}
 
-.chat-panel--menu .chat-header-actions {
-    flex-direction: row;
-    align-items: center;
-}
-
-.chat-panel--menu .chat-close {
-    min-height: 20px;
-    margin-left: 4px;
+.chat-panel--menu .chat-icon-button {
+    width: 23px;
+    height: 22px;
+    min-height: 22px;
 }
 
 /* Directory section labels inside the explicit DIRECT view. */
@@ -322,8 +327,11 @@
 .chat-tabs {
     height: 38px;
     margin-top: 10px;
+    margin-right: 62px;
     flex-direction: row;
 }
+/* Gameplay shows only Minimize/Close; reserve one icon slot, not two. */
+.chat-root--gameplay .chat-tabs { margin-right: 34px; }
 
 .chat-tab {
     flex-grow: 1;

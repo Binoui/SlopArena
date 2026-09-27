@@ -117,6 +117,7 @@ namespace SlopArena.Client.Input
         /// <summary>Pending RMB target-lock toggle (ADR-0018, issue #127): set by Poll on
         /// the RMB press edge, consumed by BuildInputState. One tick of ToggleLock.</summary>
         private bool _pendingToggleLock;
+        private bool _pendingRetarget;
         /// <summary>True if the action assigned to the canonical slot index is held.</summary>
         public bool IsSlotKeyHeld(byte slotIdx)
         {
@@ -277,6 +278,8 @@ namespace SlopArena.Client.Input
                 _pendingFaceToCamera = true;
             if (HumanInputActions.Get("ToggleLock").WasPressedThisFrame())
                 _pendingToggleLock = true;
+            if (HumanInputActions.Get("Retarget").WasPressedThisFrame())
+                _pendingRetarget = true;
             PollSlots();
         }
 
@@ -363,6 +366,7 @@ namespace SlopArena.Client.Input
             _pendingDownPressed = false;
             _pendingFaceToCamera = false;
             _pendingToggleLock = false;
+            _pendingRetarget = false;
             _defenseInputEdges.ClearPending(HumanInputActions.Get("Shield").IsPressed());
             _pendingSlotPress = 0;
             Array.Clear(_controllerSlots, 0, _controllerSlots.Length);
@@ -469,6 +473,7 @@ namespace SlopArena.Client.Input
                 return (input, moveDir, snappedDir);
             }
 
+            input.LockMode = ClientSettingsService.Instance.AutoLockMode;
             if (HumanInputBlocked)
             {
                 ClearPendingFrameState();
@@ -528,11 +533,13 @@ namespace SlopArena.Client.Input
             input.ActiveSlot = pendingSlotPress;
             input.IsAiming = aimCtx.IsAiming;
             // Utility edges (ADR-0017/0018): consumed here, one tick each. Set before the
-            // FSM gate — a snap/toggle is not movement and must survive a canMove=false.
+            // FSM gate — a snap/toggle/retarget is not movement and must survive canMove=false.
             input.FaceToCamera = _pendingFaceToCamera;
             _pendingFaceToCamera = false;
             input.ToggleLock = _pendingToggleLock;
             _pendingToggleLock = false;
+            input.RetargetPressed = _pendingRetarget;
+            _pendingRetarget = false;
 
             // Facing yaw from body rotation
             float deg = bodyYawDeg;

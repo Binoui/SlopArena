@@ -47,9 +47,13 @@ namespace SlopArena.Client.World
             yield return SettleAndCapture("vb-01-neutral-spacing");
 
             SetupNeutral();
-            _match.SetCaptureInput(new InputState { MoveX = 1f, Dash = true });
-            yield return WaitForState(ActionState.Dashing, "vb-02-dash");
-
+            _match.SetCaptureInput(new InputState { Jump = true, JumpHeld = true });
+            yield return new WaitForFixedUpdate();
+            _match.SetCaptureInput(default);
+            yield return WaitUntilOrFail(
+                () => !_match.GetCaptureState(PlayerId).IsGrounded, "airborne before air dodge", 120);
+            _match.SetCaptureInput(new InputState { ShieldHeld = true, ShieldPressed = true });
+            yield return WaitForState(ActionState.AirDodgeMovement, "vb-02-air-dodge");
             SetupNeutral();
             _match.SetCaptureInput(new InputState { Jump = true, JumpHeld = true });
             yield return new WaitForFixedUpdate();

@@ -78,6 +78,7 @@ public sealed class AbilityLabWindow : EditorWindow
     private Button _airMovesButton = null!;
     private Button _createLabRig = null!;
     private VisualElement _inspector = null!;
+    private VisualElement _moveTimeline = null!;
     private Label _timelineTick = null!;
     private Button _timelinePlay = null!;
     private SliderInt _timelineSlider = null!;
@@ -92,6 +93,8 @@ public sealed class AbilityLabWindow : EditorWindow
     private AbilityLabOperationProjection? _selectedOperation;
     private readonly Dictionary<string, VisualElement> _pages = new(StringComparer.Ordinal);
     private bool _airborneSelector;
+    private bool _grabSelected;
+    private bool _grabPriorShowHitboxes;
     private VisualElement _characterGeneral = null!;
     private VisualElement _characterMovement = null!;
     private VisualElement _movementGround = null!;
@@ -149,6 +152,7 @@ public sealed class AbilityLabWindow : EditorWindow
     private void OnDisable()
     {
         SceneView.duringSceneGui -= OnSceneGUI;
+        if (_grabSelected && _lab != null) _lab.ShowHitboxes = _grabPriorShowHitboxes;
         DestroyOwnedLab();
     }
 
@@ -205,6 +209,7 @@ public sealed class AbilityLabWindow : EditorWindow
         _airMovesButton = Required<Button>("air-moves-button");
         _createLabRig = Required<Button>("create-lab-rig");
         _inspector = Required<VisualElement>("inspector");
+        _moveTimeline = Required<VisualElement>("move-timeline");
         _timelineTick = Required<Label>("timeline-tick");
         _timelinePlay = Required<Button>("timeline-play");
         _timelineSlider = Required<SliderInt>("timeline-slider");
@@ -459,7 +464,9 @@ public sealed class AbilityLabWindow : EditorWindow
     private void SelectMoveMode(bool airborne)
     {
         if (_updatingControls || _lab == null) return;
+        if (_grabSelected) _lab.ShowHitboxes = _grabPriorShowHitboxes;
         _airborneSelector = airborne;
+        _grabSelected = false;
         if (CanonicalSlotProjection.TryGet(_lab.SelectedSlotId, out var current) &&
             CanonicalSlotProjection.TryGet(airborne, current.InputLabel, out var target))
             _lab.SetSlot(target);
@@ -665,6 +672,13 @@ public sealed class AbilityLabWindow : EditorWindow
         if (_updatingControls || !_workspace.HasPackage) return;
         if (_workspace.ReplaceMovement(edit(_workspace.Draft.Movement)))
             RefreshCharacterPage();
+    }
+
+    private void CommitGrab(Func<CharacterCaptureGeometrySource, CharacterCaptureGeometrySource> edit)
+    {
+        if (_updatingControls || !_workspace.HasPackage) return;
+        if (_workspace.ReplaceCaptureGeometry(edit(_workspace.Draft.CaptureGeometry)))
+            SceneView.RepaintAll();
     }
 
     private void CommitPresentation(Func<CharacterPresentationSource, CharacterPresentationSource> edit)
@@ -948,6 +962,7 @@ public sealed class AbilityLabWindow : EditorWindow
         RefreshRigState();
         UpdateTimelineControls();
         RefreshCompatibilityControls();
+        if (_grabSelected) RefreshInspector();
         RestoreFocus(focusedName);
     }
 
@@ -1028,6 +1043,11 @@ public sealed class AbilityLabWindow : EditorWindow
         else
         {
             _moveList.Clear();
+        }
+        if (_grabSelected && _lab != null)
+        {
+            _lab.ShowHitboxes = false;
+            _lab.Playing = false;
         }
         RefreshRigState();
     }
@@ -1127,22 +1147,49 @@ public sealed class AbilityLabWindow : EditorWindow
                 : $"Unknown ({address.Id})";
             var button = new Button(() =>
             {
+                if (_grabSelected && _lab != null) _lab.ShowHitboxes = _grabPriorShowHitboxes;
+                _grabSelected = false;
                 _lab?.SetSlot(address);
                 UpdateTimelineControls();
                 RefreshInspector();
                 BuildMoveButtons(airborne);
+                SceneView.RepaintAll();
             })
             {
                 text = MoveButtonLabel(address),
                 userData = address,
             };
             button.name = address.Id == "ground.1" ? "selected-ground-1" : address.Id;
-            if (_lab?.SelectedSlotId == address.Id)
+            if (!_grabSelected && _lab?.SelectedSlotId == address.Id)
             {
                 button.AddToClassList("move-slot-selected");
                 if (airborne) button.AddToClassList("move-slot-air-selected");
             }
             _moveList.Add(button);
+        }
+        if (!airborne)
+        {
+            var grab = new Button(() =>
+            {
+                if (_lab != null)
+                {
+                    if (!_grabSelected) _grabPriorShowHitboxes = _lab.ShowHitboxes;
+                    _lab.ShowHitboxes = false;
+                    _lab.Playing = false;
+                }
+                _grabSelected = true;
+                _selectedOperation = null;
+                UpdateTimelineControls();
+                RefreshInspector();
+                BuildMoveButtons(false);
+                SceneView.RepaintAll();
+            })
+            {
+                name = "selected-grab",
+                text = "Grab",
+            };
+            if (_grabSelected) grab.AddToClassList("move-slot-selected");
+            _moveList.Add(grab);
         }
     }
     private static string MoveButtonLabel(SlotAddress address)
@@ -1413,6 +1460,14 @@ public sealed class AbilityLabWindow : EditorWindow
     }
     private void UpdateTimelineControls()
     {
+        if (_grabSelected)
+        {
+            _timelineProjection = null;
+            _timelineSlider.SetEnabled(false);
+            _timelinePlay.SetEnabled(false);
+            _stageSelector.style.display = DisplayStyle.None;
+            return;
+        }
         _timelineProjection = BuildTimelineProjection();
         if (_lab == null || !_lab.IsPackagePreview || _timelineProjection == null || _timelineProjection.Stages.Count == 0)
         {
@@ -1642,6 +1697,49 @@ public sealed class AbilityLabWindow : EditorWindow
     private void RefreshInspector()
     {
         _inspector.Clear();
+        _moveTimeline.style.display = _grabSelected ? DisplayStyle.None : DisplayStyle.Flex;
+        if (_grabSelected)
+        {
+            _stageSelector.style.display = DisplayStyle.None;
+            _stageSelector.SetEnabled(false);
+            if (!_workspace.HasPackage)
+            {
+                _inspector.Add(new Label("Open a cooked character package to edit Grab."));
+                return;
+            }
+
+            var capture = _workspace.Draft.CaptureGeometry;
+            _inspector.Add(new Label("Grounded Grab · local +Z is forward. Values are meters; dimensions must be positive."));
+            var volume = new Foldout { text = "Forward capture volume", value = true };
+            AddDelayedFloat(volume, "Reach", capture.Reach,
+                value => CommitGrab(current => current with { Reach = value }));
+            AddDelayedFloat(volume, "Width", capture.Width,
+                value => CommitGrab(current => current with { Width = value }));
+            AddDelayedFloat(volume, "Height", capture.Height,
+                value => CommitGrab(current => current with { Height = value }));
+            AddDelayedFloat(volume, "Vertical center", capture.OffsetY,
+                value => CommitGrab(current => current with { OffsetY = value }));
+            _inspector.Add(volume);
+
+            var attacker = new Foldout { text = "Attacker restraint anchor", value = false };
+            AddDelayedFloat(attacker, "X", capture.AttackerAnchor.X,
+                value => CommitGrab(current => current with { AttackerAnchor = current.AttackerAnchor with { X = value } }));
+            AddDelayedFloat(attacker, "Y", capture.AttackerAnchor.Y,
+                value => CommitGrab(current => current with { AttackerAnchor = current.AttackerAnchor with { Y = value } }));
+            AddDelayedFloat(attacker, "Z", capture.AttackerAnchor.Z,
+                value => CommitGrab(current => current with { AttackerAnchor = current.AttackerAnchor with { Z = value } }));
+            _inspector.Add(attacker);
+
+            var victim = new Foldout { text = "Victim restraint anchor", value = false };
+            AddDelayedFloat(victim, "X", capture.VictimAnchor.X,
+                value => CommitGrab(current => current with { VictimAnchor = current.VictimAnchor with { X = value } }));
+            AddDelayedFloat(victim, "Y", capture.VictimAnchor.Y,
+                value => CommitGrab(current => current with { VictimAnchor = current.VictimAnchor with { Y = value } }));
+            AddDelayedFloat(victim, "Z", capture.VictimAnchor.Z,
+                value => CommitGrab(current => current with { VictimAnchor = current.VictimAnchor with { Z = value } }));
+            _inspector.Add(victim);
+            return;
+        }
         if (_lab == null || !_workspace.HasPackage ||
             !_workspace.TryResolveCanonicalSlot(_lab.SelectedSlotId, out _, out var slot) ||
             _lab.StageIndex < 0 || _lab.StageIndex >= slot.Timeline.Stages.Count)
@@ -2304,6 +2402,7 @@ public sealed class AbilityLabWindow : EditorWindow
         {
             var go = new GameObject("AbilityLab") { hideFlags = HideFlags.HideAndDontSave };
             _lab = go.AddComponent<AbilityLab>();
+            if (_grabSelected) _grabPriorShowHitboxes = _lab.ShowHitboxes;
             _ownsLab = true;
         }
         _lab.EnsureCamera();
@@ -2340,6 +2439,12 @@ public sealed class AbilityLabWindow : EditorWindow
         if (_activePage != "moves-page" || _lab == null || !_lab.IsPackagePreview ||
             !_workspace.HasPackage || _preview == null || !_preview.IsAvailable || _lab.Playing)
             return;
+        if (_grabSelected)
+        {
+            if (!_workspace.LiveDraftInvalid) DrawGrabPreview();
+            return;
+        }
+
 
         var hitboxes = _lab.ResolveHitboxes();
         if (hitboxes.Count == 0)
@@ -2379,6 +2484,31 @@ public sealed class AbilityLabWindow : EditorWindow
         }
         if (_sceneRadiusEditing && Event.current.type == EventType.MouseUp && Event.current.button == 0)
             CommitSceneRadius();
+    }
+
+    private void DrawGrabPreview()
+    {
+        var renderer = _lab?.Renderer;
+        if (renderer == null) return;
+        var capture = _workspace.Draft.CaptureGeometry;
+        Vector3 center = renderer.transform.position - Vector3.up * renderer.ModelYOffset;
+        Matrix4x4 previousMatrix = Handles.matrix;
+        Color previousColor = Handles.color;
+        Handles.matrix = Matrix4x4.TRS(center,
+            Quaternion.Euler(0f, _lab!.FacingYaw * Mathf.Rad2Deg, 0f), Vector3.one);
+        Handles.color = new Color(1f, 0.25f, 0.05f, 0.95f);
+        Handles.DrawWireCube(new Vector3(0f, capture.OffsetY, capture.Reach * 0.5f),
+            new Vector3(capture.Width, capture.Height, capture.Reach));
+        Handles.color = Color.cyan;
+        Handles.SphereHandleCap(0,
+            new Vector3(capture.AttackerAnchor.X, capture.AttackerAnchor.Y, capture.AttackerAnchor.Z),
+            Quaternion.identity, 0.08f, EventType.Repaint);
+        Handles.color = Color.magenta;
+        Handles.SphereHandleCap(0,
+            new Vector3(capture.VictimAnchor.X, capture.VictimAnchor.Y, capture.VictimAnchor.Z),
+            Quaternion.identity, 0.08f, EventType.Repaint);
+        Handles.matrix = previousMatrix;
+        Handles.color = previousColor;
     }
 
     private void DrawPresentationHandles()

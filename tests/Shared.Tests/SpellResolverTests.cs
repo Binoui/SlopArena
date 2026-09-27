@@ -95,6 +95,59 @@ public class SpellResolverTests
         Assert.Equal(0.3f, hits[0].HitZ, 4);
     }
 
+    [Theory]
+    [InlineData(0f, -0.95f)]
+    [InlineData(120f, -2f)]
+    [InlineData(240f, -2f)]
+    public void SphereHitboxContactsFrontOfShieldAtFirstSurface(float speed, float startX)
+    {
+        var resolver = new SpellResolver();
+        var projectile = MakeHitbox(startX, 0f, 0f, radius: 0.1f);
+        projectile.VX = speed;
+        resolver.Spawn(projectile);
+        var shield = MakeEntity(100, 0f, 0f, 0f, radius: 1.05f);
+        shield.ShieldSurface = true;
+
+        var hit = Assert.Single(resolver.Tick(new List<SpellResolver.EntityData> { shield }));
+
+        Assert.Equal(100UL, hit.TargetEntityId);
+        Assert.Equal(-1.05f, hit.HitX, 3);
+        Assert.Equal(0f, hit.HitY, 3);
+        Assert.Equal(0f, hit.HitZ, 3);
+    }
+
+    [Fact]
+    public void CapsuleHitboxContactsShieldSurfaceNotDefenderHurtbox()
+    {
+        var resolver = new SpellResolver();
+        var capsule = MakeHitbox(-1.2f, 0f, 0f, radius: 0.1f);
+        capsule.Shape = HitboxShape.Capsule;
+        capsule.EndX = -0.8f;
+        resolver.Spawn(capsule);
+        var shield = MakeEntity(100, 0f, 0f, 0f, radius: 1.05f);
+        shield.ShieldSurface = true;
+
+        var hit = Assert.Single(resolver.Tick(new List<SpellResolver.EntityData> { shield }));
+
+        Assert.Equal(-1.05f, hit.HitX, 3);
+    }
+
+    [Fact]
+    public void ProjectileHitsCloserBodyBeforeOverlappingShieldSurface()
+    {
+        var resolver = new SpellResolver();
+        var projectile = MakeHitbox(1.28f, 0f, 0f, radius: 0.12f);
+        projectile.VX = -13.8f;
+        resolver.Spawn(projectile);
+        var shield = MakeEntity(100, 0f, 0f, 0f, radius: 0.95f);
+        shield.ShieldSurface = true;
+        var body = MakeEntity(101, 1.2f, 0f, 0f, radius: 0.3f);
+
+        var hit = Assert.Single(resolver.Tick(new List<SpellResolver.EntityData> { shield, body }));
+
+        Assert.Equal(101UL, hit.TargetEntityId);
+    }
+
     // ── CanHitOwner ──
 
     [Fact]

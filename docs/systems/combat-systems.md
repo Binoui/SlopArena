@@ -19,11 +19,59 @@ Every move is a fixed-timeline entry with authored stage timing, animation IDs, 
 - Jump and double jump use the character's movement definition. ShortHop is release-timed during the opening jump window.
 - FastFall requires a fresh Down press while already descending; it sets and latches the configured downward speed until landing or interruption. Release preserves the latch; ascent/apex and locked/owned presses are discarded. Ordinary aerial attacks may coexist, but Hitstop, Hitstun, ledges and authored vertical motion prevent activation. FastFall overrides any active gravity window.
 - Shield is a permanent, full-body grounded defense held with Left Shift / RT. It stops ordinary melee, projectile and explosion attacks from every direction, freezes combat facing, and enters a vulnerable 7-tick drop after release. Grab is C or the controller LB+RT chord.
-- LedgeHang is occupied and single-occupancy. Drop, ledge jump, and stand are explicit escapes.
+- Automatic ledge grabs and LedgeHang are disabled for the friends demo. Fighters fall past stage edges; return with jumps, movement, and kit recovery moves.
 - Each ability entry can be limited to one use per flight. Landing resets air-use counters.
 - RecoveryMove is the per-character return-to-stage move. It is the only ordinary move that resets the FloatWindow mid-air.
 
 All gameplay timing uses 60 Hz ticks. Values are authored in package data and resolved by Shared simulation.
+
+### Permanent shield bubble
+
+While `Shielding`, Shared replaces the fighter's ordinary attack-contact hurtboxes
+with one non-shrinking sphere centered on its capsule center. The package-owned
+`shieldRadius` is authoritative: FightGuy, Kistu, and Bonk use 1.05 m, Manki
+0.95 m, and legacy Nilus 1.025 m initially. Ordinary melee, projectile, and
+explosion hitboxes contact the sphere from every direction, without damage,
+reflection, shield-poking, or a meter. The first physical surface contact
+determines which fighter a one-hit projectile strikes. Block stun, hitstop,
+collision-safe pushback, projectile lifetime, and stable block-event identity
+are unchanged. Shared emits the actual first shield-sphere contact before
+pushback; Unity positions the tangent ripple on the currently rendered bubble
+surface so the effect follows presentation interpolation without moving gameplay.
+Unshielded fighters use ordinary baked hurtboxes. Grab capture continues to
+check those body hurtboxes, never the expanded shield sphere. The Unity guard
+mesh has no collider or combat authority; `PlayerRenderer` follows the
+authoritative state and scales it to the same diameter.
+
+### Forward air dodge
+
+A fresh airborne Defense press (Left Shift / RT) starts a facing-locked forward
+air dodge if the fighter has an air dodge left and is otherwise actionable.
+Holding Defense through a shield-jump does not produce a fresh press. The
+first 5 ticks are invulnerable; horizontal movement lasts 10 ticks from
+acceptance, so ticks 5–9 are vulnerable. The following 20 ticks are vulnerable
+recovery. Movement overrides, rather than adds to, inherited run/slide speed
+and stops at tick 10. Gravity and vertical momentum continue. Attacks, jump,
+grab, steering, Down/fast-fall and Shield cannot cancel commitment; rejected
+edges do not queue. Landing ends movement and invulnerability but retains
+all remaining commitment as grounded recovery. Ledge grabs do not interrupt
+recovery while the ledge mechanic is disabled. Genuine landing and respawn
+replenish the one-use resource; wall contact and hitstun do not.
+
+Initial no-obstacle comparison at 60 Hz (old universal airborne Dash used the
+per-character `dashSpeed` and `dashDurationTicks`; the new independently
+authored `airDodgeSpeed` runs for 10 ticks). Values are horizontal distance
+before collision/landing:
+
+| Fighter | Old peak m/s | Old travel m | Dodge peak m/s | Dodge travel m |
+| --- | ---: | ---: | ---: | ---: |
+| FightGuy | 20 | 6.667 | 11 | 1.833 |
+| Manki | 20 | 6.000 | 11 | 1.833 |
+| Kistu | 22 | 5.867 | 12.1 | 2.017 |
+| Bonk | 20 | 6.667 | 11 | 1.833 |
+
+Universal airborne Dash input no longer moves the fighter. Kit-owned
+dash/lunge/recovery abilities retain their own timing and mobility.
 
 ### Contextual Down
 
@@ -74,6 +122,40 @@ ownership controls, ten-cycle resource routes and 1,152 finite response scenario
 `aerialAccepted` and `slideStartTick` to distinguish a full aerial/slide route from
 interruption or a crouched landing. These are scenario measurements, not balance proof.
 
+### Ground grab and forward throw
+
+Grab commits to 7 startup, 3 front-only active, and 18 whiff-recovery ticks.
+It snapshots facing on acceptance, including when leaving an unstunned shield;
+block stun prevents admission. Cooked per-character `captureGeometry` defines the
+short forward volume and restraint anchors. Hurtbox overlap and stage collision
+determine capture; neither target lock nor Unity animation moves the victim.
+Reciprocal active grabs clash with 10 recovery ticks. An accepted damaging hit
+resolves before capture and interrupts a linked pair before its release.
+
+In the Editor, enable Scene or Game **Gizmos** to see the cooked forward grab box
+while `GrabAttempt` runs: yellow startup, orange active contact, gray whiff
+recovery. `PlayerRenderer` places it using Shared position and captured facing;
+it does not add a Unity collider or change targeting.
+
+Capture restrains both fighters for 12 ticks. The automatic forward throw deals
+6 damage and launches at 30° along the captured facing, using the ordinary
+weight/percent/DI knockback path with base 5 and growth 26 (FightGuy's
+non-finisher forward sweeping/double kick tuning). The grabber then has 12
+recovery ticks. Release is targeted, not an area hit; missing or invalid partners
+unlink without throwing. Training and the GameServer use the same Shared rules;
+online prediction waits for the authoritative paired outcome.
+
+Initial throw launch report (hypothetical light weight 50, heavy weight 150;
+the four admitted packages currently author weight 100). Values are initial
+velocity magnitude after global 0.17 launch scaling, before DI or decay:
+
+| Victim pre-throw % | Light 50 | Heavy 150 |
+| ---: | ---: | ---: |
+| 0 | 7.516 | 4.510 |
+| 50 | 10.463 | 6.278 |
+| 100 | 13.410 | 8.046 |
+| 150 | 16.356 | 9.814 |
+
 ## Damage and hit response
 
 SlopArena uses damage percent rather than a conventional health pool. A hit applies damage, then Knockback using the hit's profile and the victim's current percent. Profiles cover Light, Medium, Launcher, Kill, Spike, and explicit Custom values.
@@ -118,11 +200,11 @@ No Unity physics query or client-only trajectory determines gameplay.
 
 ## Targeting and aiming
 
-The client may provide camera-derived aim and target intent. The server validates targetability, range, and final state. Soft-lock selection favors an enemy near screen center and is used by supported abilities for targeting, camera behavior, and warp/recovery decisions. An ability's authored aim mode defines whether it uses facing, camera aim, or a target/zone representation.
+The client may provide camera-derived aim and target intent. The Shared simulation validates targetability and range and owns the selected target. Target lock is passive while moving: it does not steer facing outside attacks. Supported attacks snap toward the locked target; without lock, `TrackingStrength` closes that fraction of the shortest yaw difference per 60 Hz tick. Hitstop pauses attack tracking. Unity renders the resulting authoritative facing and lock indicator.
+
+The Gameplay target-lock setting has three modes: **Always auto-lock** (default) acquires an enemy automatically; **Never auto-lock** requires manual activation; **Auto-lock on hit** activates when the fighter deals or receives a damaging hit. An active lock keeps its target while valid within 20 m rather than switching as the camera moves. Retarget selects the nearest valid enemy within 20 m; the lock toggle explicitly disables or reenables automatic locking. If a target leaves range, automatic modes may reacquire when one returns, but explicit lock-off remains off until reenabling. Manual camera-facing snap does not disable lock.
 
 Aim indicators and camera movement are visual input aids. They do not bypass server validation or replace Shared simulation.
-
-All roster normals (`ground.1–4` and `air.1–4`) enable target-facing rotation. Specials opt in per move. Shared snaps enabled attacks toward the resolved enemy while locked on; without lock-on, `TrackingStrength` is the fraction of the shortest yaw difference closed per 60 Hz tick, not a per-second rate. Hitstop pauses attack tracking. Unity renders the resulting authoritative facing.
 
 ## Design rules
 

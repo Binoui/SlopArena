@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 using System.Text.Json;
 using SlopArena.Server;
+using SlopArena.Shared;
 using Xunit;
 
 namespace SlopArena.Server.Tests;
@@ -289,13 +290,13 @@ public class GameServerRegistrationTests
         foreach (var registrationBody in new[] { firstRegistration, secondRegistrationBody })
         {
             Assert.Equal(registration.InstanceId, registrationBody.RootElement.GetProperty("instanceId").GetGuid());
-            Assert.Equal(2, registrationBody.RootElement.GetProperty("protocolVersion").GetInt32());
+            Assert.Equal(SteamMatchDescriptor.CurrentProtocolVersion, registrationBody.RootElement.GetProperty("protocolVersion").GetInt32());
             Assert.Equal(orchestrator.CatalogHash, registrationBody.RootElement.GetProperty("catalogHash").GetString());
         }
         using var heartbeatBody = JsonDocument.Parse(handler.Bodies.First(x => x.Path.EndsWith("/heartbeat", StringComparison.Ordinal)).Body);
         Assert.Equal(registration.InstanceId, heartbeatBody.RootElement.GetProperty("instanceId").GetGuid());
         Assert.Equal(TestHostSteamId.ToString(), heartbeatBody.RootElement.GetProperty("steamId").GetString());
-        Assert.Equal(2, heartbeatBody.RootElement.GetProperty("protocolVersion").GetInt32());
+        Assert.Equal(SteamMatchDescriptor.CurrentProtocolVersion, heartbeatBody.RootElement.GetProperty("protocolVersion").GetInt32());
         Assert.Equal(orchestrator.CatalogHash, heartbeatBody.RootElement.GetProperty("catalogHash").GetString());
     }
 

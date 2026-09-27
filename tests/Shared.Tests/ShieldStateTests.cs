@@ -101,7 +101,8 @@ public class ShieldStateTests
         var airborne = sim.GetState(1);
         Assert.False(airborne.IsGrounded);
         Assert.Equal((byte)1, airborne.AirDodgesLeft);
-        Assert.NotEqual(ActionState.AirDodgeStartup, airborne.State);
+        Assert.NotEqual(ActionState.AirDodgeMovement, airborne.State);
+        Assert.NotEqual(ActionState.AirDodgeRecovery, airborne.State);
     }
 
     [Fact]

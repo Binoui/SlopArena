@@ -30,6 +30,9 @@ public sealed class MatchContentCatalogTests
         var second = adapter.Snapshot(CharacterClass.Nilus);
         Assert.NotSame(first.Definition, second.Definition);
         Assert.Equal(first.Identity, second.Identity);
+        Assert.Equal(11.55f, second.Definition.Movement.AirDodgeSpeed);
+        Assert.Equal(1.025f, first.Definition.ShieldRadius);
+        Assert.Equal(1.025f, second.Definition.ShieldRadius);
         first.Definition.DisplayName = "mutated";
         Assert.NotEqual("mutated", second.Definition.DisplayName);
     }

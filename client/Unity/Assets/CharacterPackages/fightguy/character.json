@@ -1,5 +1,5 @@
 {
-  "authoringSchemaVersion": 1,
+  "authoringSchemaVersion": 3,
   "displayName": "FightGuy",
   "weight": 100,
   "movement": {
@@ -7,6 +7,7 @@
     "runAccelerationA": 20,
     "runAccelerationB": 12,
     "dashSpeed": 20,
+    "airDodgeSpeed": 11,
     "airSpeedMax": 7.5,
     "airAccelStick": 16,
     "airAccelBase": 3.2,
@@ -51,13 +52,14 @@
   "capsuleHeight": 1.7,
   "hipHeight": 0.82,
   "hurtboxRadius": 1,
+  "shieldRadius": 1.05,
   "captureGeometry": {
-    "reach": 0.9,
-    "width": 0.7,
-    "height": 1.2,
-    "offsetY": 0.6,
-    "attackerAnchor": { "x": 0, "y": 0.6, "z": 0.3 },
-    "victimAnchor": { "x": 0, "y": 0.6, "z": 0.45 }
+    "reach": 0.76,
+    "width": 0.68,
+    "height": 1.15,
+    "offsetY": 0.57,
+    "attackerAnchor": { "x": 0, "y": 0.57, "z": 0.25 },
+    "victimAnchor": { "x": 0, "y": 0.57, "z": 0.39 }
   },
   "hurtboxCapsules": [
     {

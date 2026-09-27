@@ -114,7 +114,7 @@ The palette is warm paper and near-black ink interrupted by rare hazard acid and
 
 Screens begin with a stable rectangular grid: primary action zone, content or roster zone, status zone, and utility zone. The grid is then disrupted once or twice with controlled rotation, overlap, crop, or a burst shape. Keep interactive controls aligned even when surrounding poster elements are crooked.
 
-The current Unity UI uses proportional screen anchoring for major regions, with fixed internal dimensions for buttons, HUD billboards, slots, and status strips. Common observed rhythm values are `8px`, `12px`, `14px`, and `18px`; dense HUD elements use tighter internal padding than menus. Gameplay HUD information stays stable while the camera moves: player billboards stack predictably, action slots remain centered at the lower edge, and overhead damage remains spatially attached to fighters.
+The current Unity UI uses proportional screen anchoring for major regions, with fixed internal dimensions for buttons, HUD billboards, and slots. Common observed rhythm values are `8px`, `12px`, `14px`, and `18px`; dense HUD elements use tighter internal padding than menus. Gameplay HUD information stays stable while the camera moves: player billboards stack predictably, two adjacent ability diamonds stay centered at the lower edge, and overhead damage remains spatially attached to fighters.
 
 Do not rotate dense paragraphs, settings controls, or critical status. Rotation belongs to decorative notes, tape labels, poster groups, and cutout material.
 
@@ -171,7 +171,7 @@ Navigation is a stable action stack or flow-specific footer, not a decorative po
 
 ### HUD Billboards
 
-Player identity, damage, and stocks live in stable left-side billboard cards with portrait cutouts, accent edges, and large outlined percentage readouts. The action bar is a centered utility strip at the lower edge; slot readiness uses scale/translation pulses and readable state changes rather than constant animation.
+Player identity, damage, and stocks live in stable left-side billboard cards with portrait cutouts, accent edges, and large outlined percentage readouts. The local kit uses an orange normal diamond (`1–4`) beside a blue special diamond (`A/E/R/F`) at the bottom center. Each has four circular slots ordered top, right, bottom, left, with an effective-binding prompt above each slot and cooldown feedback inside it. Keyboard prompts follow the active layout; Xbox controller specials show modifier plus face button. Unsupported glyphs fall back to text. Slot readiness uses scale/translation pulses rather than constant animation.
 
 ## Do's and Don'ts
 

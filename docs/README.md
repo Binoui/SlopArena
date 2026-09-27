@@ -45,6 +45,8 @@ Use [Project context](../CONTEXT.md) for canonical gameplay vocabulary and settl
 | [Visual language](design/visual-language.md) | Graphic identity, UI composition, palette, typography, motion, and presentation voice |
 | [Stage concepts](design/stage-concepts.md) | Gameplay-first PVP stage concepts, readability, topology, and background hierarchy |
 | [Art and asset conventions](contributing/conventions.md) | 3D character rendering, asset production, naming, licensing, and hygiene |
+| [Credits](../CREDITS.md) | Public thank-you and creator links |
+| [Asset source and license notes](assets/credits-and-licenses.md) | Internal provenance and release checks |
 | [Visual presentation baseline](visual-baseline.md) | Repeatable gameplay-camera evidence for visual comparisons |
 
 ## Character authoring

@@ -24,6 +24,8 @@ namespace SlopArena.Client.UI
         private const double CompactLifetimeSeconds = 8d;
 
         public const string DockOpenPlayerPrefsKey = "SlopArena.Chat.DockOpen";
+        private const string WidthPlayerPrefsKey = "SlopArena.Chat.WidthPx";
+        private const string HeightPlayerPrefsKey = "SlopArena.Chat.HeightPx";
 
         private static ChatOverlay? _instance;
 
@@ -46,17 +48,21 @@ namespace SlopArena.Client.UI
         private Button? _newest;
         private Button? _refreshDirectory;
         private Button? _send;
-        private Button? _identity;
         private Button? _expand;
         private Button? _globalTab;
         private Button? _serverTab;
         private Button? _directTab;
-        private Label? _statusCollapsed;
-        private Label? _statusHeader;
-        private Label? _titleHeader;
         private Label? _onlineFeedback;
         private Label? _unread;
         private TextField? _draft;
+        private VisualElement? _resizeGrip;
+        private int _resizePointerId = -1;
+        private Vector2 _resizeStartPosition;
+        private float _resizeStartWidthPx;
+        private float _resizeStartHeightPx;
+        private float _preferredWidthPx;
+        private float _preferredHeightPx;
+        private bool _resizeDirty;
 
         private ChatSession? _session;
         private IVisualElementScheduledItem? _compactTick;
@@ -135,6 +141,8 @@ namespace SlopArena.Client.UI
             _instance = this;
             DontDestroyOnLoad(gameObject);
             _dockOpen = PlayerPrefs.GetInt(DockOpenPlayerPrefsKey, 1) == 1;
+            _preferredWidthPx = PlayerPrefs.GetFloat(WidthPlayerPrefsKey, 0f);
+            _preferredHeightPx = PlayerPrefs.GetFloat(HeightPlayerPrefsKey, 0f);
         }
 
         private void OnEnable()
@@ -148,6 +156,7 @@ namespace SlopArena.Client.UI
 
         private void OnDisable()
         {
+            FinishResize();
             SceneManager.sceneLoaded -= OnSceneLoaded;
             FrontendController.PageChanged -= OnFrontendPageChanged;
             if (_expanded)
@@ -169,6 +178,7 @@ namespace SlopArena.Client.UI
 
         private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
         {
+            FinishResize();
             _ownsCursor = false;
             // Frontend recreation must not reset the conversation view
             // (issue #214): scene loads keep the dock/expanded state and
@@ -213,6 +223,7 @@ namespace SlopArena.Client.UI
             _hostIsShell = true;
             _expanded = _dockOpen;
             _socialExpanded = false;
+            FrontendController.Shell?.SetSocialCellSize(_preferredWidthPx, _preferredHeightPx);
             ApplyPresentation();
             FrontendFocusRouter.NotifyPresentationChanged();
         }
@@ -336,6 +347,11 @@ namespace SlopArena.Client.UI
             _root.style.top = 0;
             _root.style.bottom = 0;
             _root.pickingMode = PickingMode.Ignore;
+            _root.RegisterCallback<GeometryChangedEvent>(_ =>
+            {
+                if (!_hostIsShell)
+                    ApplyGameplayFrameSize();
+            });
             var frame = _root.Q<VisualElement>("chat-root");
             if (frame != null) frame.pickingMode = PickingMode.Ignore;
             _frame = frame;
@@ -352,22 +368,25 @@ namespace SlopArena.Client.UI
             _newest = _root.Q<Button>("chat-newest");
             _refreshDirectory = _root.Q<Button>("directory-refresh");
             _send = _root.Q<Button>("chat-send");
-            _identity = _root.Q<Button>("chat-identity");
             _expand = _root.Q<Button>("chat-expand");
             _globalTab = _root.Q<Button>("chat-tab-global");
             _serverTab = _root.Q<Button>("chat-tab-server");
             _directTab = _root.Q<Button>("chat-tab-direct");
-            _statusCollapsed = _root.Q<Label>("chat-status-collapsed");
-            _statusHeader = _root.Q<Label>("chat-status-header");
-            _titleHeader = _root.Q<Label>("chat-title-header");
             _onlineFeedback = _root.Q<Label>("online-feedback");
             _unread = _root.Q<Label>("chat-unread");
             _draft = _root.Q<TextField>("chat-draft");
+            _resizeGrip = _root.Q<VisualElement>("chat-resize-grip");
+            if (_resizeGrip != null)
+            {
+                _resizeGrip.RegisterCallback<PointerDownEvent>(BeginResize);
+                _resizeGrip.RegisterCallback<PointerMoveEvent>(MoveResize);
+                _resizeGrip.RegisterCallback<PointerUpEvent>(EndResize);
+                _resizeGrip.RegisterCallback<PointerCaptureOutEvent>(_ => FinishResize());
+            }
 
             if (_open != null) _open.clicked += OnOpenButtonClicked;
             if (_close != null) _close.clicked += OnCloseButtonClicked;
             if (_expand != null) _expand.clicked += ExpandSocial;
-            if (_identity != null) _identity.clicked += OpenShellIdentitySurface;
             if (_newest != null) _newest.clicked += ScrollToNewest;
             if (_refreshDirectory != null) _refreshDirectory.clicked += RefreshDirectory;
             if (_send != null) _send.clicked += () => SendDraft(ChatInputGate.IsGameplayScene);
@@ -455,16 +474,12 @@ namespace SlopArena.Client.UI
 
             if (_session == null)
             {
-                SetText(_statusCollapsed, "CHAT SESSION STARTING");
-                SetText(_statusHeader, "CHAT SESSION STARTING");
+                SetText(_historyFeedback, "CHAT IS STARTING");
                 return;
             }
 
             ChatConversation? active = _session.ActiveConversation;
-            SetText(_statusCollapsed, _session.Status);
-            SetText(_statusHeader, _session.Status);
 
-            SetText(_titleHeader, active?.Title ?? "CHAT");
             int directUnread = 0;
             foreach (ChatConversation conversation in _session.Conversations)
             {
@@ -477,15 +492,13 @@ namespace SlopArena.Client.UI
                 _unread.EnableInClassList("chat-unread--visible", directUnread > 0);
             }
             _main?.SetDisplayed(true);
-            // Identity presentation and renaming moved to the shared shell
-            // identity surface (issue #220); the presenter only routes there.
-            if (_identity != null)
-                _identity.SetDisplayed(FrontendController.IsFrontendActive);
 
             RenderTabs(active, _session.IsConnected);
             RenderConversations(active);
             RenderDirectory(active);
             RenderHistory(active);
+            if (!_session.IsConnected && string.IsNullOrEmpty(active?.Feedback))
+                SetText(_historyFeedback, _session.Status);
             RenderCompactFeed();
             // Dynamic rows are new Buttons with default focusability; re-apply
             // the active region's gating after every rebuild (issue #215).
@@ -503,6 +516,12 @@ namespace SlopArena.Client.UI
             _serverTab?.EnableInClassList("chat-tab--active", isServer);
             _directTab?.EnableInClassList("chat-tab--active", isDirect);
             _serverTab?.SetEnabled(connected && (_session?.JoinedRoomId.HasValue == true || isServer));
+            if (_directTab != null)
+            {
+                bool inDirectConversation = !_showDirectory && key.StartsWith("direct:", StringComparison.Ordinal);
+                _directTab.text = inDirectConversation ? active?.Title ?? "DIRECT" : "DIRECT";
+                _directTab.tooltip = inDirectConversation ? active?.Title ?? "Direct messages" : "Direct messages";
+            }
             _directTab?.SetEnabled(true);
         }
 
@@ -652,6 +671,9 @@ namespace SlopArena.Client.UI
 
             if (active == null)
             {
+                if (_historyFeedback != null)
+                    _history.Add(_historyFeedback);
+                SetText(_historyFeedback, _session.IsConnected ? string.Empty : _session.Status);
                 _lastConversationKey = string.Empty;
                 _newest?.SetDisplayed(false);
                 return;
@@ -664,14 +686,14 @@ namespace SlopArena.Client.UI
                 _history.Add(BuildMessageRow(message));
                 hasMessages = true;
             }
-            if (!hasMessages)
+            if (!hasMessages && _session.IsConnected)
             {
-                var empty = new Label(_session.IsConnected
-                    ? "NO MESSAGES YET"
-                    : "CHAT NOT CONNECTED // Solo and Training still work.");
+                var empty = new Label("NO MESSAGES YET");
                 empty.AddToClassList("chat-empty");
                 _history.Add(empty);
             }
+            if (_historyFeedback != null)
+                _history.Add(_historyFeedback);
 
             _lastConversationKey = active.Key;
             if (_draft.value != active.Draft)
@@ -857,17 +879,6 @@ namespace SlopArena.Client.UI
             _focusParker.Focus();
         }
 
-        /// <summary>
-        /// Routes the chat's identity affordance to the shared shell identity
-        /// surface (issue #220): first-run entry, rename and the joined-server
-        /// prohibition all live there.
-        /// </summary>
-        private void OpenShellIdentitySurface()
-        {
-            if (UiModalState.Presented)
-                return;
-            FrontendController.Identity?.OpenIdentitySurface(rename: true);
-        }
 
         private void OnDraftChanged(ChangeEvent<string> evt)
         {
@@ -876,6 +887,7 @@ namespace SlopArena.Client.UI
             {
                 _draft?.SetValueWithoutNotify(_lastDraft);
                 SetText(_historyFeedback, "MESSAGE MUST BE 500 UNICODE CHARACTERS OR FEWER");
+                ScrollToNewest();
                 return;
             }
             _lastDraft = evt.newValue;
@@ -999,7 +1011,7 @@ namespace SlopArena.Client.UI
                     MinimizeChat();
                 return;
             }
-            CloseChat();
+            SetExpanded(false, false);
         }
 
         /// <summary>Open gameplay chat after a deliberate action.</summary>
@@ -1066,6 +1078,11 @@ namespace SlopArena.Client.UI
         {
             if (UiModalState.Presented)
                 return;
+            if (!_hostIsShell && ChatInputGate.IsGameplayScene)
+            {
+                OpenChat();
+                return;
+            }
             _socialExpanded = true;
             _expanded = true;
             ApplyPresentation();
@@ -1156,6 +1173,7 @@ namespace SlopArena.Client.UI
                 _panel?.EnableInClassList("chat-panel--menu", true);
                 _panel?.EnableInClassList("chat-panel--menu-opaque", expanded);
                 _root?.EnableInClassList("chat-root--menu", true);
+                _root?.EnableInClassList("chat-root--gameplay", false);
                 _root?.EnableInClassList("chat-root--expanded", expanded);
                 _panel?.SetDisplayed(_expanded);
                 _collapsed?.SetDisplayed(!_expanded);
@@ -1163,36 +1181,135 @@ namespace SlopArena.Client.UI
                 // compact cell keeps the channel row instead (issue #220).
                 _conversationList?.SetDisplayed(expanded);
                 if (_expand != null)
-                    _expand.style.display = !expanded && _expanded
-                        ? DisplayStyle.Flex : DisplayStyle.None;
+                    _expand.style.display = expanded ? DisplayStyle.None : DisplayStyle.Flex;
                 if (_close != null)
-                    _close.text = expanded ? "COLLAPSE" : "MINIMIZE";
+                {
+                    _close.tooltip = expanded ? "Collapse chat" : "Minimize chat";
+                    _root?.Q<VisualElement>("chat-close-icon")
+                        ?.EnableInClassList("chat-icon-minimize--collapse", expanded);
+                }
                 ApplyRegionFocusability();
                 return;
             }
 
             // Gameplay keeps its HUD overlay geometry; no frontend page is
-            // resized, replaced, or discovered through a document root.
+            // resized, replaced, or discovered through a document root. The
+            // frame mirrors from the right side to the left; the bottom
+            // anchor keeps the existing top-right grip drag directions.
             if (_frame != null)
             {
                 _frame.style.position = Position.Absolute;
-                _frame.style.left = StyleKeyword.Auto;
+                _frame.style.left = 24;
                 _frame.style.top = StyleKeyword.Auto;
-                _frame.style.right = 24;
+                _frame.style.right = StyleKeyword.Auto;
                 _frame.style.bottom = 94;
-                _frame.style.width = 540;
-                _frame.style.height = 620;
+                ApplyGameplayFrameSize();
             }
             _panel?.EnableInClassList("chat-panel--menu", false);
             _panel?.EnableInClassList("chat-panel--menu-opaque", false);
             _root?.EnableInClassList("chat-root--menu", false);
+            _root?.EnableInClassList("chat-root--gameplay", true);
             _root?.EnableInClassList("chat-root--expanded", false);
             if (_expand != null)
-                _expand.style.display = DisplayStyle.None;
+                _expand.style.display = DisplayStyle.None; // Gameplay has no larger social surface; only Minimize/Close applies.
             _panel?.EnableInClassList("chat-panel--solid", false);
             _panel?.SetDisplayed(_expanded);
             _collapsed?.SetDisplayed(!_expanded);
+            if (_close != null) _close.tooltip = _expanded ? "Minimize chat" : "Close chat";
+            _root?.Q<VisualElement>("chat-close-icon")
+                ?.RemoveFromClassList("chat-icon-minimize--collapse");
             ApplyRegionFocusability();
+        }
+
+        private float PhysicalPixelsPerPoint()
+        {
+            float panelScale = _root?.panel?.scaledPixelsPerPoint ?? 1f;
+            float uiScale = ClientSettingsService.Instance.UiScale / 100f;
+            return panelScale / Mathf.Max(0.01f, uiScale);
+        }
+
+        private void ApplyGameplayFrameSize()
+        {
+            if (_frame == null || _root?.panel == null)
+                return;
+            if (_root.resolvedStyle.width <= 0f || _root.resolvedStyle.height <= 0f)
+                return;
+            float factor = PhysicalPixelsPerPoint();
+            float maxWidth = Mathf.Max(1f, _root.resolvedStyle.width - 48f);
+            float maxHeight = Mathf.Max(1f, _root.resolvedStyle.height - 110f);
+            float width = _preferredWidthPx > 0f ? _preferredWidthPx / factor : 540f;
+            float height = _preferredHeightPx > 0f ? _preferredHeightPx / factor : 620f;
+            _frame.style.width = Mathf.Clamp(width, Mathf.Min(400f / factor, maxWidth), maxWidth);
+            _frame.style.height = Mathf.Clamp(height, Mathf.Min(300f / factor, maxHeight), maxHeight);
+        }
+
+        private void BeginResize(PointerDownEvent evt)
+        {
+            if (evt.button != 0 || _resizePointerId >= 0 || _resizeGrip == null || _root?.panel == null
+                || !_expanded || _socialExpanded || UiModalState.Presented)
+                return;
+            var source = _hostIsShell ? FrontendController.Shell?.SocialHost : _frame;
+            if (source == null)
+                return;
+            float factor = PhysicalPixelsPerPoint();
+            _resizePointerId = evt.pointerId;
+            _resizeStartPosition = new Vector2(evt.position.x, evt.position.y);
+            _resizeStartWidthPx = source.resolvedStyle.width * factor;
+            _resizeStartHeightPx = source.resolvedStyle.height * factor;
+            _resizeDirty = false;
+            _resizeGrip.CapturePointer(evt.pointerId);
+            evt.StopPropagation();
+        }
+
+        private void MoveResize(PointerMoveEvent evt)
+        {
+            if (_resizePointerId != evt.pointerId || _resizeGrip?.HasPointerCapture(evt.pointerId) != true
+                || _root == null)
+                return;
+            var viewport = _hostIsShell ? FrontendController.Shell?.Root : _root;
+            if (viewport == null)
+                return;
+            float factor = PhysicalPixelsPerPoint();
+            float widthLimit = Mathf.Max(120f, Mathf.Min(960f, viewport.resolvedStyle.width * factor - 48f));
+            float heightLimit = Mathf.Max(120f, Mathf.Min(720f,
+                viewport.resolvedStyle.height * factor * (_hostIsShell ? 0.65f : 1f)
+                - (_hostIsShell ? 0f : 120f)));
+            float deltaX = (evt.position.x - _resizeStartPosition.x) * factor;
+            float deltaY = (_resizeStartPosition.y - evt.position.y) * factor;
+            _preferredWidthPx = Mathf.Clamp(_resizeStartWidthPx + deltaX,
+                Mathf.Min(300f, widthLimit), widthLimit);
+            _preferredHeightPx = Mathf.Clamp(_resizeStartHeightPx + deltaY,
+                Mathf.Min(180f, heightLimit), heightLimit);
+            _resizeDirty = true;
+            if (_hostIsShell)
+                FrontendController.Shell?.SetSocialCellSize(_preferredWidthPx, _preferredHeightPx);
+            else
+                ApplyGameplayFrameSize();
+            evt.StopPropagation();
+        }
+
+        private void EndResize(PointerUpEvent evt)
+        {
+            if (_resizePointerId != evt.pointerId)
+                return;
+            FinishResize();
+            evt.StopPropagation();
+        }
+
+        private void FinishResize()
+        {
+            if (_resizePointerId < 0)
+                return;
+            int pointerId = _resizePointerId;
+            _resizePointerId = -1;
+            if (_resizeGrip?.HasPointerCapture(pointerId) == true)
+                _resizeGrip.ReleasePointer(pointerId);
+            if (!_resizeDirty)
+                return;
+            _resizeDirty = false;
+            PlayerPrefs.SetFloat(WidthPlayerPrefsKey, _preferredWidthPx);
+            PlayerPrefs.SetFloat(HeightPlayerPrefsKey, _preferredHeightPx);
+            PlayerPrefs.Save();
         }
 
         /// <summary>The conversation must be visibly laid out, not minimized,
