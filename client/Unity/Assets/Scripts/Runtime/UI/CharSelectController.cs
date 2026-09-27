@@ -46,7 +46,10 @@ namespace SlopArena.Client.UI
         private Label _lblPvPStatus;
         private bool _lockedIn;
         private LobbySnapshot _snapshot;
-
+        private RoomSnapshot _roomSnapshot;
+        private bool _roomMode;
+        private ChatSession _chatSession;
+        private bool _roomActionPending;
         public void InjectPageContext(FrontendPageContext context)
         {
             _context = context ?? throw new ArgumentNullException(nameof(context));
@@ -54,6 +57,10 @@ namespace SlopArena.Client.UI
 
         private void OnEnable()
         {
+            _roomMode = false;
+            _roomSnapshot = null;
+            _roomActionPending = false;
+            _lockedIn = false;
             _gridButtons.Clear();
             _selectingCpu = false;
             if (_context == null)
@@ -108,7 +115,9 @@ namespace SlopArena.Client.UI
             if (_selected != CharacterClass.None)
                 SelectCharacter(_selected, _context);
 
-            if (MatchConfig.Mode == GameMode.PvP)
+            if (ClientSession.SelectedOnlineMode == ClientSession.OnlineSelection.Room)
+                InitRoom(_context);
+            else if (MatchConfig.Mode == GameMode.PvP)
                 InitPvP(_context);
             else if (MatchConfig.Mode == GameMode.Solo)
                 InitSolo(_context);
@@ -333,6 +342,353 @@ namespace SlopArena.Client.UI
                 _selectingCpu ? "EDITING FIGHTER" : $"CPU {BotDifficultyProfile.DisplayName(MatchConfig.SoloCpuDifficulty)}",
                 local: false, host: false));
         }
+        private void InitRoom(FrontendPageContext context)
+        {
+            _roomMode = true;
+            SetModeChrome(context, "ROOM // CHOOSE YOUR FIGHTER", "ROOM PREPARATION  /  FIGHTER");
+            context.Q<Button>("btn-select")?.style.SetDisplay(false);
+            context.Q<VisualElement>("solo-config")?.style.SetDisplay(false);
+            _rosterPanel = context.Q<VisualElement>("roster-panel");
+            _btnLockIn = context.Q<Button>("btn-lockin");
+            _btnStartMatch = context.Q<Button>("btn-start-match");
+            _lblPvPStatus = context.Q<Label>("lbl-pvp-status");
+            _btnLockIn?.SetEnabled(false);
+            _btnStartMatch?.SetEnabled(false);
+            _btnLockIn?.style.SetDisplay(true);
+            _btnStartMatch?.style.SetDisplay(false);
+            if (_btnLockIn != null)
+            {
+                _btnLockIn.text = "LOCK IN";
+                _btnLockIn.clicked += OnRoomLockInClicked;
+            }
+            if (_btnStartMatch != null)
+            {
+                _btnStartMatch.text = "CHOOSE ARENA";
+                _btnStartMatch.clicked += OnRoomStartStageSelectClicked;
+            }
+            var back = context.Q<Button>("btn-back");
+            if (back != null) back.clicked += OnRoomBackClicked;
+            ConfigureNavigation(context, _btnLockIn, back, OnRoomBackClicked);
+
+            _chatSession = ChatSession.Instance;
+            if (_chatSession != null)
+                _chatSession.ActiveLobbyChanged += OnActiveLobbyChanged;
+            _lobby = _chatSession?.ActiveLobby ?? ClientSession.ActiveLobby;
+            BindRoomLobby(_lobby);
+            for (int i = 0; i < _gridButtons.Count; i++)
+                _gridButtons[i].SetEnabled(false);
+            SetRoomStatus("Loading Room state…", false);
+            if (_lobby == null)
+                FrontendController.Show(FrontendPage.LobbyRoom);
+            else
+                _ = RefreshRoom();
+        }
+        private void BindRoomLobby(LobbyClient lobby)
+        {
+            if (lobby == null) return;
+            lobby.RoomUpdated += OnRoomUpdated;
+            lobby.RoomDeleted += OnRoomDeleted;
+            lobby.RoomMembershipRevoked += OnRoomMembershipRevoked;
+            lobby.Connected += OnRoomConnected;
+            lobby.Disconnected += OnRoomDisconnected;
+            lobby.Error += OnRoomError;
+        }
+
+        private void UnbindRoomLobby(LobbyClient lobby)
+        {
+            lobby.RoomUpdated -= OnRoomUpdated;
+            lobby.RoomDeleted -= OnRoomDeleted;
+            lobby.RoomMembershipRevoked -= OnRoomMembershipRevoked;
+            lobby.Connected -= OnRoomConnected;
+            lobby.Disconnected -= OnRoomDisconnected;
+            lobby.Error -= OnRoomError;
+        }
+
+        private void OnActiveLobbyChanged(LobbyClient lobby)
+        {
+            if (!_roomMode || !isActiveAndEnabled || ReferenceEquals(_lobby, lobby))
+                return;
+            if (_lobby != null) UnbindRoomLobby(_lobby);
+            _lobby = lobby;
+            _roomSnapshot = null;
+            _roomActionPending = false;
+            _lockedIn = false;
+            ClientSession.IsLobbyHost = false;
+            BindRoomLobby(lobby);
+            RenderRoomRoster();
+            RenderRoomCardMarkers();
+            for (int i = 0; i < _gridButtons.Count; i++)
+                _gridButtons[i].SetEnabled(false);
+            _btnLockIn?.SetEnabled(false);
+            _btnStartMatch?.SetEnabled(false);
+            SetRoomStatus(lobby == null
+                ? "Room authentication expired. Reconnecting…"
+                : "Restoring Room state…", false);
+            if (lobby != null) _ = RefreshRoom();
+        }
+
+        private void OnRoomDeleted(Guid roomId)
+        {
+            if (roomId == ClientSession.SelectedRoomId)
+                ReturnToRoomBrowser("This room has closed.");
+        }
+
+        private void OnRoomMembershipRevoked(Guid roomId)
+        {
+            if (roomId == ClientSession.SelectedRoomId)
+                ReturnToRoomBrowser("Your Room membership ended.");
+        }
+
+        private void ReturnToRoomBrowser(string notice)
+        {
+            ClientSession.SelectedRoomId = Guid.Empty;
+            ClientSession.SelectedOnlineMode = ClientSession.OnlineSelection.LegacyServer;
+            ServerBrowserUI.PendingReturnNotice = notice;
+            FrontendController.Show(FrontendPage.ServerBrowser);
+        }
+
+
+        private async System.Threading.Tasks.Task RefreshRoom()
+        {
+            var lobby = _lobby;
+            if (lobby == null) return;
+            try
+            {
+                if (!lobby.IsConnected && !await lobby.ConnectAsync()) return;
+                var room = await lobby.GetMyRoomAsync();
+                if (!isActiveAndEnabled || !ReferenceEquals(_lobby, lobby)) return;
+                if (room == null || room.Id != ClientSession.SelectedRoomId)
+                    ReturnToRoomBrowser("You are no longer a member of this Room. Return to the browser and join another room.");
+                else
+                    OnRoomUpdated(room);
+            }
+            catch (Exception ex)
+            {
+                if (isActiveAndEnabled && ReferenceEquals(_lobby, lobby))
+                    SetRoomStatus($"Couldn’t restore Room state: {ex.Message}", true);
+            }
+        }
+
+        private void OnRoomConnected() => _ = RefreshRoom();
+
+        private void OnRoomDisconnected(Exception _)
+        {
+            if (isActiveAndEnabled)
+            {
+                UpdateRoomControls();
+                SetRoomStatus("Room connection dropped. Reconnecting…", true);
+            }
+        }
+
+        private void OnRoomError(string message)
+        {
+            if (isActiveAndEnabled) SetRoomStatus(message, true);
+        }
+
+        private void OnRoomUpdated(RoomSnapshot room)
+        {
+            if (!isActiveAndEnabled || room.Id != ClientSession.SelectedRoomId)
+                return;
+            _roomSnapshot = room;
+            _roomActionPending = false;
+            if (string.Equals(room.Phase, "Lobby", StringComparison.Ordinal))
+            {
+                FrontendController.Show(FrontendPage.LobbyRoom);
+                return;
+            }
+            if (string.Equals(room.Phase, "Stage Select", StringComparison.Ordinal))
+            {
+                FrontendController.Show(FrontendPage.StageSelect);
+                return;
+            }
+            if (string.Equals(room.Phase, "Match Starting", StringComparison.Ordinal) ||
+                string.Equals(room.Phase, "In Match", StringComparison.Ordinal))
+            {
+                FrontendController.Show(FrontendPage.StageSelect);
+                return;
+            }
+            ApplyRoomCharacterAllowlist();
+            RenderRoomRoster();
+            UpdateRoomControls();
+        }
+
+        private void ApplyRoomCharacterAllowlist()
+        {
+            var admitted = _roomSnapshot?.AdmittedCharacters ?? Array.Empty<string>();
+            CharacterClass firstAllowed = CharacterClass.None;
+            for (int i = 0; i < _gridButtons.Count; i++)
+            {
+                var button = _gridButtons[i];
+                string characterName = button.name.Substring("char-".Length);
+                bool allowed = Array.Exists(admitted,
+                    name => string.Equals(name, characterName, StringComparison.OrdinalIgnoreCase));
+                button.style.display = allowed ? DisplayStyle.Flex : DisplayStyle.None;
+                button.SetEnabled(allowed && !_lockedIn && !_roomActionPending);
+                if (allowed && firstAllowed == CharacterClass.None &&
+                    Enum.TryParse(characterName, true, out CharacterClass parsed))
+                    firstAllowed = parsed;
+            }
+            if (_selected == CharacterClass.None ||
+                !Array.Exists(admitted, name => string.Equals(name, _selected.ToString(), StringComparison.OrdinalIgnoreCase)))
+            {
+                _selected = firstAllowed;
+                if (_selected != CharacterClass.None)
+                    SelectCharacter(_selected, _context);
+            }
+            if (admitted.Length == 0)
+                SetRoomStatus("Master has not admitted any characters for this Room.", true);
+        }
+
+        private void RenderRoomRoster()
+        {
+            if (_rosterPanel == null) return;
+            _rosterPanel.Clear();
+            var members = _roomSnapshot?.Members ?? Array.Empty<RoomMemberInfo>();
+            for (int i = 0; i < members.Length; i++)
+            {
+                var member = members[i];
+                bool hasCharacter = Enum.TryParse(member.CharacterSelection, true, out CharacterClass cls);
+                _rosterPanel.Add(BuildPlayerCard(
+                    $"P{i + 1}", member.Name,
+                    hasCharacter ? cls : (CharacterClass?)null,
+                    member.LockedIn ? "LOCKED" : "WAITING",
+                    member.SteamId == ClientSession.SteamId,
+                    member.IsLeader));
+            }
+        }
+
+        private void UpdateRoomControls()
+        {
+            var members = _roomSnapshot?.Members ?? Array.Empty<RoomMemberInfo>();
+            bool localLocked = false;
+            bool leader = false;
+            bool allLocked = members.Length >= 2;
+            for (int i = 0; i < members.Length; i++)
+            {
+                allLocked &= members[i].LockedIn;
+                if (members[i].SteamId == ClientSession.SteamId)
+                {
+                    localLocked = members[i].LockedIn;
+                    leader = members[i].IsLeader;
+                }
+            }
+            _lockedIn = localLocked;
+            ClientSession.IsLobbyHost = leader;
+            var admittedCharacters = _roomSnapshot?.AdmittedCharacters ?? Array.Empty<string>();
+            for (int i = 0; i < _gridButtons.Count; i++)
+            {
+                string characterName = _gridButtons[i].name.Substring("char-".Length);
+                bool allowed = Array.Exists(admittedCharacters,
+                    name => string.Equals(name, characterName, StringComparison.OrdinalIgnoreCase));
+                _gridButtons[i].SetEnabled(allowed && !localLocked && !_roomActionPending &&
+                    _lobby?.IsConnected == true);
+            }
+            if (_btnLockIn != null)
+            {
+                _btnLockIn.style.SetDisplay(true);
+                _btnLockIn.text = localLocked ? "LOCKED" : "LOCK IN";
+                _btnLockIn.SetEnabled(!localLocked && !_roomActionPending &&
+                    _selected != CharacterClass.None && _lobby?.IsConnected == true);
+            }
+            if (_btnStartMatch != null)
+            {
+                _btnStartMatch.style.SetDisplay(leader);
+                _btnStartMatch.SetEnabled(leader && allLocked && !_roomActionPending &&
+                    _lobby?.IsConnected == true);
+            }
+            SetRoomStatus(admittedCharacters.Length == 0
+                ? "Master has not admitted any characters for this Room."
+                : localLocked
+                    ? (leader
+                        ? allLocked ? "Everyone is locked in. Choose the arena." : "Locked in. Waiting for the other members."
+                        : "Locked in. Waiting for the Room leader.")
+                    : "Choose your fighter, then lock in.", admittedCharacters.Length == 0);
+            RenderRoomCardMarkers();
+        }
+
+        private void RenderRoomCardMarkers()
+        {
+            foreach (var button in _gridButtons)
+                button.Q<VisualElement>("char-markers")?.Clear();
+            var members = _roomSnapshot?.Members ?? Array.Empty<RoomMemberInfo>();
+            for (int i = 0; i < members.Length; i++)
+            {
+                if (!Enum.TryParse<CharacterClass>(members[i].CharacterSelection, true, out var cls))
+                    continue;
+                var markers = _context.Q<Button>($"char-{cls}")?.Q<VisualElement>("char-markers");
+                if (markers == null) continue;
+                var marker = new Label($"P{i + 1} {(members[i].LockedIn ? "LOCKED" : "SELECTING")}");
+                marker.AddToClassList("char-marker");
+                marker.AddToClassList(members[i].LockedIn ? "char-marker--ready" : "char-marker--selecting");
+                markers.Add(marker);
+            }
+        }
+
+        private async void OnRoomLockInClicked()
+        {
+            var lobby = _lobby;
+            if (_roomActionPending || _lockedIn || lobby == null || _selected == CharacterClass.None)
+                return;
+            string character = _selected.ToString();
+            _roomActionPending = true;
+            UpdateRoomControls();
+            try
+            {
+                var room = await lobby.RoomSelectCharacterAsync(character);
+                if (isActiveAndEnabled && ReferenceEquals(_lobby, lobby))
+                    OnRoomUpdated(room);
+            }
+            catch (Exception ex)
+            {
+                if (!isActiveAndEnabled || !ReferenceEquals(_lobby, lobby)) return;
+                _roomActionPending = false;
+                UpdateRoomControls();
+                SetRoomStatus($"Character selection rejected: {ex.Message}", true);
+            }
+        }
+
+        private async void OnRoomStartStageSelectClicked()
+        {
+            var lobby = _lobby;
+            var snapshot = _roomSnapshot;
+            if (_roomActionPending || lobby == null || snapshot == null)
+                return;
+            var members = snapshot.Members ?? Array.Empty<RoomMemberInfo>();
+            bool isLeader = false;
+            bool allLocked = members.Length >= 2;
+            foreach (var member in members)
+            {
+                allLocked &= member.LockedIn;
+                if (member.SteamId == ClientSession.SteamId) isLeader = member.IsLeader;
+            }
+            if (!isLeader || !allLocked) return;
+            _roomActionPending = true;
+            UpdateRoomControls();
+            try
+            {
+                var room = await lobby.RoomStartStageSelectAsync();
+                if (isActiveAndEnabled && ReferenceEquals(_lobby, lobby))
+                    OnRoomUpdated(room);
+            }
+            catch (Exception ex)
+            {
+                if (!isActiveAndEnabled || !ReferenceEquals(_lobby, lobby)) return;
+                _roomActionPending = false;
+                UpdateRoomControls();
+                SetRoomStatus($"Stage select rejected: {ex.Message}", true);
+            }
+        }
+
+        private void OnRoomBackClicked() => FrontendController.Show(FrontendPage.LobbyRoom);
+
+        private void SetRoomStatus(string message, bool error)
+        {
+            if (_lblPvPStatus == null) return;
+            _lblPvPStatus.text = message;
+            if (error) _lblPvPStatus.AddToClassList("error");
+            else _lblPvPStatus.RemoveFromClassList("error");
+        }
+
 
         private void InitPvP(FrontendPageContext context)
         {
@@ -466,6 +822,8 @@ namespace SlopArena.Client.UI
 
         private void OnMatchStarted(MatchStartedConfig config)
         {
+            if (config.RoomId != null)
+                return;
             Debug.Log($"[CharSelect] Match started: {config.Players.Count} players, port={config.MatchPort}, arena={config.ArenaName}.");
 
             // Keep the lobby connection alive through the match (issue #40): the
@@ -563,9 +921,11 @@ namespace SlopArena.Client.UI
             var number = new Label(playerNumber);
             number.AddToClassList("player-card__number");
             identity.Add(number);
-            var role = new Label(MatchConfig.Mode == GameMode.PvP
-                ? (host ? "HOST" : "PLAYER")
-                : (local ? "PLAYER" : "CPU"));
+            var role = new Label(_roomMode
+                ? (host ? "LEADER" : "MEMBER")
+                : MatchConfig.Mode == GameMode.PvP
+                    ? (host ? "HOST" : "PLAYER")
+                    : (local ? "PLAYER" : "CPU"));
             role.AddToClassList("player-card__host");
             identity.Add(role);
             card.Add(identity);
@@ -707,13 +1067,28 @@ namespace SlopArena.Client.UI
 
         private void OnDisable()
         {
+            if (_roomMode && _chatSession != null)
+                _chatSession.ActiveLobbyChanged -= OnActiveLobbyChanged;
+            _chatSession = null;
             if (_lobby != null)
             {
-                _lobby.LobbyUpdated    -= OnLobbyUpdated;
-                _lobby.CharacterSelected -= OnCharacterSelected;
-                _lobby.StageSelect      -= OnStageSelect;
-                _lobby.MatchStarted     -= OnMatchStarted;
-                _lobby.Error            -= OnPvPError;
+                if (_roomMode)
+                {
+                    UnbindRoomLobby(_lobby);
+                    if (_btnLockIn != null) _btnLockIn.clicked -= OnRoomLockInClicked;
+                    if (_btnStartMatch != null) _btnStartMatch.clicked -= OnRoomStartStageSelectClicked;
+                    var backButton = _context.Q<Button>("btn-back");
+                    if (backButton != null) backButton.clicked -= OnRoomBackClicked;
+                }
+                else
+                {
+                    _lobby.LobbyUpdated -= OnLobbyUpdated;
+                    _lobby.CharacterSelected -= OnCharacterSelected;
+                    _lobby.StageSelect -= OnStageSelect;
+                    _lobby.MatchStarted -= OnMatchStarted;
+                    _lobby.Error -= OnPvPError;
+                }
+                _lobby = null;
             }
         }
 

@@ -3,6 +3,13 @@
 **Status:** Accepted — 2026-08-01
 **Deciders:** @Binoui
 
+> **2026-09-27 implementation amendment (#241–#247):** Master now owns named
+> public Rooms independently of physical GameHosts. Server Chat is authorized
+> by Room membership; a GameHost is allocated only at Match start. A terminal
+> GameHost report returns its matching Room to Lobby without resetting chat or
+> another Room's Match. The original GameServer-associated waiting-roster
+> wording below records the 2026-08-01 choice, not the current browser contract.
+
 ## Context
 
 Players need a lobby room after connecting to a game server — a place to wait for opponents, see who's present, pick characters, and have the host start the match. Two options for where lobby state lives:

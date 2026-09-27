@@ -30,6 +30,10 @@ namespace SlopArena.Client.UI
         private VisualElement _playerCards;
         private VisualElement _grid;
         private LobbyClient _lobby;
+        private ChatSession _chatSession;
+        private bool _roomMode;
+        private RoomSnapshot _roomSnapshot;
+        private bool _roomActionPending;
 
         public void InjectPageContext(FrontendPageContext context)
         {
@@ -39,6 +43,8 @@ namespace SlopArena.Client.UI
         private void OnEnable()
         {
             _selectedArena = "";
+            _roomSnapshot = null;
+            _roomActionPending = false;
             _grid = _context.Q<VisualElement>("stage-grid");
             _grid?.Clear();
             _btnConfirm = _context.Q<Button>("btn-confirm");
@@ -46,27 +52,29 @@ namespace SlopArena.Client.UI
             _lblWaiting = _context.Q<Label>("lbl-waiting");
             _playerCards = _context.Q<VisualElement>("player-cards-area");
 
+            _roomMode = ClientSession.SelectedOnlineMode == ClientSession.OnlineSelection.Room;
             bool isOnline = MatchConfig.Mode == GameMode.PvP;
-            bool isHost = !isOnline || ClientSession.IsLobbyHost;
-            SetModeChrome(isOnline ? "ONLINE // SELECT STAGE" : "SOLO // SELECT STAGE",
-                "STEP 2 OF 2  /  STAGE");
-            _context.Q<Label>("subtitle").text = isHost
-                ? "CHOOSE YOUR BATTLEGROUND"
-                : "THE HOST WILL CHOOSE THE BATTLEGROUND";
-            _context.Q<Label>("lbl-host").text = isOnline
-                ? (isHost ? "HOST CHOOSES THE STAGE" : "WAITING FOR HOST")
+            bool isHost = _roomMode ? false : !isOnline || ClientSession.IsLobbyHost;
+            SetModeChrome(_roomMode ? "ROOM // SELECT ARENA" : isOnline ? "ONLINE // SELECT STAGE" : "SOLO // SELECT STAGE",
+                _roomMode ? "ROOM PREPARATION  /  ARENA" : "STEP 2 OF 2  /  STAGE");
+            _context.Q<Label>("subtitle").text = _roomMode
+                ? (isHost ? "CHOOSE THE ROOM ARENA" : "THE ROOM LEADER WILL CHOOSE THE ARENA")
+                : isHost ? "CHOOSE YOUR BATTLEGROUND" : "THE HOST WILL CHOOSE THE BATTLEGROUND";
+            _context.Q<Label>("lbl-host").text = _roomMode
+                ? (isHost ? "ROOM LEADER CHOOSES THE ARENA" : "WAITING FOR ROOM LEADER")
+                : isOnline ? (isHost ? "HOST CHOOSES THE STAGE" : "WAITING FOR HOST")
                 : "YOU CHOOSE THE STAGE";
 
             if (_btnConfirm != null)
             {
                 _btnConfirm.style.display = DisplayStyle.None;
-                _btnConfirm.text = isOnline ? "START MATCH" : "START SOLO";
+                _btnConfirm.text = _roomMode ? "CONFIRM ARENA" : isOnline ? "START MATCH" : "START SOLO";
             }
             if (_lblWaiting != null)
             {
                 _lblWaiting.style.display = isHost ? DisplayStyle.None : DisplayStyle.Flex;
                 if (!isHost)
-                    _lblWaiting.text = "WAITING FOR HOST TO PICK A STAGE";
+                    _lblWaiting.text = _roomMode ? "WAITING FOR THE ROOM LEADER TO CHOOSE" : "WAITING FOR HOST TO PICK A STAGE";
             }
             RenderPlayerCards();
 
@@ -137,18 +145,34 @@ namespace SlopArena.Client.UI
             }
 
             var btnBack = _context.Q<Button>("btn-back");
-            Action back = BackToFighterSelect;
+            Action back = _roomMode ? BackToRoom : BackToFighterSelect;
             if (btnBack != null)
+            {
                 btnBack.clicked += back;
+                if (_roomMode) btnBack.style.display = DisplayStyle.None;
+            }
             Button initial = isHost && firstStageButton != null ? firstStageButton : btnBack;
             if (initial != null)
                 MenuNavigation.Configure(_context, initial, back);
 
-            _lobby = isOnline ? ClientSession.ActiveLobby : null;
-            if (_lobby != null)
+            if (_roomMode)
             {
-                _lobby.MatchStarted += OnMatchStarted;
-                _lobby.Error += OnError;
+                _chatSession = ChatSession.Instance;
+                if (_chatSession != null)
+                    _chatSession.ActiveLobbyChanged += OnActiveLobbyChanged;
+                _lobby = _chatSession?.ActiveLobby ?? ClientSession.ActiveLobby;
+                BindRoomLobby(_lobby);
+                if (_lobby != null)
+                    _ = RefreshRoom();
+            }
+            else
+            {
+                _lobby = isOnline ? ClientSession.ActiveLobby : null;
+                if (_lobby != null)
+                {
+                    _lobby.MatchStarted += OnMatchStarted;
+                    _lobby.Error += OnError;
+                }
             }
 
             if (_btnConfirm != null)
@@ -158,10 +182,20 @@ namespace SlopArena.Client.UI
 
         private void OnDisable()
         {
+            if (_roomMode && _chatSession != null)
+                _chatSession.ActiveLobbyChanged -= OnActiveLobbyChanged;
+            _chatSession = null;
             if (_lobby != null)
             {
-                _lobby.MatchStarted -= OnMatchStarted;
-                _lobby.Error -= OnError;
+                if (_roomMode)
+                {
+                    UnbindRoomLobby(_lobby);
+                }
+                else
+                {
+                    _lobby.MatchStarted -= OnMatchStarted;
+                    _lobby.Error -= OnError;
+                }
                 _lobby = null;
             }
             if (_btnConfirm != null) _btnConfirm.clicked -= OnConfirmClicked;
@@ -196,10 +230,350 @@ namespace SlopArena.Client.UI
         private static void BackToFighterSelect()
             => FrontendController.Show(FrontendPage.FighterSelect);
 
+        private void BackToRoom() => FrontendController.Show(FrontendPage.LobbyRoom);
+        private void BindRoomLobby(LobbyClient lobby)
+        {
+            if (lobby == null) return;
+            lobby.RoomUpdated += OnRoomUpdated;
+            lobby.RoomDeleted += OnRoomDeleted;
+            lobby.RoomMembershipRevoked += OnRoomMembershipRevoked;
+            lobby.Connected += OnRoomConnected;
+            lobby.Disconnected += OnRoomDisconnected;
+            lobby.Error += OnRoomError;
+        }
+
+        private void UnbindRoomLobby(LobbyClient lobby)
+        {
+            lobby.RoomUpdated -= OnRoomUpdated;
+            lobby.RoomDeleted -= OnRoomDeleted;
+            lobby.RoomMembershipRevoked -= OnRoomMembershipRevoked;
+            lobby.Connected -= OnRoomConnected;
+            lobby.Disconnected -= OnRoomDisconnected;
+            lobby.Error -= OnRoomError;
+        }
+
+        private void OnActiveLobbyChanged(LobbyClient lobby)
+        {
+            if (!_roomMode || !isActiveAndEnabled || ReferenceEquals(_lobby, lobby))
+                return;
+            if (_lobby != null) UnbindRoomLobby(_lobby);
+            _lobby = lobby;
+            _roomSnapshot = null;
+            _selectedArena = "";
+            _roomActionPending = false;
+            ClientSession.IsLobbyHost = false;
+            BindRoomLobby(lobby);
+            RenderPlayerCards();
+            if (_lblSelectedStage != null) _lblSelectedStage.text = "RESTORING ROOM ARENA…";
+            _btnConfirm?.style.SetDisplay(false);
+            ApplyRoomArenaAllowlist();
+            _btnConfirm?.SetEnabled(false);
+            ShowRoomStatus(lobby == null
+                ? "Room authentication expired. Reconnecting…"
+                : "Restoring Room state…", false);
+            if (lobby != null) _ = RefreshRoom();
+        }
+
+        private void OnRoomDeleted(Guid roomId)
+        {
+            if (roomId == ClientSession.SelectedRoomId)
+                ReturnToRoomBrowser("This room has closed.");
+        }
+
+        private void OnRoomMembershipRevoked(Guid roomId)
+        {
+            if (roomId == ClientSession.SelectedRoomId)
+                ReturnToRoomBrowser("Your Room membership ended.");
+        }
+
+        private void ReturnToRoomBrowser(string notice)
+        {
+            ClientSession.SelectedRoomId = Guid.Empty;
+            ClientSession.SelectedOnlineMode = ClientSession.OnlineSelection.LegacyServer;
+            ServerBrowserUI.PendingReturnNotice = notice;
+            FrontendController.Show(FrontendPage.ServerBrowser);
+        }
+
+        private async System.Threading.Tasks.Task RefreshRoom()
+        {
+            var lobby = _lobby;
+            if (lobby == null) return;
+            try
+            {
+                if (!lobby.IsConnected && !await lobby.ConnectAsync()) return;
+                var room = await lobby.GetMyRoomAsync();
+                if (!isActiveAndEnabled || !ReferenceEquals(_lobby, lobby)) return;
+                if (room == null || room.Id != ClientSession.SelectedRoomId)
+                    ReturnToRoomBrowser("You are no longer a member of this Room. Return to the browser and join another room.");
+                else
+                    OnRoomUpdated(room);
+            }
+            catch (Exception ex)
+            {
+                if (isActiveAndEnabled && ReferenceEquals(_lobby, lobby))
+                    ShowRoomStatus($"Couldn’t restore Room state: {ex.Message}", true);
+            }
+        }
+
+        private void OnRoomConnected() => _ = RefreshRoom();
+
+        private void OnRoomDisconnected(Exception _)
+        {
+            if (isActiveAndEnabled)
+            {
+                ApplyRoomArenaAllowlist();
+                _btnConfirm?.SetEnabled(false);
+                ShowRoomStatus("Room connection dropped. Reconnecting…", true);
+            }
+        }
+
+        private void OnRoomError(string message)
+        {
+            if (!isActiveAndEnabled) return;
+            if (_lobby?.IsConnected != true)
+            {
+                ApplyRoomArenaAllowlist();
+                _btnConfirm?.SetEnabled(false);
+            }
+            ShowRoomStatus($"Room connection error: {message}", true);
+        }
+
+        private void OnRoomUpdated(RoomSnapshot room)
+        {
+            if (!isActiveAndEnabled || room.Id != ClientSession.SelectedRoomId)
+                return;
+            if (string.Equals(room.Phase, "Lobby", StringComparison.Ordinal))
+            {
+                FrontendController.Show(FrontendPage.LobbyRoom);
+                return;
+            }
+            if (string.Equals(room.Phase, "Character Select", StringComparison.Ordinal))
+            {
+                FrontendController.Show(FrontendPage.FighterSelect);
+                return;
+            }
+            if (string.Equals(room.Phase, "Match Starting", StringComparison.Ordinal) ||
+                string.Equals(room.Phase, "In Match", StringComparison.Ordinal))
+            {
+                _roomSnapshot = room;
+                _roomActionPending = true;
+                ClientSession.IsLobbyHost = IsLocalRoomLeader(room);
+                if (_btnConfirm != null)
+                {
+                    _btnConfirm.style.display = DisplayStyle.Flex;
+                    _btnConfirm.text = "MATCH STARTING";
+                    _btnConfirm.SetEnabled(false);
+                }
+                ShowRoomStatus(room.Phase == "In Match"
+                    ? "Match host allocated. Waiting for the Room match descriptor…"
+                    : "Master is preparing the Room match…", false);
+                return;
+            }
+            _roomSnapshot = room;
+            _roomActionPending = false;
+            ClientSession.IsLobbyHost = IsLocalRoomLeader(room);
+            if (_context.Q<Label>("subtitle") is { } subtitle)
+                subtitle.text = ClientSession.IsLobbyHost ? "CHOOSE THE ROOM ARENA" : "THE ROOM LEADER WILL CHOOSE THE ARENA";
+            if (_context.Q<Label>("lbl-host") is { } hostLabel)
+                hostLabel.text = ClientSession.IsLobbyHost ? "ROOM LEADER CHOOSES THE ARENA" : "WAITING FOR ROOM LEADER";
+            ApplyRoomArenaAllowlist();
+            RenderPlayerCards();
+            if (_btnConfirm != null)
+            {
+                _btnConfirm.style.display = DisplayStyle.Flex;
+                _btnConfirm.text = ClientSession.IsLobbyHost ? "CONFIRM ARENA" : "WAITING FOR LEADER";
+            }
+            if (!string.IsNullOrWhiteSpace(room.ArenaName) &&
+                _grid?.Q<VisualElement>($"stage-{room.ArenaName}") != null)
+            {
+                SelectStage(room.ArenaName);
+                if (_lblSelectedStage != null)
+                    _lblSelectedStage.text = $"ROOM ARENA: {DisplayArenaName(room.ArenaName)}";
+                if (_btnConfirm != null)
+                    _btnConfirm.text = ClientSession.IsLobbyHost
+                        ? string.Equals(_selectedArena, room.ArenaName, StringComparison.OrdinalIgnoreCase)
+                            ? "START MATCH"
+                            : "CHANGE ARENA"
+                        : "ARENA CONFIRMED";
+                _btnConfirm?.SetEnabled(ClientSession.IsLobbyHost && !_roomActionPending &&
+                    _lobby?.IsConnected == true);
+                ShowRoomStatus("Arena selection is confirmed for every Room member.", false);
+            }
+            else if (string.IsNullOrWhiteSpace(room.ArenaName))
+            {
+                if (_lblSelectedStage != null)
+                    _lblSelectedStage.text = string.IsNullOrEmpty(_selectedArena)
+                        ? "ROOM LEADER HAS NOT CHOSEN AN ARENA"
+                        : $"ARENA TO CONFIRM: {DisplayArenaName(_selectedArena)}";
+                _btnConfirm?.SetEnabled(ClientSession.IsLobbyHost && !string.IsNullOrEmpty(_selectedArena) &&
+                    !_roomActionPending && _lobby?.IsConnected == true);
+                ShowRoomStatus(string.IsNullOrEmpty(_selectedArena)
+                    ? ClientSession.IsLobbyHost ? "Choose an admitted arena, then confirm it." : "Waiting for the Room leader to choose an arena."
+                    : "Confirm the selected arena to share it with the Room.", false);
+            }
+            else
+            {
+                if (_lblSelectedStage != null)
+                    _lblSelectedStage.text = $"ROOM ARENA: {DisplayArenaName(room.ArenaName)}";
+                _btnConfirm?.SetEnabled(false);
+                ShowRoomStatus($"The chosen arena ({room.ArenaName}) is not available in this client build.", true);
+            }
+            ConfigureRoomNavigation();
+        }
+        private void ConfigureRoomNavigation()
+        {
+            Button initial = null;
+            if (ClientSession.IsLobbyHost && _grid != null)
+            {
+                foreach (var element in _grid.Children())
+                {
+                    if (element is Button button && button.enabledSelf &&
+                        button.style.display != DisplayStyle.None)
+                    {
+                        initial = button;
+                        break;
+                    }
+                }
+            }
+            initial ??= _btnConfirm ?? _context.Q<Button>("btn-back");
+            if (initial != null)
+                MenuNavigation.Configure(_context, initial, BackToRoom);
+        }
+
+
+        private static bool IsLocalRoomLeader(RoomSnapshot room)
+        {
+            var members = room.Members ?? Array.Empty<RoomMemberInfo>();
+            for (int i = 0; i < members.Length; i++)
+                if (members[i].SteamId == ClientSession.SteamId)
+                    return members[i].IsLeader;
+            return false;
+        }
+
+        private void ApplyRoomArenaAllowlist()
+        {
+            var admitted = _roomSnapshot?.AdmittedArenas ?? Array.Empty<string>();
+            if (_grid == null) return;
+            foreach (var element in _grid.Children())
+            {
+                if (element is not Button button || !button.name.StartsWith("stage-", StringComparison.Ordinal))
+                    continue;
+                string arenaName = button.name.Substring("stage-".Length);
+                bool allowed = Array.Exists(admitted,
+                    name => string.Equals(name, arenaName, StringComparison.OrdinalIgnoreCase));
+                button.style.display = allowed ? DisplayStyle.Flex : DisplayStyle.None;
+                button.SetEnabled(allowed && ClientSession.IsLobbyHost && !_roomActionPending &&
+                    _lobby?.IsConnected == true);
+                if (!allowed && _selectedArena == arenaName)
+                {
+                    _selectedArena = "";
+                    if (_lblSelectedStage != null) _lblSelectedStage.text = "CHOOSE AN ADMITTED ARENA";
+                    _btnConfirm?.SetEnabled(false);
+                }
+            }
+            if (admitted.Length == 0 && _lblWaiting != null)
+            {
+                _lblWaiting.text = "Master has not admitted any arenas for this Room.";
+                _lblWaiting.style.display = DisplayStyle.Flex;
+            }
+        }
+
+        private string DisplayArenaName(string arenaName)
+        {
+            ArenaDefinition? arena = ArenaRegistry.Get(arenaName);
+            return arena.HasValue ? DisplayName(arena.Value).ToUpperInvariant() : arenaName.ToUpperInvariant();
+        }
+
+        private void ShowRoomStatus(string message, bool error)
+        {
+            if (_lblWaiting == null) return;
+            _lblWaiting.text = message;
+            _lblWaiting.style.display = DisplayStyle.Flex;
+            if (error) _lblWaiting.AddToClassList("error");
+            else _lblWaiting.RemoveFromClassList("error");
+        }
+
+        private async void ChooseRoomArena()
+        {
+            var lobby = _lobby;
+            string arena = _selectedArena;
+            if (_roomActionPending || lobby == null || _roomSnapshot == null ||
+                !ClientSession.IsLobbyHost || string.IsNullOrEmpty(arena))
+                return;
+            _roomActionPending = true;
+            ApplyRoomArenaAllowlist();
+            _btnConfirm?.SetEnabled(false);
+            ShowRoomStatus("Confirming the arena with Master…", false);
+            try
+            {
+                var room = await lobby.RoomChooseArenaAsync(arena);
+                if (isActiveAndEnabled && ReferenceEquals(_lobby, lobby))
+                    OnRoomUpdated(room);
+            }
+            catch (Exception ex)
+            {
+                if (!isActiveAndEnabled || !ReferenceEquals(_lobby, lobby)) return;
+                _roomActionPending = false;
+                ApplyRoomArenaAllowlist();
+                _btnConfirm?.SetEnabled(ClientSession.IsLobbyHost && !string.IsNullOrEmpty(_selectedArena) &&
+                    _lobby?.IsConnected == true);
+                if (_lblSelectedStage != null)
+                    _lblSelectedStage.text = $"ARENA NOT CONFIRMED: {DisplayArenaName(arena)}";
+                ShowRoomStatus($"Master rejected this arena: {ex.Message}", true);
+            }
+        }
+        private async void StartRoomMatch()
+        {
+            var lobby = _lobby;
+            Guid roomId = ClientSession.SelectedRoomId;
+            if (_roomActionPending || lobby == null || _roomSnapshot?.Id != roomId ||
+                !ClientSession.IsLobbyHost || !lobby.IsConnected ||
+                !string.Equals(_selectedArena, _roomSnapshot.ArenaName, StringComparison.OrdinalIgnoreCase))
+                return;
+            _roomActionPending = true;
+            _btnConfirm?.SetEnabled(false);
+            ShowRoomStatus("Starting the Room match with Master…", false);
+            try
+            {
+                await lobby.RoomStartMatchAsync();
+            }
+            catch (Exception ex)
+            {
+                if (!isActiveAndEnabled || !ReferenceEquals(_lobby, lobby) ||
+                    ClientSession.SelectedRoomId != roomId)
+                    return;
+                if (_roomSnapshot?.Id == roomId &&
+                    (_roomSnapshot.Phase == "Match Starting" || _roomSnapshot.Phase == "In Match"))
+                    return;
+                _roomActionPending = false;
+                ApplyRoomArenaAllowlist();
+                _btnConfirm?.SetEnabled(ClientSession.IsLobbyHost &&
+                    !string.IsNullOrEmpty(_selectedArena) && lobby.IsConnected);
+                ShowRoomStatus($"Could not start the Room match: {ex.Message}. You can retry.", true);
+            }
+        }
+
         private void RenderPlayerCards()
         {
             if (_playerCards == null) return;
             _playerCards.Clear();
+
+            if (_roomMode)
+            {
+                var members = _roomSnapshot?.Members ?? Array.Empty<RoomMemberInfo>();
+                for (int i = 0; i < members.Length; i++)
+                {
+                    var member = members[i];
+                    bool hasCharacter = Enum.TryParse(member.CharacterSelection, true, out CharacterClass selectedClass);
+                    _playerCards.Add(BuildPlayerCard(
+                        $"P{i + 1}", member.Name,
+                        hasCharacter ? selectedClass : (CharacterClass?)null,
+                        member.LockedIn ? "LOCKED" : "WAITING",
+                        member.SteamId == ClientSession.SteamId,
+                        member.IsLeader));
+                }
+                return;
+            }
 
             if (MatchConfig.Mode == GameMode.Solo)
             {
@@ -246,14 +620,16 @@ namespace SlopArena.Client.UI
             var number = new Label(playerNumber);
             number.AddToClassList("player-card__number");
             identity.Add(number);
-            var role = new Label(MatchConfig.Mode == GameMode.PvP
-                ? (host ? "HOST" : "PLAYER")
-                : (local ? "PLAYER" : "CPU"));
+            var role = new Label(_roomMode
+                ? (host ? "LEADER" : "MEMBER")
+                : MatchConfig.Mode == GameMode.PvP
+                    ? (host ? "HOST" : "PLAYER")
+                    : (local ? "PLAYER" : "CPU"));
             role.AddToClassList("player-card__host");
             identity.Add(role);
             card.Add(identity);
 
-            var name = new Label(playerName);
+            var name = new Label(playerName) { enableRichText = false };
             name.AddToClassList("player-card__name");
             card.Add(name);
 
@@ -286,9 +662,18 @@ namespace SlopArena.Client.UI
             {
                 if (_lblWaiting != null)
                 {
-                    _lblWaiting.text = "Choose a stage before starting.";
+                    _lblWaiting.text = _roomMode ? "Choose an admitted arena before confirming." : "Choose a stage before starting.";
                     _lblWaiting.style.display = DisplayStyle.Flex;
                 }
+                return;
+            }
+            if (_roomMode)
+            {
+                if (_roomSnapshot != null &&
+                    string.Equals(_roomSnapshot.ArenaName, _selectedArena, StringComparison.OrdinalIgnoreCase))
+                    StartRoomMatch();
+                else
+                    ChooseRoomArena();
                 return;
             }
 
@@ -298,7 +683,6 @@ namespace SlopArena.Client.UI
                 SceneManager.LoadScene("Arena_Offline");
                 return;
             }
-
             _btnConfirm?.SetEnabled(false);
             if (_lblWaiting != null)
             {
@@ -318,6 +702,9 @@ namespace SlopArena.Client.UI
 
         private void OnMatchStarted(MatchStartedConfig config)
         {
+            if (config.RoomId != null)
+                return;
+
             Debug.Log($"[StageSelect] Match started: {config.Players.Count} players, port={config.MatchPort}, arena={config.ArenaName}.");
             if (_lobby != null)
             {
@@ -329,6 +716,16 @@ namespace SlopArena.Client.UI
 
         private void OnError(string message)
         {
+            if (_roomMode)
+            {
+                _roomActionPending = false;
+                ApplyRoomArenaAllowlist();
+                if (_btnConfirm != null)
+                    _btnConfirm.SetEnabled(ClientSession.IsLobbyHost && !string.IsNullOrEmpty(_selectedArena) &&
+                        _lobby?.IsConnected == true);
+                ShowRoomStatus($"Master rejected the arena choice: {message}", true);
+                return;
+            }
             _btnConfirm?.SetEnabled(true);
             if (_lblWaiting != null)
             {
@@ -343,7 +740,7 @@ namespace SlopArena.Client.UI
                 return;
 
             _selectedArena = name;
-            MatchConfig.ArenaName = name;
+            if (!_roomMode) MatchConfig.ArenaName = name;
             var grid = _grid;
             if (grid != null)
             {
@@ -358,13 +755,21 @@ namespace SlopArena.Client.UI
             ArenaDefinition? arena = ArenaRegistry.Get(name);
             string label = arena.HasValue ? DisplayName(arena.Value) : name.Replace('_', ' ');
             if (_lblSelectedStage != null)
-                _lblSelectedStage.text = $"STAGE SELECTED: {label.ToUpperInvariant()}";
+                _lblSelectedStage.text = _roomMode
+                    ? $"ARENA TO CONFIRM: {label.ToUpperInvariant()}"
+                    : $"STAGE SELECTED: {label.ToUpperInvariant()}";
             if (_lblWaiting != null)
                 _lblWaiting.style.display = DisplayStyle.None;
             if (_btnConfirm != null)
             {
                 _btnConfirm.style.display = DisplayStyle.Flex;
-                _btnConfirm.SetEnabled(true);
+                if (_roomMode)
+                    _btnConfirm.text = _roomSnapshot != null &&
+                        string.Equals(name, _roomSnapshot.ArenaName, StringComparison.OrdinalIgnoreCase)
+                        ? "START MATCH"
+                        : "CONFIRM ARENA";
+                _btnConfirm.SetEnabled(!_roomMode || ClientSession.IsLobbyHost &&
+                    !_roomActionPending && _lobby?.IsConnected == true);
             }
         }
     }

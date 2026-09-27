@@ -117,9 +117,10 @@ namespace SlopArena.Server
             try
             {
                 ulong currentSteamId = _getSteamId?.Invoke() ?? 0;
-                if (_config.IsVps && (currentSteamId == 0 || !_orchestrator.TryRefreshCatalogHash(out _)))
+                bool catalogReady = _orchestrator.TryRefreshCatalogHash(out _);
+                if (_config.IsVps && (currentSteamId == 0 || !catalogReady))
                     return RegistrationOutcome.Retry;
-                string? catalogHash = _orchestrator.CatalogHash;
+                string? catalogHash = catalogReady ? _orchestrator.CatalogHash : null;
                 if (_config.IsVps && catalogHash is null)
                     return RegistrationOutcome.Retry;
                 var ip = _config.PublicIp ?? GetPublicIpAddress();
@@ -128,8 +129,8 @@ namespace SlopArena.Server
                     hostId = _config.HostId,
                     instanceId = _config.IsVps ? InstanceId : (Guid?)null,
                     steamId = _config.IsVps ? currentSteamId.ToString(CultureInfo.InvariantCulture) : null,
-                    protocolVersion = _config.IsVps ? (int?)SteamMatchDescriptor.CurrentProtocolVersion : null,
-                    catalogHash = _config.IsVps ? catalogHash : null,
+                    protocolVersion = _config.IsVps ? SteamMatchDescriptor.CurrentProtocolVersion : 0,
+                    catalogHash = catalogHash,
                     name = _config.ServerName,
                     ipAddress = ip,
                     port = _config.Port,
@@ -217,7 +218,7 @@ namespace SlopArena.Server
                     instanceId = _config.IsVps ? InstanceId : (Guid?)null,
                     steamId = _config.IsVps ? steamId.ToString(CultureInfo.InvariantCulture) : null,
                     protocolVersion = _config.IsVps ? (int?)SteamMatchDescriptor.CurrentProtocolVersion : null,
-                    catalogHash = _config.IsVps ? catalogHash : null
+                    catalogHash
                 }),
                     Encoding.UTF8, "application/json")
             };

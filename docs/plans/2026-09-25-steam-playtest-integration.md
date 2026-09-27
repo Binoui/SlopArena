@@ -1,6 +1,6 @@
 # Steam Playtest identity and gameplay on the VPS
 
-**Status:** 2A relay feasibility accepted. Initial BuildID `25546025` is known to reconnect healthy matches at 30 seconds; stability hotfix BuildID `25547241` was uploaded for a controlled private-branch test. Master/GameHost hotfix `steam-2c-proton-20260926-hf1` was deployed to the VPS test stack at schema `20260926000000_AddSteamMatchRouting` (operator event `c083833dee19473eba88978896b130ba`); Master `/ready` returned 200 and invalid ticket, anonymous hub and guest were denied. The operator reported launching the local game, connecting, chatting, joining a room and using Training while remaining connected. **Installed Steam BuildID/Proton version were not recorded; no admitted PvP match, 90-second fight, outage/account-switch or two-account join-to-rematch has been observed.** The [playable friends demo reset](2026-09-05-playable-demo-reset.md) remains the product target.
+**Status:** The Steam relay feasibility gate is accepted. A connection-age reconnect limit was removed from the implementation; keep an admitted match active for its intended duration. The hotfix and runtime validation history is preserved in private operator notes, not this public plan. Packaged Windows validation, admitted two-account PvP, a sustained match and outage/account-switch coverage remain acceptance requirements.
 
 ## Outcome and ownership
 
@@ -32,29 +32,29 @@ The **intended gameplay transport is SteamNetworkingSockets** via the Steamworks
 3. **Match start (Master → GameHost):** one authoritative match ID, roster of verified SteamIDs and assigned entity IDs, chosen content/catalog, admission lifetime and compatibility version. The GameHost must acknowledge the match only when content and capacity are ready. Preserve the master-created match row/result relationship; cancellation must remove or mark a pre-created row unambiguously without reporting a winner or applying competitive results.
 4. **Join descriptor (Master → assigned clients):** typed transport, GameHost Steam identity, match ID, virtual port and protocol/content compatibility. The client verifies the connected GameHost identity against the descriptor. Never overload the old IP field with a SteamID; the descriptor does not depend on future Room IDs.
 5. **Connection admission (client ↔ GameHost):** one shared Steam listener and bounded pending-join request naming the match. Steam supplies the authenticated remote identity; GameHost checks match, roster, assigned entity, compatibility and admission lifetime before binding the connection handle. Reject non-rostered identities, stale/ended matches, conflicting second handles, mismatched content/protocol and packet-claimed entity IDs. Route messages only to that match. Use bounded queues into match threads, deterministic release of native messages/handles, and bounded deadlines for pending joins.
-6. **Lifecycle (GameHost → Master → clients):** define normal result versus canceled/aborted match, cause and single logical notification. A 60-second waiting/abandonment expiry or GameHost restart must return users to the existing lobby/server-chat membership without manufacturing a competitive winner. Match completion releases listener bindings and capacity. An already admitted match must not be terminated merely because Steam's web verification or the Master briefly becomes unavailable; new admission still needs a valid master-authorized roster and authenticated Steam identity.
+6. **Lifecycle (GameHost → Master → clients):** define normal result versus canceled/aborted match, cause and single logical notification. A 60-second waiting/abandonment expiry or GameHost restart must return users to the existing gameplay lobby without manufacturing a competitive winner. Room Server Chat remains independently authorized by the current RoomManager attachment; GameHost lifecycle never grants it. Match completion releases listener bindings and capacity. An already admitted match must not be terminated merely because Steam's web verification or the Master briefly becomes unavailable; new admission still needs a valid master-authorized roster and authenticated Steam identity.
 
 Keep compatible `InputState`/state/event codecs and the existing `NetworkClient`/`MatchInstance` packet-consumer seams where they still fit. Input/state stays unreliable and tick-sequenced; admission and one-time control/completion use reliability deliberately. Do not repeatedly queue the already-broadcast result as reliable work. Preserve an honest ping display from observed connection data or bounded RTT measurement. Never move combat, prediction, rollback or content authority into Unity.
 
 ## Gates and sequencing
 
-### 2A — Steam runtime and OVH route proof (stop gate)
+### 2A — Dedicated-host route proof (stop gate)
 
-2A establishes that the pinned binding and native runtime initialize on Linux Editor and GameHost, the Windows player builds with its required Steam native library, and a real Steam identity connects a packaged Linux client to the dedicated OVH GameHost over `CreateListenSocketP2P`/`ConnectP2P`. Record connection time, peer identity, relay route, RTT, loss and queue state for 60 Hz game-sized traffic. Keep the existing VPS ingress restricted and DB/control endpoints private; do not expose legacy raw UDP to make a probe work. If native loading, game-server login, authenticated identity or the actual OVH route fails, stop before the gameplay transport rewrite. A synthetic local socket or Editor import alone does not pass this gate.
+2A establishes that the pinned binding and native runtime initialize on Linux Editor and GameHost, the Windows player builds with its required Steam native library, and a real Steam identity connects a packaged Linux client to a dedicated GameHost over `CreateListenSocketP2P`/`ConnectP2P`. Record connection time, peer identity, relay route, RTT, loss and queue state for 60 Hz game-sized traffic. Keep VPS ingress restricted and database/control endpoints private; do not expose legacy raw UDP to make a probe work. If native loading, game-server login, authenticated identity or the dedicated-host route fails, stop before the gameplay transport rewrite. A synthetic local socket or Editor import alone does not pass this gate.
 
-**Decision (2026-09-25):** the observed OVH Linux-player relay proof below is sufficient to proceed with 2B. It does not certify Steam-installed Windows native loading, a second entitled account, a gameplay match or a direct-UDP RTT comparison. Check Windows install/launch and those end-to-end requirements in 2D ([#240](https://github.com/Binoui/SlopArena/issues/240)); record a direct-route comparison there if practical, but do not block 2B solely on an unmeasured baseline. Any unexpected Windows or gameplay failure remains a release blocker, not an implicit raw-UDP fallback.
+**Decision (2026-09-25):** the dedicated-host Linux-player relay proof below is sufficient to proceed with 2B. It does not certify Steam-installed Windows native loading, a second entitled account, a gameplay match or a direct-UDP RTT comparison. Check Windows install/launch and those end-to-end requirements in 2D ([#240](https://github.com/Binoui/SlopArena/issues/240)); record a direct-route comparison there if practical, but do not block 2B solely on an unmeasured baseline. Any unexpected Windows or gameplay failure remains a release blocker, not an implicit raw-UDP fallback.
 
-**Local 2A evidence (not VPS acceptance, 2026-09-25):** Steamworks.NET `2025.164.1` UPM package and matching standalone Linux wrapper/`libsteam_api.so` from the verified release ZIP (SHA-256 `9412348cc404563be5a43a28347cfeda3c679ee044a14d87a507ed2d796a537d`). Linux Editor `SteamAPI.Init()` succeeded with the locally configured candidate AppID `5325920`; a separate Linux GameHost `GameServer.InitEx` anonymously logged on and opened a P2P listener. A locally built Linux player authenticated the GameHost Steam identity and exchanged 600/600 echoed 200-byte unreliable messages at 60 Hz, with 0% observed loss, 29.42 ms mean RTT and a relay POP reported. These are same-workstation observations, not an OVH latency comparison. Unity CLI built Windows and Linux players; the Windows output includes `steam_api64.dll` and excludes `steam_appid.txt`, but it was not launched through Steam on Windows.
+**Local 2A evidence (not VPS acceptance, 2026-09-25):** Steamworks.NET `2025.164.1` UPM package and matching standalone Linux wrapper/`libsteam_api.so` from the verified release ZIP (SHA-256 `9412348cc404563be5a43a28347cfeda3c679ee044a14d87a507ed2d796a537d`). Linux Editor `SteamAPI.Init()` succeeded with the locally configured candidate AppID `5325920`; a separate Linux GameHost `GameServer.InitEx` anonymously logged on and opened a P2P listener. A locally built Linux player authenticated the GameHost Steam identity and exchanged 600/600 echoed 200-byte unreliable messages at 60 Hz, with 0% observed loss, 29.42 ms mean RTT and a relay POP reported. These are same-workstation observations, not a dedicated-host latency comparison. Unity CLI built Windows and Linux players; the Windows output includes `steam_api64.dll` and excludes `steam_appid.txt`, but it was not launched through Steam on Windows.
 
 **Local container proof:** `libsteam_api.so` alone was insufficient in the clean GameHost runtime image: initialization failed because `steamclient.so` was absent. The supplied SDK 1.65 ZIP contains no `steamclient.so` and its `libsteam_api.so` is not mixed with the pinned 1.64 wrapper. Valve SteamCMD's Linux64 `steamclient.so` (SHA-256 `e74b17cd7849882c73fee6ab59124a533e48b63340d1ce37be0ce469bbb92dc2`) was staged only in an ignored, isolated proof archive, not committed or added to the normal image. With that runtime mounted read-only in the clean .NET container and **no published gameplay ports**, anonymous server login and a relay connection succeeded; a local Linux player received 600/600 echoes at 60 Hz with 29.50 ms mean RTT, 0% observed loss and a relay POP. Confirm the Playtest's permitted [dedicated-server redistributable settings](https://partner.steamgames.com/doc/sdk/api) and exact runtime before a production image.
 
-**OVH proof and operator handoff (2026-09-25):** The operator reported starting the isolated GameHost container and its Steam networking identity `90293421017699331`. An initial workstation Linux player attempt failed with certificate error “We're not logged into Steam”; a separate immediate-initialization check found certificate status `Attempting` and relay status `Waiting` even though `SteamAPI.Init()` succeeded. The opt-in client now waits for both to become `Current` before `ConnectP2P` and fails within a bounded timeout if they do not. Against that OVH GameHost, the corrected local Linux player verified the server identity and received **600/600** echoed 200-byte unreliable messages at 60 Hz with **31.59 ms mean RTT**, 0% observed loss and relay POP `7364978`. This is OVH route evidence from one Linux workstation, **not** a Steam-installed Windows result or a direct-UDP RTT comparison. SteamPipe uploaded corrected Windows candidate BuildID `25536791` to Playtest AppID `5325920`/depot `5325921` **without setting a branch live**; the operator must activate that exact build on the controlled test branch and exercise a real Windows install. Confirm the Playtest's server redistributable setting and retain the isolated SteamCMD runtime source separately from the ordinary GameHost image. No firewall rule or deployed service was changed by this local development work.
+**Dedicated-host relay proof:** The relay feasibility proof passed for the test setup after waiting for Steam certificate and relay readiness. Exact host identity, environment details, timing, packet metrics and incident records are retained in private operator notes. This is not Windows, two-account or gameplay acceptance.
 
 ### 2B — Steam-backed application session
 
 Implement the authentication interface in both repositories, keeping one persistent chat/lobby session owner and a deliberately separate local/development path. Test stable same-account identity across launches, distinct accounts, account switch, display-name preservation, global/server/direct chat, invalid/reused/wrong-app tickets, missing entitlement, publisher/API outage, expired token, guest JWT rejection on REST/SignalR/refresh and fresh-ticket hourly renewal. Existing active matches do not depend on a successful renewal during a brief outage.
 
-**2B runtime contract (VPS test deployed; real Playtest login pending):** `POST /auth/steam` accepts JSON
+**2B runtime contract:** `POST /auth/steam` accepts JSON
 `{"ticket":"<hex>"}`; `POST /auth/refresh` accepts the same payload with the
 current bearer JWT. Both return `{token,steamId,expiresAt}` with numeric, lossless
 SteamID in the existing client DTO. Unity requests each ticket via
@@ -62,7 +62,7 @@ SteamID in the existing client DTO. Unity requests each ticket via
 ticket valid through the Master response and cancels it afterward. Development
 guests can renew without a ticket only if the Master explicitly enables them;
 public Steam sessions never use guest issuance or renewal. The packaged client
-selects `https://master-test.sloparena.barakaslurp.fr` before startup; Editor-only
+selects `https://<MASTER_TEST_HOST>` before startup; Editor-only
 overrides and guest opt-in do not ship as public fallbacks. Package/Editor
 verification is not two-account Steam-installed acceptance.
 
@@ -73,9 +73,7 @@ JWT provider claims reject guest and legacy providerless tokens in Steam mode
 on REST and SignalR. One-hour Steam renewal rechecks the same verified account
 and current ownership; consumed ticket hashes persist in a new DB table with
 a unique key. Run the `AddSteamAuthIdentity` migration before a Master cutover.
-The VPS test release pins Playtest AppID `5325920`; the operator reported
-setting the private publisher key and applying both migrations. Valid-ticket
-ownership and same-account renewal still require a Steam-launched client run.
+Valid-ticket ownership and same-account renewal still require a Steam-launched client run.
 
 Treat `SteamUser.BLoggedOn() == false` as backend unavailability, **not** proof
 of account switch. Only a different nonzero observed SteamID or a freshly
@@ -84,7 +82,7 @@ may fail during an outage and chat ends at JWT expiry; already admitted
 GameHost gameplay continues while its Steam connection remains healthy.
 Master closes WebSocket hub connections at token expiry; the existing
 LobbyClient reconnects with the current renewed JWT and revalidates remembered
-Server Chat/waiting-roster membership without a new gameplay admission.
+Room Chat membership separately from physical GameServer/waiting-roster membership.
 
 ### 2C — Steam match routing and admission
 
@@ -133,17 +131,14 @@ new Steam web tickets during a temporary Master outage.
 
 Build the Playtest Windows player via the installed Unity CLI/Pipeline, upload with `scripts/steam-playtest.sh`, and deploy pinned Master/GameHost image digests and migration bundle with `deploy/vps/release.py`. The older direct-Editor `scripts/build-release.sh` is not this Steam test build. The packaged player selects the VPS Master **before** authentication, never the home host or a tester shell override. The isolated SteamCMD game-server runtime mount is checksum-pinned for this test; confirm permitted dedicated-server redistribution before production packaging. Never distribute `steam_appid.txt`, publisher credentials or a guest/UDP fallback.
 
-For friends outside one fixed IP, the operator approved public **IPv4 TCP 443**
-to the test Master through host UFW and Docker-aware Caddy forwarding. TCP 80
-remains ACME/redirect only; management SSH stays CIDR-restricted at the host,
-IPv6 TCP 443 remains blocked and no GameHost UDP/private Master/control/DB
-ports are published. On 2026-09-26 the OVH `/ip/firewall` API listed no Edge
-Firewall for `135.125.100.228/32` (`get` returned 404); there was no provider
-rule to change. Steam tickets/entitlements and per-source POST quotas remain
-in force, but anonymous Internet traffic and resource abuse are possible.
-The guarded host cutover succeeded and preserved SSH and Master `/ready` for
-the original source; an off-site Windows `/ready` retry is still required
-before attributing any remaining failure to Steam auth or gameplay relay.
+For friends outside a fixed IP, public IPv4 TCP 443 may reach the test Master
+through host UFW and Docker-aware Caddy forwarding. TCP 80 is for ACME/redirect;
+management SSH remains CIDR-restricted. Keep IPv6 policy explicit and tested;
+do not publish GameHost UDP or private Master/control/database ports. Steam
+tickets/entitlements and per-source POST quotas remain in force, but anonymous
+Internet traffic and resource abuse are possible. Verify the network policy
+from an independent source and confirm HTTPS readiness after each authorized
+change; don't infer provider firewall behavior from host rules.
 
 The Steam-installed **Windows** Playtest build must also prove Steam initialization, the expected GameHost identity, authenticated relay handshake and a short packet exchange on real Windows hardware. Its compiled `steam_api64.dll` is packaging evidence only. This check moved from 2A to the 2D acceptance ticket by explicit decision; do not report it as passed from the Linux route proof.
 
@@ -173,4 +168,4 @@ chat reconnection.
 - [Valve SDR/dedicated-server routing](https://partner.steamgames.com/doc/features/multiplayer/steamdatagramrelay), [SteamNetworkingSockets](https://partner.steamgames.com/doc/api/ISteamNetworkingSockets), [backend authentication/ownership](https://partner.steamgames.com/doc/features/auth), [Steam Playtest](https://partner.steamgames.com/doc/features/playtest), [Steamworks.NET](https://steamworks.github.io/).
 - [`scripts/steam-playtest.sh`](../../scripts/steam-playtest.sh) names the candidate Playtest AppID/depot; verify against operator-owned Steamworks settings.
 - [`ChatSession`](../../client/Unity/Assets/Scripts/Runtime/Network/ChatSession.cs) and [`MasterServerClient`](../../src/Shared/MasterServerClient.cs) own one Steam-backed application session with an explicit Editor guest path. [`NetworkClient`](../../client/Unity/Assets/Scripts/Runtime/Network/NetworkClient.cs) uses Steam P2P for packaged PvP and keeps raw UDP only behind the Editor development opt-in; [`MatchControlServer`](../../src/Server/MatchControlServer.cs), [`MultiMatchOrchestrator`](../../src/Server/MultiMatchOrchestrator.cs), and [`MatchInstance`](../../src/Server/MatchInstance.cs) own authoritative match control, allocation and Steam input routing.
-- Master pre-creates a match row before `POST /match/start`, pins its roster and catalog digest, and uses a private match-control credential (`Program.cs`, `Lobbies/HttpMatchLauncher.cs` in the separate repository). The Steam admission/descriptor code is deployed to the test VPS, not yet accepted from a Steam-installed two-account match.
+- Master pre-creates a match row before `POST /match/start`, pins its roster and catalog digest, and uses a private match-control credential (`Program.cs`, `Lobbies/HttpMatchLauncher.cs` in the separate repository). The Steam admission/descriptor code has been implemented; packaged two-account Steam acceptance remains required.

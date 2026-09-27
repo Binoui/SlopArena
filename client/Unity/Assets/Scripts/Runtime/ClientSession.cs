@@ -41,6 +41,15 @@ namespace SlopArena.Client
         /// <summary>Display name of the selected game server (for the lobby title).</summary>
         public static string SelectedServerName = string.Empty;
 
+        public enum OnlineSelection
+        {
+            LegacyServer,
+            Room
+        }
+
+        /// <summary>Separates Room membership from the legacy physical-server lobby route.</summary>
+        public static OnlineSelection SelectedOnlineMode = OnlineSelection.LegacyServer;
+        public static Guid SelectedRoomId;
         /// <summary>
         /// The launch-scoped SignalR client owned by ChatSession. Scene transitions,
         /// match completion, and leaving a GameServer do not dispose this connection.
@@ -167,15 +176,42 @@ namespace SlopArena.Client
                 return;
             }
 
+            var descriptor = config.Descriptor;
+            Guid matchId = config.MatchId;
+            if (config.RoomId is Guid roomId &&
+                (SelectedOnlineMode != OnlineSelection.Room ||
+                 SelectedRoomId != roomId || ActiveLobby?.JoinedRoomId != roomId))
+            {
+                UnityEngine.Debug.LogWarning("[PvP] Ignoring MatchStarted for a Room that is no longer selected or joined.");
+                return;
+            }
+            if (matchId == Guid.Empty ||
+                descriptor != null && descriptor.MatchId != matchId)
+            {
+                RejectMatchStart("Master sent an invalid match ID.");
+                return;
+            }
+            if (UI.MatchConfig.Transport != UI.MatchTransport.None &&
+                UI.MatchConfig.MatchId == matchId)
+                return;
+
+            bool developmentUdp = IsEditorDevelopmentUdpEnabled();
+
             MatchContentCatalog = null;
             MatchContentHandleMap = null;
-            var descriptor = config.Descriptor;
-            bool developmentUdp = IsEditorDevelopmentUdpEnabled();
+
             if (descriptor == null)
             {
                 if (!developmentUdp || config.MatchPort <= 0)
                 {
                     RejectMatchStart("This client requires a Steam match descriptor; raw UDP is available only in explicit Editor development mode.");
+                    return;
+                }
+                if (config.RoomId is not null &&
+                    (string.IsNullOrWhiteSpace(config.ServerAddress) ||
+                     Uri.CheckHostName(config.ServerAddress) is not (UriHostNameType.IPv4 or UriHostNameType.Dns)))
+                {
+                    RejectMatchStart("Room Match has no valid physical GameHost address for development UDP.");
                     return;
                 }
             }
@@ -248,8 +284,13 @@ namespace SlopArena.Client
                 ? UI.MatchTransport.SteamP2P
                 : UI.MatchTransport.DevelopmentUdp;
             UI.MatchConfig.SteamDescriptor = descriptor;
+            UI.MatchConfig.MatchId = matchId;
             UI.MatchConfig.ArenaName = config.ArenaName;
             UI.MatchConfig.ServerPort = descriptor != null ? 0 : config.MatchPort;
+            if (descriptor == null && config.RoomId is not null)
+                UI.MatchConfig.ServerIP = config.ServerAddress!;
+
+
             var playerClass = ParseClass(local.CharacterSelection,
                 descriptor == null ? Shared.CharacterClass.Manki : Shared.CharacterClass.None);
             if (descriptor != null && (playerClass == Shared.CharacterClass.None ||
@@ -285,6 +326,17 @@ namespace SlopArena.Client
             UnityEngine.SceneManagement.SceneManager.LoadScene("Arena_PvP");
         }
 
+        public static void ClearMatchForExit()
+        {
+            Network.NetworkClient.DisconnectActiveMatch();
+
+            MatchContentCatalog = null;
+            MatchContentHandleMap = null;
+            MatchRoster = null;
+            CurrentMatchResults = null;
+            UI.MatchConfig.ClearActiveMatch();
+        }
+
         public static void RejectMatchStart(string reason)
         {
             UnityEngine.Debug.LogError($"[PvP] {reason}");
@@ -293,18 +345,20 @@ namespace SlopArena.Client
             MatchRoster = null;
             CurrentMatchResults = null;
             UI.MatchConfig.ClearActiveMatch();
-            UI.FrontendController.Show(SelectedServerId != Guid.Empty
+            if (SelectedOnlineMode == OnlineSelection.Room && SelectedRoomId != Guid.Empty)
+                UI.LobbyRoomUI.PendingRoomNotice = reason;
+            UI.FrontendController.Show(SelectedRoomId != Guid.Empty || SelectedServerId != Guid.Empty
                 ? UI.FrontendPage.LobbyRoom
                 : UI.FrontendPage.ServerBrowser);
         }
 
         public static bool ApplyMatchAborted(Guid matchId, string reason)
         {
-            if (UI.MatchConfig.Transport != UI.MatchTransport.SteamP2P ||
-                UI.MatchConfig.SteamDescriptor is not { } descriptor ||
-                descriptor.MatchId != matchId)
+            if (matchId == Guid.Empty ||
+                UI.MatchConfig.Transport is not (UI.MatchTransport.SteamP2P or UI.MatchTransport.DevelopmentUdp) ||
+                UI.MatchConfig.MatchId != matchId)
                 return false;
-            EndActiveSteamMatch($"Match aborted ({reason}).");
+            EndActiveMatch($"Match aborted ({reason}).");
             return true;
         }
 
@@ -313,33 +367,38 @@ namespace SlopArena.Client
             if (UI.MatchConfig.Transport == UI.MatchTransport.SteamP2P &&
                 UI.MatchConfig.SteamDescriptor is { } descriptor &&
                 descriptor.MatchId == matchId)
-                EndActiveSteamMatch($"Match connection failed: {reason}");
+                EndActiveMatch($"Match connection failed: {reason}");
         }
 
-        private static void EndActiveSteamMatch(string notice)
+        private static void EndActiveMatch(string notice)
         {
-            Network.NetworkClient.DisconnectActiveSteamMatch();
+            Network.NetworkClient.DisconnectActiveMatch();
             MatchContentCatalog = null;
             MatchContentHandleMap = null;
             MatchRoster = null;
             CurrentMatchResults = null;
             UI.MatchConfig.ClearActiveMatch();
+            if (SelectedOnlineMode == OnlineSelection.Room && SelectedRoomId != Guid.Empty)
+            {
+                UI.LobbyRoomUI.PendingRoomNotice = notice;
+                UI.FrontendController.Show(UI.FrontendPage.LobbyRoom);
+                return;
+            }
             if (SelectedServerId != Guid.Empty)
             {
                 UI.FrontendController.Show(UI.FrontendPage.LobbyRoom);
+                return;
             }
-            else
-            {
-                UI.ServerBrowserUI.PendingReturnNotice = notice;
-                UI.FrontendController.Show(UI.FrontendPage.ServerBrowser);
-            }
+
+            UI.ServerBrowserUI.PendingReturnNotice = notice;
+            UI.FrontendController.Show(UI.FrontendPage.ServerBrowser);
         }
 
         public static void ClearActiveMatchForAccountChange()
         {
-            if (UI.MatchConfig.Transport != UI.MatchTransport.SteamP2P)
+            if (UI.MatchConfig.Transport is not (UI.MatchTransport.SteamP2P or UI.MatchTransport.DevelopmentUdp))
                 return;
-            Network.NetworkClient.DisconnectActiveSteamMatch();
+            Network.NetworkClient.DisconnectActiveMatch();
             MatchContentCatalog = null;
             MatchContentHandleMap = null;
             MatchRoster = null;
@@ -507,13 +566,16 @@ namespace SlopArena.Client
         /// <summary>Drop identity and match state without changing the selected development endpoint.</summary>
         public static void ClearAccountData()
         {
-            Network.NetworkClient.DisconnectActiveSteamMatch();
+            Network.NetworkClient.DisconnectActiveMatch();
+
             UI.MatchConfig.ClearActiveMatch();
             AuthToken = null;
             SteamId = 0;
             Username = null;
             SelectedServerId = Guid.Empty;
             SelectedServerName = string.Empty;
+            SelectedOnlineMode = OnlineSelection.LegacyServer;
+            SelectedRoomId = Guid.Empty;
             ActiveLobby = null;
             LobbyRoster = null;
             MatchRoster = null;

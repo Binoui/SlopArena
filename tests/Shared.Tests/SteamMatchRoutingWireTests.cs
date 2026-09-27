@@ -78,6 +78,7 @@ public sealed class SteamMatchRoutingWireTests
         var payload = new
         {
             serverId = Guid.Parse("22222222-2222-2222-2222-222222222222"),
+            matchId = Match,
             arenaName = "slop_court",
             players = new[]
             {
@@ -95,11 +96,18 @@ public sealed class SteamMatchRoutingWireTests
                 admissionExpiresAtUtc = DateTimeOffset.Parse("2026-09-26T12:00:00Z")
             }
         };
-        using var valid = JsonDocument.Parse(JsonSerializer.Serialize(payload));
+        string serialized = JsonSerializer.Serialize(payload);
+        using var valid = JsonDocument.Parse(serialized);
         Assert.NotNull(LobbyPayloadCodec.TryParseMatchStarted(valid.RootElement));
-        var tampered = JsonSerializer.Serialize(payload).Replace("FightGuy", "Manki");
+        var firstMatchId = serialized.IndexOf($"\"matchId\":\"{Match:D}\"", StringComparison.Ordinal);
+        Assert.True(firstMatchId >= 0);
+        var mismatch = serialized.Remove(firstMatchId, $"\"matchId\":\"{Match:D}\"".Length)
+            .Insert(firstMatchId, "\"matchId\":\"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa\"");
+        using var mismatched = JsonDocument.Parse(mismatch);
+        Assert.Null(LobbyPayloadCodec.TryParseMatchStarted(mismatched.RootElement));
+        var tampered = serialized.Replace("FightGuy", "Manki");
         using var changed = JsonDocument.Parse(tampered);
         Assert.Null(LobbyPayloadCodec.TryParseMatchStarted(changed.RootElement));
-    }
 
+    }
 }

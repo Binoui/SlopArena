@@ -126,6 +126,93 @@
     white-space: normal;
 }
 
+/* The frontend-wide pause menu shares the shell's square, printed controls. */
+.shell-escape-menu {
+    display: none;
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(13, 13, 20, 0.78);
+}
+
+.shell-escape-menu--open {
+    display: flex;
+}
+
+.shell-escape-card {
+    width: 360px;
+    max-width: 90%;
+    padding: 24px;
+    background-color: rgb(23, 19, 27);
+    border-width: 2px;
+    border-color: rgb(255, 200, 33);
+    border-bottom-width: 7px;
+}
+
+.shell-escape-title {
+    margin-bottom: 18px;
+    color: rgb(255, 200, 33);
+    font-size: 36px;
+    -unity-font-definition: url("../Fonts/Baloo2.asset");
+    -unity-font-style: bold;
+}
+
+.shell-escape-action {
+    width: 100%;
+    margin-bottom: 10px;
+}
+
+
+.shell-escape-action.btn-back {
+    width: 100%;
+    font-size: 18px;
+}
+
+.shell-menu-trigger {
+    min-width: 92px;
+    min-height: 40px;
+    margin-left: 12px;
+    padding-left: 32px;
+    padding-right: 10px;
+    background-color: rgb(13, 13, 20);
+    border-width: 1px;
+    border-color: rgb(98, 92, 107);
+    color: rgb(240, 238, 232);
+    font-size: 13px;
+    letter-spacing: 1px;
+    -unity-font-style: bold;
+}
+
+.shell-menu-trigger:hover,
+.shell-menu-trigger:focus {
+    border-color: rgb(255, 200, 33);
+    color: rgb(255, 200, 33);
+}
+
+.shell-menu-gear {
+    position: absolute;
+    left: 9px;
+    top: 9px;
+    width: 20px;
+    height: 20px;
+    background-image: url("MenuGear.png");
+    -unity-background-scale-mode: scale-to-fit;
+}
+
+/* Keep the bottom action visible in shorter desktop windows. */
+.frontend-shell--compact .shell-escape-card {
+    padding: 16px;
+}
+
+.frontend-shell--compact .shell-escape-action {
+    min-height: 44px;
+}
+
+
 /* ── Top bar ──────────────────────────────────────────────────────────── */
 
 .shell-top-bar {
@@ -190,12 +277,6 @@
     white-space: nowrap;
 }
 
-/* The Settings action fills the shell's reserved top-bar slot. */
-.shell-settings-slot {
-    width: auto;
-    min-width: auto;
-    margin-left: 12px;
-}
 
 /* ── Workspace and page hosts ─────────────────────────────────────────── */
 

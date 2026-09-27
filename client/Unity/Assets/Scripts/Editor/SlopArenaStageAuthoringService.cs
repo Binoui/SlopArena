@@ -311,15 +311,20 @@ public sealed class SlopArenaStageAuthoringService
             float killMaxX = prefabBounds.max.x + ArenaCollision.SideBlastMargin;
             float killMinZ = prefabBounds.min.z - ArenaCollision.SideBlastMargin;
             float killMaxZ = prefabBounds.max.z + ArenaCollision.SideBlastMargin;
+            float killHeight = prefabBounds.min.y - 10f;
+            float killTop = prefabBounds.max.y + ArenaCollision.TopBlastMargin;
             if (File.Exists(paths.ArenaFullPath))
             {
                 ArenaDefinition arena = ArenaBinaryFormat.LoadFromFile(paths.ArenaFullPath).GetValueOrDefault();
                 if (arena.MinX != 0f || arena.MaxX != 0f)
                 {
-                    killMinX = arena.MinX - ArenaCollision.SideBlastMargin;
-                    killMaxX = arena.MaxX + ArenaCollision.SideBlastMargin;
-                    killMinZ = arena.MinZ - ArenaCollision.SideBlastMargin;
-                    killMaxZ = arena.MaxZ + ArenaCollision.SideBlastMargin;
+                    ArenaCollision.BlastLines lines = ArenaCollision.ResolveBlastLines(in arena);
+                    killMinX = lines.KillMinX;
+                    killMaxX = lines.KillMaxX;
+                    killMinZ = lines.KillMinZ;
+                    killMaxZ = lines.KillMaxZ;
+                    killHeight = lines.KillHeight;
+                    killTop = lines.KillTop;
                 }
             }
             else
@@ -329,8 +334,8 @@ public sealed class SlopArenaStageAuthoringService
             result.KillPlanes = new SlopArenaStageKillPlanes
             {
                 MinX = killMinX, MaxX = killMaxX, MinZ = killMinZ, MaxZ = killMaxZ,
-                KillHeight = prefabBounds.min.y - 10f,
-                KillTop = prefabBounds.max.y + ArenaCollision.TopBlastMargin,
+                KillHeight = killHeight,
+                KillTop = killTop,
             };
 
             utility = new PreviewRenderUtility(true);
@@ -346,7 +351,7 @@ public sealed class SlopArenaStageAuthoringService
             RenderDesignTop(utility, outDir, result, "design-top.png", new Vector3(0f, prefabBounds.center.y, (killMinZ + killMaxZ) * 0.5f), killMinX, killMaxX, killMinZ, killMaxZ);
 
             const float wallHeight = 0.6f; // low curb marking the death line, not a veil
-            float wallY = prefabBounds.min.y - 10f + wallHeight * 0.5f;
+            float wallY = result.KillPlanes.KillHeight + wallHeight * 0.5f;
             CreateDesignWall(wallRoot, cleanup, new Vector3(killMinX, wallY, (killMinZ + killMaxZ) * 0.5f), new Vector3(0.15f, wallHeight, killMaxZ - killMinZ));
             CreateDesignWall(wallRoot, cleanup, new Vector3(killMaxX, wallY, (killMinZ + killMaxZ) * 0.5f), new Vector3(0.15f, wallHeight, killMaxZ - killMinZ));
             CreateDesignWall(wallRoot, cleanup, new Vector3((killMinX + killMaxX) * 0.5f, wallY, killMinZ), new Vector3(killMaxX - killMinX, wallHeight, 0.15f));
@@ -823,10 +828,14 @@ public sealed class SlopArenaStageAuthoringService
         Transform geometry = root.transform.Find("GameplayGeometry");
         Transform spawns = root.transform.Find("SpawnPoints");
         Transform aids = root.transform.Find("AuthoringAids");
+        Transform killPlaneMarker = aids != null ? aids.Find("KillPlane") : null;
         if (geometry == null) Add(build.Diagnostics, "GAMEPLAY_GEOMETRY_MISSING", "Missing GameplayGeometry child.");
         if (spawns == null) Add(build.Diagnostics, "SPAWN_CONTAINER_MISSING", "Missing SpawnPoints child.");
         if (aids == null) Add(build.Diagnostics, "AUTHORING_AIDS_MISSING", "Missing AuthoringAids child.");
         if (geometry == null || spawns == null || aids == null) return build;
+        if (killPlaneMarker != null
+            && (killPlaneMarker.childCount != 0 || killPlaneMarker.GetComponents<Component>().Length != 1))
+            Add(build.Diagnostics, "KILL_PLANE_MARKER_NOT_EMPTY", "AuthoringAids/KillPlane must be an empty transform.");
 
         string[] childNames = root.transform.Cast<Transform>().Select(x => x.name).OrderBy(x => x, StringComparer.Ordinal).ToArray();
         string[] expectedChildren = { "AuthoringAids", "GameplayGeometry", "SpawnPoints" };
@@ -928,6 +937,16 @@ public sealed class SlopArenaStageAuthoringService
 
         if (build.Diagnostics.Count > 0 || triangles.Count == 0 || spawnPoints.Count != 4) return build;
         float killHeight = minY - 10f;
+        if (killPlaneMarker != null)
+        {
+            if (!IsFinite(killPlaneMarker.position))
+                Add(build.Diagnostics, "KILL_PLANE_NONFINITE", "AuthoringAids/KillPlane must have a finite position.");
+            else if (Mathf.Abs(killPlaneMarker.position.y - minY) > 0.001f)
+                Add(build.Diagnostics, "KILL_PLANE_GEOMETRY_MISMATCH",
+                    "AuthoringAids/KillPlane Y must match the lowest gameplay geometry vertex.");
+            killHeight = killPlaneMarker.position.y;
+        }
+        if (build.Diagnostics.Count > 0) return build;
         int gridWidth = Mathf.CeilToInt((maxX - minX) / HeightmapCellSize) + 1;
         int gridHeight = Mathf.CeilToInt((maxZ - minZ) / HeightmapCellSize) + 1;
         var heightData = Enumerable.Repeat(float.MinValue, gridWidth * gridHeight).ToArray();

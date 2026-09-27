@@ -186,12 +186,12 @@ _Avoid_: control scheme
 ## PvP / Multiplayer
 
 **ServerBrowser**:
-A listing of active game servers maintained by the master server. Players browse the list (name, region, player count) and join one directly. No matchmaking queue — the player chooses which server to connect to. Like Counter-Strike community servers.
-_Avoid_: matchmaking, queue, server list (too generic)
+The normal Unity directory of named public Rooms from Master. It shows every Room phase, member count and whether joining is allowed; only Lobby Rooms with free slots accept new members. Physical GameHosts are allocated at Match start, not chosen in this directory. Explicit development host/address tools are separate.
+_Avoid_: matchmaking queue, GameHost list
 
-**LobbyRoom**:
-A pre-match waiting state managed by the master server via SignalR. Players who have joined a game server wait in the lobby room, see the player list, and the host presses Start to begin character select. Not the game server's concern — the game server only receives "start match" commands.
-_Avoid_: waiting room, pre-game, staging
+**Room** (LobbyRoom in the UI):
+The Master-managed, named group of up to four players. Membership and Server Chat survive Character Select, Arena selection, a Match, Results and rematch. The leader advances preparation; the Room admits new members only in Lobby. Master returns the matching Room to Lobby and clears preparation on a completed or canceled Match, without erasing membership or chat.
+_Avoid_: physical GameHost lobby, Match, waiting roster
 
 **GuestAuth**:
 Access to SlopArena under a temporary player identity without Steam authentication. A guest identity is not a Steam identity.
@@ -206,7 +206,7 @@ The SlopArena-wide chat channel, not restricted to one GameServer, LobbyRoom, or
 _Avoid_: server chat
 
 **Server Chat**:
-The SlopArena Chat channel shared by players on the same GameServer, including players in different matches and players waiting to play.
+The SlopArena Chat channel shared by members attached to the same Master Room. A Room's Server Chat is isolated from other Rooms and from physical GameServer lobby membership.
 _Avoid_: lobby chat, match chat
 
 **Direct Message**:
@@ -250,12 +250,12 @@ The embedded host model where a player starts the game server from the Unity cli
 _Avoid_: listen server, client-hosted, peer-to-peer host
 
 **OfficialServer**:
-An operator-run, always-on GameServer instance listed in the ServerBrowser (the demo runs these on the home mini PC). Players join it but never host it; it is the default online path for non-technical users because it removes per-player NAT/port-forwarding. The opposite of a HostAndPlay server. `isOfficial` in the registration payload flags the server, though nothing currently filters on it.
-_Avoid_: hosted server, our server, dedicated (ambiguous with server binary)
+An operator-run, always-on GameHost available to Master for Match allocation. Players do not choose it from the normal ServerBrowser; `isOfficial` remains a registration property.
+_Avoid_: public Room, dedicated Room, hosted lobby
 
 **MatchFlow**:
-The lifecycle of a PvP match: Server Browser → Lobby Room → Character Select → Countdown → Fight → Results → Lobby Room. The master server (SignalR) manages lobby/char-select/results; the game server (UDP) manages countdown/fight only.
-_Avoid_: game flow, match lifecycle, session flow
+The lifecycle of a PvP group: ServerBrowser → Room (Lobby) → Character Select → Stage Select → Match Starting → Fight → Results → the same Room (Lobby), if membership remains valid. Master owns Room preparation and its terminal transition; the GameHost runs the authoritative Match and sends its result or cancellation. Results remains viewable until the player returns; leaving or Room expiry routes to the browser with an explanation. A rematch requires new selections and Lock-in.
+_Avoid_: physical-server lobby flow, automatic rematch
 
 ## Prediction & Rollback
 
@@ -294,9 +294,9 @@ _Avoid_: unsafe state, hard state, ability state
 
 ## Game Server (src/Server)
 
-**GameServer**:
-The dedicated .NET console process that runs match simulations. Registers with the master server, receives match-start commands, and runs 2-4 player matches on dedicated UDP ports. Lives in `src/Server/`. This is what the master server's ServerBrowser lists; clients connect to it by IP+port for the fight.
-_Avoid_: server (ambiguous — see disambiguation below), ServerApp (old name), match server
+**GameHost** (GameServer process):
+The dedicated .NET console process in `src/Server/` that registers and heartbeats with Master, accepts Match start commands, and runs 2–4-player server-authoritative Matches (multiple concurrently). Master assigns a compatible GameHost only when a Room launches; clients receive its route for gameplay, not Room membership or Server Chat.
+_Avoid_: Room, server (ambiguous), match server
 
 **MatchControlServer**:
 The HTTP control plane on the GameServer. Listens on TCP at the registered base port and exposes `POST /match/start` for the master server. Parses the roster, asks the orchestrator for a port, and replies with it. UDP matches bind base+offset, so TCP control and UDP simulation coexist on the same port number. This is the seam that keeps the GameServer stateless between matches (ADR-0008).
@@ -320,12 +320,12 @@ _Avoid_: port pool, port map, port range (too vague)
 
 ## Disambiguation: "server"
 
-The word "server" is overloaded in SlopArena. Three distinct things share it:
-- **Master server** — the separate-repo ASP.NET Core app (SignalR/REST, PostgreSQL) that handles matchmaking, lobby, char-select, and results. Repo: `SlopArena-MasterServer`. Never runs simulation.
-- **Game server** (GameServer above) — the .NET console process in this repo (`src/Server/`) that runs match simulation over UDP. Registers with the master server; receives match-start commands via MatchControlServer.
-- **ServerSimulation** — the pure C# tick loop in `src/Shared/` (`Simulation.cs`, `CombatMath.cs`). Runs identically on client (prediction) and GameServer (authority). Not a process — a class.
+The word "server" is overloaded in SlopArena. Use these distinct terms:
+- **Master server** — the separate-repo ASP.NET Core app (SignalR/REST, PostgreSQL) that owns Rooms, browser, chat and Match records. Never runs simulation.
+- **GameHost** (the `GameServer` process above) — the .NET console process in `src/Server/` that hosts authoritative Matches and reports their outcomes to Master. Not a browseable Room.
+- **ServerSimulation** — the pure C# tick loop in `src/Shared/` (`Simulation.cs`, `CombatMath.cs`). Runs on GameHost and client prediction tracks; not a process.
 
-When any of these is meant, use the full term. Bare "server" is ambiguous and should be challenged.
+Bare "server" is ambiguous; name the owner instead.
  
 ## Workshop / Creator Content
 

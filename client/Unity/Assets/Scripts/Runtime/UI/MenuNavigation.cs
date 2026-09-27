@@ -94,11 +94,9 @@ namespace SlopArena.Client.UI
             evt.StopImmediatePropagation();
             if (ChatInputGate.SuppressShortcuts)
                 return;
-            // On shell-mounted pages the focus router resolves the cancel
-            // layers (issue #220): modal → expanded social → top-bar →
-            // social → page Back. The page's back action is invoked only as
-            // the last layer, so one press never departs the page and
-            // dismisses something else simultaneously.
+            // On shell-mounted pages, Escape/Start opens the shell menu;
+            // controller Back resolves the existing modal, social, region,
+            // then page layers. One press never departs two layers.
             if (FrontendController.IsFrontendActive && FrontendController.FocusRouter is { } router)
             {
                 router.HandlePageCancel();

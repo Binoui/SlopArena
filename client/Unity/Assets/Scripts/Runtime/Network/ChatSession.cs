@@ -67,9 +67,14 @@ namespace SlopArena.Client.Network
         private float _retryDelay = InitialRetrySeconds;
         // Per-launch budget: never reset on success, so a flapping connection cannot retry forever.
         private int _automaticRetries;
-        private Guid? _joinedServerId;
+        private Guid? _joinedRoomId;
+        private Guid _roomTitleId;
+        private string _roomTitleName = string.Empty;
         public static ChatSession? Instance => _instance;
         public event Action? Changed;
+        public event Action? AccountChanged;
+
+        public event Action<LobbyClient?>? ActiveLobbyChanged;
 
         /// <summary>
         /// Raised with the conversation key when the bounded history buffer
@@ -86,7 +91,7 @@ namespace SlopArena.Client.Network
         public bool SavedNameRejected => _savedNameRejected;
         public bool DirectoryAvailable => _directoryAvailable;
         public string Status => _status;
-        public Guid? JoinedServerId => _joinedServerId;
+        public Guid? JoinedRoomId => _joinedRoomId;
         public IReadOnlyList<ChatPlayer> OnlinePlayers => _onlinePlayers;
         public IReadOnlyList<ChatConversation> Conversations => _conversations;
         public ChatConversation? ActiveConversation => _activeConversation;
@@ -433,7 +438,7 @@ namespace SlopArena.Client.Network
             {
                 conversation.Feedback = key.StartsWith("direct:", StringComparison.Ordinal)
                     ? "That player is offline. The message was not queued."
-                    : "That GameServer is no longer joined.";
+                    : "That Room is no longer joined.";
                 NotifyChanged();
                 return;
             }
@@ -447,8 +452,8 @@ namespace SlopArena.Client.Network
             {
                 if (key == "global")
                     accepted = await _lobby!.SendGlobalAsync(normalized);
-                else if (TryServerKey(key, out var serverId))
-                    accepted = await _lobby!.SendServerAsync(serverId, normalized);
+                else if (TryRoomKey(key, out var roomId))
+                    accepted = await _lobby!.SendServerAsync(roomId, normalized);
                 else if (key.StartsWith("direct:", StringComparison.Ordinal))
                     accepted = await _lobby!.SendDirectAsync(key.Substring("direct:".Length), normalized);
                 else
@@ -456,6 +461,9 @@ namespace SlopArena.Client.Network
 
                 if (accepted != null)
                 {
+                    if (!_conversations.Contains(conversation) ||
+                        (TryRoomKey(key, out var sentRoomId) && _joinedRoomId != sentRoomId))
+                        return;
                     AddMessage(accepted);
                     if (conversation.Draft == text)
                         conversation.Draft = string.Empty;
@@ -476,7 +484,7 @@ namespace SlopArena.Client.Network
                 {
                     var message when message.Contains("rate_limited") => "Too many messages. Wait a few seconds before retrying.",
                     var message when message.Contains("recipient_offline") => "That player is offline. The message was not queued.",
-                    var message when message.Contains("not_in_server") => "This GameServer is no longer joined.",
+                    var message when message.Contains("not_in_room") => "This Room is no longer joined.",
                     var message when message.Contains("not_connected") => "The connection was lost before the message was accepted.",
                     var message when message.Contains("chat_capacity") => "Chat is temporarily busy. Try again later.",
                     _ => "The Master rejected this message."
@@ -584,6 +592,7 @@ namespace SlopArena.Client.Network
                     _developmentGuest ? 0 : SteamMatchDescriptor.CurrentProtocolVersion);
                 SubscribeLobby(_lobby);
                 ClientSession.ActiveLobby = _lobby;
+                ActiveLobbyChanged?.Invoke(_lobby);
             }
             var lobby = _lobby;
             if (!lobby.IsConnected && !await lobby.ConnectAsync())
@@ -699,6 +708,7 @@ namespace SlopArena.Client.Network
                 ClientSession.AuthToken = null;
                 _chatStateReady = false;
                 _nameApplied = false;
+                ActiveLobbyChanged?.Invoke(null);
                 ClientSession.ActiveLobby = null;
                 _ = _lobby?.DisconnectAsync();
                 _lobby = null;
@@ -749,17 +759,29 @@ namespace SlopArena.Client.Network
             _authenticatedSteamId = 0;
             _pendingTicket?.TrySetResult(null);
             CancelWebTicket();
+            var previousLobby = _lobby;
+            bool leaveRoom = ClientSession.SelectedOnlineMode == ClientSession.OnlineSelection.Room &&
+                ClientSession.SelectedRoomId != Guid.Empty;
             ClientSession.ClearActiveMatchForAccountChange();
             _masterClient?.ClearAuthentication();
             ClientSession.ClearAccountData();
-            _ = _lobby?.DisconnectAsync();
+            if (previousLobby != null)
+            {
+                UnsubscribeLobby(previousLobby);
+                if (leaveRoom)
+                    _ = LeaveRoomThenDisconnectAsync(previousLobby);
+                else
+                    _ = previousLobby.DisconnectAsync();
+            }
             _lobby = null;
             _authTask = null;
             _renewTask = null;
             _nameApplied = false;
             _chatStateReady = false;
             _directoryAvailable = false;
-            _joinedServerId = null;
+            _joinedRoomId = null;
+            _roomTitleId = Guid.Empty;
+            _roomTitleName = string.Empty;
             Self = null;
             _selfPlayerId = null;
             _onlinePlayers.Clear();
@@ -768,6 +790,22 @@ namespace SlopArena.Client.Network
             _conversations.Clear();
             _activeConversation = GetOrCreateConversation("global", "GLOBAL");
             SetStatus("Steam account changed. Connecting with the current account…");
+            AccountChanged?.Invoke();
+        }
+
+        private static async Task LeaveRoomThenDisconnectAsync(LobbyClient lobby)
+        {
+            try
+            {
+                Task leave = lobby.LeaveRoomAsync();
+                if (await Task.WhenAny(leave, Task.Delay(2000)) == leave)
+                    await leave;
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[ChatSession] Room leave during account switch failed: {ex.Message}");
+            }
+            await lobby.DisconnectAsync();
         }
 
         private void EnsureMasterClient()
@@ -795,12 +833,40 @@ namespace SlopArena.Client.Network
             lobby.ChatMessageReceived += OnChatMessage;
             lobby.ChatPresenceChanged += OnPresence;
             lobby.ChatServerChanged += OnServerChanged;
+            lobby.RoomUpdated += UpdateRoomTitle;
             lobby.Connected += OnLobbyConnected;
             lobby.Disconnected += OnLobbyDisconnected;
             lobby.Error += OnLobbyError;
+            lobby.MatchStarted += OnMatchStarted;
+
             lobby.MatchAborted += OnMatchAborted;
             lobby.MatchStartedRejected += OnMatchStartedRejected;
         }
+        private void UnsubscribeLobby(LobbyClient lobby)
+        {
+            lobby.ChatMessageReceived -= OnChatMessage;
+            lobby.ChatPresenceChanged -= OnPresence;
+            lobby.ChatServerChanged -= OnServerChanged;
+            lobby.RoomUpdated -= UpdateRoomTitle;
+            lobby.Connected -= OnLobbyConnected;
+            lobby.Disconnected -= OnLobbyDisconnected;
+            lobby.Error -= OnLobbyError;
+            lobby.MatchStarted -= OnMatchStarted;
+            lobby.MatchAborted -= OnMatchAborted;
+            lobby.MatchStartedRejected -= OnMatchStartedRejected;
+        }
+
+        private void OnMatchStarted(MatchStartedConfig config)
+        {
+            if (config.RoomId is not Guid roomId ||
+                ClientSession.SelectedOnlineMode != ClientSession.OnlineSelection.Room ||
+                ClientSession.SelectedRoomId != roomId ||
+                _lobby?.JoinedRoomId != roomId ||
+                config.MatchId == Guid.Empty)
+                return;
+            ClientSession.ApplyMatchStarted(config);
+        }
+
 
         private void OnLobbyConnected()
         {
@@ -843,6 +909,16 @@ namespace SlopArena.Client.Network
         {
             if (message == null || message.MessageId == Guid.Empty)
                 return;
+            if (string.Equals(message.Channel, "server", StringComparison.OrdinalIgnoreCase))
+            {
+                if (message.RoomId is not Guid roomId || _lobby?.JoinedRoomId != roomId)
+                    return;
+                if (_joinedRoomId != roomId)
+                {
+                    SetCurrentRoom(roomId);
+                    GetOrCreateConversation(RoomKey(roomId), RoomTitle(roomId));
+                }
+            }
             AddMessage(message);
             NotifyChanged();
         }
@@ -873,24 +949,42 @@ namespace SlopArena.Client.Network
 
         private void OnServerChanged(ServerChatState state)
         {
-            _joinedServerId = state?.ServerId;
-            ClientSession.SelectedServerId = _joinedServerId ?? Guid.Empty;
-            if (_joinedServerId is Guid serverId)
+            Guid? roomId = state?.RoomId;
+            if (roomId is Guid id && _lobby?.JoinedRoomId != id)
+                return;
+            SetCurrentRoom(roomId);
+            if (roomId is Guid currentRoomId)
             {
-                GetOrCreateConversation(ServerKey(serverId), ServerTitle(serverId));
+                GetOrCreateConversation(RoomKey(currentRoomId), RoomTitle(currentRoomId));
                 foreach (var message in state.Messages ?? Array.Empty<ChatMessage>())
-                    AddMessage(message);
+                {
+                    if (message.RoomId == currentRoomId)
+                        AddMessage(message);
+                }
             }
             RefreshConversationStates();
             NotifyChanged();
         }
+
+        public void UpdateRoomTitle(RoomSnapshot room)
+        {
+            if (room == null ||
+                (room.Id != _joinedRoomId && room.Id != ClientSession.SelectedRoomId))
+                return;
+            _roomTitleId = room.Id;
+            _roomTitleName = room.Name;
+            if (ClientSession.SelectedRoomId == room.Id)
+                ClientSession.SelectedServerName = room.Name;
+            var conversation = _conversations.FirstOrDefault(c => c.Key == RoomKey(room.Id));
+            if (conversation == null)
+                return;
+            conversation.Title = RoomTitle(room.Id);
+            NotifyChanged();
+        }
         private void OnMatchAborted(MatchAbortedNotification notification)
         {
-            if (!ClientSession.ApplyMatchAborted(notification.MatchId, notification.Reason) &&
-                ClientSession.SelectedServerId != Guid.Empty &&
-                _lobby is { IsConnected: true } lobby &&
-                lobby.JoinedServerId == ClientSession.SelectedServerId)
-                _ = lobby.JoinLobbyAsync(ClientSession.SelectedServerId);
+            if (!ClientSession.ApplyMatchAborted(notification.MatchId, notification.Reason))
+                return;
             SetStatus($"Match aborted ({notification.Reason}). Returned to the lobby.");
             NotifyChanged();
         }
@@ -911,21 +1005,23 @@ namespace SlopArena.Client.Network
             if (global != null)
                 foreach (var message in snapshot?.GlobalMessages ?? Array.Empty<ChatMessage>())
                     AddMessage(message);
-            if (snapshot?.Server?.ServerId is Guid serverId)
+            Guid? roomId = snapshot?.Server?.RoomId;
+            if (roomId is Guid id && _lobby?.JoinedRoomId != id)
+                roomId = null;
+            SetCurrentRoom(roomId);
+            if (roomId is Guid currentRoomId)
             {
-                _joinedServerId = serverId;
-                var server = GetOrCreateConversation(ServerKey(serverId), ServerTitle(serverId));
+                GetOrCreateConversation(RoomKey(currentRoomId), RoomTitle(currentRoomId));
                 foreach (var message in snapshot.Server.Messages ?? Array.Empty<ChatMessage>())
-                    AddMessage(message);
-            }
-            else
-            {
-                _joinedServerId = null;
+                {
+                    if (message.RoomId == currentRoomId)
+                        AddMessage(message);
+                }
             }
             RefreshConversationStates();
             NotifyChanged();
-        }
 
+        }
         private void AddMessage(ChatMessage message)
         {
             if (message == null || message.MessageId == Guid.Empty)
@@ -938,9 +1034,9 @@ namespace SlopArena.Client.Network
                     key = "global";
                     title = "GLOBAL";
                     break;
-                case "server" when message.ServerId is Guid serverId:
-                    key = ServerKey(serverId);
-                    title = ServerTitle(serverId);
+                case "server" when message.RoomId is Guid roomId && _joinedRoomId == roomId:
+                    key = RoomKey(roomId);
+                    title = RoomTitle(roomId);
                     break;
                 case "direct":
                     string? other = message.Sender?.PlayerId == _selfPlayerId
@@ -1065,7 +1161,7 @@ namespace SlopArena.Client.Network
         private bool IsDestinationAvailable(string key)
         {
             if (key == "global") return true;
-            if (TryServerKey(key, out var serverId)) return _joinedServerId == serverId;
+            if (TryRoomKey(key, out var roomId)) return _joinedRoomId == roomId;
             if (key.StartsWith("direct:", StringComparison.Ordinal))
             {
                 if (!_directoryAvailable) return false;
@@ -1075,18 +1171,34 @@ namespace SlopArena.Client.Network
             return false;
         }
 
-        private static string ServerKey(Guid serverId) => $"server:{serverId:D}";
-        private static string DirectKey(string playerId) => $"direct:{playerId}";
-        private static bool TryServerKey(string key, out Guid serverId)
+        private void SetCurrentRoom(Guid? roomId)
         {
-            serverId = default;
-            return key.StartsWith("server:", StringComparison.Ordinal) &&
-                Guid.TryParse(key.Substring("server:".Length), out serverId);
+            if (roomId == Guid.Empty) roomId = null;
+            _joinedRoomId = roomId;
+            for (int i = _conversations.Count - 1; i >= 0; i--)
+            {
+                if (TryRoomKey(_conversations[i].Key, out var existingRoomId) &&
+                    existingRoomId != roomId)
+                    _conversations.RemoveAt(i);
+            }
+            if (_activeConversation != null && !_conversations.Contains(_activeConversation))
+                _activeConversation = GetOrCreateConversation("global", "GLOBAL");
         }
-        private string ServerTitle(Guid serverId) =>
-            serverId == ClientSession.SelectedServerId && !string.IsNullOrEmpty(ClientSession.SelectedServerName)
-                ? $"SERVER // {ClientSession.SelectedServerName}"
-                : $"SERVER // {serverId:D}";
+
+        private static string RoomKey(Guid roomId) => $"room:{roomId:D}";
+        private static string DirectKey(string playerId) => $"direct:{playerId}";
+        private static bool TryRoomKey(string key, out Guid roomId)
+        {
+            roomId = default;
+            return key.StartsWith("room:", StringComparison.Ordinal) &&
+                Guid.TryParse(key.Substring("room:".Length), out roomId);
+        }
+        private string RoomTitle(Guid roomId) =>
+            roomId == _roomTitleId && !string.IsNullOrEmpty(_roomTitleName)
+                ? $"SERVER // {_roomTitleName}"
+                : roomId == ClientSession.SelectedRoomId && !string.IsNullOrEmpty(ClientSession.SelectedServerName)
+                    ? $"SERVER // {ClientSession.SelectedServerName}"
+                    : $"SERVER // {roomId:D}";
         private string ResolveDirectTitle(string playerId, ChatPlayer fallback) =>
             FormatPlayerTitle(_onlinePlayers.FirstOrDefault(p => p.PlayerId == playerId) ?? fallback ?? new ChatPlayer(playerId, playerId, string.Empty));
         private static string FormatPlayerTitle(ChatPlayer player) =>
@@ -1109,6 +1221,8 @@ namespace SlopArena.Client.Network
             if (_instance != this)
                 return;
             _destroyed = true;
+            if (_lobby != null)
+                UnsubscribeLobby(_lobby);
             _lobby?.DisconnectAsync();
             _masterClient?.Dispose();
             _lobby = null;

@@ -31,9 +31,14 @@ or invented social activity.
   reuse a misleading stage-selection confirmation label.
 - **Stages:** cards show rendered previews of the actual project prefabs. Kistu and Bonk
   portraits likewise come from existing character prefabs; image metadata records provenance.
-- **Recovery:** focus is visible; Cancel closes address entry before leaving the browser.
-  Directory, host, and room failures present a retry or a route back rather than an
-  indefinite connecting label. Empty player slots are not presented as connected players.
+- **Recovery:** focus is visible; controller Back closes address entry before leaving the
+  browser. Escape, gamepad Start, or the top-right gear opens the frontend menu on any
+  pre-match page, including over address entry and chat. Resume or a second Escape/Start
+  returns to the same page; Settings returns to the menu when closed; Quit Game exits
+  immediately. Mandatory identity entry and active Settings confirmations/remaps keep
+  their own cancel behavior. Directory, host, and room failures present a retry or a
+  route back rather than an indefinite connecting label. Empty player slots are not
+  presented as connected players.
 
 Results and in-match HUD presentation are outside this pre-match refresh.
 

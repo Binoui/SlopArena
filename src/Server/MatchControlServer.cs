@@ -129,6 +129,10 @@ namespace SlopArena.Server
                 }
                 else if (request.ProtocolVersion != 0)
                     return new StartOutcome(0, null, "Development matches require the explicit UDP protocol.");
+                if (!steam && request.AdmissionExpiresAtUtc is { } developmentExpiry &&
+                    (developmentExpiry <= DateTimeOffset.UtcNow ||
+                     developmentExpiry > DateTimeOffset.UtcNow.AddSeconds(65)))
+                    return new StartOutcome(0, null, "Invalid or expired development match admission.");
 
                 var arena = string.IsNullOrEmpty(request.ArenaName) ? _defaultArena : request.ArenaName;
                 if (!ArenaRegistry.Get(arena).HasValue)
@@ -138,9 +142,9 @@ namespace SlopArena.Server
                     !_isReady()))
                     return new StartOutcome(0, null, "Master-pinned catalog or GameHost registration is stale.");
                 if (!_orchestrator.TryAssignMatch(request.MatchId, arena, request.Players, (byte)request.MaxStocks,
-                    steam ? request.AdmissionExpiresAtUtc : null,
+                    request.AdmissionExpiresAtUtc,
                     steam ? request.CatalogHash : null,
-                    out int port, out var content, out var error))
+                    out int port, out var content, out var contentHash, out var error))
                     return new StartOutcome(0, null, error ?? "Failed to build match content.");
                 if (steam && _steamHost!.CurrentSteamId != serverSteamId)
                 {
@@ -150,9 +154,8 @@ namespace SlopArena.Server
 
                 return steam
                     ? new StartOutcome(port, content, null, matchGuid.ToString("D"),
-                        serverSteamId.ToString(CultureInfo.InvariantCulture),
-                        SteamMatchDescriptor.HashContent(content!))
-                    : new StartOutcome(port, content, null);
+                        serverSteamId.ToString(CultureInfo.InvariantCulture), contentHash)
+                    : new StartOutcome(port, content, null, ContentHash: contentHash);
             }
         }
 
@@ -280,7 +283,7 @@ namespace SlopArena.Server
             else
             {
                 var udpResponse = Encoding.UTF8.GetBytes(
-                    $"{{\"port\":{result.Port},\"content\":{MatchContentHandleMapCodec.Serialize(result.Content!)}}}");
+                    $"{{\"port\":{result.Port},\"content\":{MatchContentHandleMapCodec.Serialize(result.Content!)},\"contentHash\":\"{result.ContentHash}\"}}");
                 await ctx.Response.OutputStream.WriteAsync(udpResponse);
             }
         }

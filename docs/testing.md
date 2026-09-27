@@ -205,12 +205,12 @@ Run the normal lifecycle first, then repeat it with controlled failures:
 
 | Scenario | Required observation |
 | --- | --- |
-| Join → character/stage selection → match | Both clients receive the same admission content and reach authoritative gameplay; lobby slots are released without losing Server chat |
-| Combat → stocks/respawn → completion | Damage and outcomes agree with server state; result reporting succeeds at the Master and Results opens on both clients |
-| Results → rematch | A new match starts; launch identities, conversations, and drafts survive |
-| Full waiting roster | An additional admitted chat member can use Server chat without taking a waiting slot |
-| Explicit Leave / server switch | Old Server chat becomes read-only and stops delivering; Global and Direct remain usable |
-| Hub disconnect/reconnect during a match | Same identity/tag; previously admitted Server membership resumes without adding a waiting player or duplicating history/sends |
+| Join Room → Character/Arena selection → Match | Two clients receive the same Match admission content; Room chat stays isolated from other Rooms even on one GameHost |
+| Combat → stocks/respawn → completion | Damage and outcomes agree with server state; the GameHost's authenticated report returns only the matching Room to Lobby while Results remains viewable |
+| Results → Room → rematch | Return validates current membership; picks and Lock-in reset; a new Match starts with fresh IDs while Room conversation and drafts survive |
+| GameHost unavailable or full | Room members can prepare/chat without a GameHost; failed start preserves choices for retry, with explicit feedback |
+| Room leave, expiry, revocation, or switch | Player returns to browser with an explanation; old Room draft/history is cleared and Room pushes stop; Global and Direct remain usable |
+| Hub disconnect/reconnect during gameplay | Same identity/tag; only currently authorized Room restores Server Chat history; gameplay connectivity is separate |
 | Offline/rate-rejected send | Draft retained, readable feedback, no automatic replay; uncertain delivery is not presented as confirmed failure |
 | Direct, rename, mute | Direct stays private; recipient identity is ID-based; rename does not retarget a conversation; local mute filters the sender |
 | Compose during combat | Movement/attacks/camera shortcuts suppressed, simulation and damage continue, Escape preserves draft, held controls require release |
@@ -220,12 +220,22 @@ Then exercise the boundaries independently:
 
 - Interrupt **SignalR and UDP separately**. A restored chat connection is not proof of
   recovered gameplay. Record both transports' state and the exact recovery behavior.
-- Disconnect the host during selection and disconnect a player during a match. Check
-  roster/host changes, match cleanup, and whether the remaining client can continue.
-- Restart Master and GameServer separately. Record lost in-memory state and surfaced
-  errors; do not assume either operation transparently resumes a match.
-- Run simultaneous matches and repeated join/leave/rematch cycles. Check isolation,
-  port/slot reuse, result association, and absence of cross-match state or Server chat leaks.
+- Disconnect the leader during selection and a player during a Match. Check
+  leader transfer, roster state, Match cleanup, and whether the remaining client can continue.
+- Restart a GameHost and cancel a Match for missing players. Neither cancellation
+  invents a winner or resets another Room, and old reports must not reset a rematch.
+- Leave a browser open as another player creates, fills, starts and finishes a
+  Room; rows must refresh without a manual scan. Cancel a slow Room create/join,
+  then re-enter; stale cleanup must not revoke a newly adopted Room.
+- Crash a GameHost without deregistration after a Match starts. After 60 seconds
+  without a heartbeat and a failed control `/health`, only its open Matches
+  cancel with `host_unavailable`; a reachable `/health` must not abort a fight
+  merely because Master missed a heartbeat. Recheck no winner and Room chat.
+- In explicit Editor development UDP, an unfilled Room Match abort must correlate
+  its root Match ID, leave gameplay without Results, and return to that Room.
+- Restart Master separately; record lost in-memory Room state and surfaced errors.
+- Run two concurrent Matches on one GameHost and repeated join/leave/rematch cycles.
+  Check isolation, Room state, result association, and cross-Room chat boundaries.
 - On an isolated test network, introduce latency, jitter, loss, and a brief outage.
   Record the actual impairment settings and remove them afterward. No network-fault
   tool is assumed installed; do not alter the development machine's shared route blindly.

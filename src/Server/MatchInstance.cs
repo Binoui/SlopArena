@@ -139,6 +139,14 @@ namespace SlopArena.Server
 			try { _udpServer?.Close(); } catch { }
 		}
 
+		internal void StopAndWait()
+		{
+			Stop();
+			var thread = _thread;
+			if (thread is not null && thread != Thread.CurrentThread)
+				thread.Join();
+		}
+
 		/// <summary>Bind a Steam-authenticated account to its roster slot.</summary>
 		public bool TryBindSteamPlayer(ulong steamId, long connectionId, string contentHash,
 			out ulong entityId, out long replacedConnectionId, out byte denialCode)
@@ -291,14 +299,14 @@ namespace SlopArena.Server
 				if (currentTime >= nextTickTime)
 				{
 					ReceiveInputs();
+					if (_matchState == MatchState.Waiting && _admissionDeadlineUtc is DateTimeOffset deadline &&
+						_clock.GetUtcNow() >= deadline)
+					{
+						Stop("unfilled");
+						break;
+					}
 					if (_steamSend is not null)
 					{
-						if (_matchState == MatchState.Waiting && _admissionDeadlineUtc is DateTimeOffset deadline &&
-							_clock.GetUtcNow() >= deadline)
-						{
-							Stop("unfilled");
-							break;
-						}
 						if (_matchState == MatchState.Waiting && AllConnected())
 						{
 							_matchState = MatchState.Countdown;

@@ -300,6 +300,47 @@ public class GameServerRegistrationTests
     }
 
     [Fact]
+    public async Task DevelopmentRegistrationAdvertisesCatalogHashWithoutSteamIdentity()
+    {
+        var serverId = Guid.NewGuid();
+        var heartbeat = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var handler = new StubHandler(request =>
+        {
+            if (request.RequestUri!.AbsolutePath == "/servers/register")
+                return Registered(serverId);
+            if (request.RequestUri.AbsolutePath.EndsWith("/heartbeat", StringComparison.Ordinal))
+                heartbeat.TrySetResult();
+            return new HttpResponseMessage(HttpStatusCode.OK);
+        });
+        var config = TestConfig();
+        var orchestrator = new MultiMatchOrchestrator(config);
+        string catalogHash = Assert.IsType<string>(orchestrator.CatalogHash);
+        var registration = new GameServerRegistration(config, orchestrator, handler);
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        var run = registration.RunAsync(cts.Token, heartbeatInterval: TimeSpan.FromMilliseconds(15));
+        try
+        {
+            await heartbeat.Task.WaitAsync(TimeSpan.FromSeconds(3));
+        }
+        finally
+        {
+            cts.Cancel();
+            await run;
+        }
+
+        using var registerBody = JsonDocument.Parse(handler.Bodies.Single(x => x.Path == "/servers/register").Body);
+        Assert.Equal(catalogHash, registerBody.RootElement.GetProperty("catalogHash").GetString());
+        Assert.Equal(JsonValueKind.Null, registerBody.RootElement.GetProperty("steamId").ValueKind);
+        Assert.Equal(JsonValueKind.Null, registerBody.RootElement.GetProperty("instanceId").ValueKind);
+        Assert.Equal(0, registerBody.RootElement.GetProperty("protocolVersion").GetInt32());
+        using var heartbeatBody = JsonDocument.Parse(handler.Bodies.Single(x => x.Path.EndsWith("/heartbeat", StringComparison.Ordinal)).Body);
+        Assert.Equal(catalogHash, heartbeatBody.RootElement.GetProperty("catalogHash").GetString());
+        Assert.Equal(JsonValueKind.Null, heartbeatBody.RootElement.GetProperty("steamId").ValueKind);
+        Assert.Equal(JsonValueKind.Null, heartbeatBody.RootElement.GetProperty("protocolVersion").ValueKind);
+        Assert.Equal(JsonValueKind.Null, heartbeatBody.RootElement.GetProperty("instanceId").ValueKind);
+    }
+
+    [Fact]
     public async Task PendingResultRetriesTransientFailureAndCancellationConflictIsTerminal()
     {
         var serverId = Guid.NewGuid();

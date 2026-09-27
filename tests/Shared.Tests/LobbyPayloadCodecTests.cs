@@ -195,10 +195,10 @@ public class LobbyPayloadCodecTests
     // ── MatchStarted matchPort + arenaName (issue #35) ──
 
     [Fact]
-    public void TryParseMatchStarted_ParsesMatchPortAndArena()
+    public void TryParseMatchStarted_DevelopmentRoomRequiresMatchId()
     {
         var json = """
-        {"serverId":"22222222-2222-2222-2222-222222222222","matchPort":9877,"arenaName":"split","content":{"schemaVersion":1,"entries":[{"handle":1,"selector":"fightguy","identity":{"packageId":"fightguy","version":"0.0.0-dev","sourceHash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","cookedContentHash":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","packageHash":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"},"displayName":"FightGuy"}]},"players":[
+        {"serverId":"22222222-2222-2222-2222-222222222222","roomId":"33333333-3333-3333-3333-333333333333","serverAddress":"203.0.113.60","matchId":"44444444-4444-4444-4444-444444444444","matchPort":9877,"arenaName":"split","content":{"schemaVersion":1,"entries":[{"handle":1,"selector":"fightguy","identity":{"packageId":"fightguy","version":"0.0.0-dev","sourceHash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","cookedContentHash":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","packageHash":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"},"displayName":"FightGuy"}]},"players":[
             {"steamId":1,"name":"A","characterSelection":"Manki","lockedIn":true,"isHost":true,"entityId":1},
             {"steamId":2,"name":"B","characterSelection":"FightGuy","lockedIn":true,"isHost":false,"entityId":2}
         ]}
@@ -207,12 +207,22 @@ public class LobbyPayloadCodecTests
         var cfg = LobbyPayloadCodec.TryParseMatchStarted(Parse(json));
 
         Assert.NotNull(cfg);
-        Assert.Equal(9877, cfg!.MatchPort);
+        Assert.Equal(System.Guid.Parse("44444444-4444-4444-4444-444444444444"), cfg!.MatchId);
+        Assert.Equal(9877, cfg.MatchPort);
         Assert.Equal("split", cfg.ArenaName);
+        Assert.Equal(System.Guid.Parse("33333333-3333-3333-3333-333333333333"), cfg.RoomId);
+        Assert.Equal("203.0.113.60", cfg.ServerAddress);
         Assert.Equal(1, cfg.Players[0].EntityId);
         Assert.Equal(2, cfg.Players[1].EntityId);
         Assert.Equal("Manki", cfg.Players[0].CharacterSelection);
         Assert.Equal("FightGuy", cfg.Players[1].CharacterSelection);
+        Assert.Null(LobbyPayloadCodec.TryParseMatchStarted(Parse(
+            json.Replace("\"matchId\":\"44444444-4444-4444-4444-444444444444\",", ""))));
+        Assert.Null(LobbyPayloadCodec.TryParseMatchStarted(Parse(
+            json.Replace("\"matchId\":\"44444444-4444-4444-4444-444444444444\"",
+                "\"matchId\":\"not-a-guid\""))));
+        Assert.Null(LobbyPayloadCodec.TryParseMatchStarted(Parse(
+            json.Replace("\"serverAddress\":\"203.0.113.60\",", ""))));
     }
 
 }

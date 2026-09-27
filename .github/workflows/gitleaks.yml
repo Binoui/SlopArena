@@ -1,0 +1,22 @@
+name: Gitleaks history scan
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Scan full Git history
+        run: >-
+          docker run --rm --user "$(id -u):$(id -g)"
+          -v "${GITHUB_WORKSPACE}:/repo"
+          ghcr.io/gitleaks/gitleaks:v8.30.1
+          git --redact --verbose --log-opts="--all" /repo

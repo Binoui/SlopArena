@@ -1,6 +1,6 @@
 # SlopArena Chat
 
-**Status:** Design approved on 2026-09-16. Master-only implementation is complete and headless-verified locally under [#206](https://github.com/Binoui/SlopArena/issues/206). Unity integration and deployment remain pending.
+**Status:** The original Global/Direct chat foundation was approved under #206. Issue #243 retargets Server Chat to authenticated Master Room membership. Unity client Room-chat changes are implemented; native and real SignalR integration validation remain pending.
 
 ## Goal and scope
 
@@ -15,14 +15,14 @@ Canonical terms are in the [multiplayer glossary](../../CONTEXT.md#pvp--multipla
 | Channel | Audience | Joining and leaving |
 | --- | --- | --- |
 | Global Chat | All connected SlopArena Chat participants, including players in menus and Training | Available throughout the game after chat connects |
-| Server Chat | All players joined to the same GameServer, including waiting players and players in different matches | Starts after a successful server join; ends when the player leaves or switches servers |
+| Server Chat | Members of the same Master Room | Starts when Room membership is admitted; ends on leave, revocation, or membership expiry |
 | Direct Message | The sender and one selected, currently connected recipient | Started through the game-wide online-player picker; no offline delivery |
 
-Server Chat is not a private lobby or match channel. Membership continues through character/stage selection, fights, results, and rematches. Hosting multiple matches on one GameServer does not split its chat.
+Server Chat is scoped to one Master Room, not a physical GameHost lobby or an individual match. Distinct Rooms have isolated Server Chat even when their members use the same physical GameHost.
 
-A player has access to the Server Chat for their joined GameServer, not independent subscriptions to other servers. Leaving it does not disconnect Global Chat or Direct Messages. Reconnect must revalidate server membership rather than trust a client-supplied server ID.
+A player has access only to the Server Chat for their currently attached Room membership. Knowing or guessing a Room ID does not grant access. Leaving or losing membership clears that Room conversation without disconnecting Global Chat or Direct Messages. Reconnect must revalidate current identity and Room attachment membership.
 
-The online-player picker shows connected players by Display Name and Session Tag, including players in menus, Training, and other GameServers. It is not a friends list.
+The online-player picker shows connected players by Display Name and Session Tag, including players in menus, Training, and other Rooms. It is not a friends list.
 
 ## Guest identity and display names
 
@@ -58,7 +58,13 @@ clusters. The client must use the same count. Master preserves accepted message
 text, including literal line breaks and tabs; it rejects malformed Unicode and
 other control characters.
 
-Master determines sender identity, the current sender name, and message attribution. Client-supplied sender fields cannot impersonate another player. Validate Server Chat membership on the server; knowing a GameServer ID does not grant access.
+Master determines sender identity, the current sender name, and message attribution. Client-supplied sender fields cannot impersonate another player. Validate Server Chat membership against the current authenticated identity and RoomManager attachment on the server; knowing a Room ID does not grant access. Physical GameServer membership never grants Server Chat.
+
+On the existing authenticated SignalR connection, Server-channel `ChatMessage` and
+`ServerChatState` carry `RoomId`; `ChatSnapshot.Server` remains the snapshot property.
+`SendServer(roomId, text)` keeps the existing RPC name, and `ChatServerChanged`
+delivers the Room ID with its messages or a null state when membership ends. The
+Unity conversation key is `room:<guid>`; physical GameServer IDs never select it.
 
 Enforce limits on Master, not only in the UI. Switching channels or opening another connection must not reset the guest's send allowance. Keep authentication/connection protections, but separate chat message limits from lobby/control traffic.
 
@@ -68,13 +74,13 @@ Bound total client storage, pending work, and server backlog storage as well as 
 
 Global Chat and Server Chat each provide up to 50 earlier messages when a participant joins. The backlog exists only in the current Master process; a Master restart clears it. It is not a permanent archive.
 
-Clients retain their bounded received history and draft across scene changes and temporary chat outages. Already-received Direct Messages may remain in local scrollback for the launch; this is not an offline inbox. A later game launch starts with no saved conversations.
+Clients retain bounded received history and drafts across scenes and temporary chat outages while the same identity and Room membership remain authorized. Leaving, losing membership, or switching Rooms discards that Room conversation. Already-received Direct Messages may remain in local scrollback for the launch; this is not an offline inbox. A later game launch starts with no saved conversations.
 
 Reconnect automatically, but never automatically replay unsent or unconfirmed sends. Preserve the draft, show connection state, and let the player decide whether to resend. If acceptance is uncertain, do not falsely report definite success or failure.
 
 A send confirmation means Master accepted the message, not that another person read it. There is no delivery/read-receipt system. A known-offline Direct recipient produces a clear failure; the message is not queued for a later login.
 
-Use stable message identity to merge public backlog with local scrollback without duplicate lines. Keep histories separated by channel and GameServer identity. Leaving or switching servers must not let late messages appear as messages from the new server.
+Use stable message identity to merge public backlog with local scrollback without duplicate lines. Keep histories separated by channel and Room ID. Leaving, losing membership, or switching Rooms clears the previous Room conversation; queued messages for that Room must not appear in a later Room.
 
 Chat failure must not block local play or interrupt an already-running fight. Authentication and membership failures must be visible; they must not silently change identity, recipient, or destination.
 
@@ -88,11 +94,11 @@ There are no reports, bans, moderation dashboard, or durable account-blocking sy
 
 ## Interface and input
 
-Use one shared chat interface across menus, Training, lobby/select screens, fights, results, and rematches. Preserve the existing [visual language](visual-language.md); this task does not authorize a redesign of unrelated menus or HUD elements.
+Use one shared chat interface across menus, Training, Room Lobby, fights, results, and rematches. Preserve the existing [visual language](visual-language.md); this task does not authorize a redesign of unrelated menus or HUD elements.
 
-Expanded chat has separate Global and Server tabs, plus a Direct area with a conversation list. Keep the active destination visible beside the composer. Do not silently redirect a draft when its server or recipient becomes unavailable.
+Expanded chat has separate Global and Server tabs, plus a Direct area with a conversation list. Keep the active destination visible beside the composer. Server Chat keeps the `SERVER CHAT` label and is available from the shared chat UI, including Room Lobby, only while Room membership is active. Do not silently redirect a draft when its Room or recipient becomes unavailable.
 
-During combat, show a small fading feed of clearly labeled Global/Server messages. Apply the three-line/eight-second defaults without covering stocks, damage, move indicators, or other critical combat information.
+During combat, show a small fading feed of clearly labeled Global/Server messages authorized for the current Room. Apply the three-line/eight-second defaults without covering stocks, damage, move indicators, or other critical combat information.
 
 Direct Messages use a quiet unread indicator. Do not put their text in the public fading feed or add notification sounds. Incoming messages must not steal keyboard focus.
 
@@ -113,9 +119,9 @@ Replace local-only chat echoes, fabricated messages, and fabricated online count
 
 ## Implementation boundary and repository evidence
 
-Use the existing Master repository and authenticated SignalR transport. No fourth repository, separate chat process, or raw-WebSocket rewrite is required. Keep chat outside Shared simulation and GameServer gameplay traffic.
+Use the existing Master repository and authenticated SignalR transport. No fourth repository, separate chat process, or raw-WebSocket rewrite is required. Keep chat outside Shared simulation and GameServer gameplay traffic. Server Chat access comes only from RoomManager's authenticated identity and current connection attachment; physical GameServer lobby membership is not authorization.
 
-Use one game-wide owner for the authenticated guest session, connection lifecycle, and main-thread event delivery. Lobby membership is a state within that session, not the lifetime of all chat. Reuse existing patterns instead of adding a speculative identity framework or transport abstraction.
+Use one game-wide owner for the authenticated guest session, connection lifecycle, and main-thread event delivery. Room membership is a state within that session, not the lifetime of all chat. Reuse existing patterns instead of adding a speculative identity framework or transport abstraction.
 
 The following source facts were checked on 2026-09-16. They describe code, not a verified deployed service:
 
@@ -125,7 +131,7 @@ The following source facts were checked on 2026-09-16. They describe code, not a
 | [LobbyRoomUI](../../client/Unity/Assets/Scripts/Runtime/UI/LobbyRoomUI.cs) creates the current lobby connection; [ServerBrowserUI](../../client/Unity/Assets/Scripts/Runtime/UI/ServerBrowserUI.cs) performs guest sign-ins | Move lifetime ownership out of individual screens so scene changes cannot create extra guest identities or stop chat |
 | [MasterServerClient](../../src/Shared/MasterServerClient.cs) already handles guest JWTs and numeric IDs | Reuse the authenticated player identity; the current field name `SteamId` does not mean a verified Steam user |
 | [Master Program.cs](https://github.com/Binoui/SlopArena-MasterServer/blob/main/Program.cs) issues guest identities and applies a shared per-IP POST limit | Support chosen names and prevent chat traffic from consuming the control/authentication request budget; do not merely raise one shared limit |
-| [Master LobbyHub](https://github.com/Binoui/SlopArena-MasterServer/blob/main/Hubs/LobbyHub.cs) owns authenticated lobby membership and groups | Derive channel access from authoritative membership; do not trust client-selected sender or server membership |
+| [Master LobbyHub](https://github.com/Binoui/SlopArena-MasterServer/blob/main/Hubs/LobbyHub.cs) owns authenticated lobby and Room membership | Derive Server Chat access from RoomManager identity+connection attachment; never trust a client-selected Room ID or physical server membership |
 | [InputController](../../client/Unity/Assets/Scripts/Runtime/Input/InputController.cs) polls hardware directly | A focused text field alone cannot isolate gameplay input; cover all human-input and camera paths |
 | [ResultsUI](../../client/Unity/Assets/Scripts/Runtime/UI/ResultsUI.cs) only appends local chat labels, and [Results.uxml](../../client/Unity/Assets/UI/Results.uxml) contains fabricated activity | Replace the placeholder behavior rather than treating it as an existing networked chat implementation |
 
@@ -159,19 +165,21 @@ checks do not satisfy the native UI, input, local mute, or scene-lifetime checks
 
 | Scenario | Required result |
 | --- | --- |
-| Players in menus, Training, and separate GameServers use Global Chat | All connected chat participants receive it, independent of scene or match state |
-| Waiting players and players in different matches share one GameServer | They share Server Chat; another GameServer's players do not receive it |
-| A player leaves or switches servers | Old Server Chat access ends; messages and drafts are not redirected to the new server; Global and Direct remain available |
+| Players in menus, Training, and separate Rooms use Global Chat | All connected chat participants receive it, independent of scene or Room membership |
+| Members of one Room use Server Chat | They share only that Room's Server Chat; another Room remains isolated even with overlapping physical GameHost assumptions |
+| A player leaves, loses membership, or switches Rooms | Previous Room history and draft are cleared; late pushes are rejected; Global and Direct remain available |
+| Physical GameServer lobby admission or `JOIN BY ADDRESS` | Gameplay admission still works, but grants no Server Chat access |
+| A client reconnects or rejoins a Room | Revalidate membership and restore only that Room's authorized Master history; no old Room draft/history crosses |
 | Two players use the same name | Session Tags distinguish them; Direct and mute select the intended identity, not a name match |
 | A recipient is offline, or relaunches under the same name | No offline queue and no automatic retargeting of the old Direct conversation |
 | A player renames outside a GameServer | Current name updates without changing identity/tag; earlier messages keep the old name; mute still applies; renaming while joined is rejected |
 | A muted sender posts to Global, Server, or Direct | Their messages and alerts remain hidden during the muting player's current launch |
-| A client reconnects or rejoins a public channel | Draft/history survive; at most 50 backlog messages merge without duplicate lines; no unconfirmed send is automatically resent |
+| A chat client reconnects | Global backlog merges by stable ID; active Room history is revalidated; drafts survive only while the same Room membership remains; no unconfirmed send is resent |
 | Master restarts | Its public backlog is gone; local received history is not fabricated or silently presented as a new backlog |
-| A sender exceeds limits, supplies spoofed sender fields, or targets an unauthorized server | Master enforces length/rate/membership and authentic attribution; other players' lobby/control actions remain usable |
+| A sender exceeds limits, supplies spoofed sender fields, or guesses an unauthorized Room ID | Master enforces length/rate/membership and authentic attribution; other players' lobby/control actions remain usable |
 | Text contains markup-like input or Unicode | It renders as literal text, with consistent validation; it cannot inject formatting or another sender identity |
 | Chat opens, sends, and closes during a fight | Typing cannot move, attack, steer the camera, or activate background shortcuts; closing does not release buffered attacks; simulation and vulnerability continue |
 | Two real clients exchange messages through the shared UI | Live delivery works across menus, Training, lobby/select, fight, results, and rematch; no fixture activity or local-only success is presented as real delivery |
 | Native UI is inspected at 16:9 and approximately 2:1 | Feed, tabs, picker, draft, scrollback, and failure states remain usable without covering critical HUD information |
 
-Follow the applicable [verification mode](../testing.md) and [Unity CLI workflow](../contributing/unity-cli.md) when implementation is authorized. Protocol checks do not replace native input/focus and real-client delivery checks.
+Follow the applicable [verification mode](../testing.md) and [Unity CLI workflow](../contributing/unity-cli.md) when verifying this client integration. Protocol checks do not replace native input/focus and real-client delivery checks.

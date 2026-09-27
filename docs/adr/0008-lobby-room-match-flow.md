@@ -3,6 +3,17 @@
 **Status:** Accepted — 2026-08-01
 **Deciders:** @Binoui
 
+> **2026-09-27 implementation amendment (#241–#247):** The accepted separation
+> between Master-owned lobby state and GameHost-owned simulation remains. The
+> normal Server Browser now lists named public **Rooms**, not physical GameHosts;
+> a Room persists through preparation, Match, Results and rematch. Master
+> allocates a GameHost only at Room Match start and stores Room ID separately
+> from physical GameHost ID. The GameHost reports a terminal result/cancellation;
+> Master returns only the matching active Room to Lobby and clears preparation
+> without erasing membership or Server Chat. Results is an authoritative
+> gameplay snapshot displayed until the client elects to return. The original
+> direct-GameServer browser and SignalR-results wording below is historical.
+
 ## Context
 
 The match lifecycle needs a defined flow from server browser to match and back. The current `MatchInstance` has countdown → fight → 3-death → post-match, but no lobby state, no character select, and the client ignores `MatchState` entirely.

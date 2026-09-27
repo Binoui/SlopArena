@@ -53,6 +53,12 @@ namespace SlopArena.Client.UI
         private Button _btnHostCancel;
         private TextField _hostIpField;
         private Label _lblHostStatus;
+        private TextField _roomNameField;
+        private Button _btnCreateRoom;
+        private ChatSession? _chatSession;
+        private LobbyClient? _roomDirectoryLobby;
+
+
         private Button _btnDirectConnect;
         private VisualElement _directConnectModal;
         private TextField _ipField;
@@ -66,8 +72,11 @@ namespace SlopArena.Client.UI
         private CancellationTokenSource _refreshCts;
         private CancellationTokenSource _hostCts;
         private CancellationTokenSource _addressCts;
+        private CancellationTokenSource? _roomActionCts;
         private bool _alive;
         private bool _refreshing;
+        private bool _roomListDirty;
+
         private bool _joining;
         private bool _hostStarting;
         private bool _hostHandedOff;
@@ -83,6 +92,7 @@ namespace SlopArena.Client.UI
 
             _serverList = _context.Q<ScrollView>("server-list");
             _lblStatus = _context.Q<Label>("lbl-status");
+            if (_lblStatus != null) _lblStatus.enableRichText = false;
             _btnRefresh = _context.Q<Button>("btn-refresh");
             _btnBack = _context.Q<Button>("btn-back");
             _btnHost = _context.Q<Button>("btn-host");
@@ -93,6 +103,23 @@ namespace SlopArena.Client.UI
             _directConnectModal = _context.Q<VisualElement>("direct-connect-modal");
             _ipField = _context.Q<TextField>("ip-field");
             _directConnectStatus = _context.Q<Label>("direct-connect-status");
+            _roomNameField = _context.Q<TextField>("room-name-field");
+            bool showLegacyTools = IsDevelopmentLegacyRouteEnabled();
+            var legacyHostPanel = _context.Q<VisualElement>("legacy-host-panel");
+            var directConnectPanel = _context.Q<VisualElement>("direct-connect-panel");
+            if (legacyHostPanel != null)
+                legacyHostPanel.style.display = showLegacyTools ? DisplayStyle.Flex : DisplayStyle.None;
+            if (directConnectPanel != null)
+                directConnectPanel.style.display = showLegacyTools ? DisplayStyle.Flex : DisplayStyle.None;
+            if (_btnHost != null)
+                _btnHost.style.display = showLegacyTools ? DisplayStyle.Flex : DisplayStyle.None;
+            if (_btnDirectConnect != null)
+                _btnDirectConnect.style.display = showLegacyTools ? DisplayStyle.Flex : DisplayStyle.None;
+
+
+            _btnCreateRoom = _context.Q<Button>("btn-create-room");
+            if (_btnCreateRoom != null) _btnCreateRoom.clicked += CreateRoom;
+
 
             if (_btnRefresh != null) _btnRefresh.clicked += RefreshServers;
             if (_btnBack != null) _btnBack.clicked += LeaveBrowser;
@@ -134,7 +161,15 @@ namespace SlopArena.Client.UI
                 MenuNavigation.Configure(_context, initial, LeaveBrowser);
 
             ChatSession.ConfigureMasterServerUrl(ClientSession.MasterServerUrl);
+            _chatSession = ChatSession.Instance;
+            if (_chatSession != null)
+            {
+                _chatSession.AccountChanged += OnAccountChanged;
+                _chatSession.ActiveLobbyChanged += OnActiveLobbyChanged;
+                SetRoomDirectoryLobby(_chatSession.ActiveLobby);
+            }
             _masterClient = ChatSession.Instance?.MasterClient;
+
             // The return explanation is captured for this activation and shown
             // until the scan settles; SetBrowserStatus suppresses loading
             // replacements while it is pending (issue #213).
@@ -153,11 +188,13 @@ namespace SlopArena.Client.UI
                 return;
 
             _refreshing = true;
+            _roomListDirty = false;
             int operation = ++_operationVersion;
             _refreshCts?.Cancel();
             _refreshCts?.Dispose();
             _refreshCts = CancellationTokenSource.CreateLinkedTokenSource(_lifecycleCts.Token);
             CancellationToken ct = _refreshCts.Token;
+
             SetBrowserStatus("Looking for public rooms…", loading: true);
 
             try
@@ -172,27 +209,39 @@ namespace SlopArena.Client.UI
                             : "Couldn’t reach the room directory. Check your connection, then retry.");
                     return;
                 }
-                _masterClient = chat.MasterClient;
-                if (_masterClient == null)
+                var lobby = chat.ActiveLobby;
+                if (lobby == null)
                 {
                     ShowBrowserFailure("Couldn’t reach the room directory. Check your connection, then retry.");
                     return;
                 }
-                SetBrowserStatus("Scanning for public rooms…", loading: true);
-                var servers = await _masterClient.GetServersAsync(ct);
+                SetRoomDirectoryLobby(lobby);
+
+                var myRoom = await lobby.GetMyRoomAsync();
                 if (!IsCurrent(operation, ct))
                     return;
-                if (servers == null)
+                if (myRoom != null)
                 {
-                    ShowBrowserFailure("Couldn’t load public rooms. Check your connection, then retry.");
+                    ClientSession.AuthToken = chat.AuthToken;
+                    ClientSession.SteamId = chat.SteamId ?? 0;
+                    ClientSession.Username = chat.Self?.DisplayName;
+                    ClientSession.SelectedOnlineMode = ClientSession.OnlineSelection.Room;
+                    ClientSession.SelectedRoomId = myRoom.Id;
+                    ClientSession.SelectedServerId = Guid.Empty;
+                    ClientSession.SelectedServerName = myRoom.Name;
+                    chat.UpdateRoomTitle(myRoom);
+                    FrontendController.Show(FrontendPage.LobbyRoom);
                     return;
                 }
-
+                SetBrowserStatus("Scanning public rooms…", loading: true);
+                var rooms = await lobby.GetRoomsAsync();
+                if (!IsCurrent(operation, ct))
+                    return;
                 _serverList?.Clear();
-                if (servers.Count == 0)
+                if (rooms == null || rooms.Length == 0)
                 {
                     _pendingReturnNotice = null;
-                    SetBrowserStatus("No public rooms right now. Host a match or retry the scan.", loading: false);
+                    SetBrowserStatus("No public rooms right now. Create a room or retry the scan.", loading: false);
                     return;
                 }
 
@@ -202,8 +251,8 @@ namespace SlopArena.Client.UI
                     _lblStatus.style.display = DisplayStyle.None;
                     _lblStatus.RemoveFromClassList("error");
                 }
-                foreach (var server in servers)
-                    _serverList?.Add(CreateServerRow(server));
+                foreach (var room in rooms)
+                    _serverList?.Add(CreateRoomRow(room));
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
@@ -217,10 +266,19 @@ namespace SlopArena.Client.UI
             }
             finally
             {
+                bool refreshAgain = operation == _operationVersion && _roomListDirty &&
+                    _alive && !_joining;
                 if (operation == _operationVersion)
                     _refreshing = false;
+                if (refreshAgain)
+                    RefreshServers();
             }
+
         }
+
+        private static bool IsDevelopmentLegacyRouteEnabled() =>
+            Application.isEditor &&
+            string.Equals(Environment.GetEnvironmentVariable("SLOPARENA_DEV_UDP"), "1", StringComparison.Ordinal);
 
         private static bool SupportsMatchTransport(ServerInfo server)
         {
@@ -234,33 +292,245 @@ namespace SlopArena.Client.UI
                 server.ProtocolVersion == 0;
         }
 
-        private VisualElement CreateServerRow(ServerInfo server)
+        private VisualElement CreateRoomRow(RoomSummary room)
         {
-            var row = new VisualElement { name = "server-row" };
+            var row = new VisualElement { name = "room-row" };
             row.AddToClassList("server-row");
-
-            var name = new Label(server.Name ?? "Unnamed room") { name = "server-name" };
-            name.AddToClassList("server-name");
-            var info = new Label($"{server.Region}  —  {server.CurrentMatches}/{server.MaxConcurrentMatches}")
+            row.AddToClassList("room-row");
+            row.Add(new Label(room.Name) { name = "room-name", enableRichText = false });
+            row.Add(new Label($"{room.Phase}  —  {room.MemberCount}/{room.Capacity} players") { name = "room-info" });
+            row.Add(new Label($"ID {room.Id}") { name = "room-id" });
+            var join = new Button(() => JoinRoom(room))
             {
-                name = "server-info"
-            };
-            info.AddToClassList("server-info");
-            bool compatible = SupportsMatchTransport(server);
-            if (!compatible)
-                info.text += "  —  INCOMPATIBLE CLIENT";
-            var join = new Button(() => JoinServer(server))
-            {
-                text = compatible ? "JOIN" : "UNSUPPORTED",
-                name = "btn-join"
+                text = room.Joinable ? "JOIN" : (room.MemberCount >= room.Capacity ? "FULL" : "UNAVAILABLE"),
+                name = "btn-join-room"
             };
             join.AddToClassList("server-join");
-            join.SetEnabled(compatible);
-            row.Add(name);
-            row.Add(info);
+            join.SetEnabled(room.Joinable);
             row.Add(join);
             return row;
         }
+
+        private async void JoinRoom(RoomSummary room)
+        {
+            if (!_alive || _joining || _hostStarting || !room.Joinable)
+                return;
+            var request = BeginRoomAction();
+            if (request == null) return;
+            SetBrowserStatus($"Joining {room.Name}…", loading: true);
+            try
+            {
+                var chat = ChatSession.Instance;
+                bool connected = chat != null && await chat.EnsureConnectedAsync();
+                if (!IsCurrentRoomAction(request)) return;
+                var lobby = chat?.ActiveLobby;
+                if (!connected || lobby == null)
+                    throw new InvalidOperationException(chat?.NeedsDisplayName == true
+                        ? "Choose a display name before joining a room."
+                        : "Couldn’t connect to the room directory. Retry when online.");
+
+                var currentRoom = await lobby.GetMyRoomAsync();
+                if (!IsCurrentRoomAction(request)) return;
+                RoomMembershipResult? joinOperation = null;
+                RoomSnapshot joined;
+                if (currentRoom?.Id == room.Id)
+                {
+                    joined = currentRoom!;
+                }
+                else
+                {
+                    joinOperation = await lobby.JoinRoomAsync(room.Id, request.Token);
+                    joined = joinOperation.Value.Room;
+                }
+                if (!IsCurrentRoomAction(request))
+                {
+                    if (joinOperation is RoomMembershipResult stale)
+                        await LeaveStaleRoomAsync(lobby, stale);
+                    return;
+                }
+
+                ClientSession.AuthToken = chat!.AuthToken;
+                ClientSession.SteamId = chat.SteamId ?? 0;
+                ClientSession.Username = chat.Self?.DisplayName;
+                ClientSession.SelectedOnlineMode = ClientSession.OnlineSelection.Room;
+                ClientSession.SelectedRoomId = joined.Id;
+                ClientSession.SelectedServerId = Guid.Empty;
+                ClientSession.SelectedServerName = joined.Name;
+                chat!.UpdateRoomTitle(joined);
+                FrontendController.Show(FrontendPage.LobbyRoom);
+            }
+            catch (OperationCanceledException) when (request.IsCancellationRequested)
+            {
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[ServerBrowser] Room join failed: {ex.Message}");
+                if (IsCurrentRoomAction(request))
+                    ShowBrowserFailure(DescribeRoomError(ex, "Couldn’t join this room. Refresh the list and retry."));
+            }
+            finally
+            {
+                FinishRoomAction(request);
+            }
+        }
+
+        private async void CreateRoom()
+        {
+            if (!_alive || _joining || _hostStarting)
+                return;
+            string name = _roomNameField?.value?.Trim() ?? string.Empty;
+            if (name.Length == 0)
+            {
+                ShowBrowserFailure("Enter a room name before creating it.");
+                _roomNameField?.Focus();
+                return;
+            }
+            var request = BeginRoomAction();
+            if (request == null) return;
+            SetBrowserStatus("Creating your room…", loading: true);
+            try
+            {
+                var chat = ChatSession.Instance;
+                bool connected = chat != null && await chat.EnsureConnectedAsync();
+                if (!IsCurrentRoomAction(request)) return;
+                var lobby = chat?.ActiveLobby;
+                if (!connected || lobby == null)
+                    throw new InvalidOperationException(chat?.NeedsDisplayName == true
+                        ? "Choose a display name before creating a room."
+                        : "Couldn’t connect to the room directory. Retry when online.");
+
+                var created = await lobby.CreateRoomAsync(name, request.Token);
+                var room = created.Room;
+                if (!IsCurrentRoomAction(request))
+                {
+                    await LeaveStaleRoomAsync(lobby, created);
+                    return;
+                }
+                ClientSession.AuthToken = chat!.AuthToken;
+                ClientSession.SteamId = chat.SteamId ?? 0;
+                ClientSession.Username = chat.Self?.DisplayName;
+                ClientSession.SelectedOnlineMode = ClientSession.OnlineSelection.Room;
+                ClientSession.SelectedRoomId = room.Id;
+                ClientSession.SelectedServerId = Guid.Empty;
+                ClientSession.SelectedServerName = room.Name;
+                chat!.UpdateRoomTitle(room);
+                FrontendController.Show(FrontendPage.LobbyRoom);
+            }
+            catch (OperationCanceledException) when (request.IsCancellationRequested)
+            {
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[ServerBrowser] Room creation failed: {ex.Message}");
+                if (IsCurrentRoomAction(request))
+                    ShowBrowserFailure(DescribeRoomError(ex, "Couldn’t create the room. Check the name and retry."));
+            }
+            finally
+            {
+                FinishRoomAction(request);
+            }
+        }
+
+        private CancellationTokenSource? BeginRoomAction()
+        {
+            if (_roomActionCts != null)
+            {
+                ShowBrowserFailure("A previous room operation is still finishing. Retry shortly.");
+                return null;
+            }
+            _refreshCts?.Cancel();
+            _refreshCts?.Dispose();
+            _refreshCts = null;
+            _operationVersion++;
+            _refreshing = false;
+            var request = CancellationTokenSource.CreateLinkedTokenSource(_lifecycleCts.Token);
+            _roomActionCts = request;
+            _joining = true;
+            SetBrowserActionsEnabled(false);
+            return request;
+        }
+
+        private bool IsCurrentRoomAction(CancellationTokenSource request) =>
+            _alive && ReferenceEquals(_roomActionCts, request) && !request.IsCancellationRequested;
+
+        private void FinishRoomAction(CancellationTokenSource request)
+        {
+            if (!ReferenceEquals(_roomActionCts, request))
+                return;
+            _roomActionCts = null;
+            _joining = false;
+            request.Dispose();
+            if (_alive)
+            {
+                SetBrowserActionsEnabled(true);
+                if (_roomListDirty)
+                    RefreshServers();
+            }
+        }
+
+        private static async Task LeaveStaleRoomAsync(LobbyClient lobby, RoomMembershipResult operation)
+        {
+            try
+            {
+                await lobby.LeaveRoomIfCurrentAsync(operation.Room.Id,
+                    operation.OperationGeneration, operation.MembershipGeneration);
+            }
+            catch (Exception ex) { Debug.LogWarning($"[ServerBrowser] Stale Room cleanup failed: {ex.Message}"); }
+        }
+
+        private void SetRoomDirectoryLobby(LobbyClient? lobby)
+        {
+            if (ReferenceEquals(_roomDirectoryLobby, lobby))
+                return;
+            if (_roomDirectoryLobby != null)
+                _roomDirectoryLobby.RoomDirectoryChanged -= OnRoomDirectoryChanged;
+            _roomDirectoryLobby = lobby;
+            if (_alive && _roomDirectoryLobby != null)
+                _roomDirectoryLobby.RoomDirectoryChanged += OnRoomDirectoryChanged;
+        }
+
+        private void OnActiveLobbyChanged(LobbyClient? lobby) => SetRoomDirectoryLobby(lobby);
+
+        private void OnRoomDirectoryChanged()
+        {
+            if (!_alive)
+                return;
+            _roomListDirty = true;
+            if (!_refreshing && !_joining)
+                RefreshServers();
+        }
+
+        private void OnAccountChanged()
+        {
+            _operationVersion++;
+            _refreshing = false;
+            _roomListDirty = false;
+            SetRoomDirectoryLobby(null);
+            _refreshCts?.Cancel();
+            _roomActionCts?.Cancel();
+            ShowBrowserFailure("Steam account changed. Sign in with the current account before using Rooms.");
+        }
+
+
+        private static string DescribeRoomError(Exception ex, string fallback)
+        {
+            string message = ex.Message;
+            if (message.Contains("room_full", StringComparison.OrdinalIgnoreCase))
+                return "That room is full. Refresh the list and choose another room.";
+            if (message.Contains("room_limit", StringComparison.OrdinalIgnoreCase))
+                return "The room limit has been reached. Try joining an existing room.";
+            if (message.Contains("invalid_room_name", StringComparison.OrdinalIgnoreCase))
+                return "Room names must contain 1–24 characters. Change the name and retry.";
+            if (message.Contains("room_not_found", StringComparison.OrdinalIgnoreCase))
+                return "That room no longer exists. Refresh the list and choose another room.";
+            if (message.Contains("already_in_room", StringComparison.OrdinalIgnoreCase) ||
+                message.Contains("lobby", StringComparison.OrdinalIgnoreCase))
+                return "Leave your current lobby before joining or creating a Room.";
+            if (message.Contains("not_in_room", StringComparison.OrdinalIgnoreCase))
+                return "You are no longer in that room. Return to the browser and refresh.";
+            return fallback;
+        }
+
 
         private void JoinServer(ServerInfo server)
         {
@@ -279,6 +549,8 @@ namespace SlopArena.Client.UI
             ClientSession.AuthToken = chat?.AuthToken;
             ClientSession.SteamId = chat?.SteamId ?? 0;
             ClientSession.Username = chat?.Self?.DisplayName;
+            ClientSession.SelectedOnlineMode = ClientSession.OnlineSelection.LegacyServer;
+            ClientSession.SelectedRoomId = Guid.Empty;
             ClientSession.SelectedServerId = server.Id;
             ClientSession.SelectedServerName = server.Name;
             Debug.Log($"[ServerBrowser] Joining server: {server.Name}");
@@ -288,7 +560,8 @@ namespace SlopArena.Client.UI
 
         private void OpenDirectConnect()
         {
-            if (!_alive || _joining || _hostStarting || _directConnectModal == null)
+            if (!_alive || _joining || _hostStarting || _directConnectModal == null ||
+                !IsDevelopmentLegacyRouteEnabled())
                 return;
             // The shell identity surface owns the topmost modal layer while
             // it is presented; the direct-connect form never stacks over it.
@@ -299,8 +572,8 @@ namespace SlopArena.Client.UI
             _directConnectModal.style.display = DisplayStyle.Flex;
             _modalPresented = true;
             UiModalState.Push();
-            // One Back/Escape press resolves the modal layer first (issue
-            // #221): the page context carries the modal's close action.
+            // Controller Back resolves this page-owned modal; Escape/Start
+            // opens the shell menu above it without closing the form.
             _context.SetModalAction(CloseDirectConnect);
             FrontendFocusRouter.NotifyPresentationChanged();
             if (_directConnectStatus != null)
@@ -375,7 +648,7 @@ namespace SlopArena.Client.UI
 
         private async void JoinDirectConnect()
         {
-            if (!_alive || _joining || _ipField == null)
+            if (!_alive || _joining || _ipField == null || !IsDevelopmentLegacyRouteEnabled())
                 return;
             if (!TryParseServerAddress(_ipField.value, out var ip, out var port, out var error))
             {
@@ -455,7 +728,7 @@ namespace SlopArena.Client.UI
 
         private void OnHostClicked()
         {
-            if (!_alive || _hostStarting || _joining)
+            if (!_alive || _hostStarting || _joining || !IsDevelopmentLegacyRouteEnabled())
                 return;
             _hostStarting = true;
             _hostHandedOff = false;
@@ -537,6 +810,8 @@ namespace SlopArena.Client.UI
                     MatchConfig.ServerPort = host.AssignedPort;
                     ClientSession.AuthToken = authToken;
                     ClientSession.SteamId = steamId;
+                    ClientSession.SelectedOnlineMode = ClientSession.OnlineSelection.LegacyServer;
+                    ClientSession.SelectedRoomId = Guid.Empty;
                     ClientSession.SelectedServerId = serverId;
                     ClientSession.SelectedServerName = GenerateServerName();
                     // Host ownership transfer: the persistent ServerHost is now
@@ -621,6 +896,7 @@ namespace SlopArena.Client.UI
                 _btnHostCancel.SetEnabled(busy);
             }
             if (_btnDirectConnect != null) _btnDirectConnect.SetEnabled(!busy);
+            if (_btnCreateRoom != null) _btnCreateRoom.SetEnabled(!busy);
             if (_lblHostStatus != null)
             {
                 _lblHostStatus.style.display = DisplayStyle.Flex;
@@ -638,6 +914,7 @@ namespace SlopArena.Client.UI
         {
             _btnRefresh?.SetEnabled(enabled);
             _btnHost?.SetEnabled(enabled && !_hostStarting);
+            _btnCreateRoom?.SetEnabled(enabled && !_hostStarting);
             _btnDirectConnect?.SetEnabled(enabled && !_hostStarting);
         }
 
@@ -682,11 +959,19 @@ namespace SlopArena.Client.UI
             _alive = false;
             if (_btnRefresh != null) _btnRefresh.clicked -= RefreshServers;
             if (_btnBack != null) _btnBack.clicked -= LeaveBrowser;
+            if (_btnCreateRoom != null) _btnCreateRoom.clicked -= CreateRoom;
             if (_btnHost != null) _btnHost.clicked -= OnHostClicked;
             if (_btnDirectConnect != null) _btnDirectConnect.clicked -= OpenDirectConnect;
             if (_btnHostCancel != null) _btnHostCancel.clicked -= CancelHost;
             if (_modalClose != null) _modalClose.clicked -= CloseDirectConnect;
             if (_modalJoin != null) _modalJoin.clicked -= JoinDirectConnect;
+            if (_chatSession != null)
+            {
+                _chatSession.AccountChanged -= OnAccountChanged;
+                _chatSession.ActiveLobbyChanged -= OnActiveLobbyChanged;
+            }
+            SetRoomDirectoryLobby(null);
+            _chatSession = null;
             if (_modalPresented)
             {
                 _modalPresented = false;
@@ -694,6 +979,7 @@ namespace SlopArena.Client.UI
             }
             _addressCts?.Cancel();
             _addressCts?.Dispose();
+            _roomActionCts?.Cancel();
             _addressCts = null;
             _lifecycleCts?.Cancel();
             _refreshCts?.Cancel();

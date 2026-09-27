@@ -44,7 +44,7 @@ public class MatchControlHealthTests
 
         var admitted = orchestrator.TryAssignMatch("not-started", "slop_court",
             new[] { new MatchPlayer(1, CharacterClass.Manki, 1), new MatchPlayer(2, CharacterClass.FightGuy, 2) },
-            3, null, null, out var port, out _, out var error);
+            3, null, null, out var port, out _, out _, out var error);
 
         Assert.False(admitted);
         Assert.Equal(-1, port);

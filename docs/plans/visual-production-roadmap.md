@@ -224,10 +224,11 @@ Propagate the approved HUD language through the playable loop in this order:
    underground fight-poster broadcast identity: title treatment, roster cards,
    poster-strip actions, focus states, connection/version footer, and a direct
    connect modal.
-2. **Shared global chat shell — presentation pass complete.** Main Menu, Lobby,
+2. **Shared chat shell — presentation pass complete.** Main Menu, Lobby,
    Lobby Room, Server Browser, Character Select, Stage Select, and Results now
-   use the same compact SC2/WoW-style chat panel. It remains presentation-only
-   until the master-server chat contract exists.
+   use the same compact SC2/WoW-style chat panel backed by Master SignalR.
+   Server Chat uses the current authorized Master Room, not physical GameServer
+   membership; see [SlopArena Chat](../design/sloparena-chat.md).
 3. **Character select — presentation pass complete.** The screen now uses a
    portrait-first fighter roster with a selected-character role line, persistent
    global chat, and bottom lobby player cards. PvP cards show each lobby player's

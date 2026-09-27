@@ -23,21 +23,28 @@
                     </ui:VisualElement>
                     <ui:ScrollView name="server-list" class="server-list" mode="Vertical" horizontal-scroller-visibility="Hidden" />
                     <ui:VisualElement class="browser-panel__footer">
-                        <ui:Label text="Nothing here? Refresh, host, or use an address." class="browser-hint" />
+                        <ui:Label text="Nothing here? Refresh or create a room." class="browser-hint" />
                         <ui:Button name="btn-refresh" text="REFRESH" class="btn-secondary browser-refresh" />
                     </ui:VisualElement>
                 </ui:VisualElement>
                 <ui:VisualElement name="browser-tools" class="browser-tools">
-                    <ui:VisualElement name="host-panel" class="browser-tool browser-host-panel">
-                        <ui:Label text="MAKE A ROOM" class="panel-title" />
-                        <ui:Label text="Start the room here, then invite your friends with the address." class="tool-copy" />
+                    <ui:VisualElement name="create-room-panel" class="browser-tool browser-host-panel">
+                        <ui:Label text="CREATE A ROOM" class="panel-title" />
+                        <ui:Label text="Create a public room without starting a game server." class="tool-copy" />
+                        <ui:Label text="ROOM NAME" class="field-label" />
+                        <ui:TextField name="room-name-field" placeholdertext="Room name" class="browser-input" />
+                        <ui:Button name="btn-create-room" text="CREATE ROOM" class="btn-hot" />
+                    </ui:VisualElement>
+                    <ui:VisualElement name="legacy-host-panel" class="browser-tool browser-host-panel">
+                        <ui:Label text="DEV ONLY // LEGACY HOST &amp; PLAY" class="panel-title" />
+                        <ui:Label text="Editor-only development route. Starts a local game server through the physical lobby API." class="tool-copy" />
                         <ui:Label text="PUBLIC ADDRESS (OPTIONAL)" class="field-label" />
                         <ui:TextField name="host-ip-field" placeholdertext="auto-detect" class="browser-input" />
                         <ui:Label text="Leave blank to advertise the server's detected address." class="field-help" />
                     </ui:VisualElement>
                     <ui:VisualElement name="direct-connect-panel" class="browser-tool browser-direct-panel">
-                        <ui:Label text="JOIN BY ADDRESS" class="panel-title" />
-                        <ui:Label text="Have a registered server address from a friend? Enter it directly." class="tool-copy" />
+                        <ui:Label text="DEV ONLY // JOIN BY ADDRESS" class="panel-title" />
+                        <ui:Label text="Editor-only development route for a registered physical server address." class="tool-copy" />
                     </ui:VisualElement>
                 </ui:VisualElement>
             </ui:VisualElement>
@@ -48,8 +55,8 @@
         </ui:VisualElement>
         <ui:VisualElement name="page-actions" class="page-section browser-actions-section">
             <ui:Button name="btn-host-cancel" text="CANCEL HOST" class="btn-secondary host-cancel" style="display: none;" />
-            <ui:Button name="btn-host" text="HOST MATCH" class="btn-hot" />
-            <ui:Button name="btn-direct-connect" text="JOIN BY ADDRESS" class="btn-secondary" />
+            <ui:Button name="btn-host" text="DEV HOST &amp; PLAY" class="btn-hot" />
+            <ui:Button name="btn-direct-connect" text="DEV JOIN BY ADDRESS" class="btn-secondary" />
         </ui:VisualElement>
     </ui:VisualElement>
     <!-- The page modal mounts into the shell modal host (issue #221);

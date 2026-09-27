@@ -5,5 +5,5 @@ After=docker.service
 
 [Service]
 Type=oneshot
-ExecStart=/usr/bin/python3 /opt/sloparena/deploy/vps/recovery.py backup --target-dir /var/lib/sloparena --credentials /etc/sloparena/private/s3-curl.conf
+ExecStart=/usr/bin/python3 /opt/sloparena/deploy/vps/recovery.py backup --target-dir /var/lib/sloparena --credentials /etc/sloparena/private/s3-curl.conf --storage-config /etc/sloparena/private/storage.json
 TimeoutStartSec=45min

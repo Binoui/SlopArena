@@ -5,6 +5,7 @@ using UnityEngine;
 using UnityEngine.UIElements;
 using SlopArena.Shared;
 using SlopArena.Client;
+using SlopArena.Client.Network;
 
 namespace SlopArena.Client.UI
 {
@@ -31,6 +32,8 @@ namespace SlopArena.Client.UI
         private Label _metadata = null!;
         private Label _headline = null!;
         private Button _returnButton = null!;
+        private bool _roomCheckPending;
+
 
         public void InjectPageContext(FrontendPageContext context)
         {
@@ -68,26 +71,24 @@ namespace SlopArena.Client.UI
         }
 
 
-        private static void ReturnFromResults()
+        private void ReturnFromResults()
         {
-            // Completed local results (Solo, Training) end at Home with
-            // preparation reset (issues #210, #211); PvP keeps its lobby
-            // return route.
             if (MatchConfig.Mode != GameMode.PvP)
             {
                 FrontendController.Show(FrontendPage.Home);
                 return;
             }
 
-            // Completed PvP returns to the existing LobbyRoom only while the
-            // GameServer membership is still valid (issue #213); otherwise the
-            // Server Browser explains why the room is gone instead of showing
-            // an unusable room.
+            if (ClientSession.SelectedOnlineMode == ClientSession.OnlineSelection.Room)
+            {
+                _ = ReturnToRoomAsync();
+                return;
+            }
+
             var lobby = ClientSession.ActiveLobby;
-            bool membershipValid = lobby != null && lobby.IsConnected &&
+            if (lobby != null && lobby.IsConnected &&
                 ClientSession.SelectedServerId != Guid.Empty &&
-                lobby.JoinedServerId == ClientSession.SelectedServerId;
-            if (membershipValid)
+                lobby.JoinedServerId == ClientSession.SelectedServerId)
             {
                 FrontendController.Show(FrontendPage.LobbyRoom);
                 return;
@@ -96,6 +97,61 @@ namespace SlopArena.Client.UI
             ServerBrowserUI.PendingReturnNotice =
                 "Your room connection closed during the match. Pick another room or host a new one.";
             FrontendController.Show(FrontendPage.ServerBrowser);
+        }
+
+        private async System.Threading.Tasks.Task ReturnToRoomAsync()
+        {
+            if (_roomCheckPending)
+                return;
+            _roomCheckPending = true;
+            _returnButton.SetEnabled(false);
+            _returnButton.text = "CHECKING ROOM…";
+            try
+            {
+                var chat = ChatSession.Instance;
+                if (chat == null || !await chat.EnsureConnectedAsync())
+                {
+                    SetRoomCheckFailure("Couldn’t reconnect to the Room directory. Retry to check your membership.");
+                    return;
+                }
+
+                var lobby = chat.ActiveLobby;
+                if (lobby == null)
+                {
+                    SetRoomCheckFailure("Couldn’t reconnect to the Room directory. Retry to check your membership.");
+                    return;
+                }
+
+                var room = await lobby.GetMyRoomAsync();
+                if (room == null || room.Id != ClientSession.SelectedRoomId)
+                {
+                    ClientSession.SelectedRoomId = Guid.Empty;
+                    ClientSession.SelectedOnlineMode = ClientSession.OnlineSelection.LegacyServer;
+                    ClientSession.SelectedServerName = string.Empty;
+                    ServerBrowserUI.PendingReturnNotice =
+                        "You are no longer a member of this Room. Join another Room or create one.";
+                    FrontendController.Show(FrontendPage.ServerBrowser);
+                    return;
+                }
+
+                ClientSession.SelectedServerName = room.Name;
+                chat.UpdateRoomTitle(room);
+                FrontendController.Show(FrontendPage.LobbyRoom);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[Results] Room membership check failed: {ex.Message}");
+                SetRoomCheckFailure("Couldn’t check Room membership. Retry when the directory connection is available.");
+            }
+        }
+
+        private void SetRoomCheckFailure(string message)
+        {
+            _roomCheckPending = false;
+            _returnButton.text = "RETRY ROOM CHECK";
+            _returnButton.SetEnabled(true);
+            if (_metadata != null)
+                _metadata.text = $"{_metadata.text}\n{message}";
         }
 
         private void RenderResults()

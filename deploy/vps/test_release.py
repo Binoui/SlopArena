@@ -169,7 +169,7 @@ class BackupRetentionTests(unittest.TestCase):
                 stdout.write(f"dump-{Clock.current}".encode())
                 return b""
 
-            def s3(method, key, credentials, file=None, *, verify_upload=False):
+            def s3(method, key, credentials, storage, file=None, *, verify_upload=False):
                 if method == "PUT":
                     uploads[key] = file.read_bytes()
                 elif method == "GET":
@@ -188,7 +188,7 @@ class BackupRetentionTests(unittest.TestCase):
                     SimpleNamespace(hex=f"{index:032x}") for index in range(20)
                 ]),
             ):
-                manifests = [recovery.backup(target, credentials) for _ in range(5)]
+                manifests = [recovery.backup(target, credentials, {"bucket": "test", "endpoint": "https://storage.example", "region": "test"}) for _ in range(5)]
 
             self.assertEqual([manifest["key"] for manifest in manifests], [
                 f"postgres/20260101T00000{second}Z-{second * 3:032x}.dump"
@@ -210,13 +210,44 @@ class BackupRetentionTests(unittest.TestCase):
                 self.assertFalse(old.exists())
                 self.assertFalse(old.with_name(old.name + ".json").exists())
 
+class StorageConfigurationTests(unittest.TestCase):
+    def test_private_storage_config_selects_https_target_and_signing_region(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "storage.json"
+            path.write_text(json.dumps({
+                "bucket": "example-backups", "endpoint": "https://storage.example.test/",
+                "region": "eu-test-1",
+            }))
+            path.chmod(0o600)
+            config = recovery.load_storage(path)
+            credentials = Path(tmp) / "curl.conf"
+            credentials.write_text('user = "test:secret"')
+            credentials.chmod(0o600)
+            with patch.object(recovery, "command", return_value=b"") as command:
+                recovery.s3("PUT", "postgres/test.dump", credentials, config, path)
+            args = command.call_args.args[0]
+            self.assertEqual("https://storage.example.test/example-backups/postgres/test.dump", args[-1])
+            self.assertIn("aws:amz:eu-test-1:s3", args)
+
+    def test_storage_config_rejects_public_file_or_non_https_endpoint(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "storage.json"
+            path.write_text('{"bucket":"example-backups","endpoint":"https://storage.example.test","region":"eu-test-1"}')
+            with self.assertRaises(release.ReleaseError):
+                recovery.load_storage(path)
+            path.chmod(0o600)
+            path.write_text('{"bucket":"example-backups","endpoint":"http://storage.example.test","region":"eu-test-1"}')
+            with self.assertRaises(release.ReleaseError):
+                recovery.load_storage(path)
+
+
 class RestoreSafetyTests(unittest.TestCase):
     def test_restore_rejects_archive_keys_that_escape_its_isolated_target(self):
         from pathlib import Path
         for key in ("postgres/..dump", "postgres/.dump", "postgres/../live.dump",
                     "postgres/../../live.dump", "other/live.dump"):
             with self.subTest(key=key), self.assertRaises(release.ReleaseError):
-                recovery.restore(Path("/no-live-state"), Path("/no-credentials"), key)
+                recovery.restore(Path("/no-live-state"), Path("/no-credentials"), {}, key)
 
 
 class LogPrivacyTests(unittest.TestCase):

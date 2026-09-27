@@ -25,7 +25,8 @@ namespace SlopArena.Client.Network
         private const double SteamConnectionTimeoutSeconds = 30;
         private const double SteamJoinTimeoutSeconds = 15;
         private static readonly IntPtr[] SteamMessages = new IntPtr[MaxSteamMessages];
-        private static NetworkClient? _activeSteamMatch;
+        private static NetworkClient? _activeMatch;
+
 
         private UI.MatchTransport _transport;
         private SteamMatchDescriptor? _steamDescriptor;
@@ -128,10 +129,22 @@ namespace SlopArena.Client.Network
         {
             StopSteamTransport();
             StopUdpTransport();
+            _transport = UI.MatchTransport.None;
         }
 
-        public static void DisconnectActiveSteamMatch()
-            => _activeSteamMatch?.StopSteamTransport();
+        public static void DisconnectActiveMatch()
+        {
+            var active = _activeMatch;
+            if (active == null)
+                return;
+            active.StopSteamTransport();
+            active.StopUdpTransport();
+            active._transport = UI.MatchTransport.None;
+            active._connected = false;
+            active.ClearReceiveQueues();
+            if (_activeMatch == active)
+                _activeMatch = null;
+        }
 
         private void StopSteamTransport()
         {
@@ -151,8 +164,9 @@ namespace SlopArena.Client.Network
                 _steamSendBuffer = IntPtr.Zero;
             }
             ClearReceiveQueues();
-            if (_activeSteamMatch == this)
-                _activeSteamMatch = null;
+            if (_activeMatch == this)
+                _activeMatch = null;
+
             if (_transport == UI.MatchTransport.SteamP2P)
                 _transport = UI.MatchTransport.None;
             _steamDescriptor = null;
@@ -167,6 +181,9 @@ namespace SlopArena.Client.Network
             socket?.Close();
             _receiveThread?.Join(500);
             _receiveThread = null;
+            if (_activeMatch == this)
+                _activeMatch = null;
+
         }
 
         /// <summary>Connect only through the explicit Editor development UDP profile.</summary>
@@ -194,6 +211,8 @@ namespace SlopArena.Client.Network
             _serverEp = new IPEndPoint(IPAddress.Parse(ip), port);
             CreateSocket();
             StartReceiveThread();
+            _activeMatch = this;
+
         }
 
         public void ConnectSteam(SteamMatchDescriptor descriptor)
@@ -219,7 +238,7 @@ namespace SlopArena.Client.Network
             _steamReconnectDelaySeconds = 1;
             _steamAttemptStartedAt = Stopwatch.GetTimestamp();
             _connectionFailure = string.Empty;
-            _activeSteamMatch = this;
+            _activeMatch = this;
             try
             {
                 _steamSendBuffer = Marshal.AllocHGlobal(MaxSteamFrameBytes);

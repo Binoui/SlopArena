@@ -180,7 +180,8 @@ namespace SlopArena.Client.UI
             // Renaming is prohibited while joined to a GameServer (issue
             // #218): the surface explains instead of offering a form that
             // cannot succeed.
-            _joinProhibition = !_mandatory && rename && _session.JoinedServerId.HasValue;
+            _joinProhibition = !_mandatory && rename &&
+                _session.ActiveLobby is { JoinedServerId: var serverId } && serverId != Guid.Empty;
             BuildModal();
             _modal?.SetDisplayed(true);
             _presented = true;

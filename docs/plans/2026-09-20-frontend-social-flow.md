@@ -48,9 +48,9 @@ they are not current requirements:
 ### Menus and Results
 
 The following social/session contracts remain current:
-- Reuse Global Chat, Server Chat, Direct Messages, conversation switching, online-player access and composer capabilities. Server Chat remains GameServer-wide, not room- or match-only.
+- Reuse Global Chat, Server Chat, Direct Messages, conversation switching, online-player access and composer capabilities. Server Chat follows current Master Room attachment, not physical GameServer membership or an individual match.
 - Distinguish unavailable/disconnected directory state from a genuine zero-player result. Social readiness, GameServer membership and gameplay connectivity are distinct; do not present one as proof of the others.
-- Within a launch, preserve the selected conversation, drafts and per-conversation scroll anchors through page changes, gameplay and reconnects, subject to existing bounded retention.
+- Within a launch, preserve the selected conversation, drafts and per-conversation scroll anchors through page changes and gameplay. Reconnect preserves Room state only while that same membership is revalidated; leaving/revocation discards the Room draft/history.
 - If incoming messages evict the viewed history anchor from the existing 50-message buffer, return to newest with an explanation. Do not expand retention merely to preserve the anchor. The normal read rule then applies.
 - Do not persist conversation history, drafts or scroll state to disk. Display Name and social-layout preference are the cross-launch preferences in this scope.
 

@@ -475,6 +475,45 @@ public class ArenaShippingTests
     }
 
     [Fact]
+    public void SlopPit_PerimeterWallsBlockEscapeAndPreserveKillHeight()
+    {
+        var arena = ArenaBinaryFormat.LoadFromFile(
+            Path.Combine(RepoRoot(), "data", "arenas", "slop_pit.arena"))!.Value;
+        Assert.Equal(-11f, arena.KillHeight, precision: 3);
+
+        var def = TestHelpers.FightGuyDef;
+        var edges = new[]
+        {
+            (StartX: 15f, StartZ: 0f, MoveX: 1f, MoveZ: 0f, UsesX: true, Direction: 1f, Limit: 16.5f),
+            (StartX: -15f, StartZ: 0f, MoveX: -1f, MoveZ: 0f, UsesX: true, Direction: -1f, Limit: 16.5f),
+            (StartX: 0f, StartZ: 12f, MoveX: 0f, MoveZ: 1f, UsesX: false, Direction: 1f, Limit: 13.5f),
+            (StartX: 0f, StartZ: -12f, MoveX: 0f, MoveZ: -1f, UsesX: false, Direction: -1f, Limit: 13.5f),
+        };
+
+        foreach (var edge in edges)
+        {
+            var state = TestHelpers.PlayerState(edge.StartX, edge.StartZ);
+            state.PY = TestHelpers.GroundPY(def);
+            state.IsGrounded = true;
+            var sim = TestHelpers.MakeSim(arena);
+            sim.RegisterEntity(1, def, state);
+            var inputs = new Dictionary<ulong, InputState>
+            {
+                [1] = TestHelpers.Input(moveX: edge.MoveX, moveY: edge.MoveZ)
+            };
+
+            for (int tick = 0; tick < 90; tick++) sim.Tick(inputs);
+
+            var final = sim.GetState(1);
+            float outwardPosition = edge.Direction * (edge.UsesX ? final.PX : final.PZ);
+            Assert.True(final.IsGrounded, $"Lost floor support at edge starting ({edge.StartX}, {edge.StartZ}).");
+            Assert.True(outwardPosition <= edge.Limit,
+                $"Crossed perimeter wall from ({edge.StartX}, {edge.StartZ}) to ({final.PX:F2}, {final.PZ:F2}).");
+            Assert.True(final.PY > arena.KillHeight, "Wall contact unexpectedly entered the blastzone.");
+        }
+    }
+
+    [Fact]
     public void SlopPit_RisingPlatformContact_DoesNotLaunchFightGuy()
     {
         var arena = ArenaBinaryFormat.LoadFromFile(

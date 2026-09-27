@@ -106,8 +106,8 @@ public static class LobbyPayloadCodec
     }
 
     /// <summary>Parse a MatchStarted push with exactly one transport route:
-    /// a typed Steam descriptor or an explicit development UDP port. Missing,
-    /// conflicting, or mismatched content never enters a playable match.</summary>
+    /// a typed Steam descriptor or an explicit development UDP port. Every push
+    /// requires a match ID, and it must agree with the descriptor when present.</summary>
     public static MatchStartedConfig? TryParseMatchStarted(JsonElement element)
     {
         var snap = TryParseSnapshot(element);
@@ -139,6 +139,32 @@ public static class LobbyPayloadCodec
         if (descriptor != null &&
             !string.Equals(SteamMatchDescriptor.HashContent(content), descriptor.ContentHash, StringComparison.Ordinal))
             return null;
-        return new MatchStartedConfig(snap.ServerId, snap.Players, matchPort, arenaName, maxStocks, content, descriptor);
+        Guid? roomId = null;
+        if (element.TryGetProperty("roomId", out var room) && room.ValueKind != JsonValueKind.Null)
+        {
+            if (room.ValueKind != JsonValueKind.String ||
+                !Guid.TryParse(room.GetString(), out var parsedRoomId) || parsedRoomId == Guid.Empty)
+                return null;
+            roomId = parsedRoomId;
+        }
+        string? serverAddress = null;
+        if (element.TryGetProperty("serverAddress", out var address) &&
+            address.ValueKind != JsonValueKind.Null)
+        {
+            if (address.ValueKind != JsonValueKind.String) return null;
+            serverAddress = address.GetString();
+        }
+        if (roomId is not null && descriptor is null &&
+            (string.IsNullOrWhiteSpace(serverAddress) ||
+             Uri.CheckHostName(serverAddress) is not (UriHostNameType.IPv4 or UriHostNameType.Dns)))
+            return null;
+        if (!element.TryGetProperty("matchId", out var match) ||
+            match.ValueKind != JsonValueKind.String ||
+            !Guid.TryParse(match.GetString(), out var matchId) || matchId == Guid.Empty)
+            return null;
+        if (descriptor != null && matchId != descriptor.MatchId)
+            return null;
+        return new MatchStartedConfig(snap.ServerId, snap.Players, matchPort, arenaName,
+            maxStocks, content, descriptor, roomId, serverAddress, matchId);
     }
 }

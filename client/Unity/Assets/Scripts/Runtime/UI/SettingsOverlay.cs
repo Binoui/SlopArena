@@ -152,8 +152,21 @@ namespace SlopArena.Client.UI
             if (deviceLabel != null) deviceLabel.style.color = OptionText;
             _device.RegisterValueChangedCallback(evt => { _deviceName = evt.newValue; SelectCategory(Controls); });
             root.Add(_device);
-            foreach (var action in HumanInputActions.RebindableActions)
-                AddBindingRow(root, action, ActionLabel(action));
+            if (_deviceName == "Controller")
+            {
+                foreach (var action in new[]
+                         {
+                             "MoveStick", "Slot1", "Slot2", "Slot3", "Slot4", "SpecialModifier",
+                             "Jump", "Down", "Dash", "Burst", "FaceToCamera", "ToggleLock", "Pause"
+                         })
+                    AddBindingRow(root, action, ActionLabel(action, controller: true));
+                root.Add(new Label("Specials: hold Special Modifier + Normal button."));
+            }
+            else
+            {
+                foreach (var action in HumanInputActions.RebindableActions)
+                    if (action != "SpecialModifier") AddBindingRow(root, action, ActionLabel(action));
+            }
             AddSlider(root, "Stick Deadzone", settings.StickDeadzone, 5f, 50f, settings.SetStickDeadzone);
             var vibration = new Toggle("Vibration") { value = settings.Vibration };
             var vibrationLabel = vibration.Q<Label>();
@@ -187,7 +200,9 @@ namespace SlopArena.Client.UI
         private void BeginCapture(string action, string label)
         {
             string group = SelectedGroup;
-            _status!.text = $"Press a {group} control for {label}. Escape cancels.";
+            _status!.text = _deviceName == "Controller"
+                ? $"Press a {group} control for {label}. Select/View/Back cancels."
+                : $"Press a {group} control for {label}. Escape cancels.";
             HumanInputActions.Rebind(action, group, (path, error) =>
             {
                 if (_open && _category == Controls) SelectCategory(Controls);
@@ -208,13 +223,18 @@ namespace SlopArena.Client.UI
             _ => HumanInputActions.KeyboardGroup,
         };
 
-        private static string ActionLabel(string action) => action switch
+        private static string ActionLabel(string action, bool controller = false) => action switch
         {
             "MoveUp" => "Move Forward", "MoveDown" => "Move Back", "MoveLeft" => "Move Left", "MoveRight" => "Move Right",
             "MoveStick" => "Analog Move Stick",
-            "Down" => "Down (Crouch / Slide / Fast Fall)", "FaceToCamera" => "Face to Camera (LMB)",
-            "ToggleLock" => "Target Lock (RMB)", "Pause" => "Open / Close Match Menu",
-            "Slot1" => "Action 1", "Slot2" => "Action 2", "Slot3" => "Action 3", "Slot4" => "Action 4",
+            "Down" => "Down (Crouch / Slide / Fast Fall)", "FaceToCamera" => "Face to Camera",
+            "ToggleLock" => "Target Lock", "Pause" => "Pause",
+            "Slot1" => controller ? "Normal 1" : "Action 1",
+            "Slot2" => controller ? "Normal 2" : "Action 2",
+            "Slot3" => controller ? "Normal 3" : "Action 3",
+            "Slot4" => controller ? "Normal 4" : "Action 4",
+            "SpecialModifier" => "Special Modifier",
+            "Burst" => "Burst", "Jump" => "Jump", "Dash" => "Dash",
             "SlotA" => "Action A", "SlotE" => "Action E", "SlotR" => "Action R", "SlotF" => "Action F",
             _ => action,
         };
@@ -421,7 +441,8 @@ namespace SlopArena.Client.UI
         private void OnNavigationCancel(NavigationCancelEvent evt)
         {
             evt.StopImmediatePropagation();
-            HandleBack();
+            // UI cancel is buttonEast; do not steal it from a controller rebind capture.
+            if (!HumanInputActions.IsCapturing) HandleBack();
         }
 
         public void HandleBack()

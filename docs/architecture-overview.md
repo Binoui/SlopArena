@@ -100,11 +100,13 @@ the return to the requested distance. It changes camera position, not aim rotati
 Fighters, triggers, and ordinary aim raycasts do not participate in this proxy;
 Shared remains the gameplay collision authority.
 
-`ChatSession` owns one launch-scoped guest identity and reusable SignalR `LobbyClient`.
+`ChatSession` owns one launch-scoped identity and reusable SignalR `LobbyClient`.
 The shared `ChatOverlay` attaches to each scene's existing UI document; Global and
-Direct conversations survive scene changes, while Server chat follows admitted
-GameServer membership, independently of the waiting roster. `ChatInputGate` suppresses
-human gameplay input while composing, never Shared simulation or incoming damage.
+Direct conversations survive scene changes, while Server Chat follows the authenticated
+player's current Master Room. Room membership survives Matches and rematches independently
+of the assigned GameHost. Physical GameHost admission grants no Server Chat access;
+`ChatInputGate` suppresses human gameplay input while composing, never Shared
+simulation or incoming damage.
 See [launch/session ownership and chat](systems/netcode-architecture.md#launch-session-and-chat).
 
 ## Common change paths

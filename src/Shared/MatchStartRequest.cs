@@ -142,6 +142,15 @@ public static class MatchStartRequestCodec
             admissionExpiresAtUtc = expires;
             catalogHash = expectedHash;
         }
+        else if (element.TryGetProperty("admissionExpiresAtUtc", out var developmentDeadline))
+        {
+            if (developmentDeadline.ValueKind != JsonValueKind.String ||
+                !Guid.TryParse(matchId, out var developmentMatchGuid) || developmentMatchGuid == Guid.Empty ||
+                !DateTimeOffset.TryParse(developmentDeadline.GetString(), CultureInfo.InvariantCulture,
+                    DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var developmentExpiry))
+                return null;
+            admissionExpiresAtUtc = developmentExpiry;
+        }
         return new MatchStartRequest(matchId, arenaName, list, maxStocks,
             protocolVersion, virtualPort, admissionExpiresAtUtc, catalogHash);
     }

@@ -40,7 +40,7 @@ namespace SlopArena.Client.Input
         {
             "MoveUp", "MoveDown", "MoveLeft", "MoveRight", "MoveStick", "Jump", "Dash", "Burst", "Down",
             "Slot1", "Slot2", "Slot3", "Slot4", "SlotA", "SlotE", "SlotR", "SlotF",
-            "FaceToCamera", "ToggleLock", "Pause"
+            "SpecialModifier", "FaceToCamera", "ToggleLock", "Pause"
         };
 
         public static void Initialize(string overridesJson)
@@ -104,7 +104,7 @@ namespace SlopArena.Client.Input
             _capturing = true;
             _map!.Disable();
             string devicePath = group == GamepadGroup ? "<Gamepad>" : group == MouseGroup ? "<Mouse>" : "<Keyboard>";
-            string cancelPath = group == GamepadGroup ? "<Gamepad>/buttonEast" : "<Keyboard>/escape";
+            string cancelPath = group == GamepadGroup ? "<Gamepad>/select" : "<Keyboard>/escape";
             _operation = action.PerformInteractiveRebinding(bindingIndex)
                 .WithControlsHavingToMatchPath(devicePath)
                 .WithCancelingThrough(cancelPath)
@@ -140,6 +140,10 @@ namespace SlopArena.Client.Input
                 string group = entry.path.StartsWith("<Gamepad>", StringComparison.OrdinalIgnoreCase)
                     ? GamepadGroup
                     : entry.path.StartsWith("<Mouse>", StringComparison.OrdinalIgnoreCase) ? MouseGroup : KeyboardGroup;
+                if (group == GamepadGroup && (name == "SlotA" || name == "SlotE" ||
+                    name == "SlotR" || name == "SlotF" ||
+                    name.StartsWith("Move", StringComparison.Ordinal) && name != "MoveStick"))
+                    continue;
                 for (int i = 0; i < action.bindings.Count; i++)
                     if (action.bindings[i].groups?.Contains(group, StringComparison.OrdinalIgnoreCase) == true)
                     {
@@ -178,24 +182,27 @@ namespace SlopArena.Client.Input
             _asset = ScriptableObject.CreateInstance<InputActionAsset>();
             _map = new InputActionMap("Gameplay");
             _asset.AddActionMap(_map);
-            AddButton("MoveUp", "<Keyboard>/w", "<Gamepad>/leftStick/up");
-            AddButton("MoveDown", "<Keyboard>/s", "<Gamepad>/leftStick/down");
-            AddButton("MoveLeft", "<Keyboard>/a", "<Gamepad>/leftStick/left");
-            AddButton("MoveRight", "<Keyboard>/d", "<Gamepad>/leftStick/right");
-            AddButton("Jump", "<Keyboard>/space", "<Gamepad>/dpad/up");
-            AddButton("Dash", "<Keyboard>/leftShift", "<Gamepad>/dpad/right");
+            AddButton("MoveUp", "<Keyboard>/w");
+            AddButton("MoveDown", "<Keyboard>/s");
+            AddButton("MoveLeft", "<Keyboard>/a");
+            AddButton("MoveRight", "<Keyboard>/d");
+            AddButton("Jump", "<Keyboard>/space", "<Gamepad>/rightShoulder");
+            AddButton("Dash", "<Keyboard>/leftShift", "<Gamepad>/rightTrigger");
             AddButton("Burst", "<Keyboard>/c", "<Gamepad>/dpad/left");
-            AddButton("Down", "<Keyboard>/x", "<Gamepad>/dpad/down");
+            AddButton("Down", "<Keyboard>/x", "<Gamepad>/leftTrigger");
             AddButton("Slot1", "<Keyboard>/1", "<Gamepad>/buttonSouth");
             AddButton("Slot2", "<Keyboard>/2", "<Gamepad>/buttonEast");
             AddButton("Slot3", "<Keyboard>/3", "<Gamepad>/buttonWest");
             AddButton("Slot4", "<Keyboard>/4", "<Gamepad>/buttonNorth");
             var keyboard = Keyboard.current;
             string slotAKey = keyboard != null ? keyboard.FindKeyOnCurrentKeyboardLayout("A").name : "q";
-            AddButton("SlotA", $"<Keyboard>/{slotAKey}", "<Gamepad>/leftShoulder");
-            AddButton("SlotE", "<Keyboard>/e", "<Gamepad>/rightShoulder");
-            AddButton("SlotR", "<Keyboard>/r", "<Gamepad>/leftTrigger");
-            AddButton("SlotF", "<Keyboard>/f", "<Gamepad>/rightTrigger");
+            AddButton("SlotA", $"<Keyboard>/{slotAKey}");
+            AddButton("SlotE", "<Keyboard>/e");
+            AddButton("SlotR", "<Keyboard>/r");
+            AddButton("SlotF", "<Keyboard>/f");
+            var modifier = _map.AddAction("SpecialModifier", InputActionType.Button);
+            modifier.AddBinding("<Gamepad>/leftShoulder").WithGroup(GamepadGroup);
+            Actions.Add("SpecialModifier", modifier);
             AddButton("FaceToCamera", "<Mouse>/leftButton", "<Gamepad>/leftStickPress");
             AddButton("ToggleLock", "<Mouse>/rightButton", "<Gamepad>/rightStickPress");
             AddButton("Pause", "<Keyboard>/escape", "<Gamepad>/start");
@@ -205,12 +212,12 @@ namespace SlopArena.Client.Input
             AddValue("Zoom", "<Mouse>/scroll/y", "Axis");
         }
 
-        private static void AddButton(string name, string keyboardOrMouse, string gamepad)
+        private static void AddButton(string name, string keyboardOrMouse, string gamepad = null)
         {
             var action = _map!.AddAction(name, InputActionType.Button);
             string group = keyboardOrMouse.StartsWith("<Mouse>", StringComparison.Ordinal) ? MouseGroup : KeyboardGroup;
             action.AddBinding(keyboardOrMouse).WithGroup(group);
-            action.AddBinding(gamepad).WithGroup(GamepadGroup);
+            if (gamepad != null) action.AddBinding(gamepad).WithGroup(GamepadGroup);
             Actions.Add(name, action);
         }
 

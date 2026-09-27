@@ -202,6 +202,7 @@ client/Unity/Assets/Plugins/**/NuGet/.nuget-installed.json
 !client/Unity/Assets/CharacterPackages/bonk/Animations/bonk_crouch.anim
 !client/Unity/Assets/CharacterPackages/kistu/Animations/kistu_crouch.anim
 *.png
+!client/Unity/Assets/UI/MenuGear.png
 *.tga
 *.jpg
 *.jpeg
@@ -302,6 +303,9 @@ __pycache__/
 # Local UI review evidence; design contracts remain versioned.
 /.impeccable/review/
 /.impeccable/critique/
+
+# Local promo renders and composition workspaces
+/brag-output*/
 
 # Runtime UI artwork shipped with the pre-match screens.
 !client/Unity/Assets/Resources/UI/Portraits/*.png

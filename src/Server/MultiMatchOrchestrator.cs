@@ -63,9 +63,9 @@ namespace SlopArena.Server
         /// <summary>Assigns a match only after building its match-scoped catalog.</summary>
         public bool TryAssignMatch(string matchId, string arenaName, IReadOnlyList<MatchPlayer> roster, byte maxStocks,
             DateTimeOffset? admissionDeadlineUtc, string? expectedCatalogHash,
-            out int port, out MatchContentHandleMap? content, out string? error)
+            out int port, out MatchContentHandleMap? content, out string? contentHash, out string? error)
         {
-            port = -1; content = null; error = null;
+            port = -1; content = null; contentHash = null; error = null;
             lock (_admissionGate)
                 if (_stopping) { error = "GameServer is shutting down."; return false; }
             if (roster == null || roster.Count is < 2 or > 4) { error = "Roster must contain 2-4 players."; return false; }
@@ -86,7 +86,7 @@ namespace SlopArena.Server
                 error ??= "Cooked roster unavailable.";
                 return false;
             }
-            string contentHash = SteamMatchDescriptor.HashContent(content!);
+            contentHash = SteamMatchDescriptor.HashContent(content!);
             Volatile.Write(ref _catalogHash, contentHash);
             if (steamTransport && !string.Equals(expectedCatalogHash, contentHash, StringComparison.Ordinal))
             {
@@ -137,7 +137,12 @@ namespace SlopArena.Server
                     int candidate = _config.Port + offset;
                     if (_activeMatches.ContainsKey(candidate)) continue;
                     MatchInstance match;
-                    try { match = new MatchInstance(candidate, matchId, arenaName, roster, catalog, OnMatchEnd, maxStocks, ReportMatchResult); }
+                    try
+                    {
+                        match = new MatchInstance(candidate, matchId, arenaName, roster, catalog,
+                            OnMatchEnd, maxStocks, ReportMatchResult, onMatchCancelled: ReportMatchCancellation,
+                            admissionDeadlineUtc: admissionDeadlineUtc);
+                    }
                     catch (Exception ex) { error = ex.Message; return false; }
                     if (_activeMatches.TryAdd(candidate, match))
                     {
@@ -173,10 +178,25 @@ namespace SlopArena.Server
 
         public bool AbortMatch(Guid matchId)
         {
-            if (!_steamMatches.TryRemove(matchId, out var match)) return false;
-            _steamHost?.CloseMatch(matchId);
-            match.Stop();
-            return true;
+            lock (_admissionGate)
+            {
+                if (_steamMatches.TryRemove(matchId, out var steamMatch))
+                {
+                    _steamHost?.CloseMatch(matchId);
+                    steamMatch.Stop();
+                    return true;
+                }
+
+                foreach (var entry in _activeMatches)
+                {
+                    var match = entry.Value;
+                    if (!Guid.TryParse(match.MatchId, out var activeMatchId) || activeMatchId != matchId)
+                        continue;
+                    match.StopAndWait();
+                    return true;
+                }
+                return false;
+            }
         }
 
         public void StopAcceptingMatches()

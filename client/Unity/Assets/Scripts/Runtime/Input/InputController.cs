@@ -4,6 +4,8 @@ using SlopArena.Shared;
 using SlopArena.Client.Camera;
 using SlopArena.Client.UI;
 using System;
+using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.Controls;
 
 namespace SlopArena.Client.Input
 {
@@ -47,7 +49,13 @@ namespace SlopArena.Client.Input
                 return _aiInput.ActiveSlot == slotIdx + 1;
             if (HumanInputBlocked) return false;
             string action = SlotAction(slotIdx);
-            return action != null && HumanInputActions.Get(action).IsPressed();
+            if (action != null)
+                foreach (var control in HumanInputActions.Get(action).controls)
+                    if (control.device is Keyboard && control is ButtonControl button && button.isPressed)
+                        return true;
+            foreach (byte heldSlot in _controllerSlots)
+                if (heldSlot == slotIdx + 1) return true;
+            return false;
         }
 
         private static string SlotAction(byte slotIdx) => slotIdx switch
@@ -63,6 +71,9 @@ namespace SlopArena.Client.Input
             MatchPauseMenu.Active is { IsPaused: true };
 
         private bool _humanReleaseRequired;
+        // Face-button slots are fixed at press time; changing the modifier never changes a hold.
+        private readonly byte[] _controllerSlots = new byte[4];
+        private readonly ButtonControl?[] _controllerButtons = new ButtonControl?[4];
         private bool HumanInputBlocked => HumanInputSuppressed || _humanReleaseRequired;
 
         public void RequireReleaseBeforeHumanInput()
@@ -193,17 +204,9 @@ namespace SlopArena.Client.Input
 
             if (HumanInputActions.Get("FaceToCamera").WasPressedThisFrame())
                 _pendingFaceToCamera = true;
-            else if (HumanInputActions.Get("ToggleLock").WasPressedThisFrame())
+            if (HumanInputActions.Get("ToggleLock").WasPressedThisFrame())
                 _pendingToggleLock = true;
-            else
-            {
-                foreach (var (action, slot) in SlotActions)
-                    if (HumanInputActions.Get(action).WasPressedThisFrame())
-                    {
-                        _pendingSlotPress = slot;
-                        break;
-                    }
-            }
+            PollSlots();
         }
 
         private static readonly (string action, byte slot)[] SlotActions =
@@ -212,6 +215,44 @@ namespace SlopArena.Client.Input
             ("SlotF", AbilitySlots.F), ("Slot2", AbilitySlots.Slot2), ("Slot3", AbilitySlots.Slot3),
             ("Slot4", AbilitySlots.Slot4), ("SlotA", AbilitySlots.A),
         };
+
+        private void PollSlots()
+        {
+            bool modifier = HumanInputActions.Get("SpecialModifier").IsPressed();
+            for (int face = 0; face < 4; face++)
+            {
+                var held = _controllerButtons[face];
+                if (held != null && !held.isPressed)
+                {
+                    _controllerButtons[face] = null;
+                    _controllerSlots[face] = 0;
+                }
+                var action = HumanInputActions.Get(FaceActions[face]);
+                foreach (var control in action.controls)
+                {
+                    if (control is not ButtonControl button) continue;
+                    if (control.device is Gamepad && button.wasPressedThisFrame && _controllerButtons[face] == null)
+                    {
+                        _controllerButtons[face] = button;
+                        _controllerSlots[face] = modifier ? SpecialSlots[face] : NormalSlots[face];
+                        if (_pendingSlotPress == 0) _pendingSlotPress = _controllerSlots[face];
+                    }
+                    else if (control.device is Keyboard && button.wasPressedThisFrame && _pendingSlotPress == 0)
+                        _pendingSlotPress = NormalSlots[face];
+                }
+            }
+            foreach (var (actionName, slot) in SlotActions)
+            {
+                if (actionName == "Slot1" || actionName == "Slot2" ||
+                    actionName == "Slot3" || actionName == "Slot4") continue;
+                if (HumanInputActions.Get(actionName).WasPressedThisFrame() && _pendingSlotPress == 0)
+                    _pendingSlotPress = slot;
+            }
+        }
+
+        private static readonly string[] FaceActions = { "Slot1", "Slot2", "Slot3", "Slot4" };
+        private static readonly byte[] NormalSlots = { AbilitySlots.Slot1, AbilitySlots.Slot2, AbilitySlots.Slot3, AbilitySlots.Slot4 };
+        private static readonly byte[] SpecialSlots = { AbilitySlots.A, AbilitySlots.E, AbilitySlots.R, AbilitySlots.F };
 
         /// <summary>
         /// Discard buffered jump/dash/slot presses without consuming them. Called
@@ -227,6 +268,8 @@ namespace SlopArena.Client.Input
             _pendingFaceToCamera = false;
             _pendingToggleLock = false;
             _pendingSlotPress = 0;
+            Array.Clear(_controllerSlots, 0, _controllerSlots.Length);
+            Array.Clear(_controllerButtons, 0, _controllerButtons.Length);
             if (IsDownHeld())
                 _downReleaseRequired = true;
         }

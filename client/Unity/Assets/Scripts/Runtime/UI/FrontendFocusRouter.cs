@@ -105,7 +105,7 @@ namespace SlopArena.Client.UI
             // Exactly one pump owner on shell pages: the chat overlay skips
             // the shell panel, so the router pumps it here (issue #220).
             GamepadUIBridge.Pump(shell.Root.panel);
-
+            PollPause();
             if (UiModalState.Presented)
             {
                 UpdateHints();
@@ -117,7 +117,23 @@ namespace SlopArena.Client.UI
                 PollTopBarRoute();
                 PollRegionSwitch();
             }
-            PollCancel(editing);
+            UpdateHints();
+        }
+
+        private void PollPause()
+        {
+            if (Gamepad.current?.startButton.wasPressedThisFrame != true
+                && Keyboard.current?.escapeKey.wasPressedThisFrame != true)
+                return;
+            // Settings already handles Escape through its own NavigationCancelEvent.
+            // Start is not a UI cancel event, so send it to the protected layer.
+            if (SettingsOverlay.Active is { IsOpen: true } settings)
+            {
+                if (Gamepad.current?.startButton.wasPressedThisFrame == true)
+                    settings.HandleBack();
+                return;
+            }
+            HandlePageCancel();
             UpdateHints();
         }
 
@@ -362,9 +378,8 @@ namespace SlopArena.Client.UI
         // ── Cancel resolution ─────────────────────────────────────────────
 
         /// <summary>
-        /// One Back/Escape press resolves one layer (issue #220): the
-        /// topmost modal, then the expanded social view, then top-bar
-        /// interaction, then social interaction, then the page Back action.
+        /// Escape/Start toggles the shell menu; controller Back resolves the
+        /// active modal, then expanded social, region focus and page Back.
         /// The handler on the stable shell root is the frontend entry point.
         /// </summary>
         private void OnShellNavigationCancel(NavigationCancelEvent evt)
@@ -389,34 +404,37 @@ namespace SlopArena.Client.UI
             ResolveCancelLayers();
         }
 
-        private void PollCancel(bool editing)
-        {
-            if (Keyboard.current?.escapeKey.wasPressedThisFrame != true)
-                return;
-            // The layer resolution itself honors editing (the social
-            // interaction layer leaves editing first; the page layer never
-            // runs while a text field owns editing).
-            HandlePageCancel();
-        }
 
         private void ResolveCancelLayers()
         {
+            if (SettingsOverlay.ClosedThisFrame)
+                return;
             if (SettingsOverlay.Active is { IsOpen: true } settings)
             {
                 settings.HandleBack();
                 return;
             }
-            // Layer 1: the topmost modal. On shell pages the only modal is
-            // the shell identity surface; it consumes the press even when it
-            // cannot close (first-run mandatory entry).
-            if (FrontendController.Identity is { } identity && identity.IsPresented)
+            var shell = FrontendController.Shell;
+            if (shell?.IsMenuOpen == true)
+            {
+                shell.CloseMenu();
+                return;
+            }
+            // Required identity entry and active rename remain the top layer.
+            if (FrontendController.Identity is { IsPresented: true } identity)
             {
                 identity.HandleCancel();
                 return;
             }
-            // Layer 1b: a page-owned modal presented in the shell modal host
-            // (issue #221, the direct-connect form). One Back/Escape press
-            // closes it and never also departs the page.
+            // Escape/Start opens over ordinary page dialogs, chat and editors.
+            if (Gamepad.current?.startButton.wasPressedThisFrame == true
+                || Keyboard.current?.escapeKey.wasPressedThisFrame == true)
+            {
+                shell?.OpenMenu();
+                return;
+            }
+            // Controller Back closes a page-owned modal first; Escape/Start
+            // instead opens the menu above it without discarding its form.
             if (UiModalState.Presented && FrontendController.CurrentContext != null)
             {
                 FrontendController.CurrentContext.InvokeModalAction();

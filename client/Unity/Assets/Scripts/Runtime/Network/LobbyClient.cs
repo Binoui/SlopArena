@@ -11,6 +11,48 @@ using SlopArena.Shared;
 
 namespace SlopArena.Client.Network
 {
+    public sealed class RoomMemberInfo
+    {
+        public long SteamId { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public bool IsLeader { get; set; }
+        public string? CharacterSelection { get; set; }
+        public bool LockedIn { get; set; }
+    }
+
+    public class RoomSummary
+    {
+        public Guid Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string Phase { get; set; } = string.Empty;
+        public long LeaderSteamId { get; set; }
+        public int MemberCount { get; set; }
+        public int Capacity { get; set; }
+        public bool Joinable { get; set; }
+    }
+
+    public sealed class RoomSnapshot : RoomSummary
+    {
+        public string? ArenaName { get; set; }
+        public string[] AdmittedArenas { get; set; } = Array.Empty<string>();
+        public string[] AdmittedCharacters { get; set; } = Array.Empty<string>();
+        public RoomMemberInfo[] Members { get; set; } = Array.Empty<RoomMemberInfo>();
+    }
+    public readonly struct RoomMembershipResult
+    {
+        public RoomSnapshot Room { get; }
+        public long OperationGeneration { get; }
+        public int MembershipGeneration { get; }
+
+        public RoomMembershipResult(RoomSnapshot room, long operationGeneration, int membershipGeneration)
+        {
+            Room = room;
+            OperationGeneration = operationGeneration;
+            MembershipGeneration = membershipGeneration;
+        }
+    }
+
+
     public sealed class MatchAbortedNotification
     {
         public Guid MatchId { get; }
@@ -36,6 +78,15 @@ namespace SlopArena.Client.Network
         private readonly int _protocolVersion;
         private Guid _activeMatchId;
         private Guid _joinedServerId;
+        private readonly object _roomMembershipSync = new();
+        private Guid _joinedRoomId;
+        private readonly SemaphoreSlim _roomOperationGate = new(1, 1);
+        private long _roomOperationGeneration;
+
+        private volatile bool _roomLeavePending;
+        private volatile bool _roomChatResyncPending;
+        private volatile bool _roomChatResyncInFlight;
+        private int _roomMembershipGeneration;
         private readonly ConcurrentQueue<Action> _pending = new();
         private int _pendingCount;
         private int _overflowed;
@@ -47,6 +98,8 @@ namespace SlopArena.Client.Network
         private bool _leavePending;
         /// <summary>Server target retained for reconnect revalidation.</summary>
         public Guid JoinedServerId => _joinedServerId;
+        /// <summary>Current Master Room membership for Server Chat.</summary>
+        public Guid JoinedRoomId => GetJoinedRoomId();
 
         /// <summary>True if background pushes exceeded the bounded main-thread queue.</summary>
         public bool HasPendingOverflow => Volatile.Read(ref _overflowed) != 0;
@@ -65,6 +118,12 @@ namespace SlopArena.Client.Network
         public event Action? Connected;
         public event Action<Exception?>? Disconnected;
         public event Action<string>? Error;
+        public event Action<RoomSnapshot>? RoomUpdated;
+        public event Action? RoomDirectoryChanged;
+
+        public event Action<Guid>? RoomDeleted;
+        public event Action<Guid>? RoomMembershipRevoked;
+
 
         // ── Chat pushes (raised on the main thread, after Pump) ──
         public event Action<ChatMessage>? ChatMessageReceived;
@@ -156,6 +215,18 @@ namespace SlopArena.Client.Network
                 await LeaveLobbyAsync();
                 return;
             }
+            if (GetJoinedRoomId() != Guid.Empty)
+            {
+                try
+                {
+                    await GetMyRoomAsync();
+                }
+                catch (Exception ex)
+                {
+                    Enqueue(() => Error?.Invoke($"Room membership could not be revalidated: {ex.Message}"));
+                }
+                return;
+            }
             if (_joinedServerId == Guid.Empty) return;
             try
             {
@@ -182,6 +253,36 @@ namespace SlopArena.Client.Network
                 var snap = LobbyPayloadCodec.TryParseSnapshot(element);
                 if (snap is not null) Enqueue(() => LobbyUpdated?.Invoke(snap));
             });
+            _conn.On<JsonElement>("RoomUpdated", element =>
+            {
+                var room = Deserialize<RoomSnapshot>(element);
+                if (room != null) Enqueue(() => RoomUpdated?.Invoke(room));
+            });
+            _conn.On("RoomDirectoryChanged", () =>
+                Enqueue(() => RoomDirectoryChanged?.Invoke()));
+
+            _conn.On<JsonElement>("RoomDeleted", element =>
+            {
+                if (element.ValueKind == JsonValueKind.String && Guid.TryParse(element.GetString(), out var roomId))
+                    Enqueue(() => RoomDeleted?.Invoke(roomId));
+            });
+            _conn.On<JsonElement>("RoomMembershipRevoked", element =>
+            {
+                if (element.ValueKind == JsonValueKind.String && Guid.TryParse(element.GetString(), out var roomId))
+                    Enqueue(() =>
+                    {
+                        if (GetJoinedRoomId() == roomId)
+                        {
+                            SetJoinedRoomId(Guid.Empty);
+                            ChatServerChanged?.Invoke(new ServerChatState());
+                            _roomChatResyncPending = false;
+                            _roomChatResyncInFlight = false;
+                        }
+                        RoomMembershipRevoked?.Invoke(roomId);
+                    });
+            });
+
+
             _conn.On<JsonElement>("MatchStarting", element =>
             {
                 var cfg = LobbyPayloadCodec.TryParseMatchStarting(element);
@@ -210,11 +311,25 @@ namespace SlopArena.Client.Network
                     });
                     return;
                 }
+                int roomGeneration = Volatile.Read(ref _roomMembershipGeneration);
+                Guid joinedRoomId = GetJoinedRoomId();
+                if ((joinedRoomId != Guid.Empty && cfg.RoomId != joinedRoomId) ||
+                    (cfg.RoomId is Guid receivedRoomId && receivedRoomId != joinedRoomId))
+                    return;
                 _resumeServerOnly = true;
                 Enqueue(() =>
                 {
-                    _activeMatchId = cfg.Descriptor?.MatchId ?? Guid.Empty;
+                    // A Room launch is addressed only to members of that Room.
+                    // Ignore a queued push after membership changes, and never
+                    // let a Room payload enter the legacy physical-lobby flow.
+                    if (roomGeneration != Volatile.Read(ref _roomMembershipGeneration) ||
+                        (joinedRoomId != Guid.Empty && cfg.RoomId != joinedRoomId) ||
+                        (cfg.RoomId is Guid roomId && roomId != GetJoinedRoomId()))
+                        return;
+                    _resumeServerOnly = true;
+                    _activeMatchId = cfg.MatchId;
                     MatchStarted?.Invoke(cfg);
+
                 });
             });
             _conn.On<JsonElement>("MatchAborted", element =>
@@ -236,7 +351,8 @@ namespace SlopArena.Client.Network
                 if (message is not null) Enqueue(() =>
                 {
                     if (string.Equals(message.Channel, "server", StringComparison.OrdinalIgnoreCase)
-                        && (_leavePending || message.ServerId != _joinedServerId))
+                        && (_roomLeavePending || _roomChatResyncPending ||
+                            message.RoomId != GetJoinedRoomId()))
                         return;
                     ChatMessageReceived?.Invoke(message);
                 });
@@ -249,12 +365,287 @@ namespace SlopArena.Client.Network
             _conn.On<JsonElement>("ChatServerChanged", element =>
             {
                 var state = Deserialize<ServerChatState>(element);
-                if (state is not null) Enqueue(() =>
+                if (state is null) return;
+                int membershipGeneration = Volatile.Read(ref _roomMembershipGeneration);
+                Enqueue(() => ApplyServerChatState(state, membershipGeneration));
+            });
+        }
+
+        private void ApplyServerChatState(ServerChatState state, int membershipGeneration)
+        {
+            if (_roomLeavePending) return;
+            Guid currentRoomId = GetJoinedRoomId();
+            if (state.RoomId is not Guid roomId)
+            {
+                if (membershipGeneration != Volatile.Read(ref _roomMembershipGeneration))
+                    return;
+                if (currentRoomId != Guid.Empty)
                 {
-                    if (!_leavePending && state.ServerId == (_joinedServerId == Guid.Empty ? (Guid?)null : _joinedServerId))
+                    StartRoomChatResync();
+                    return;
+                }
+                _roomChatResyncPending = false;
+                _roomChatResyncInFlight = false;
+                ChatServerChanged?.Invoke(state);
+                return;
+            }
+            if (_roomChatResyncPending)
+            {
+                StartRoomChatResync();
+                return;
+            }
+            if (currentRoomId == roomId)
+            {
+                ChatServerChanged?.Invoke(state);
+                return;
+            }
+            if (membershipGeneration != Volatile.Read(ref _roomMembershipGeneration))
+                return;
+            StartRoomChatResync();
+        }
+
+        private void StartRoomChatResync()
+        {
+            _roomChatResyncPending = true;
+            if (_roomChatResyncInFlight)
+                return;
+            _roomChatResyncInFlight = true;
+            _ = ResyncRoomChatStateAsync();
+        }
+
+        private async Task ResyncRoomChatStateAsync()
+        {
+            bool authoritativeState = false;
+            try
+            {
+                var room = await GetMyRoomAsync();
+                if (_roomLeavePending)
+                    return;
+                Guid currentRoomId = GetJoinedRoomId();
+                if (currentRoomId == Guid.Empty)
+                {
+                    authoritativeState = room == null;
+                    return;
+                }
+                var snapshot = await GetChatStateAsync();
+                if (_roomLeavePending || snapshot?.Server?.RoomId is not Guid roomId ||
+                    roomId == Guid.Empty || GetJoinedRoomId() != roomId)
+                    return;
+                ServerChatState state = snapshot.Server;
+                Enqueue(() =>
+                {
+                    if (!_roomLeavePending && GetJoinedRoomId() == roomId)
                         ChatServerChanged?.Invoke(state);
                 });
-            });
+                authoritativeState = true;
+            }
+            catch (Exception ex)
+            {
+                UnityEngine.Debug.LogWarning($"[LobbyClient] Room chat resync failed: {ex.Message}");
+            }
+            finally
+            {
+                _roomChatResyncInFlight = false;
+                if (authoritativeState)
+                    _roomChatResyncPending = false;
+            }
+        }
+
+        public Task<RoomSummary[]> GetRoomsAsync() => InvokeRoomAsync<RoomSummary[]>("GetRooms");
+
+        public async Task<RoomSnapshot?> GetMyRoomAsync()
+        {
+            await _roomOperationGate.WaitAsync();
+            try
+            {
+                int membershipGeneration = Volatile.Read(ref _roomMembershipGeneration);
+                Guid previousRoomId = GetJoinedRoomId();
+                var room = await InvokeRoomAsync<RoomSnapshot?>("GetMyRoom");
+                if (!TrySetJoinedRoomId(room?.Id ?? Guid.Empty, membershipGeneration) &&
+                    GetJoinedRoomId() != (room?.Id ?? Guid.Empty))
+                    return room;
+                Interlocked.Increment(ref _roomOperationGeneration);
+                if (room == null)
+                {
+                    int revokedGeneration = Volatile.Read(ref _roomMembershipGeneration);
+                    Enqueue(() =>
+                    {
+                        if (revokedGeneration != Volatile.Read(ref _roomMembershipGeneration) ||
+                            GetJoinedRoomId() != Guid.Empty)
+                            return;
+                        ChatServerChanged?.Invoke(new ServerChatState());
+                        if (!_roomChatResyncInFlight)
+                            _roomChatResyncPending = false;
+                        if (previousRoomId != Guid.Empty)
+                            RoomMembershipRevoked?.Invoke(previousRoomId);
+                    });
+                }
+                else
+                {
+                    Enqueue(() => RoomUpdated?.Invoke(room));
+                }
+                return room;
+            }
+            finally
+            {
+                _roomOperationGate.Release();
+            }
+        }
+
+        public async Task<RoomMembershipResult> CreateRoomAsync(
+            string name, CancellationToken cancellationToken = default)
+        {
+            await _roomOperationGate.WaitAsync(cancellationToken);
+            try
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (_joinedServerId != Guid.Empty)
+                    throw new InvalidOperationException("Leave the physical server lobby before creating a room.");
+                int membershipGeneration = Volatile.Read(ref _roomMembershipGeneration);
+                var room = await InvokeRoomAsync<RoomSnapshot>("CreateRoom", name);
+                TrySetJoinedRoomId(room.Id, membershipGeneration);
+                long operationGeneration = Interlocked.Increment(ref _roomOperationGeneration);
+                return new RoomMembershipResult(room, operationGeneration,
+                    Volatile.Read(ref _roomMembershipGeneration));
+            }
+            finally
+            {
+                _roomOperationGate.Release();
+            }
+        }
+
+        public async Task<RoomMembershipResult> JoinRoomAsync(
+            Guid roomId, CancellationToken cancellationToken = default)
+        {
+            await _roomOperationGate.WaitAsync(cancellationToken);
+            try
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (_joinedServerId != Guid.Empty)
+                    throw new InvalidOperationException("Leave the physical server lobby before joining a room.");
+                int membershipGeneration = Volatile.Read(ref _roomMembershipGeneration);
+                var room = await InvokeRoomAsync<RoomSnapshot>("JoinRoom", roomId);
+                TrySetJoinedRoomId(room.Id, membershipGeneration);
+                long operationGeneration = Interlocked.Increment(ref _roomOperationGeneration);
+                return new RoomMembershipResult(room, operationGeneration,
+                    Volatile.Read(ref _roomMembershipGeneration));
+            }
+            finally
+            {
+                _roomOperationGate.Release();
+            }
+        }
+
+        public async Task LeaveRoomAsync()
+        {
+            await _roomOperationGate.WaitAsync();
+            try
+            {
+                await LeaveRoomCoreAsync(Volatile.Read(ref _roomMembershipGeneration));
+            }
+            finally
+            {
+                _roomOperationGate.Release();
+            }
+        }
+
+        public async Task<bool> LeaveRoomIfCurrentAsync(
+            Guid roomId, long operationGeneration, int membershipGeneration)
+        {
+            await _roomOperationGate.WaitAsync();
+            try
+            {
+                if (roomId == Guid.Empty ||
+                    Volatile.Read(ref _roomOperationGeneration) != operationGeneration ||
+                    Volatile.Read(ref _roomMembershipGeneration) != membershipGeneration ||
+                    GetJoinedRoomId() != roomId)
+                    return false;
+                await LeaveRoomCoreAsync(membershipGeneration);
+                return true;
+            }
+            finally
+            {
+                _roomOperationGate.Release();
+            }
+        }
+
+        private async Task LeaveRoomCoreAsync(int membershipGeneration)
+        {
+            if (_conn is null || !IsConnected)
+                throw new InvalidOperationException("Not connected to the room directory. Retry when online.");
+            _roomLeavePending = true;
+            try
+            {
+                await _conn.InvokeCoreAsync("LeaveRoom", Array.Empty<object?>());
+                if (TrySetJoinedRoomId(Guid.Empty, membershipGeneration))
+                {
+                    Interlocked.Increment(ref _roomOperationGeneration);
+                    int clearedGeneration = Volatile.Read(ref _roomMembershipGeneration);
+                    Enqueue(() =>
+                    {
+                        if (clearedGeneration != Volatile.Read(ref _roomMembershipGeneration) ||
+                            GetJoinedRoomId() != Guid.Empty)
+                            return;
+                        ChatServerChanged?.Invoke(new ServerChatState());
+                        _roomChatResyncPending = false;
+                        _roomChatResyncInFlight = false;
+                    });
+                }
+            }
+            finally
+            {
+                _roomLeavePending = false;
+            }
+        }
+
+        private Guid GetJoinedRoomId()
+        {
+            lock (_roomMembershipSync)
+                return _joinedRoomId;
+        }
+
+        private void SetJoinedRoomId(Guid roomId)
+        {
+            lock (_roomMembershipSync)
+            {
+                if (_joinedRoomId == roomId)
+                    return;
+                _joinedRoomId = roomId;
+                Interlocked.Increment(ref _roomMembershipGeneration);
+                Interlocked.Increment(ref _roomOperationGeneration);
+            }
+        }
+
+        private bool TrySetJoinedRoomId(Guid roomId, int expectedGeneration)
+        {
+            lock (_roomMembershipSync)
+            {
+                if (_roomMembershipGeneration != expectedGeneration)
+                    return false;
+                if (_joinedRoomId != roomId)
+                {
+                    _joinedRoomId = roomId;
+                    Interlocked.Increment(ref _roomMembershipGeneration);
+                    Interlocked.Increment(ref _roomOperationGeneration);
+                }
+                return true;
+            }
+        }
+
+
+        private async Task<T> InvokeRoomAsync<T>(string method, params object?[] args)
+        {
+            if (_conn is null || !IsConnected)
+                throw new InvalidOperationException("Not connected to the room directory. Retry when online.");
+            try
+            {
+                return await _conn.InvokeCoreAsync<T>(method, args);
+            }
+            catch (Exception ex)
+            {
+                UnityEngine.Debug.LogWarning($"[LobbyClient] {method} rejected: {ex.Message}");
+                throw;
+            }
         }
 
         /// <summary>Join the lobby for the given game server.</summary>
@@ -317,13 +708,12 @@ namespace SlopArena.Client.Network
             }
         }
 
-        /// <summary>Leave the current lobby and revoke Server Chat membership.</summary>
+        /// <summary>Leave the current physical lobby; it does not grant Server Chat.</summary>
         public async Task LeaveLobbyAsync()
         {
             _leavePending = true;
             _joinedServerId = Guid.Empty;
             _resumeServerOnly = false;
-            Enqueue(() => ChatServerChanged?.Invoke(new ServerChatState()));
             if (_conn is null || !IsConnected)
             {
                 Enqueue(() => Error?.Invoke("Server leave will complete after reconnect."));
@@ -342,25 +732,95 @@ namespace SlopArena.Client.Network
         }
 
         public Task HostStartAsync() => InvokeSafe("HostStart");
+        public Task<RoomSnapshot> RoomStartCharacterSelectAsync() =>
+            InvokeRoomAsync<RoomSnapshot>("RoomStartCharacterSelect");
+        public Task<RoomSnapshot> RoomSelectCharacterAsync(string character) =>
+            InvokeRoomAsync<RoomSnapshot>("RoomSelectCharacter", character);
+        public Task<RoomSnapshot> RoomStartStageSelectAsync() =>
+            InvokeRoomAsync<RoomSnapshot>("RoomStartStageSelect");
+        public Task<RoomSnapshot> RoomChooseArenaAsync(string arena) =>
+            InvokeRoomAsync<RoomSnapshot>("RoomChooseArena", arena);
+        public Task RoomStartMatchAsync() =>
+            InvokeRoomAsync<JsonElement>("RoomStartMatch");
         public Task SelectCharacterAsync(string characterClass) => InvokeSafe("SelectCharacter", characterClass);
         public Task StartStageSelectAsync() => InvokeSafe("StartStageSelect");
         public Task StartMatchAsync(string arenaName) => InvokeSafe("StartMatch", arenaName);
 
         public async Task<ChatSnapshot?> GetChatStateAsync()
         {
+            int membershipGeneration = Volatile.Read(ref _roomMembershipGeneration);
             var snapshot = await InvokeChatAsync<ChatSnapshot>("GetChatState");
-            if (_leavePending && snapshot != null)
-                snapshot.Server = new ServerChatState();
+            if (snapshot == null)
+                return null;
+            snapshot.Server ??= new ServerChatState();
+            if (_roomLeavePending || membershipGeneration != Volatile.Read(ref _roomMembershipGeneration))
+            {
+                Guid preservedRoomId = GetJoinedRoomId();
+                snapshot.Server = new ServerChatState
+                {
+                    RoomId = preservedRoomId == Guid.Empty ? (Guid?)null : preservedRoomId
+                };
+                return snapshot;
+            }
+            bool authoritativeRoomState = false;
+            Guid returnedRoomId = snapshot.Server.RoomId ?? Guid.Empty;
+            Guid currentRoomId = GetJoinedRoomId();
+            if (currentRoomId == Guid.Empty)
+            {
+                if (TrySetJoinedRoomId(returnedRoomId, membershipGeneration))
+                    authoritativeRoomState = true;
+                else
+                {
+                    currentRoomId = GetJoinedRoomId();
+                    snapshot.Server = new ServerChatState
+                    {
+                        RoomId = currentRoomId == Guid.Empty ? (Guid?)null : currentRoomId
+                    };
+                }
+            }
+            else if (returnedRoomId == Guid.Empty)
+            {
+                if (TrySetJoinedRoomId(Guid.Empty, membershipGeneration))
+                    authoritativeRoomState = true;
+                else
+                {
+                    currentRoomId = GetJoinedRoomId();
+                    snapshot.Server = new ServerChatState
+                    {
+                        RoomId = currentRoomId == Guid.Empty ? (Guid?)null : currentRoomId
+                    };
+                }
+            }
+            else if (returnedRoomId != currentRoomId)
+            {
+                if (TrySetJoinedRoomId(returnedRoomId, membershipGeneration))
+                    authoritativeRoomState = true;
+                else
+                {
+                    currentRoomId = GetJoinedRoomId();
+                    snapshot.Server = new ServerChatState
+                    {
+                        RoomId = currentRoomId == Guid.Empty ? (Guid?)null : currentRoomId
+                    };
+                }
+            }
+            else
+            {
+                authoritativeRoomState = true;
+            }
+            if (authoritativeRoomState && !_roomChatResyncInFlight)
+                _roomChatResyncPending = false;
             return snapshot;
         }
         public Task<ChatPlayer[]?> GetOnlinePlayersAsync() => InvokeChatAsync<ChatPlayer[]>("GetOnlinePlayers");
         public Task<ChatMessage?> SendGlobalAsync(string text) => SendChatAsync("SendGlobal", text);
-        public Task<ChatMessage?> SendServerAsync(Guid serverId, string text) =>
-            _leavePending || serverId != _joinedServerId
-                ? Task.FromException<ChatMessage?>(new InvalidOperationException("not_joined"))
-                : SendChatAsync("SendServer", serverId, text);
+        public Task<ChatMessage?> SendServerAsync(Guid roomId, string text) =>
+            _roomLeavePending || _roomChatResyncPending || roomId != GetJoinedRoomId()
+                ? Task.FromException<ChatMessage?>(new InvalidOperationException("not_in_room"))
+                : SendChatAsync("SendServer", roomId, text);
         public Task<ChatMessage?> SendDirectAsync(string playerId, string text) =>
             SendChatAsync("SendDirect", playerId, text);
+
 
         private Task<ChatMessage?> SendChatAsync(string method, params object?[] args)
         {
@@ -426,7 +886,7 @@ namespace SlopArena.Client.Network
                 return null;
 
             string? value = reason.GetString();
-            return value is "unfilled" or "absent" or "host_restart" or "host_shutdown" or "content_unavailable"
+            return value is "unfilled" or "absent" or "host_restart" or "host_shutdown" or "content_unavailable" or "host_unavailable"
                 ? new MatchAbortedNotification(matchId, value)
                 : null;
         }

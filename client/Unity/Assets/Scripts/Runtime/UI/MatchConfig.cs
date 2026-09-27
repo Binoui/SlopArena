@@ -12,6 +12,8 @@ namespace SlopArena.Client.UI
     {
         public static GameMode Mode = GameMode.Training;
         public static MatchTransport Transport = MatchTransport.None;
+        public static System.Guid? MatchId;
+
         public static SteamMatchDescriptor? SteamDescriptor;
         public static SlopArena.Shared.CharacterClass PlayerClass
             = SlopArena.Shared.CharacterClass.FightGuy;
@@ -57,6 +59,8 @@ namespace SlopArena.Client.UI
             Mode = GameMode.Training;
             Transport = MatchTransport.None;
             SteamDescriptor = null;
+            MatchId = null;
+
             LocalEntityId = 1;
             Opponents.Clear();
             MaxStocks = SlopArena.Shared.MatchDefaults.DefaultMaxStocks;

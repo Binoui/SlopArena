@@ -19,6 +19,10 @@ SlopArena combines:
 
 Each kit has a canonical **16-entry grid**: grounded and aerial variants for normals `1`, `2`, `3`, `4` and specials `A`, `E`, `R`, `F`. `LMB` and `RMB` are not persisted move identities; physical controls map to the canonical slots through the client input layer.
 
+### Gamepad controls
+
+Left Stick moves; Right Stick controls the camera and ability aim. Face buttons South/East/West/North use normals 1/2/3/4; hold LB with those buttons for specials A/E/R/F. The selected move stays fixed until its face button is released. RB jumps, LT crouches/slides/fast-falls, RT dashes, D-pad Left bursts, L3 faces the camera, R3 toggles target lock, and Start pauses. Remap buttons and the special modifier under Settings → Controls → Controller.
+
 ## Current roster
 
 | Fighter | Style | Content status |

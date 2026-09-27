@@ -13,11 +13,12 @@ import time
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import release
 
-BUCKET = "sloparena-vps-db-backups"
-ENDPOINT = "https://s3.sbg.io.cloud.ovh.net"
+BUCKET_NAME = re.compile(r"^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$")
+REGION = re.compile(r"^[a-z0-9-]{2,32}$")
 PREFIX = "postgres/"
 KEY = re.compile(r"^postgres/[A-Za-z0-9_-][A-Za-z0-9._-]*\.dump$")
 DAILY_DUMP = re.compile(r"^\d{8}T\d{6}Z-[0-9a-f]{32}\.dump$")
@@ -47,14 +48,34 @@ def command(argv: list[str], *, stdout=None, env=None) -> bytes:
     return proc.stdout if stdout is None else b""
 
 
-def s3(method: str, key: str, credentials: Path, file: Path | None = None, *, verify_upload: bool = False) -> bytes:
+def load_storage(path: Path) -> dict[str, str]:
+    if not path.is_absolute() or not path.is_file() or path.stat().st_mode & 0o077:
+        raise release.ReleaseError("storage config must be an absolute private file (mode 0600)")
+    try:
+        config = json.loads(path.read_text())
+    except (ValueError, UnicodeError) as exc:
+        raise release.ReleaseError("invalid storage config JSON") from exc
+    if not isinstance(config, dict) or set(config) != {"bucket", "endpoint", "region"}:
+        raise release.ReleaseError("storage config requires bucket, endpoint and region")
+    bucket, endpoint, region = (config[field] for field in ("bucket", "endpoint", "region"))
+    if not all(isinstance(value, str) for value in (bucket, endpoint, region)):
+        raise release.ReleaseError("invalid storage config")
+    url = urlsplit(endpoint)
+    if (not BUCKET_NAME.fullmatch(bucket) or not REGION.fullmatch(region) or
+        url.scheme != "https" or not url.hostname or url.username or url.password or
+        url.path not in ("", "/") or url.query or url.fragment):
+        raise release.ReleaseError("invalid storage bucket, region or HTTPS endpoint")
+    return {"bucket": bucket, "endpoint": endpoint.rstrip("/"), "region": region}
+
+
+def s3(method: str, key: str, credentials: Path, storage: dict[str, str], file: Path | None = None, *, verify_upload: bool = False) -> bytes:
     if not credentials.is_file() or credentials.stat().st_mode & 0o077:
         raise release.ReleaseError("curl S3 credentials file must be a private regular file (mode 0600)")
     if not KEY.fullmatch(key.removesuffix(".json")) or key.endswith(".json") and not key.endswith(".dump.json"):
         raise release.ReleaseError("invalid backup key")
-    url = f"{ENDPOINT}/{BUCKET}/{key}"
+    url = f"{storage['endpoint']}/{storage['bucket']}/{key}"
     argv = ["curl", "--silent", "--show-error", "--fail", "--proto", "=https", "--tlsv1.2",
-            "--retry", "3", "--aws-sigv4", "aws:amz:sbg:s3", "--config", str(credentials),
+            "--retry", "3", "--aws-sigv4", f"aws:amz:{storage['region']}:s3", "--config", str(credentials),
             "--request", method]
     if method == "PUT":
         argv += ["--upload-file", str(file), "--header", "Content-Type: application/octet-stream"]
@@ -77,7 +98,7 @@ def digest(path: Path) -> str:
     return hash_value.hexdigest()
 
 
-def backup(target: Path, credentials: Path) -> dict:
+def backup(target: Path, credentials: Path, storage: dict[str, str]) -> dict:
     active = release.active_manifest(target, False)
     if active is None or not (target / "release.env").is_file():
         raise release.ReleaseError("no active VPS release")
@@ -104,23 +125,23 @@ def backup(target: Path, credentials: Path) -> dict:
                 "release_id": active["release_id"], "images": active["images"]}
     manifest_path = daily_dir / f"{path.name}.json"
     release.atomic_write(manifest_path, release.json_bytes(manifest))
-    s3("PUT", key, credentials, path)
+    s3("PUT", key, credentials, storage, path)
     # A successful upload response alone is not proof that the archive can be recovered.
     fetched = daily_dir / f".{path.name}.verify"
     try:
-        s3("GET", key, credentials, fetched, verify_upload=True)
+        s3("GET", key, credentials, storage, fetched, verify_upload=True)
         if digest(fetched) != manifest["sha256"]:
             raise release.ReleaseError("uploaded backup failed downloaded SHA-256 verification")
     finally:
         fetched.unlink(missing_ok=True)
-    s3("PUT", key + ".json", credentials, manifest_path)
+    s3("PUT", key + ".json", credentials, storage, manifest_path)
     release.atomic_write(target / "last-offhost-backup.json", release.json_bytes(manifest))
     # Only successful uploads enter the short local rolling window.
     prune_daily_dumps(backup_dir, 3)
     return manifest
 
 
-def restore(target: Path, credentials: Path, key: str) -> dict:
+def restore(target: Path, credentials: Path, storage: dict[str, str], key: str) -> dict:
     if not KEY.fullmatch(key):
         raise release.ReleaseError("restore requires an explicit postgres/<backup-id>.dump key")
     if not (target / "release.env").is_file():
@@ -134,11 +155,11 @@ def restore(target: Path, credentials: Path, key: str) -> dict:
     name = "sloparena-restore-" + uuid.uuid4().hex[:12]
     volume = name + "-data"
     try:
-        s3("GET", key + ".json", credentials, manifest_path)
+        s3("GET", key + ".json", credentials, storage, manifest_path)
         manifest = release.parse_json(manifest_path)
         if manifest.get("key") != key or not isinstance(manifest.get("sha256"), str):
             raise release.ReleaseError("backup manifest does not match selected archive")
-        s3("GET", key, credentials, archive)
+        s3("GET", key, credentials, storage, archive)
         if digest(archive) != manifest["sha256"] or archive.stat().st_size != manifest["bytes"]:
             raise release.ReleaseError("downloaded archive does not match manifest")
         network = name + "-net"
@@ -205,6 +226,7 @@ def main() -> int:
     parser.add_argument("command", choices=["backup", "restore"])
     parser.add_argument("--target-dir", type=Path, required=True)
     parser.add_argument("--credentials", type=Path, required=True, help="private curl config containing user = access-key:secret-key")
+    parser.add_argument("--storage-config", type=Path, required=True, help="private JSON containing bucket, endpoint and region")
     parser.add_argument("--key", help="explicit S3 archive key for isolated restore")
     args = parser.parse_args()
     try:
@@ -213,10 +235,11 @@ def main() -> int:
             raise release.ReleaseError("--key is required only for restore")
         if not args.credentials.is_absolute():
             raise release.ReleaseError("--credentials must be an absolute private file path")
+        storage = load_storage(args.storage_config)
         with release.with_lock(target):
             if args.command == "backup":
                 try:
-                    result = backup(target, args.credentials)
+                    result = backup(target, args.credentials, storage)
                 except (release.ReleaseError, OSError):
                     release.atomic_write(target / "last-backup-attempt.json",
                                          release.json_bytes({"timestamp": release.now(), "result": "failed"}))
@@ -224,7 +247,7 @@ def main() -> int:
                 release.atomic_write(target / "last-backup-attempt.json",
                                      release.json_bytes({"timestamp": release.now(), "result": "success"}))
             else:
-                result = restore(target, args.credentials, args.key)
+                result = restore(target, args.credentials, storage, args.key)
             print(json.dumps(result, indent=2))
         return 0
     except (release.ReleaseError, OSError) as exc:

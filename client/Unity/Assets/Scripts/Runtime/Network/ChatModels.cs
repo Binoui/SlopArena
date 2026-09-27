@@ -28,7 +28,7 @@ namespace SlopArena.Client.Network
         public Guid MessageId { get; set; }
         public long Sequence { get; set; }
         public string Channel { get; set; } = string.Empty;
-        public Guid? ServerId { get; set; }
+        public Guid? RoomId { get; set; }
         public string? RecipientId { get; set; }
         public ChatPlayer Sender { get; set; } = new();
         public string Text { get; set; } = string.Empty;
@@ -43,7 +43,7 @@ namespace SlopArena.Client.Network
 
     public sealed class ServerChatState
     {
-        public Guid? ServerId { get; set; }
+        public Guid? RoomId { get; set; }
         public ChatMessage[] Messages { get; set; } = Array.Empty<ChatMessage>();
     }
 

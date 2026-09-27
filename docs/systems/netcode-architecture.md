@@ -11,56 +11,33 @@ track-selected simulation state and semantic events.
 
 ## 2. Components
 
+```text
+Unity ServerBrowser -- SignalR GetRooms --> Master Room directory
+Unity Room/selection/chat <-- SignalR --> Master RoomManager + ChatService
+                                           |
+                  RoomStartMatch -> select compatible GameHost
+                                           |
+                                    POST /match/start
+                                           v
+                             GameHost MultiMatchOrchestrator
+                             + concurrent MatchInstances
+                                           |
+                       authoritative Match state/results
+                                           v
+                 Unity RollbackSimulationBridge + Results UI
+
+GameHost -- authenticated result/cancel --> Master Match record
+                                            + matching Room -> Lobby
+Unity Results -- GetMyRoom --> original Room, or browser if membership ended
 ```
-┌──────────────────────────────────────────────────────────────────────┐
-│                        MASTER SERVER (separate repo)                  │
-│           ASP.NET Core + SignalR + PostgreSQL                         │
-│                                                                       │
-│  Server Browser │ Lobby Hub │ Char Select │ Match Start │ Results    │
-│       │              │            │            │            │         │
-└───────┼──────────────┼────────────┼────────────┼────────────┼────────┘
-        │ /servers      │ SignalR    │            │ POST       │
-        │               │ pushes     │            │ /match/start│
-        ▼               ▼            ▼            ▼            ▼
-┌──────────────────────────────────────────────────────────────────────┐
-│                    GAME SERVER (src/Server, .NET console)              │
-│                                                                       │
-│  ┌─────────────────────┐    ┌──────────────────────────────────────┐ │
-│  │ MatchControlServer  │    │ MultiMatchOrchestrator                │ │
-│  │ TCP :base_port      │───►│ port allocation: base → base+max-1   │ │
-│  │ POST /match/start   │    │ tracks active MatchInstances          │ │
-│  └─────────────────────┘    └───────────┬──────────────────────────┘ │
-│                                         │ spawns                      │
-│                    ┌────────────────────┼────────────────────┐       │
-│                    ▼                    ▼                     ▼       │
-│              ┌──────────┐        ┌──────────┐          ┌──────────┐  │
-│              │ Match #1 │        │ Match #2 │   ...    │ Match #N │  │
-│              │ UDP      │        │ UDP      │          │ UDP      │  │
-│              │ :base+0  │        │ :base+1  │          │ :base+N  │  │
-│              │ thread   │        │ thread   │          │ thread   │  │
-│              └────┬─────┘        └────┬─────┘          └────┬─────┘  │
-└───────────────────┼───────────────────┼──────────────────────┼──────┘
-                    │ UDP               │ UDP                  │ UDP
-                    ▼                   ▼                      ▼
-┌──────────────────────────────────────────────────────────────────────┐
-│                         UNITY CLIENTS                                 │
-│                                                                       │
-│  ┌──────────┐  ┌──────────────┐  ┌─────────────┐  ┌───────────────┐  │
-│  │ Input    │  │ ISimulation  │  │ NetworkClient│  │ LobbyClient   │  │
-│  │ (WASD)   │─►│ Bridge       │─►│ (UDP)       │  │ (SignalR)     │  │
-│  └──────────┘  └──────────────┘  └──────┬──────┘  └───────┬───────┘  │
-│                                         │ ▲                │          │
-│                                   ┌─────▼─┴─────┐          │          │
-│                                   │  RENDER     │          │          │
-│                                   │ (Unity)     │          │          │
-│                                   │  track-selected  │          │          │
-│                                   │  simulation state│          │          │
-│                                   └─────────────┘          │          │
-│                                                             │          │
-│                 Lobby/meta via SignalR ◄────────────────────┘          │
-│                 Match sim via UDP ◄───────────────────────────────────┤
-└──────────────────────────────────────────────────────────────────────┘
-```
+
+The Room ID identifies persistent membership and Server Chat, never the
+physical GameHost or a player's game identity. Master pins the roster,
+Character selections, Arena and content for each Match; the GameHost runs
+the authoritative 60 Hz Shared simulation and reports its outcome. Results
+can remain visible after the Room resets for a rematch. The ordinary
+browser lists public Rooms in every phase with joinability and member
+counts; explicit development host/address lookup is not that directory.
 
 ### Launch session and chat
 
@@ -75,13 +52,15 @@ Scenes consume this session rather than authenticating or creating hub connectio
 - **Global:** shared across menus, Training, PvP, and Results.
 - **Direct:** addressed by player ID, not display name. Incoming messages mark an unread
   conversation without opening it or entering the public gameplay feed.
-- **Server:** follows admitted GameServer membership, not the 2–4-player waiting roster
-  or an individual match. A full waiting roster can still admit Server chat.
-  Match launch, Results, and rematch retain membership. Explicit Leave revokes it.
-  `ResumeServer` restores a previously admitted member after reconnect without taking
-  a waiting-roster slot; it cannot grant access to an unjoined server.
-  Leave while disconnected makes Server chat read-only immediately and delivers the
-  revocation before membership restoration on reconnect.
+- **Server:** follows the authenticated player's current RoomManager attachment, not
+  physical GameServer or waiting-roster membership. The Room ID is the conversation
+  identity; guessing it grants no access. Distinct Rooms remain isolated even when they
+  share a physical GameHost. Create/join and reconnect deliver that Room's authorized
+  history. Leave, revocation, and membership expiry clear the prior Room conversation;
+  queued pushes for an old Room are rejected.
+
+Physical server admission and `JOIN BY ADDRESS` remain gameplay paths only; neither
+grants Server Chat membership.
 
 The client retains at most 32 conversations with 50 messages each. Drafts and local
 mutes are launch-scoped. Offline or rejected sends retain the draft and never queue an
@@ -90,7 +69,7 @@ messages are literal text, limited to 24 and 500 Unicode scalars respectively.
 
 [`ChatOverlay`](../../client/Unity/Assets/Scripts/Runtime/UI/ChatOverlay.cs) attaches to
 the scene's existing `UIDocument`. During gameplay its compact feed shows at most
-three recent Global/current-Server lines, expires them after eight seconds, and never
+three recent Global/current-Room Server lines, expires them after eight seconds, and never
 shows Direct messages. Enter opens or submits the composer; Escape closes it while
 preserving the draft. `ChatInputGate` suppresses human movement, attacks, camera, and
 conflicting UI shortcuts while composing. Held controls must be released before they

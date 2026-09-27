@@ -1,7 +1,7 @@
 ---
 key: slop_pit
 status: locked
-locked: 2026-09-17
+locked: 2026-09-26
 approved_by: project maintainer
 blockout:
   - .stage-authoring-cache/slop_pit/design/three-quarter.png
@@ -12,7 +12,7 @@ blockout:
 
 ## Acceptance
 
-The maintainer accepted the playable layout and iterative visual passes, then approved the stage as good enough on 2026-09-17. This locks the current static design, not packaged-release readiness or external 2–4-player PVP acceptance. The initial playable blockout and art iterations proceeded under an explicit provisional exception to the design-lock gate.
+The maintainer accepted the playable layout and iterative visual passes on 2026-09-17. On 2026-09-26, the maintainer approved replacing open edges with continuous authoritative perimeter walls descending to the preserved y=−11 kill plane. This locks the revised static topology, not packaged-release readiness or external 2–4-player PVP acceptance. The initial playable blockout and art iterations proceeded under an explicit provisional exception to the design-lock gate.
 
 ## Personality
 
@@ -20,9 +20,9 @@ A scrapyard brawl happens over a cool factory void while the spectators' service
 
 ## Composition decisions
 
-1. The broad 32×26 deck stays open through every camera yaw. Open edges expose recovery and knockout space; the center is not a corridor between props.
+1. The broad 32×26 deck stays readable through every camera yaw. Four continuous steel perimeter walls follow its outer edge from deck level down to the preserved kill plane at y=−11, preventing fighters from dropping beneath the deck; their tops do not narrow the central fight. The walls are part of the authoritative shell, not decorative background.
 2. Equal 6×5 platforms occupy opposite diagonal corners, centered at (-10,-8) and (10,8), with tops 2 units above the deck. Preserve the accepted full-jump approaches and clear central fight.
-3. Four ordered deck spawns remain at X/Z (-5,-4), (5,4), (-5,4), (5,-4), with marker-center Y=0.85. Blast boundaries derive from the static collision shell.
+3. Four ordered deck spawns remain at X/Z (-5,-4), (5,4), (-5,4), and (5,-4), with marker-center Y=0.85. The y=−11 kill height is authored through `AuthoringAids/KillPlane`; side and top blast boundaries remain derived from the static collision shell.
 4. Muted, differently sized steel plates use staggered seams, two rust-toned edge replacements and five small repair patches. Sparse patch bolts and hazard-striped fascia provide industrial detail without visual noise across the center.
 5. Four sparse two-level service galleries and connecting walkways wrap the horizon. Two static diagonal conveyors sit behind opposite galleries; simple Blender-authored panel, pipe and casing scraps dress the belts and the space below the kill plane.
 6. The world is deliberately simple: cool distant enclosure, dark steel structure, warm galleries and broad warm deck-edge light pools. The cooler center and readable platform tops remain dominant. No giant sign or competing billboard.

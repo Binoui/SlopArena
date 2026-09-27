@@ -34,7 +34,12 @@ namespace SlopArena.Client.UI
         private VisualElement? _pageActionsHost;
         private VisualElement? _expandedSocialHost;
         private VisualElement? _modalHost;
-        private VisualElement? _settingsSlot;
+        private VisualElement? _menuModal;
+        private Button? _resumeButton;
+        private Button? _settingsButton;
+        private VisualElement? _restoreFocus;
+        private PickingMode _originalModalPicking;
+        private bool _menuOpen;
         private SettingsOverlay? _settingsOverlay;
         private VisualElement? _pageModalSection;
         private VisualElement? _lowerRow;
@@ -106,15 +111,17 @@ namespace SlopArena.Client.UI
             _pageSummaryHost = documentRoot.Q<VisualElement>("page-summary-host");
             _pageActionsHost = documentRoot.Q<VisualElement>("page-actions-host");
             _expandedSocialHost = documentRoot.Q<VisualElement>("expanded-social-host");
-            _settingsSlot = documentRoot.Q<VisualElement>("shell-settings-slot");
-            if (_settingsSlot != null)
-            {
-                var settingsButton = new Button(OpenSettings) { text = "SETTINGS" };
-                settingsButton.AddToClassList("shell-identity");
-                _settingsSlot.Add(settingsButton);
-                _settingsOverlay = gameObject.GetComponent<SettingsOverlay>() ?? gameObject.AddComponent<SettingsOverlay>();
-            }
             _modalHost = documentRoot.Q<VisualElement>("modal-host");
+            _menuModal = documentRoot.Q<VisualElement>("shell-escape-menu");
+            _resumeButton = documentRoot.Q<Button>("shell-menu-resume");
+            _settingsButton = documentRoot.Q<Button>("shell-menu-settings");
+            var quitButton = documentRoot.Q<Button>("shell-menu-quit");
+            var menuTrigger = documentRoot.Q<Button>("shell-menu-trigger");
+            if (menuTrigger != null) menuTrigger.clicked += ToggleMenu;
+            if (_resumeButton != null) _resumeButton.clicked += CloseMenu;
+            if (_settingsButton != null) _settingsButton.clicked += OpenSettings;
+            if (quitButton != null) quitButton.clicked += QuitGame;
+            _settingsOverlay = gameObject.GetComponent<SettingsOverlay>() ?? gameObject.AddComponent<SettingsOverlay>();
 
             if (_root == null || _pageHeaderHost == null || _pageBodyHost == null || _socialHost == null
                 || _pageLowerHost == null || _pageSummaryHost == null || _pageActionsHost == null
@@ -371,17 +378,75 @@ namespace SlopArena.Client.UI
             return context;
         }
 
+        public bool IsMenuOpen => _menuOpen;
+
+        public void ToggleMenu()
+        {
+            if (_menuOpen) CloseMenu();
+            else OpenMenu();
+        }
+
+        public void OpenMenu()
+        {
+            if (_menuOpen || _modalHost == null || _menuModal == null
+                || FrontendController.Identity is { IsPresented: true }
+                || SettingsOverlay.Active is { IsOpen: true })
+                return;
+            _restoreFocus = _root?.panel?.focusController.focusedElement as VisualElement;
+            _originalModalPicking = _modalHost.pickingMode;
+            _modalHost.pickingMode = PickingMode.Position;
+            _menuModal.BringToFront();
+            _menuModal.AddToClassList("shell-escape-menu--open");
+            _menuOpen = true;
+            UiModalState.Push();
+            _resumeButton?.Focus();
+        }
+
+        public void CloseMenu()
+        {
+            if (!_menuOpen) return;
+            _menuOpen = false;
+            _menuModal?.RemoveFromClassList("shell-escape-menu--open");
+            if (_modalHost != null) _modalHost.pickingMode = _originalModalPicking;
+            UiModalState.Pop();
+            if (_restoreFocus?.panel != null) _restoreFocus.Focus();
+            _restoreFocus = null;
+        }
 
         private void OpenSettings()
         {
-            if (_settingsOverlay == null || _modalHost == null)
+            if (_settingsOverlay == null || _modalHost == null || _menuModal == null || !_menuOpen)
                 return;
             UISFX.PlayClick();
-            _settingsOverlay.Open(_modalHost);
+            _menuModal.RemoveFromClassList("shell-escape-menu--open");
+            _settingsOverlay.Open(_modalHost, () =>
+            {
+                if (_menuOpen)
+                {
+                    _menuModal?.BringToFront();
+                    _menuModal?.AddToClassList("shell-escape-menu--open");
+                    _settingsButton?.Focus();
+                }
+            });
+        }
+
+        private void QuitGame()
+        {
+#if UNITY_EDITOR
+            UnityEditor.EditorApplication.isPlaying = false;
+#else
+            Application.Quit();
+#endif
         }
 
         private void OnDisable()
         {
+            if (_menuOpen) UiModalState.Pop();
+            _menuOpen = false;
+            _menuModal = null;
+            _resumeButton = null;
+            _settingsButton = null;
+            _restoreFocus = null;
             // The shell dies with the frontend scene; the stable-root
             // registrations and mounted content die with it. Chat re-hosts
             // through the presenter's own attach path on frontend recreation.

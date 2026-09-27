@@ -44,11 +44,54 @@ namespace SlopArena.Client.World
 
         protected override void LeaveMatch()
         {
+            bool roomMode = ClientSession.SelectedOnlineMode == ClientSession.OnlineSelection.Room;
             if (MatchConfig.Transport == MatchTransport.DevelopmentUdp && MatchConfig.IsHost)
                 ServerHost.Instance?.Stop();
+
+            if (roomMode)
+            {
+                _ = LeaveRoomAndReturnAsync();
+                return;
+            }
+
             _ = ClientSession.ActiveLobby?.LeaveLobbyAsync();
+            ClientSession.ClearMatchForExit();
             FrontendController.Show(FrontendPage.ServerBrowser);
         }
+
+        private async System.Threading.Tasks.Task LeaveRoomAndReturnAsync()
+        {
+            bool leftRoom = false;
+            try
+            {
+                var chat = ChatSession.Instance;
+                if (chat != null && await chat.EnsureConnectedAsync() &&
+                    chat.ActiveLobby is { } lobby)
+                {
+                    await lobby.LeaveRoomAsync();
+                    leftRoom = true;
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"[PvPMatch] Could not leave Room after exiting match: {ex.Message}");
+            }
+
+            ClientSession.ClearMatchForExit();
+            if (leftRoom)
+            {
+                ClientSession.SelectedRoomId = Guid.Empty;
+                ClientSession.SelectedOnlineMode = ClientSession.OnlineSelection.LegacyServer;
+                ClientSession.SelectedServerName = string.Empty;
+                ServerBrowserUI.PendingReturnNotice = "You left the Room and the match.";
+                FrontendController.Show(FrontendPage.ServerBrowser);
+                return;
+            }
+
+            LobbyRoomUI.PendingRoomNotice = "Couldn’t leave the Room. Reconnecting so you can retry.";
+            FrontendController.Show(FrontendPage.LobbyRoom);
+        }
+
 
         protected override void OnMatchStart()
         {
@@ -153,9 +196,8 @@ namespace SlopArena.Client.World
                 // the CharacterDefinition) and seeds the RawTrack initial state so the
                 // opponent renders at its spawn until the first server packet. Without
                 // this, PvP crashed on the first predictable opponent packet
-                // (KeyNotFoundException on defs[EntityId]).
                 var oppSpawn = SpawnPointFor(arena, opp.EntityId);
-                _bridge.RegisterEntity(opp.EntityId, def, new CharacterState
+                var initialState = new CharacterState
                 {
                     PX = oppSpawn.X, PY = oppSpawn.Y, PZ = oppSpawn.Z,
                     FacingYaw = oppSpawn.Yaw,
@@ -164,7 +206,9 @@ namespace SlopArena.Client.World
                     JumpsLeft = def.Movement.MaxJumps,
                     AirDodgesLeft = 1,
                     DamagePercent = 0,
-                }, opponentEntry.BakedAnimation);
+                };
+                _bridge.RegisterEntity(opp.EntityId, def, initialState, opponentEntry.BakedAnimation);
+                renderer.ApplyServerState(initialState);
             }
             _opponentArray = new List<PlayerRenderer>(_opponentRenderers.Values).ToArray();
 
@@ -177,10 +221,8 @@ namespace SlopArena.Client.World
             // Player spawns at its own roster spawn point (entityId 1..N ↔ spawnPoints[0..N-1]).
             _playerRenderer.transform.position = SpawnPosition(arena, PlayerEntityId);
 
-            // Register the self entity: without this the LocalTrack sim is empty, so the
-            // PvP player never simulates locally (frozen at origin) and _defs stays empty.
             var selfSpawn = SpawnPointFor(arena, PlayerEntityId);
-            _bridge.RegisterEntity(PlayerEntityId, playerDef, new CharacterState
+            var initialPlayerState = new CharacterState
             {
                 PX = selfSpawn.X, PY = selfSpawn.Y, PZ = selfSpawn.Z,
                 FacingYaw = selfSpawn.Yaw,
@@ -189,7 +231,9 @@ namespace SlopArena.Client.World
                 JumpsLeft = playerDef.Movement.MaxJumps,
                 AirDodgesLeft = 1,
                 DamagePercent = 0,
-            }, playerEntry.BakedAnimation);
+            };
+            _bridge.RegisterEntity(PlayerEntityId, playerDef, initialPlayerState, playerEntry.BakedAnimation);
+            _playerRenderer.ApplyServerState(initialPlayerState);
             _lastPresentedDeaths.Clear();
             _lastPresentedDeaths[PlayerEntityId] = 0;
             foreach (var id in _opponentRenderers.Keys)
@@ -407,11 +451,11 @@ namespace SlopArena.Client.World
         {
             _hudManager?.ShowMatchCallout("READY", 2f);
             yield return new WaitForSecondsRealtime(2f);
-            _hudManager?.ShowMatchCallout("1", 1f);
+            _hudManager?.ShowMatchCallout("3", 1f);
             yield return new WaitForSecondsRealtime(1f);
             _hudManager?.ShowMatchCallout("2", 1f);
             yield return new WaitForSecondsRealtime(1f);
-            _hudManager?.ShowMatchCallout("3", 1f);
+            _hudManager?.ShowMatchCallout("1", 1f);
         }
 
         private void TryScheduleResults()

@@ -12,7 +12,9 @@
                  connection status; activating it opens the shared identity
                  surface. -->
             <ui:Button name="shell-identity" text="" class="shell-identity" />
-            <ui:VisualElement name="shell-settings-slot" class="shell-settings-slot" />
+            <ui:Button name="shell-menu-trigger" text="MENU" tooltip="Open menu (Esc / Start)" class="shell-menu-trigger">
+                <ui:VisualElement class="shell-menu-gear" picking-mode="Ignore" />
+            </ui:Button>
         </ui:VisualElement>
         <ui:VisualElement name="shell-workspace" class="shell-workspace">
             <ui:VisualElement name="page-header-host" class="shell-host shell-header-host" />
@@ -26,6 +28,15 @@
             </ui:VisualElement>
         </ui:VisualElement>
         <ui:VisualElement name="expanded-social-host" class="shell-hidden" picking-mode="Ignore" />
-        <ui:VisualElement name="modal-host" class="shell-modal-host" picking-mode="Ignore" />
+        <ui:VisualElement name="modal-host" class="shell-modal-host" picking-mode="Ignore">
+            <ui:VisualElement name="shell-escape-menu" class="shell-escape-menu">
+                <ui:VisualElement class="shell-escape-card">
+                    <ui:Label text="MENU" class="shell-escape-title" />
+                    <ui:Button name="shell-menu-resume" text="RESUME" class="btn-primary shell-escape-action" />
+                    <ui:Button name="shell-menu-settings" text="SETTINGS" class="btn-secondary shell-escape-action" />
+                    <ui:Button name="shell-menu-quit" text="QUIT GAME" class="btn-back shell-escape-action" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+        </ui:VisualElement>
     </ui:VisualElement>
 </ui:UXML>

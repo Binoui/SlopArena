@@ -185,4 +185,31 @@ public class SteamGameServerAdmissionTests
         Assert.True(SpinWait.SpinUntil(() => !waiting.IsRunning, 2000));
         Assert.Equal(0, Volatile.Read(ref resultReports));
     }
+    [Fact]
+    public async Task DevelopmentRoomWaitingDeadlineReleasesUnfilledMatchWithoutWinner()
+    {
+        var clock = new TestClock(DateTimeOffset.Parse("2026-09-26T12:00:00Z"));
+        var catalog = LoadCatalog();
+        var canceled = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+        int resultReports = 0;
+        var match = new MatchInstance(0, Guid.NewGuid().ToString("D"), "slop_court",
+            new[] { new MatchPlayer(1001, CharacterClass.FightGuy, 1),
+                new MatchPlayer(1002, CharacterClass.Manki, 2) }, catalog, _ => { },
+            onMatchResult: (_, _) => Interlocked.Increment(ref resultReports),
+            onMatchCancelled: (_, reason) => canceled.TrySetResult(reason),
+            admissionDeadlineUtc: clock.GetUtcNow().AddSeconds(60), clock: clock);
+        match.Start();
+        try
+        {
+            clock.Advance(TimeSpan.FromSeconds(61));
+            Assert.Equal("unfilled", await canceled.Task.WaitAsync(TimeSpan.FromSeconds(2)));
+            Assert.True(SpinWait.SpinUntil(() => !match.IsRunning, 2000));
+            Assert.Equal(0, Volatile.Read(ref resultReports));
+        }
+        finally
+        {
+            match.Stop();
+        }
+    }
+
 }

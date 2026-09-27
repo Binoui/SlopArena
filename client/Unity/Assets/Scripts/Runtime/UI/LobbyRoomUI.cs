@@ -20,6 +20,8 @@ namespace SlopArena.Client.UI
     /// </summary>
     public class LobbyRoomUI : MonoBehaviour, IFrontendPageController
     {
+        public static string? PendingRoomNotice;
+
         private const int MaxSlots = 4;
         private const float LobbyTimeoutSeconds = 12f;
 
@@ -33,6 +35,7 @@ namespace SlopArena.Client.UI
         }
 
         private LobbyClient? _lobby;
+        private ChatSession? _chatSession;
         private VisualElement? _playerList;
         private Button? _btnStart;
         private Button? _btnLeave;
@@ -42,6 +45,9 @@ namespace SlopArena.Client.UI
         private Label? _lblServer;
         private LobbySnapshot? _snapshot;
         private CancellationTokenSource? _lifecycleCts;
+        private RoomSnapshot? _roomSnapshot;
+        private bool _roomMode;
+
         private Coroutine? _lobbyWatchdog;
         private Coroutine? _startWatchdog;
         private bool _alive;
@@ -58,6 +64,8 @@ namespace SlopArena.Client.UI
             // attempt left by a previous visit must not outlive its page.
             _snapshot = null;
             _startPending = false;
+            _roomMode = ClientSession.SelectedOnlineMode == ClientSession.OnlineSelection.Room;
+            _roomSnapshot = null;
             _lifecycleCts = new CancellationTokenSource();
             int generation = ++_attempt;
             _playerList = _context.Q<VisualElement>("player-list");
@@ -67,10 +75,11 @@ namespace SlopArena.Client.UI
             _backButton = _context.Q<Button>("btn-back");
             _lblStatus = _context.Q<Label>("lbl-status");
             _lblServer = _context.Q<Label>("lbl-server");
+            if (_lblServer != null) _lblServer.enableRichText = false;
 
             if (_lblServer != null)
                 _lblServer.text = string.IsNullOrEmpty(ClientSession.SelectedServerName)
-                    ? ClientSession.SelectedServerId.ToString()
+                    ? (_roomMode ? ClientSession.SelectedRoomId.ToString() : ClientSession.SelectedServerId.ToString())
                     : ClientSession.SelectedServerName;
             if (_backButton != null) _backButton.clicked += Leave;
             if (_btnLeave != null) _btnLeave.clicked += Leave;
@@ -89,6 +98,12 @@ namespace SlopArena.Client.UI
 
             RenderPlayers();
             var chat = ChatSession.Instance;
+            _chatSession = chat;
+            if (chat != null)
+            {
+                chat.AccountChanged += OnAccountChanged;
+                chat.ActiveLobbyChanged += OnActiveLobbyChanged;
+            }
             if (chat == null)
             {
                 SetStatus("Chat session unavailable. Return to the server browser.", true);
@@ -110,6 +125,15 @@ namespace SlopArena.Client.UI
 
         private void SubscribeLobby(LobbyClient lobby)
         {
+            if (_roomMode)
+            {
+                lobby.Connected += OnConnected;
+                lobby.Disconnected += OnDisconnected;
+                lobby.RoomUpdated += OnRoomUpdated;
+                lobby.RoomDeleted += OnRoomDeleted;
+                lobby.RoomMembershipRevoked += OnRoomMembershipRevoked;
+                return;
+            }
             lobby.Connected += OnConnected;
             lobby.PlayerJoined += OnPlayerJoined;
             lobby.PlayerLeft += OnPlayerLeft;
@@ -134,9 +158,14 @@ namespace SlopArena.Client.UI
                             : "Couldn’t connect to the room directory. Retry, or return to the server browser.");
                     return;
                 }
-                _lobby = chat.ActiveLobby;
-                if (_lobby != null)
-                    SubscribeLobby(_lobby);
+                var activeLobby = chat.ActiveLobby;
+                if (!ReferenceEquals(_lobby, activeLobby))
+                {
+                    if (_lobby != null) UnsubscribeLobby(_lobby);
+                    _lobby = activeLobby;
+                    if (_lobby != null)
+                        SubscribeLobby(_lobby);
+                }
             }
             if (_lobby == null)
                 return;
@@ -150,9 +179,23 @@ namespace SlopArena.Client.UI
                     return;
                 }
 
-                await _lobby.JoinLobbyAsync(ClientSession.SelectedServerId);
-                if (!IsCurrent(generation, ct)) return;
-                SetStatus("Connected. Waiting for the room roster…", false);
+                if (_roomMode)
+                {
+                    var room = await _lobby.GetMyRoomAsync();
+                    if (!IsCurrent(generation, ct)) return;
+                    if (room == null || room.Id != ClientSession.SelectedRoomId)
+                    {
+                        ReturnToBrowser("You are no longer a member of this room. Return to the browser and join another room.");
+                        return;
+                    }
+                    OnRoomUpdated(room);
+                }
+                else
+                {
+                    await _lobby.JoinLobbyAsync(ClientSession.SelectedServerId);
+                    if (!IsCurrent(generation, ct)) return;
+                    SetStatus("Connected. Waiting for the room roster…", false);
+                }
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
             catch (Exception ex)
@@ -181,7 +224,13 @@ namespace SlopArena.Client.UI
             if (!_alive || _leaving)
                 return;
             _attempt++;
-            _lobby = ChatSession.Instance?.ActiveLobby;
+            var replacement = ChatSession.Instance?.ActiveLobby;
+            if (!ReferenceEquals(_lobby, replacement))
+            {
+                if (_lobby != null) UnsubscribeLobby(_lobby);
+                _lobby = replacement;
+                if (_lobby != null) SubscribeLobby(_lobby);
+            }
             _awaitingLobby = true;
             _startPending = false;
             SetRetryVisible(false);
@@ -191,11 +240,41 @@ namespace SlopArena.Client.UI
         }
 
 
+        private void OnActiveLobbyChanged(LobbyClient? lobby)
+        {
+            if (!_alive || !_roomMode || ReferenceEquals(_lobby, lobby))
+                return;
+            if (_lobby != null)
+                UnsubscribeLobby(_lobby);
+            _lobby = lobby;
+            _roomSnapshot = null;
+            RenderPlayers();
+            if (lobby != null)
+                SubscribeLobby(lobby);
+            _awaitingLobby = true;
+            SetRetryVisible(false);
+            SetStatus(lobby == null
+                ? "Room authentication expired. Reconnecting…"
+                : "Reconnecting to your Room…", false);
+        }
+
         private void OnConnected()
         {
-            if (!_alive || !_awaitingLobby) return;
+            if (!_alive) return;
+            if (_roomMode)
+            {
+                if (_roomSnapshot == null)
+                {
+                    _awaitingLobby = true;
+                    ConnectAndJoin(_attempt, _lifecycleCts?.Token ?? CancellationToken.None);
+                }
+                return;
+            }
+            if (!_awaitingLobby) return;
             SetStatus("Connected. Waiting for the room roster…", false);
+
         }
+
         private void OnPlayerJoined(LobbyPlayerInfo player)
         {
             if (_alive)
@@ -216,6 +295,70 @@ namespace SlopArena.Client.UI
             _snapshot = snapshot;
             SetRetryVisible(false);
             RenderPlayers();
+        }
+        private void OnRoomUpdated(RoomSnapshot room)
+        {
+            if (!_alive || !_roomMode || room.Id != ClientSession.SelectedRoomId)
+                return;
+            _awaitingLobby = false;
+            if (_lobbyWatchdog != null) StopCoroutine(_lobbyWatchdog);
+            _startPending = false;
+            if (_startWatchdog != null) StopCoroutine(_startWatchdog);
+            _roomSnapshot = room;
+            ClientSession.SelectedServerName = room.Name;
+            ChatSession.Instance?.UpdateRoomTitle(room);
+            if (_lblServer != null) _lblServer.text = room.Name;
+            SetRetryVisible(false);
+            RenderPlayers();
+            if (!string.IsNullOrWhiteSpace(PendingRoomNotice))
+            {
+                SetStatus(PendingRoomNotice, false);
+                PendingRoomNotice = null;
+            }
+            if (string.Equals(room.Phase, "Character Select", StringComparison.Ordinal))
+            {
+                MatchConfig.Mode = GameMode.PvP;
+                FrontendController.Show(FrontendPage.FighterSelect);
+            }
+            else if (string.Equals(room.Phase, "Stage Select", StringComparison.Ordinal))
+            {
+                MatchConfig.Mode = GameMode.PvP;
+                FrontendController.Show(FrontendPage.StageSelect);
+            }
+            else if (string.Equals(room.Phase, "Match Starting", StringComparison.Ordinal) ||
+                string.Equals(room.Phase, "In Match", StringComparison.Ordinal))
+            {
+                MatchConfig.Mode = GameMode.PvP;
+                FrontendController.Show(FrontendPage.StageSelect);
+            }
+        }
+
+        private void OnRoomDeleted(Guid roomId)
+        {
+            if (_alive && _roomMode && roomId == ClientSession.SelectedRoomId)
+                ReturnToBrowser("This room has closed.");
+        }
+
+        private void OnRoomMembershipRevoked(Guid roomId)
+        {
+            if (_alive && _roomMode && roomId == ClientSession.SelectedRoomId)
+                ReturnToBrowser("Your Room membership ended.");
+        }
+
+        private void OnAccountChanged()
+        {
+            if (_alive && _roomMode)
+                ReturnToBrowser("Your Steam account changed. Reconnect before joining a Room.");
+        }
+
+        private void ReturnToBrowser(string notice)
+        {
+            PendingRoomNotice = null;
+            ClientSession.SelectedRoomId = Guid.Empty;
+            ClientSession.SelectedOnlineMode = ClientSession.OnlineSelection.LegacyServer;
+            ServerBrowserUI.PendingReturnNotice = notice;
+            _alive = false;
+            FrontendController.Show(FrontendPage.ServerBrowser);
         }
 
         private void OnMatchStarting(MatchStartingConfig config)
@@ -248,6 +391,9 @@ namespace SlopArena.Client.UI
 
         private void OnServerMatchStarted(MatchStartedConfig config)
         {
+            if (config.RoomId != null)
+                return;
+
             if (!_alive || _leaving) return;
             _awaitingLobby = false;
             if (_lobbyWatchdog != null) StopCoroutine(_lobbyWatchdog);
@@ -298,6 +444,19 @@ namespace SlopArena.Client.UI
         {
             if (!_alive || _lobby == null || _startPending || !_lobby.IsConnected)
                 return;
+            if (_roomMode)
+            {
+                if (_roomSnapshot == null || !IsLocalRoomLeader(_roomSnapshot) ||
+                    !string.Equals(_roomSnapshot.Phase, "Lobby", StringComparison.Ordinal))
+                    return;
+                _startPending = true;
+                _btnStart?.SetEnabled(false);
+                SetStatus("Opening character select…", false);
+                if (_startWatchdog != null) StopCoroutine(_startWatchdog);
+                _startWatchdog = StartCoroutine(StartWatchdog());
+                _ = StartRoomCharacterSelect();
+                return;
+            }
             _startPending = true;
             _btnStart?.SetEnabled(false);
             SetStatus("Starting the match…", false);
@@ -306,6 +465,27 @@ namespace SlopArena.Client.UI
             _ = StartMatchRequest();
         }
 
+        private async Task StartRoomCharacterSelect()
+        {
+            try
+            {
+                var room = await _lobby!.RoomStartCharacterSelectAsync();
+                if (_alive) OnRoomUpdated(room);
+            }
+            catch (Exception ex)
+            {
+                if (_alive) OnError($"Couldn’t start character select: {ex.Message}");
+            }
+        }
+
+        private static bool IsLocalRoomLeader(RoomSnapshot room)
+        {
+            var members = room.Members ?? Array.Empty<RoomMemberInfo>();
+            for (int i = 0; i < members.Length; i++)
+                if (members[i].SteamId == ClientSession.SteamId)
+                    return members[i].IsLeader;
+            return false;
+        }
         private async Task StartMatchRequest()
         {
             try { await _lobby!.HostStartAsync(); }
@@ -322,7 +502,9 @@ namespace SlopArena.Client.UI
             {
                 _startPending = false;
                 RenderPlayers();
-                SetStatus("The match did not start in time. Check the room, then try again.", true);
+                SetStatus(_roomMode
+                    ? "Character select did not open in time. Check the Room, then try again."
+                    : "The match did not start in time. Check the room, then try again.", true);
             }
         }
 
@@ -330,6 +512,25 @@ namespace SlopArena.Client.UI
         {
             if (_playerList == null) return;
             _playerList.Clear();
+            if (_roomMode)
+            {
+                var members = _roomSnapshot?.Members ?? Array.Empty<RoomMemberInfo>();
+                int capacity = Math.Min(MaxSlots, Math.Max(1, _roomSnapshot?.Capacity ?? MaxSlots));
+                for (int i = 0; i < capacity; i++)
+                    _playerList.Add(CreateRoomSlot(i, members));
+                bool leader = _roomSnapshot != null && IsLocalRoomLeader(_roomSnapshot);
+                bool lobbyPhase = string.Equals(_roomSnapshot?.Phase, "Lobby", StringComparison.Ordinal);
+                if (_btnStart != null)
+                {
+                    _btnStart.style.display = leader && lobbyPhase ? DisplayStyle.Flex : DisplayStyle.None;
+                    _btnStart.text = "CHOOSE FIGHTERS";
+                    _btnStart.SetEnabled(leader && lobbyPhase && members.Length >= 2 &&
+                        !_startPending && _lobby?.IsConnected == true);
+                }
+                if (_roomSnapshot != null)
+                    SetStatus($"{_roomSnapshot.Phase} — {_roomSnapshot.MemberCount}/{_roomSnapshot.Capacity} members.", false);
+                return;
+            }
             var players = _snapshot?.Players ?? Array.Empty<LobbyPlayerInfo>();
             bool isLocalHost = false;
             for (int i = 0; i < players.Count; i++)
@@ -372,6 +573,30 @@ namespace SlopArena.Client.UI
             slot.Add(name);
             return slot;
         }
+        private VisualElement CreateRoomSlot(int index, IReadOnlyList<RoomMemberInfo> members)
+        {
+            var slot = new VisualElement { name = "player-slot" };
+            slot.AddToClassList("player-slot");
+            slot.Add(new Label($"P{index + 1}") { name = "slot-index" });
+            var name = new Label(index < members.Count ? members[index].Name : "Open slot")
+            {
+                name = "slot-name",
+                enableRichText = false
+            };
+            slot.Add(name);
+            if (index < members.Count && members[index].IsLeader)
+                slot.Add(new Label("LEADER") { name = "leader-badge" });
+            if (index < members.Count)
+            {
+                var member = members[index];
+                if (!string.IsNullOrWhiteSpace(member.CharacterSelection))
+                    slot.Add(new Label(member.CharacterSelection.ToUpperInvariant()) { name = "room-character" });
+                slot.Add(new Label(member.LockedIn ? "LOCKED" : "WAITING")
+                    { name = "room-member-status" });
+            }
+            return slot;
+        }
+
 
         private void FailLobby(string message)
         {
@@ -401,30 +626,48 @@ namespace SlopArena.Client.UI
         private bool IsCurrent(int generation, CancellationToken ct) =>
             _alive && !_leaving && generation == _attempt && !ct.IsCancellationRequested;
 
-        private void Leave()
+        private async void Leave()
         {
             if (!_alive || _leaving) return;
             _leaving = true;
-            _alive = false;
             _attempt++;
-            _lifecycleCts?.Cancel();
-            if (MatchConfig.IsHost)
-                ServerHost.Instance?.Stop();
-            if (_lobby != null)
-                _ = LeaveRoomAsync(_lobby);
+            if (!_roomMode) _lifecycleCts?.Cancel();
+            if (_roomMode)
+            {
+                try
+                {
+                    if (_lobby == null)
+                        throw new InvalidOperationException("Not connected to the room directory.");
+                    await _lobby.LeaveRoomAsync();
+                    ClientSession.SelectedRoomId = Guid.Empty;
+                    ClientSession.SelectedOnlineMode = ClientSession.OnlineSelection.LegacyServer;
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogWarning($"[LobbyRoom] Room leave failed: {ex.Message}");
+                    if (ex.Message.Contains("not_in_room", StringComparison.OrdinalIgnoreCase))
+                    {
+                        ClientSession.SelectedRoomId = Guid.Empty;
+                        ClientSession.SelectedOnlineMode = ClientSession.OnlineSelection.LegacyServer;
+                        _alive = false;
+                        FrontendController.Show(FrontendPage.ServerBrowser);
+                        return;
+                    }
+                    _leaving = false;
+                    SetStatus("Couldn’t leave the room. Check your connection and retry.", true);
+                    _btnLeave?.SetEnabled(true);
+                    return;
+                }
+            }
+            else
+            {
+                if (MatchConfig.IsHost)
+                    ServerHost.Instance?.Stop();
+                if (_lobby != null)
+                    await Task.WhenAny(_lobby.LeaveLobbyAsync(), Task.Delay(2000));
+            }
+            _alive = false;
             FrontendController.Show(FrontendPage.ServerBrowser);
-        }
-
-        private static async Task LeaveRoomAsync(LobbyClient lobby)
-        {
-            try
-            {
-                await Task.WhenAny(lobby.LeaveLobbyAsync(), Task.Delay(2000));
-            }
-            catch (Exception ex)
-            {
-                Debug.LogWarning($"[LobbyRoom] Room teardown failed: {ex.Message}");
-            }
         }
 
         private void OnDisable()
@@ -438,6 +681,12 @@ namespace SlopArena.Client.UI
             if (_btnLeave != null) _btnLeave.clicked -= Leave;
             if (_btnRetry != null) _btnRetry.clicked -= RetryConnection;
             if (_btnStart != null) _btnStart.clicked -= OnStartClicked;
+            if (_chatSession != null)
+            {
+                _chatSession.AccountChanged -= OnAccountChanged;
+                _chatSession.ActiveLobbyChanged -= OnActiveLobbyChanged;
+            }
+            _chatSession = null;
             if (_lobby != null) UnsubscribeLobby(_lobby);
             _lifecycleCts?.Dispose();
             _lifecycleCts = null;
@@ -445,6 +694,15 @@ namespace SlopArena.Client.UI
 
         private void UnsubscribeLobby(LobbyClient lobby)
         {
+            if (_roomMode)
+            {
+                lobby.Connected -= OnConnected;
+                lobby.Disconnected -= OnDisconnected;
+                lobby.RoomUpdated -= OnRoomUpdated;
+                lobby.RoomDeleted -= OnRoomDeleted;
+                lobby.RoomMembershipRevoked -= OnRoomMembershipRevoked;
+                return;
+            }
             lobby.Connected -= OnConnected;
             lobby.PlayerJoined -= OnPlayerJoined;
             lobby.PlayerLeft -= OnPlayerLeft;

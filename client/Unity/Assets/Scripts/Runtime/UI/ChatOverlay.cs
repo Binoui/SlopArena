@@ -496,13 +496,13 @@ namespace SlopArena.Client.UI
         {
             string key = active?.Key ?? string.Empty;
             bool isGlobal = !_showDirectory && string.Equals(key, "global", StringComparison.Ordinal);
-            bool isServer = !_showDirectory && key.StartsWith("server:", StringComparison.Ordinal);
+            bool isServer = !_showDirectory && key.StartsWith("room:", StringComparison.Ordinal);
             bool isDirect = _showDirectory || key.StartsWith("direct:", StringComparison.Ordinal);
 
             _globalTab?.EnableInClassList("chat-tab--active", isGlobal);
             _serverTab?.EnableInClassList("chat-tab--active", isServer);
             _directTab?.EnableInClassList("chat-tab--active", isDirect);
-            _serverTab?.SetEnabled(connected && (_session?.JoinedServerId.HasValue == true || isServer));
+            _serverTab?.SetEnabled(connected && (_session?.JoinedRoomId.HasValue == true || isServer));
             _directTab?.SetEnabled(true);
         }
 
@@ -723,9 +723,9 @@ namespace SlopArena.Client.UI
             foreach (ChatConversation conversation in _session.Conversations)
             {
                 if (conversation.Key != "global"
-                    && (!conversation.Key.StartsWith("server:", StringComparison.Ordinal)
-                        || !_session.JoinedServerId.HasValue
-                        || conversation.Key != $"server:{_session.JoinedServerId.Value}"))
+                    && (!conversation.Key.StartsWith("room:", StringComparison.Ordinal)
+                        || !_session.JoinedRoomId.HasValue
+                        || conversation.Key != $"room:{_session.JoinedRoomId.Value}"))
                     continue;
                 foreach (ChatMessage message in conversation.Messages)
                 {
@@ -922,8 +922,8 @@ namespace SlopArena.Client.UI
         private void SelectServer()
         {
             _showDirectory = false;
-            if (_session?.JoinedServerId is Guid serverId
-                && _session.SelectConversation($"server:{serverId}"))
+            if (_session?.JoinedRoomId is Guid roomId
+                && _session.SelectConversation($"room:{roomId}"))
                 RenderSession();
         }
 

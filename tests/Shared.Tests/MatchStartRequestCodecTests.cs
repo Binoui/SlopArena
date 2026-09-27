@@ -200,4 +200,22 @@ public class MatchStartRequestCodecTests
         """;
         Assert.Null(MatchStartRequestCodec.TryParse(Parse(body)));
     }
+    [Fact]
+    public void TryParse_DevelopmentRoomDeadlineRequiresGuidAndUtcInstant()
+    {
+        var json = """
+            {"matchId":"33333333-3333-3333-3333-333333333333",
+             "admissionExpiresAtUtc":"2026-10-01T00:01:00Z","players":[
+               {"steamId":1,"characterClass":"Manki","entityId":1},
+               {"steamId":2,"characterClass":"FightGuy","entityId":2}]}
+            """;
+        var request = MatchStartRequestCodec.TryParse(Parse(json));
+        Assert.NotNull(request);
+        Assert.Equal(DateTimeOffset.Parse("2026-10-01T00:01:00Z"), request.AdmissionExpiresAtUtc);
+        Assert.Null(MatchStartRequestCodec.TryParse(Parse(
+            json.Replace("33333333-3333-3333-3333-333333333333", "not-a-guid"))));
+        Assert.Null(MatchStartRequestCodec.TryParse(Parse(
+            json.Replace("2026-10-01T00:01:00Z", "not-a-date"))));
+    }
+
 }
