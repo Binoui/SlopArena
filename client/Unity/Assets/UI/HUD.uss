@@ -373,10 +373,10 @@
 
 .slot-prompt {
     position: absolute;
-    left: -10px;
-    top: -8px;
-    width: 90px;
-    height: 24px;
+    left: -16.75px;
+    top: -12.1px;
+    width: 103.5px;
+    height: 32.2px;
     flex-direction: row;
     align-items: center;
     justify-content: center;
@@ -384,32 +384,25 @@
 
 .slot-prompt-image {
     display: none;
-    width: 23px;
-    height: 23px;
+    width: 32.2px;
+    height: 32.2px;
+    padding: 2.3px;
+    background-color: #19131b;
+    border-radius: 16.1px;
     -unity-background-scale-mode: scale-to-fit;
 }
 
-.slot-prompt-plus {
-    display: none;
-    margin: 0 1px;
-    font-size: 12px;
-    -unity-font-style: bold;
-    color: #f0eee8;
-    -unity-text-outline-width: 2px;
-    -unity-text-outline-color: #19131b;
-}
-
 .slot-key-label {
-    min-width: 32px;
-    max-width: 90px;
-    height: 19px;
-    padding: 0 2px;
-    font-size: 11px;
+    min-width: 36.8px;
+    max-width: 103.5px;
+    height: 21.85px;
+    padding: 0 2.3px;
+    font-size: 12.65px;
     -unity-font-style: bold;
     -unity-text-align: middle-center;
     color: #f0eee8;
     background-color: #19131b;
-    border-radius: 10px;
+    border-radius: 11.5px;
 }
 
 

@@ -591,14 +591,8 @@ namespace SlopArena.Client.UI
                 return;
             }
 
-            if (MatchConfig.Mode == GameMode.Training)
-            {
-                _playerCards.Add(BuildPlayerCard(
-                    "P1", "YOU", MatchConfig.PlayerClass, "READY", true, true));
-                return;
-            }
 
-            if (MatchConfig.Mode == GameMode.Solo)
+            if (MatchConfig.Mode is GameMode.Solo or GameMode.Training)
             {
                 _playerCards.Add(BuildPlayerCard(
                     "P1", "YOU", MatchConfig.PlayerClass, "READY", true, true));

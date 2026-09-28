@@ -3,7 +3,6 @@ using System.IO;
 using System;
 using System.Linq;
 using UnityEngine;
-using UnityEngine.Serialization;
 using UnityEngine.SceneManagement;
 using UnityEngine.InputSystem;
 using SlopArena.Shared;
@@ -33,9 +32,6 @@ namespace SlopArena.Client.World
         [Header("Characters (Player)")]
         [SerializeField] private CharacterClass _playerClassOverride;
  
-        [Header("Characters (NPC)")]
-        [SerializeField] private CharacterClass _npcClass = CharacterClass.Manki;
- 
         [Header("Arena")]
         [SerializeField] private string _arenaNameOverride = "";
 
@@ -43,7 +39,6 @@ namespace SlopArena.Client.World
         [SerializeField] private CombatFeedback _combatFeedback;
         [SerializeField] private ProjectileVFXManager _projectileVFX;
         [SerializeField] private NpcAiMode _npcAiMode = NpcAiMode.Idle;
-        [SerializeField, FormerlySerializedAs("_npcCpuLevel")]
         private CpuDifficulty _npcDifficulty = CpuDifficulty.Normal;
 
         [Header("Hitboxes")]
@@ -200,7 +195,7 @@ namespace SlopArena.Client.World
             SlopArena.Shared.Simulation.OnDebugLog = msg => Debug.Log(msg);
             _arenaDef = arena;
             bool solo = MatchConfig.Mode == GameMode.Solo;
-            _npcDifficulty = BotDifficultyProfile.Normalize(_npcDifficulty);
+            _npcDifficulty = BotDifficultyProfile.Normalize(MatchConfig.SoloCpuDifficulty);
             _soloCountdownTicks = solo ? (ushort)300 : (ushort)0;
             _bridge = new LocalSimulationBridge(
                 arena,
@@ -217,7 +212,7 @@ namespace SlopArena.Client.World
             SlopArena.Client.ClientSession.InstallLocalMatchCatalog(contentCatalog);
             var playerClass = _playerClassOverride != CharacterClass.None ? _playerClassOverride : MatchConfig.PlayerClass;
             var playerEntry = contentCatalog.Resolve(playerClass);
-            var npcClass = solo ? MatchConfig.SoloBotClass : _npcClass;
+            var npcClass = MatchConfig.SoloBotClass;
             var npcEntry = contentCatalog.Resolve(npcClass);
             if (playerEntry == null || npcEntry == null)
             {
@@ -255,8 +250,7 @@ namespace SlopArena.Client.World
                 Spawn = NextNpcSpawn(),
                 Rng = new System.Random(),
             };
-            first.Memory.Difficulty = BotDifficultyProfile.Normalize(
-                solo ? MatchConfig.SoloCpuDifficulty : CurrentNpcDifficulty);
+            first.Memory.Difficulty = CurrentNpcDifficulty;
             if (!SpawnNpcSlot(first))
                 return;
             _npcs.Add(first);
@@ -400,10 +394,9 @@ namespace SlopArena.Client.World
                 {
                     npc.LastDeaths = npcState.Deaths;
                     npc.Memory.Reset();
-                    npc.Memory.Difficulty = BotDifficultyProfile.Normalize(
-                        MatchConfig.Mode == GameMode.Solo
-                            ? MatchConfig.SoloCpuDifficulty
-                            : CurrentNpcDifficulty);
+                    npc.Memory.Difficulty = MatchConfig.Mode == GameMode.Solo
+                        ? BotDifficultyProfile.Normalize(MatchConfig.SoloCpuDifficulty)
+                        : CurrentNpcDifficulty;
                     continue;
                 }
 

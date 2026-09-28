@@ -24,6 +24,21 @@ namespace SlopArena.Client.UI
         private readonly Dictionary<string, Glyph> _keyboard = Load("keyboard");
         private readonly Dictionary<string, Glyph> _xbox = Load("xbox");
 
+        // Number-row binds are physical keys: AZERTY reports &/é/"/' as their
+        // legends, but the HUD's canonical 1–4 prompts should keep their digits.
+        internal static string KeyboardDisplayLabel(string path, string label)
+        {
+            const string prefix = "<Keyboard>/";
+            if (path == null || !path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) ||
+                path.Length != prefix.Length + 1) return label;
+            return path[prefix.Length] switch
+            {
+                '0' => "0", '1' => "1", '2' => "2", '3' => "3", '4' => "4",
+                '5' => "5", '6' => "6", '7' => "7", '8' => "8", '9' => "9",
+                _ => label
+            };
+        }
+
         public bool TryKeyboard(string effectivePath, string displayName, out Glyph glyph)
         {
             string name = KeyboardName(effectivePath, displayName);
@@ -42,8 +57,8 @@ namespace SlopArena.Client.UI
 
         private static string KeyboardName(string path, string label)
         {
-            // A physical digit/letter can have a different legend on the current layout.
-            // Use the Input System's displayed legend, never the QWERTY control path.
+            // For number-row keys the caller has normalized the physical digit;
+            // other keys use the Input System's layout-aware displayed legend.
             if (label.Length == 1)
             {
                 char key = char.ToLowerInvariant(label[0]);
@@ -122,7 +137,8 @@ namespace SlopArena.Client.UI
                 sourceWidth = Mathf.Max(sourceWidth, x + width);
                 sourceHeight = Mathf.Max(sourceHeight, y + height);
             }
-            // XML coordinates describe the source PNG, not Unity's possibly NPOT-resized texture.
+            // The supplied sheets are vertically inverted relative to their XML rows;
+            // Unity UVs start at the bottom, so XML y is already the UV row.
             foreach (XmlNode node in cells)
             {
                 var attributes = node.Attributes;
@@ -132,7 +148,7 @@ namespace SlopArena.Client.UI
                 float width = float.Parse(attributes["width"].Value, CultureInfo.InvariantCulture);
                 float height = float.Parse(attributes["height"].Value, CultureInfo.InvariantCulture);
                 result.Add(name, new Glyph(texture, new Rect(x / sourceWidth,
-                    1f - (y + height) / sourceHeight, width / sourceWidth, height / sourceHeight)));
+                    y / sourceHeight, width / sourceWidth, height / sourceHeight)));
             }
             return result;
         }

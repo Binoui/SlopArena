@@ -574,47 +574,80 @@
     min-height: 230px;
     margin: 0 7px;
     padding: 0;
-    background-color: rgb(35, 30, 40);
+    background-color: rgb(36, 32, 43);
     border-width: 2px;
-    border-color: rgb(83, 77, 91);
+    border-color: rgb(66, 59, 73);
     border-bottom-width: 6px;
-    border-bottom-color: rgb(224, 92, 42);
     overflow: hidden;
     transition-duration: 0.12s;
-    transition-property: translate, border-color, background-color;
+    transition-property: translate, border-color, background-color, scale;
 }
 
 .char-card--selected {
-    translate: 0 -6px;
-    border-color: rgb(255, 200, 33);
-    background-color: rgb(52, 45, 55);
+    translate: 0 -7px;
+    scale: 1.02;
+    background-color: rgb(48, 42, 52);
+    border-width: 3px;
+    border-bottom-width: 7px;
+    border-color: rgb(255, 204, 34);
 }
 
-.char-card:hover,
+.char-card:hover {
+    translate: 0 -5px;
+    border-color: rgb(241, 235, 221);
+}
 .char-card:focus {
-    translate: 0 -6px;
-    border-color: rgb(240, 238, 232);
+    translate: 0 -5px;
+    border-color: rgb(255, 204, 34);
+}
+.char-card--selected:hover,
+.char-card--selected:focus {
+    translate: 0 -7px;
+    border-color: rgb(255, 218, 74);
+    border-bottom-color: rgb(255, 204, 34);
 }
 
 .char-portrait {
     flex-grow: 1;
     min-height: 0;
     width: 100%;
+    overflow: hidden;
     background-color: rgb(44, 40, 49);
+    background-position: center;
     -unity-background-scale-mode: scale-and-crop;
+    -unity-background-image-tint-color: rgb(220, 213, 222);
+}
+.char-card:hover .char-portrait,
+.char-card:focus .char-portrait,
+.char-card--selected .char-portrait {
+    -unity-background-image-tint-color: rgb(255, 255, 255);
 }
 
+
 .char-card-name {
-    min-height: 48px;
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    min-height: 50px;
     padding-left: 14px;
-    padding-top: 11px;
-    color: rgb(240, 238, 232);
-    background-color: rgb(28, 25, 33);
+    padding-right: 8px;
+    color: rgb(214, 207, 218);
+    background-color: rgba(29, 26, 35, 0.97);
     font-size: 19px;
     letter-spacing: 1px;
     -unity-font-style: bold;
     -unity-text-align: middle-left;
 }
+.char-card--selected .char-card-name {
+    color: rgb(255, 218, 74);
+    background-color: rgba(41, 36, 46, 0.98);
+    font-size: 20px;
+}
+.char-card:hover .char-card-name,
+.char-card:focus .char-card-name { color: rgb(241, 235, 221); }
+.char-card--selected:hover .char-card-name,
+.char-card--selected:focus .char-card-name { color: rgb(255, 218, 74); }
 
 .char-markers {
     position: absolute;
@@ -790,78 +823,88 @@
     min-width: 440px;
     margin-left: 10px;
     padding: 16px 18px;
-    background-color: rgb(240, 238, 232);
+    background-color: rgb(36, 32, 43);
     border-width: 2px;
-    border-color: rgb(13, 13, 20);
+    border-color: rgb(66, 59, 73);
     border-bottom-width: 6px;
-    border-bottom-color: rgb(255, 200, 33);
     align-items: stretch;
     display: none;
 }
 
 .selection-target {
-    color: rgb(25, 19, 27);
+    color: rgb(241, 235, 221);
     font-size: 17px;
     letter-spacing: 1px;
     -unity-font-style: bold;
 }
 
 .selection-target-buttons {
-    margin-top: 8px;
+    margin-top: 12px;
     flex-direction: row;
 }
 
 .selection-target-button {
     width: 50%;
     min-height: 42px;
-    margin-right: 6px;
     padding-left: 5px;
     padding-right: 5px;
-    background-color: rgb(216, 211, 201);
-    color: rgb(25, 19, 27);
+    background-color: rgb(36, 32, 43);
+    color: rgb(241, 235, 221);
     border-width: 2px;
-    border-color: rgb(13, 13, 20);
+    border-color: rgb(66, 59, 73);
     border-bottom-width: 4px;
     font-size: 15px;
 }
-
-
+#btn-edit-player { margin-right: 6px; }
 .selection-target-button:hover,
 .selection-target-button:focus {
-    border-color: rgb(240, 238, 232);
+    background-color: rgb(55, 49, 62);
+    border-color: rgb(255, 204, 34);
 }
-
 .selection-target-button.active {
-    background-color: rgb(255, 200, 33);
-    border-color: rgb(224, 92, 42);
+    background-color: rgb(255, 204, 34);
+    border-color: rgb(255, 204, 34);
+    color: rgb(21, 18, 25);
 }
-
-.solo-config .pvp-status {
-    margin-top: 10px;
-    color: rgb(72, 65, 76);
-    font-size: 15px;
-    white-space: normal;
+.selection-target-button.active:hover,
+.selection-target-button.active:focus {
+    background-color: rgb(255, 218, 74);
+    border-color: rgb(241, 235, 221);
 }
 
 .solo-difficulty-buttons {
     width: 100%;
+    margin-top: 12px;
     flex-direction: row;
 }
-
 .solo-difficulty-button {
     width: 33%;
     min-height: 42px;
     margin-right: 5px;
     padding-left: 3px;
     padding-right: 3px;
+    background-color: rgb(36, 32, 43);
+    border-color: rgb(66, 59, 73);
+    color: rgb(241, 235, 221);
     font-size: 14px;
     letter-spacing: 0;
 }
-
-
+#btn-cpu-difficulty-hard { margin-right: 0; }
+.solo-difficulty-button:hover,
+.solo-difficulty-button:focus {
+    background-color: rgb(55, 49, 62);
+    border-color: rgb(255, 204, 34);
+    color: rgb(241, 235, 221);
+}
 .solo-difficulty-button.active {
-    background-color: rgb(255, 200, 33);
-    border-color: rgb(224, 92, 42);
+    background-color: rgb(255, 204, 34);
+    border-color: rgb(255, 204, 34);
+    color: rgb(21, 18, 25);
+}
+.solo-difficulty-button.active:hover,
+.solo-difficulty-button.active:focus {
+    background-color: rgb(255, 218, 74);
+    border-color: rgb(241, 235, 221);
 }
 
 .pvp-action-area {

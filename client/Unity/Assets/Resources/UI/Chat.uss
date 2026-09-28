@@ -290,32 +290,106 @@
     flex-direction: column;
 }
 
-/* ── Menu presentation (issue #220) ────────────────────────────────────
-   The shell-hosted presenter keeps the compact bottom-left look: a
-   translucent surface, one restrained accent, a small conversation title
-   and no big CHAT heading. Combat keeps the default panel styling so dock
-   styling can never alter the match HUD. */
-
+/* Menu chat sits over Home artwork; gameplay keeps its own panel treatment. */
 .chat-panel--menu {
-    background-color: rgba(13, 13, 20, 0.84);
+    --chat-paper: rgb(241, 235, 221);
+    --chat-acid: rgb(255, 204, 34);
+    --chat-muted: rgb(171, 163, 178);
+    --chat-border: rgb(66, 59, 73);
+    background-color: rgba(36, 32, 43, 0.98);
     border-width: 1px;
-    border-color: rgba(240, 238, 232, 0.22);
+    border-color: var(--chat-border);
     border-bottom-width: 3px;
-    border-bottom-color: var(--chat-acid);
+    border-bottom-color: var(--chat-border);
 }
 
-.chat-panel--menu-opaque {
-    background-color: rgb(13, 13, 20);
-}
+.chat-panel--menu-opaque { background-color: var(--chat-surface); }
 
 .chat-panel--menu .chat-corner-actions { right: 24px; }
-
-
 
 .chat-panel--menu .chat-icon-button {
     width: 23px;
     height: 22px;
     min-height: 22px;
+    border-color: var(--chat-border);
+    background-color: var(--chat-surface);
+}
+
+.chat-panel--menu .chat-icon-button:hover,
+.chat-panel--menu .chat-icon-button:focus,
+.chat-panel--menu .chat-resize-grip:hover {
+    border-color: var(--chat-acid);
+    background-color: rgb(55, 49, 62);
+}
+
+.chat-panel--menu .chat-icon-expand-corner,
+.chat-panel--menu .chat-icon-minimize,
+.chat-panel--menu .chat-icon-minimize--collapse { border-color: var(--chat-paper); }
+.chat-panel--menu .chat-icon-minimize { background-color: var(--chat-paper); }
+.chat-panel--menu .chat-icon-minimize--collapse { background-color: transparent; }
+.chat-panel--menu .chat-resize-mark { background-color: var(--chat-paper); }
+
+.chat-panel--menu .chat-tab {
+    border-color: transparent;
+    background-color: transparent;
+    color: var(--chat-muted);
+}
+.chat-panel--menu .chat-tab--active {
+    color: var(--chat-acid);
+}
+.chat-panel--menu .chat-tab--active .chat-tab-underline {
+    background-color: var(--chat-acid);
+}
+.chat-panel--menu .chat-tab:hover,
+.chat-panel--menu .chat-tab:focus {
+    border-color: var(--chat-border);
+    background-color: rgb(55, 49, 62);
+    color: var(--chat-acid);
+}
+.chat-panel--menu .chat-tab:focus { border-color: var(--chat-acid); }
+.chat-panel--menu .chat-tab:disabled {
+    background-color: transparent;
+    border-color: transparent;
+    color: var(--chat-muted);
+    opacity: 0.65;
+}
+
+.chat-panel--menu .chat-draft,
+.chat-panel--menu .chat-draft .unity-base-text-field__input {
+    background-color: rgb(29, 26, 35);
+    color: var(--chat-paper);
+}
+.chat-panel--menu .chat-draft {
+    border-color: var(--chat-border);
+}
+.chat-panel--menu .chat-draft:focus {
+    border-color: var(--chat-acid);
+}
+.chat-panel--menu .chat-draft .unity-base-text-field__input:focus {
+    border-width: 1px;
+    border-color: var(--chat-acid);
+}
+.chat-panel--menu .chat-draft .unity-base-text-field__input--placeholder {
+    color: var(--chat-muted);
+}
+
+.chat-panel--menu .chat-compose .chat-action {
+    background-color: var(--chat-surface);
+    border-color: var(--chat-border);
+    color: var(--chat-paper);
+}
+.chat-panel--menu .chat-compose .chat-action:hover,
+.chat-panel--menu .chat-compose .chat-action:focus {
+    background-color: rgb(55, 49, 62);
+    border-color: var(--chat-acid);
+    color: var(--chat-acid);
+    translate: 0 0;
+}
+.chat-panel--menu .chat-compose .chat-action:disabled {
+    background-color: rgb(36, 32, 43);
+    border-color: var(--chat-border);
+    color: var(--chat-muted);
+    opacity: 0.65;
 }
 
 /* Directory section labels inside the explicit DIRECT view. */
@@ -347,7 +421,17 @@
     -unity-text-align: middle-center;
 }
 
-.chat-tab:last-child {
+.chat-tab-underline {
+    position: absolute;
+    bottom: 2px;
+    left: 50%;
+    margin-left: -16px;
+    width: 32px;
+    height: 2px;
+    background-color: transparent;
+}
+
+#chat-tab-direct {
     margin-right: 0;
 }
 

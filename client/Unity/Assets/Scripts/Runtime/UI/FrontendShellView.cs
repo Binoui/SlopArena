@@ -135,8 +135,6 @@ namespace SlopArena.Client.UI
                 enabled = false;
                 return;
             }
-            var packSkin = Resources.Load<StyleSheet>("UI/LocalPack/PackSkin");
-            if (packSkin != null) _topBar?.styleSheets.Add(packSkin);
 
             // The page content region spans the three page hosts; the social
             // cell sits inside the workspace too, so region operations must
@@ -235,8 +233,9 @@ namespace SlopArena.Client.UI
 
             if (_lowerRow != null)
             {
-                _lowerRow.style.marginTop = topGap;
-                _lowerRow.style.paddingBottom = spacing;
+                bool home = _root.ClassListContains("frontend-shell--home");
+                _lowerRow.style.marginTop = home ? 0f : topGap;
+                _lowerRow.style.paddingBottom = home ? 0f : spacing;
             }
 
             if (!_socialExpanded)
@@ -300,9 +299,8 @@ namespace SlopArena.Client.UI
             {
                 if (expanded)
                 {
-                    // The social host resolves against the positioned shell
-                    // workspace, so the expanded surface sits below the top
-                    // bar and occludes the page without a second store.
+                    // On Home the positioned lower row fills the workspace;
+                    // on other pages the workspace positions this host.
                     _socialHost.style.position = Position.Absolute;
                     _socialHost.style.left = 0;
                     _socialHost.style.right = 0;
@@ -337,6 +335,9 @@ namespace SlopArena.Client.UI
         /// <summary>Update the shell's page context without hiding its persistent frame.</summary>
         public void ApplyPageMode(FrontendPage page)
         {
+            _root?.EnableInClassList("frontend-shell--home", page == FrontendPage.Home);
+            _root?.EnableInClassList("frontend-shell--stage", page == FrontendPage.StageSelect);
+            ApplyDensityGeometry();
             SetPageContext(page switch
             {
                 FrontendPage.Home => string.Empty,

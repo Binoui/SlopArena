@@ -1,11 +1,9 @@
 /* FrontendShell (issues #218/#219): the permanent frontend frame. One stable
-   document: top bar, page header/body hosts, lower row with the reserved
-   bottom-left conversation cell and the page summary/actions cell, plus
-   hidden expanded-social and modal hosts. Flex layout only — no absolute
-   placement except decorative art and the later expanded/modal surfaces.
-   Density classes live on the stable shell root and change only when the
-   selected mode changes; PanelSettings use ConstantPhysicalSize (96 dpi),
-   so USS px ≈ physical pixels and the size targets below are physical. */
+   document: top bar, page header/body hosts, lower row with social and
+   page summary/actions cells, plus expanded-social and modal hosts. Home
+   overlays its social cell instead of reserving layout space. Density classes
+   live on the stable shell root; PanelSettings use ConstantPhysicalSize
+   (96 dpi), so USS px ≈ physical pixels. */
 
 .frontend-shell {
     flex-grow: 1;
@@ -24,6 +22,16 @@
     border-right-width: 14px;
     border-right-color: rgb(224, 92, 42);
     -unity-text-align: middle-left;
+}
+
+.frontend-shell--home,
+.frontend-shell--home .shell-backdrop {
+    background-color: rgb(21, 18, 25);
+    color: rgb(241, 235, 221);
+}
+
+.frontend-shell--home .shell-backdrop {
+    border-right-color: rgb(255, 204, 34);
 }
 
 .shell-hidden {
@@ -178,10 +186,10 @@
     margin-left: 12px;
     padding-left: 32px;
     padding-right: 10px;
-    background-color: rgb(13, 13, 20);
+    background-color: rgb(36, 32, 43);
     border-width: 1px;
-    border-color: rgb(98, 92, 107);
-    color: rgb(240, 238, 232);
+    border-color: rgb(66, 59, 73);
+    color: rgb(241, 235, 221);
     font-size: 13px;
     letter-spacing: 1px;
     -unity-font-style: bold;
@@ -189,8 +197,8 @@
 
 .shell-menu-trigger:hover,
 .shell-menu-trigger:focus {
-    border-color: rgb(255, 200, 33);
-    color: rgb(255, 200, 33);
+    border-color: rgb(255, 204, 34);
+    color: rgb(255, 204, 34);
 }
 
 .shell-menu-gear {
@@ -223,23 +231,29 @@
     flex-direction: row;
     align-items: center;
     border-bottom-width: 2px;
-    border-bottom-color: rgb(255, 200, 33);
+    border-bottom-color: rgb(66, 59, 73);
 }
 
 .shell-wordmark {
     min-height: 40px;
-    padding-left: 0;
-    padding-right: 0;
-    border-width: 0;
-    background-color: transparent;
-    color: rgb(255, 200, 33);
-    font-size: 20px;
-    letter-spacing: 3px;
+    padding-left: 12px;
+    padding-right: 12px;
+    border-width: 1px;
+    border-color: rgb(255, 204, 34);
+    background-color: rgb(255, 204, 34);
+    color: rgb(21, 18, 25);
+    font-size: 22px;
+    letter-spacing: 1px;
+    -unity-font-definition: url("../Fonts/Baloo2.asset");
     -unity-font-style: bold;
     -unity-text-align: middle-center;
 }
 
-.shell-wordmark:hover, .shell-wordmark:focus { color: rgb(240, 238, 232); }
+.shell-wordmark:hover,
+.shell-wordmark:focus {
+    background-color: rgb(255, 218, 74);
+    border-color: rgb(241, 235, 221);
+}
 
 .shell-nav {
     flex-direction: row;
@@ -253,33 +267,44 @@
     min-width: 104px;
     min-height: 42px;
     margin-right: 4px;
-    padding-left: 10px;
-    padding-right: 10px;
-    border-left-width: 1px;
-    border-top-width: 1px;
-    border-right-width: 1px;
-    border-bottom-width: 4px;
-    border-left-color: rgb(13, 13, 20);
-    border-top-color: rgb(13, 13, 20);
-    border-right-color: rgb(13, 13, 20);
-    border-bottom-color: rgb(13, 13, 20);
-    background-color: rgb(36, 32, 43);
-    color: rgb(240, 238, 232);
-    font-size: 12px;
+    padding-left: 14px;
+    padding-right: 14px;
+    border-width: 1px;
+    border-color: transparent;
+    background-color: transparent;
+    color: rgb(241, 235, 221);
+    font-size: 14px;
+    letter-spacing: 1px;
     -unity-font-style: bold;
     white-space: nowrap;
 }
 
+.shell-nav-underline {
+    position: absolute;
+    bottom: 3px;
+    left: 50%;
+    margin-left: -16px;
+    width: 32px;
+    height: 3px;
+    background-color: transparent;
+}
+
 .shell-nav-tab--selected {
-    background-color: rgb(240, 238, 232);
-    border-bottom-color: rgb(224, 92, 42);
-    color: rgb(23, 19, 27);
+    color: rgb(255, 204, 34);
 }
 
-.shell-nav-tab:hover, .shell-nav-tab:focus {
-    border-top-color: rgb(255, 200, 33);
+.shell-nav-tab--selected .shell-nav-underline {
+    background-color: rgb(255, 204, 34);
 }
 
+.shell-nav-tab:hover,
+.shell-nav-tab:focus {
+    color: rgb(255, 204, 34);
+    border-color: rgb(66, 59, 73);
+    background-color: rgb(36, 32, 43);
+}
+
+.shell-nav-tab:focus { border-color: rgb(255, 204, 34); }
 .shell-nav-tab:disabled { opacity: 0.68; }
 
 .shell-settings {
@@ -288,15 +313,17 @@
     padding-left: 12px;
     padding-right: 12px;
     background-color: rgb(36, 32, 43);
-    color: rgb(240, 238, 232);
-    border-bottom-width: 3px;
-    border-bottom-color: rgb(224, 92, 42);
+    color: rgb(241, 235, 221);
+    border-width: 1px;
+    border-color: rgb(66, 59, 73);
     font-size: 12px;
     -unity-font-style: bold;
 }
 
-.shell-settings:hover, .shell-settings:focus {
-    border-bottom-color: rgb(255, 200, 33);
+.shell-settings:hover,
+.shell-settings:focus {
+    border-color: rgb(255, 204, 34);
+    color: rgb(255, 204, 34);
 }
 
 .shell-page-context {
@@ -316,19 +343,21 @@
     padding-right: 10px;
     min-height: 30px;
     border-width: 1px;
-    border-color: rgba(240, 238, 232, 0.25);
-    background-color: rgba(13, 13, 20, 0.6);
-    color: rgb(76, 221, 136);
+    border-color: rgb(66, 59, 73);
+    background-color: rgb(36, 32, 43);
+    color: rgb(171, 163, 178);
     font-size: 13px;
     letter-spacing: 1px;
     -unity-font-style: bold;
     white-space: nowrap;
 }
 
+.shell-identity--connected { color: rgb(76, 221, 136); }
+.shell-identity--warning { color: rgb(255, 204, 34); }
+
 .shell-identity:hover,
 .shell-identity:focus {
-    border-color: rgb(255, 200, 33);
-    color: rgb(255, 200, 33);
+    border-color: rgb(255, 204, 34);
 }
 
 /* The visible top-bar route (issue #220): text is set by the focus router
@@ -358,6 +387,15 @@
     position: relative;
 }
 
+/* Home art keeps its native 1438×810 size, centered without enlarging. */
+.frontend-shell--home .shell-workspace {
+    background-color: rgb(21, 18, 25);
+    background-image: url("MainMenuBackground.png");
+    background-size: 1438px 810px;
+    background-position: center;
+    background-repeat: no-repeat;
+}
+
 .shell-host {
     min-width: 0;
     min-height: 0;
@@ -380,9 +418,8 @@
     align-items: flex-end;
 }
 
-/* Reserved bottom-left conversation cell: a real layout cell, floating only
-   through spacing and the presenter's own translucent surface. The lower row
-   itself carries no background or border. */
+/* Other pages reserve a bottom-left conversation cell in the lower row;
+   Home positions that row over the page. The row has no painted surface. */
 .shell-social-host {
     width: 480px;
     height: 230px;
@@ -473,6 +510,27 @@
 .frontend-shell--compact .shell-lower-row {
     margin-top: 10px;
     padding-bottom: 16px;
+}
+
+/* Home overlays chat; other pages keep their reserved lower-row layout. */
+.frontend-shell--home .shell-lower-row {
+    position: absolute;
+    left: 24px;
+    bottom: 24px;
+    margin-top: 0;
+    padding-bottom: 0;
+}
+.frontend-shell--home .shell-page-lower-host { display: none; }
+.frontend-shell--home.frontend-shell--compact .shell-lower-row {
+    left: 16px;
+    bottom: 16px;
+}
+/* Expanded chat still fills the workspace below the unchanged top bar. */
+.frontend-shell--home.frontend-shell--social-expanded .shell-lower-row {
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
 }
 
 /* ── Presenter sizing inside the reserved cell ─────────────────────────
@@ -584,67 +642,10 @@
 
 
 /* Repeated fighter and setup sections keep their intended size. */
-.char-select-frag .frag-header,
 .char-body-section .selection-copy,
 .char-summary-section,
 .char-actions-section {
     flex-shrink: 0;
-}
-
-
-.menu-info {
-    flex-grow: 1;
-    flex-basis: 420px;
-    flex-shrink: 1;
-    min-width: 340px;
-    max-width: 850px;
-    margin-left: 24px;
-    padding: 20px 24px 24px;
-    background-color: rgb(13, 13, 20);
-    border-left-width: 3px;
-    border-top-width: 3px;
-    border-right-width: 3px;
-    border-bottom-width: 8px;
-    border-left-color: rgb(240, 238, 232);
-    border-top-color: rgb(240, 238, 232);
-    border-right-color: rgb(240, 238, 232);
-    border-bottom-color: rgb(224, 92, 42);
-}
-
-.menu-info-header {
-    flex-direction: row;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.menu-info-heading {
-    color: rgb(255, 200, 33);
-    font-size: 14px;
-    letter-spacing: 2px;
-    -unity-font-style: bold;
-}
-
-.menu-info-index {
-    color: rgb(196, 189, 197);
-    font-size: 11px;
-    letter-spacing: 1px;
-}
-
-.menu-info-declaration {
-    margin-top: 14px;
-    color: rgb(240, 238, 232);
-    font-size: 37px;
-    -unity-font-style: bold;
-    -unity-font-definition: url("../Fonts/Baloo2.asset");
-    white-space: normal;
-}
-
-.menu-info-copy {
-    max-width: 660px;
-    margin-top: 8px;
-    color: rgb(240, 238, 232);
-    font-size: 17px;
-    white-space: normal;
 }
 
 
@@ -658,70 +659,143 @@
     flex-direction: row;
     flex-wrap: wrap;
     align-items: flex-start;
-    justify-content: flex-end;
+    justify-content: space-between;
 }
 
+.menu-actions {
+    width: 330px;
+    flex-shrink: 0;
+    margin-top: 84px;
+}
 
+.menu-action {
+    width: 100%;
+    min-height: 88px;
+    margin-bottom: 12px;
+    padding-left: 28px;
+    padding-right: 28px;
+    border-radius: 0;
+    border-width: 2px;
+    border-bottom-width: 6px;
+    border-color: rgb(66, 59, 73);
+    color: rgb(241, 235, 221);
+    font-size: 27px;
+    -unity-font-definition: url("../Fonts/Baloo2.asset");
+    -unity-font-style: bold;
+    -unity-text-align: middle-left;
+}
 
+.menu-action--online {
+    background-color: rgb(255, 204, 34);
+    color: rgb(21, 18, 25);
+}
 
+.menu-action--solo,
+.menu-action--training { background-color: rgb(36, 32, 43); }
 
+.menu-action--online:hover,
+.menu-action--online:focus {
+    background-color: rgb(255, 218, 74);
+    border-color: rgb(241, 235, 221);
+}
 
-.frontend-shell--compact .menu-info {
+.menu-action--solo:hover,
+.menu-action--solo:focus,
+.menu-action--training:hover,
+.menu-action--training:focus {
+    background-color: rgb(55, 49, 62);
+    border-color: rgb(255, 204, 34);
+}
+
+.menu-action:disabled,
+.menu-action:disabled:hover,
+.menu-action:disabled:focus {
+    background-color: rgb(36, 32, 43);
+    border-color: rgb(66, 59, 73);
+    color: rgb(171, 163, 178);
+    opacity: 0.65;
+}
+
+.menu-info {
+    width: 348px;
+    height: 300px;
+    flex-shrink: 0;
+    padding: 22px 24px;
+    background-color: rgb(36, 32, 43);
+    border-width: 2px;
+    border-color: rgb(66, 59, 73);
+    border-bottom-width: 5px;
+}
+
+.menu-info-heading {
+    color: rgb(255, 204, 34);
+    font-size: 15px;
+    letter-spacing: 2px;
+    -unity-font-style: bold;
+}
+
+.menu-announcements {
     flex-grow: 1;
-    flex-basis: 400px;
-    min-width: 340px;
-    max-width: 850px;
-    margin-left: 0;
-    padding: 14px 16px;
+    min-height: 0;
+    margin-top: 18px;
 }
 
-.frontend-shell--compact .menu-info-declaration { font-size: 28px; }
+.menu-info-declaration {
+    color: rgb(241, 235, 221);
+    font-size: 28px;
+    -unity-font-style: bold;
+    -unity-font-definition: url("../Fonts/Baloo2.asset");
+    white-space: normal;
+}
+
+.menu-info-copy {
+    margin-top: 12px;
+    color: rgb(241, 235, 221);
+    font-size: 16px;
+    white-space: normal;
+}
+
+.frontend-shell--compact .menu-actions {
+    width: 270px;
+    margin-top: 18px;
+}
+.frontend-shell--compact .menu-action {
+    min-height: 70px;
+    margin-bottom: 8px;
+    font-size: 22px;
+}
+.frontend-shell--compact .menu-info {
+    width: 270px;
+    height: 260px;
+    padding: 18px 22px;
+}
+.frontend-shell--compact .menu-info-declaration { font-size: 22px; }
 .frontend-shell--compact .menu-info-copy { font-size: 14px; }
 
 
 /* Fighter Select */
 
-.char-select-frag .frag-header {
+/* Fragment roots are split across shell hosts. Solo and Training share
+   the same title-only header instead of styling a discarded wrapper. */
+.char-header--local {
     min-height: 64px;
     flex-direction: row;
     align-items: flex-start;
-    flex-shrink: 0;
 }
-
-.char-select-frag .flow-header-copy {
+.char-header--local .flow-header-copy {
+    width: 65%;
+    min-width: 0;
     margin-left: 16px;
     align-items: flex-start;
-    width: 60%;
-    min-width: 0;
 }
-
-.char-select-frag .flow-title {
-    font-size: 34px;
-    margin-top: 2px;
+.char-header--local .flow-eyebrow,
+.char-header--local .flow-subtitle { display: none; }
+.char-header--local .flow-title {
+    margin-top: 0;
+    font-size: 44px;
+    white-space: normal;
 }
-
-.frontend-shell--compact .char-select-frag .flow-title {
-    font-size: 26px;
-}
-
-.char-select-frag .flow-subtitle {
-    margin-top: 4px;
-    font-size: 15px;
-}
-
-.frontend-shell--compact .char-select-frag .flow-subtitle {
-    font-size: 13px;
-}
-
-.char-select-frag .char-header-status {
-    margin-left: auto;
-    align-items: flex-end;
-}
-
-.char-select-frag .char-select-meta {
-    margin-top: 6px;
-    font-size: 13px;
-}
+.frontend-shell--compact .char-header--local .flow-title { font-size: 32px; }
 
 .char-body-section {
     flex-grow: 1;
@@ -734,12 +808,12 @@
    230px minimum (SlopArena.uss); the body scrolls only when still too
    tight, with the primary action always reachable (issue #219). */
 .char-body-section .char-card {
-    min-height: 255px;
+    min-height: 170px;
     max-width: 340px;
 }
 .char-body-section .char-grid {
     flex-grow: 1;
-    min-height: 255px;
+    min-height: 170px;
 }
 
 .char-body-section .selection-copy {
@@ -749,21 +823,9 @@
     min-height: 42px;
 }
 
-.char-select-frag .char-name {
-    font-size: 19px;
-}
-
-.frontend-shell--compact .char-select-frag .char-name {
-    font-size: 17px;
-}
-
-.char-select-frag .char-role {
-    margin-top: 2px;
-    font-size: 13px;
-}
 .frontend-shell--compact .char-body-section .char-card,
 .frontend-shell--compact .char-body-section .char-grid {
-    min-height: 190px;
+    min-height: 135px;
 }
 
 
@@ -776,6 +838,62 @@
 .char-summary-section .roster-panel {
     flex-direction: row;
     align-items: stretch;
+}
+
+/* Local fighter selection keeps step/status and continuation beside the
+   participant controls; the one-player Training card gets its own width. */
+.char-summary-section--local {
+    align-items: flex-start;
+}
+
+.char-summary-section--solo .player-card {
+    flex-direction: column;
+    align-items: stretch;
+    background-color: rgb(36, 32, 43);
+    border-color: rgb(66, 59, 73);
+    border-bottom-color: rgb(66, 59, 73);
+}
+.char-summary-section--solo .player-card__number {
+    color: rgb(171, 163, 178);
+}
+.char-summary-section--solo .player-card:hover,
+.char-summary-section--solo .player-card:focus {
+    border-color: rgb(241, 235, 221);
+}
+.char-summary-section--solo .player-card--editing {
+    background-color: rgb(48, 42, 52);
+    border-width: 3px;
+    border-bottom-width: 6px;
+    border-color: rgb(255, 204, 34);
+    border-bottom-color: rgb(255, 204, 34);
+}
+.char-summary-section--solo .player-card--editing .player-card__number {
+    color: rgb(255, 204, 34);
+}
+.char-summary-section--solo .player-card--editing:hover,
+.char-summary-section--solo .player-card--editing:focus {
+    border-color: rgb(255, 218, 74);
+    border-bottom-color: rgb(255, 204, 34);
+}
+.char-summary-section--local .solo-next-action {
+    width: 230px;
+    min-width: 0;
+    margin-left: 16px;
+    align-self: flex-start;
+    align-items: stretch;
+}
+.char-summary-section--local .char-header-status {
+    margin-left: 0;
+    margin-bottom: 12px;
+    align-items: flex-start;
+}
+.char-summary-section--local .char-select-meta {
+    margin-top: 6px;
+}
+
+.frontend-shell--compact .char-summary-section.char-summary-section--local .solo-next-action {
+    width: 200px;
+    min-width: 0;
 }
 
 .frontend-shell--compact .char-summary-section .roster-panel .player-card {
@@ -815,9 +933,22 @@
 }
 
 /* ── Stage Select fragment (issue #221) ────────────────────────────────
-   The stage grid lives in the body's intentional scroll region; the
-   participant summary and the selected-stage/start action sit in the
-   lower-right cells as match context. */
+   Stage cards lead; participants and the primary action share the
+   lower-right row beside the persistent social cell. */
+.frontend-shell--stage .shell-page-lower-host {
+    flex-direction: row;
+    align-items: flex-end;
+}
+
+.frontend-shell--stage .shell-summary-host {
+    flex-grow: 1;
+    min-width: 0;
+}
+
+.frontend-shell--stage .shell-actions-host {
+    flex-shrink: 0;
+}
+
 
 .stage-header-section {
     flex-shrink: 0;
@@ -857,8 +988,7 @@
     min-height: 0;
 }
 .stage-body-section .stage-grid {
-    width: 82%;
-    margin-left: auto;
+    width: 100%;
 }
 
 .stage-body-section .stage-card {
@@ -869,14 +999,15 @@
 .stage-summary-section {
     flex-shrink: 0;
     margin-top: 10px;
-    margin-right: 12px;
     flex-direction: row;
-    align-items: stretch;
+    align-items: flex-end;
+    justify-content: flex-end;
 }
 
 .stage-summary-section .stage-player-cards {
     flex-direction: row;
     align-items: stretch;
+    margin-right: 12px;
 }
 
 .stage-actions-section {
@@ -902,22 +1033,21 @@
     font-size: 26px;
 }
 
+.frontend-shell--compact .stage-header-section .flow-eyebrow,
 .frontend-shell--compact .stage-header-section .flow-subtitle {
-    font-size: 13px;
+    display: none;
 }
 
 .frontend-shell--compact .stage-body-section .stage-card {
-    width: 30%;
-    height: 150px;
-}
-.frontend-shell--compact .stage-body-section .stage-grid {
-    width: 100%;
+    width: 18%;
+    height: 124px;
 }
 
 
 .frontend-shell--compact .stage-summary-section .stage-player-cards .player-card {
-    width: 140px;
+    width: 120px;
     min-height: 110px;
+    margin-right: 4px;
 }
 
 .frontend-shell--compact .stage-actions-section {

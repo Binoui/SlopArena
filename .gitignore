@@ -208,6 +208,7 @@ client/Unity/Assets/Plugins/**/NuGet/.nuget-installed.json
 !client/Unity/Assets/CharacterPackages/bonk/Animations/bonk_crouch.anim
 !client/Unity/Assets/CharacterPackages/kistu/Animations/kistu_crouch.anim
 *.png
+!client/Unity/Assets/UI/SplashArt/*.png
 !client/Unity/Assets/UI/MenuGear.png
 !client/Unity/Assets/UI/HUDNormalDiamond.png
 !client/Unity/Assets/UI/HUDSpecialDiamond.png

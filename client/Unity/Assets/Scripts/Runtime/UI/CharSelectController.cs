@@ -13,12 +13,11 @@ namespace SlopArena.Client.UI
     /// Fighter Select page (issue #219): a fragment mounted into the
     /// FrontendShell hosts — portrait grid and selection brief in the body,
     /// participant cards and CPU editing in the lower-right summary, and the
-    /// primary action outside the conversation cell. Training and Solo use
-    /// the shared fighter and stage pickers:
+    /// primary action outside the conversation cell. Training and Solo share
+    /// player/CPU fighter and difficulty selection before stage selection:
     /// <list type="bullet">
-    /// <item><b>Training</b> — pick a character, then a stage before entering Training.</item>
-    /// <item><b>Solo</b> — assign a player and CPU character,
-    /// choose a difficulty, then select a stage.</item>
+    /// <item><b>Training</b> — enter Training with the selected NPC.</item>
+    /// <item><b>Solo</b> — start a stock match against the selected CPU.</item>
     /// <item><b>PvP</b> — multiplayer via SignalR: all players pick simultaneously,
     /// lock in, and the host starts the match when everyone is locked in (min 2).</item>
     /// </list>
@@ -74,7 +73,7 @@ namespace SlopArena.Client.UI
             _selected = classes.Contains(MatchConfig.PlayerClass)
                 ? MatchConfig.PlayerClass
                 : classes.Length > 0 ? classes[0] : CharacterClass.None;
-            if (MatchConfig.Mode == GameMode.Solo &&
+            if ((MatchConfig.Mode is GameMode.Solo or GameMode.Training) &&
                 classes.Length > 0 &&
                 !classes.Contains(MatchConfig.SoloBotClass))
                 MatchConfig.SoloBotClass = classes[0];
@@ -118,57 +117,17 @@ namespace SlopArena.Client.UI
                 InitRoom(_context);
             else if (MatchConfig.Mode == GameMode.PvP)
                 InitPvP(_context);
-            else if (MatchConfig.Mode == GameMode.Solo)
-                InitSolo(_context);
             else
-            {
-                AddTrainingMarker();
-                InitTraining(_context);
-            }
-        }
-        private void InitTraining(FrontendPageContext context)
-        {
-            SetModeChrome(context, "TRAINING // CHOOSE YOUR FIGHTER", "STEP 1 OF 2  /  FIGHTER");
-            var rosterMeta = context.Q<Label>("roster-meta");
-            if (rosterMeta != null)
-                rosterMeta.text = MenuRoster.Classes.Length == 0
-                    ? "NO ADMITTED FIGHTERS"
-                    : $"{MenuRoster.Classes.Length} FIGHTERS // TRAINING";
-            // Training shows one participant card and the single primary
-            // action; the CPU editing column and PvP status stay hidden.
-            context.Q<VisualElement>("solo-config")?.style.SetDisplay(false);
-            context.Q<VisualElement>("pvp-action-area")?.style.SetDisplay(false);
-
-            var selectButton = context.Q<Button>("btn-select");
-            if (selectButton != null)
-            {
-                selectButton.style.display = DisplayStyle.Flex;
-                selectButton.text = "SELECT STAGE";
-                selectButton.SetEnabled(MenuRoster.Classes.Length > 0);
-                selectButton.clicked += () =>
-                {
-                    if (_selected == CharacterClass.None) return;
-                    MatchConfig.PlayerClass = _selected;
-                    FrontendController.Show(FrontendPage.StageSelect);
-                };
-            }
-
-            _rosterPanel = context.Q<VisualElement>("roster-panel");
-            RenderTrainingRoster();
-
-            var btnBack = context.Q<Button>("btn-back");
-            Action back = () => FrontendController.Show(FrontendPage.Home);
-            if (btnBack != null)
-                btnBack.clicked += back;
-            ConfigureNavigation(context, MenuRoster.Classes.Length > 0 ? selectButton : null, btnBack, back);
-
-            if (MenuRoster.Classes.Length == 0)
-                ShowRosterUnavailable(context, "NO ADMITTED FIGHTERS", "Cooked fighter content is unavailable. Return to the menu.");
+                InitLocal(_context);
         }
 
-        private void InitSolo(FrontendPageContext context)
+        private void InitLocal(FrontendPageContext context)
         {
-            SetModeChrome(context, "SOLO // CHOOSE YOUR FIGHTERS", "STEP 1 OF 2  /  FIGHTERS");
+            bool training = MatchConfig.Mode == GameMode.Training;
+            SetModeChrome(context, training ? "TRAINING // SELECT YOUR FIGHTER" : "SOLO // SELECT YOUR FIGHTER",
+                "STEP 1 OF 2  /  FIGHTERS");
+            ApplyLocalSelectLayout(context);
+            context.Q<VisualElement>("page-summary")?.AddToClassList("char-summary-section--solo");
             // The active card and editing panel already name this fighter;
             // keep the kit brief without a duplicate display line.
             context.Q<Label>("char-name")?.style.SetDisplay(false);
@@ -176,9 +135,8 @@ namespace SlopArena.Client.UI
             if (rosterMeta != null)
                 rosterMeta.text = MenuRoster.Classes.Length == 0
                     ? "NO ADMITTED FIGHTERS"
-                    : $"{MenuRoster.Classes.Length} FIGHTERS // SOLO";
-            // Solo shows both participant cards plus CPU editing; the PvP
-            // status column stays hidden.
+                    : $"{MenuRoster.Classes.Length} FIGHTERS // {(training ? "TRAINING" : "SOLO")}";
+            // Local modes show both participant cards and CPU editing.
             context.Q<VisualElement>("pvp-action-area")?.style.SetDisplay(false);
 
             var selectButton = context.Q<Button>("btn-select");
@@ -190,7 +148,6 @@ namespace SlopArena.Client.UI
             }
 
             _rosterPanel = context.Q<VisualElement>("roster-panel");
-            RenderSoloRoster();
 
             var config = context.Q<VisualElement>("solo-config");
             if (config != null)
@@ -205,10 +162,7 @@ namespace SlopArena.Client.UI
                 _btnEditCpu.clicked += () => SetSelectionTarget(context, selectingCpu: true);
             SetSelectionTarget(context, selectingCpu: false);
 
-            var difficultyLabel = context.Q<Label>("solo-difficulty-label");
             MatchConfig.SoloCpuDifficulty = BotDifficultyProfile.Normalize(MatchConfig.SoloCpuDifficulty);
-            if (difficultyLabel != null)
-                difficultyLabel.text = $"CPU DIFFICULTY: {BotDifficultyProfile.DisplayName(MatchConfig.SoloCpuDifficulty)}";
             foreach (CpuDifficulty difficulty in (CpuDifficulty[])Enum.GetValues(typeof(CpuDifficulty)))
             {
                 var capturedDifficulty = difficulty;
@@ -217,10 +171,7 @@ namespace SlopArena.Client.UI
                 button.clicked += () =>
                 {
                     MatchConfig.SoloCpuDifficulty = capturedDifficulty;
-                    if (difficultyLabel != null)
-                        difficultyLabel.text = $"CPU DIFFICULTY: {BotDifficultyProfile.DisplayName(capturedDifficulty)}";
                     UpdateDifficultyButtons(context);
-                    RenderSoloRoster();
                 };
             }
             UpdateDifficultyButtons(context);
@@ -244,6 +195,19 @@ namespace SlopArena.Client.UI
 
             if (MenuRoster.Classes.Length == 0)
                 ShowRosterUnavailable(context, "NO ADMITTED FIGHTERS", "Cooked fighter content is unavailable. Return to the menu.");
+        }
+
+        private static void ApplyLocalSelectLayout(FrontendPageContext context)
+        {
+            context.Q<VisualElement>("page-header")?.AddToClassList("char-header--local");
+            var summary = context.Q<VisualElement>("page-summary");
+            var nextAction = context.Q<VisualElement>("solo-next-action");
+            var stepStatus = context.Q<VisualElement>("char-header-status");
+            if (summary == null || nextAction == null || stepStatus == null) return;
+
+            summary.AddToClassList("char-summary-section--local");
+            summary.Add(nextAction);
+            nextAction.Insert(0, stepStatus);
         }
 
         private static void SetModeChrome(FrontendPageContext context, string title, string progress)
@@ -291,23 +255,22 @@ namespace SlopArena.Client.UI
             }
         }
 
-        private void SetSelectionTarget(FrontendPageContext context, bool selectingCpu)
+        private void SetSelectionTarget(FrontendPageContext context, bool selectingCpu, bool focusSlot = false)
         {
-            if (MatchConfig.Mode != GameMode.Solo)
+            if (MatchConfig.Mode is not (GameMode.Solo or GameMode.Training))
                 return;
 
             _selectingCpu = selectingCpu;
             _selected = selectingCpu ? MatchConfig.SoloBotClass : MatchConfig.PlayerClass;
             if (_selectionTarget != null)
-                _selectionTarget.text = selectingCpu ? "EDITING P2 // CPU" : "EDITING P1 // YOU";
+                _selectionTarget.text = selectingCpu ? "EDITING P2 // CPU" : "EDITING P1 // PLAYER";
             _btnEditPlayer?.EnableInClassList("active", !selectingCpu);
             _btnEditCpu?.EnableInClassList("active", selectingCpu);
-            var botLabel = context.Q<Label>("solo-bot-label");
-            if (botLabel != null)
-                botLabel.text = $"CPU CHARACTER: {MatchConfig.SoloBotClass.ToString().ToUpperInvariant()}";
-            if (_selected != CharacterClass.None)
-                UpdateSelectionVisuals(_selected, context);
+            context.Q<VisualElement>("solo-difficulty-buttons")?.style.SetDisplay(selectingCpu);
+            UpdateSelectionVisuals(_selected, context);
             RenderSoloRoster();
+            if (focusSlot)
+                _rosterPanel?.Q<Button>(selectingCpu ? "solo-slot-p2" : "solo-slot-p1")?.Focus();
         }
 
         private void UpdateSelectionVisuals(CharacterClass cls, FrontendPageContext context)
@@ -333,13 +296,20 @@ namespace SlopArena.Client.UI
             _rosterPanel.Clear();
             if (MenuRoster.Classes.Length == 0)
                 return;
-            _rosterPanel.Add(BuildPlayerCard(
+
+            var player = (Button)BuildPlayerCard(
                 "P1", "YOU", MatchConfig.PlayerClass,
-                _selectingCpu ? "SELECTED" : "EDITING FIGHTER", local: true, host: true));
-            _rosterPanel.Add(BuildPlayerCard(
+                _selectingCpu ? "" : "EDITING FIGHTER", local: true, host: true);
+            player.name = "solo-slot-p1";
+            player.clicked += () => SetSelectionTarget(_context, selectingCpu: false, focusSlot: true);
+            _rosterPanel.Add(player);
+
+            var cpu = (Button)BuildPlayerCard(
                 "P2", "CPU", MatchConfig.SoloBotClass,
-                _selectingCpu ? "EDITING FIGHTER" : $"CPU {BotDifficultyProfile.DisplayName(MatchConfig.SoloCpuDifficulty)}",
-                local: false, host: false));
+                _selectingCpu ? "EDITING FIGHTER" : "", local: false, host: false);
+            cpu.name = "solo-slot-p2";
+            cpu.clicked += () => SetSelectionTarget(_context, selectingCpu: true, focusSlot: true);
+            _rosterPanel.Add(cpu);
         }
         private void InitRoom(FrontendPageContext context)
         {
@@ -871,13 +841,6 @@ namespace SlopArena.Client.UI
             FrontendController.Show(FrontendPage.LobbyRoom);
         }
 
-        private void RenderTrainingRoster()
-        {
-            if (_rosterPanel == null) return;
-            _rosterPanel.Clear();
-            _rosterPanel.Add(BuildPlayerCard(
-                "P1", "YOU", _selected, "SELECTED", local: true, host: true));
-        }
 
         private void RenderRoster()
         {
@@ -909,10 +872,12 @@ namespace SlopArena.Client.UI
             bool local,
             bool host)
         {
-            var card = new VisualElement();
+            VisualElement card = MatchConfig.Mode is GameMode.Solo or GameMode.Training
+                ? new Button()
+                : new VisualElement();
             card.AddToClassList("player-card");
             if (local) card.AddToClassList("player-card--local");
-            if (MatchConfig.Mode == GameMode.Solo && statusText == "EDITING FIGHTER")
+            if ((MatchConfig.Mode is GameMode.Solo or GameMode.Training) && statusText == "EDITING FIGHTER")
                 card.AddToClassList("player-card--editing");
 
             var identity = new VisualElement();
@@ -953,14 +918,17 @@ namespace SlopArena.Client.UI
                 card.Add(waiting);
             }
 
-            var status = new Label(statusText);
-            status.AddToClassList("player-card__status");
-            status.AddToClassList(statusText == "LOCKED" || statusText == "BOT"
-                ? "player-card__status--locked"
-                : statusText == "EDITING FIGHTER"
-                    ? "player-card__status--editing"
-                    : "player-card__status--picking");
-            card.Add(status);
+            if (!string.IsNullOrEmpty(statusText))
+            {
+                var status = new Label(statusText);
+                status.AddToClassList("player-card__status");
+                status.AddToClassList(statusText == "LOCKED" || statusText == "BOT"
+                    ? "player-card__status--locked"
+                    : statusText == "EDITING FIGHTER"
+                        ? "player-card__status--editing"
+                        : "player-card__status--picking");
+                card.Add(status);
+            }
             return card;
         }
 
@@ -997,20 +965,6 @@ namespace SlopArena.Client.UI
         }
 
         // ── Shared ──
-        private void AddTrainingMarker()
-        {
-            foreach (var button in _gridButtons)
-                button.Q<VisualElement>("char-markers")?.Clear();
-
-            var card = _context.Q<Button>($"char-{_selected}");
-            var markers = card?.Q<VisualElement>("char-markers");
-            if (markers == null) return;
-
-            var marker = new Label("P1 SELECTING");
-            marker.AddToClassList("char-marker");
-            marker.AddToClassList("char-marker--selecting");
-            markers.Add(marker);
-        }
 
 
 
@@ -1020,22 +974,15 @@ namespace SlopArena.Client.UI
                 return;
 
             _selected = cls;
-            if (MatchConfig.Mode == GameMode.Solo && _selectingCpu)
+            if ((MatchConfig.Mode is GameMode.Solo or GameMode.Training) && _selectingCpu)
                 MatchConfig.SoloBotClass = cls;
             else
                 MatchConfig.PlayerClass = cls;
 
-            UpdateSelectionVisuals(cls, context);
-            if (MatchConfig.Mode == GameMode.Training && _rosterPanel != null)
-            {
-                RenderTrainingRoster();
-                AddTrainingMarker();
-            }
-            else if (MatchConfig.Mode == GameMode.Solo && _rosterPanel != null)
-            {
-                RenderSoloRoster();
+            if ((MatchConfig.Mode is GameMode.Solo or GameMode.Training) && _rosterPanel != null)
                 SetSelectionTarget(context, _selectingCpu);
-            }
+            else
+                UpdateSelectionVisuals(cls, context);
         }
 
         private void RenderCardMarkers()

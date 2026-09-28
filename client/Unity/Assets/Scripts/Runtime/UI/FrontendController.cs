@@ -134,9 +134,9 @@ namespace SlopArena.Client.UI
             _navOffline = bar?.Q<Button>("shell-nav-offline");
             _navOnline = bar?.Q<Button>("shell-nav-online");
             if (_navHome != null) _navHome.clicked += NavigateHome;
-            if (_navTraining != null) _navTraining.clicked += () => StartMode(GameMode.Training);
-            if (_navOffline != null) _navOffline.clicked += () => StartMode(GameMode.Solo);
-            if (_navOnline != null) _navOnline.clicked += () => StartMode(GameMode.PvP);
+            if (_navTraining != null) _navTraining.clicked += () => NavigateMode(GameMode.Training);
+            if (_navOffline != null) _navOffline.clicked += () => NavigateMode(GameMode.Solo);
+            if (_navOnline != null) _navOnline.clicked += () => NavigateMode(GameMode.PvP);
         }
 
         private void NavigateHome()
@@ -147,6 +147,28 @@ namespace SlopArena.Client.UI
                 || (_current == FrontendPage.FighterSelect
                     && MatchConfig.Mode is GameMode.Solo or GameMode.Training))
                 _currentContext?.InvokeBackAction();
+        }
+
+        private bool CanSwitchMode() =>
+            _identity is { ModeGateClosed: false }
+            && (_current is FrontendPage.Home or FrontendPage.ServerBrowser
+                || (_current is FrontendPage.FighterSelect or FrontendPage.StageSelect
+                    && MatchConfig.Mode is GameMode.Solo or GameMode.Training));
+
+        private void NavigateMode(GameMode mode)
+        {
+            if (!CanSwitchMode() || UiModalState.Presented)
+                return;
+            if ((_current == FrontendPage.ServerBrowser && mode == GameMode.PvP)
+                || (_current is FrontendPage.FighterSelect or FrontendPage.StageSelect
+                    && MatchConfig.Mode == mode))
+                return;
+
+            // Activating Home runs its existing reset and the departing page's
+            // cleanup before entering a different mode.
+            if (_current != FrontendPage.Home)
+                Show(FrontendPage.Home);
+            StartMode(mode);
         }
 
         public static void StartMode(GameMode mode)
@@ -163,14 +185,18 @@ namespace SlopArena.Client.UI
         {
             bool home = _current == FrontendPage.Home;
             bool canPlay = home && _identity is { ModeGateClosed: false };
+            bool canSwitchMode = CanSwitchMode();
             bool canReturnHome = _currentContext?.BackAction != null
                 && (_current == FrontendPage.ServerBrowser
                     || (_current == FrontendPage.FighterSelect
                         && MatchConfig.Mode is GameMode.Solo or GameMode.Training));
             _navHome?.SetEnabled(home || canReturnHome);
-            _navTraining?.SetEnabled(canPlay);
-            _navOffline?.SetEnabled(canPlay);
-            _navOnline?.SetEnabled(canPlay);
+            _navTraining?.SetEnabled(canSwitchMode);
+            _navOffline?.SetEnabled(canSwitchMode);
+            _navOnline?.SetEnabled(canSwitchMode);
+            _currentContext?.Q<Button>("menu-online")?.SetEnabled(canPlay);
+            _currentContext?.Q<Button>("menu-solo")?.SetEnabled(canPlay);
+            _currentContext?.Q<Button>("menu-training")?.SetEnabled(canPlay);
 
             bool inSetupOrResults = _current is FrontendPage.FighterSelect or FrontendPage.StageSelect
                 or FrontendPage.Results;

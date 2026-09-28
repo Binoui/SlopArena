@@ -142,6 +142,11 @@ namespace SlopArena.Client.UI
         {
             if (_topBarIdentity == null)
                 return;
+            _topBarIdentity.EnableInClassList("shell-identity--connected",
+                _session != null && !_session.NeedsDisplayName
+                && !_session.SavedNameRejected && _session.IsConnected);
+            _topBarIdentity.EnableInClassList("shell-identity--warning",
+                _session != null && (_session.NeedsDisplayName || _session.SavedNameRejected));
             if (_session == null)
             {
                 _topBarIdentity.text = "IDENTITY // STARTING";

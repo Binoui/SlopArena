@@ -148,11 +148,8 @@ namespace SlopArena.Client.UI
         // ── Region switching ──────────────────────────────────────────────
 
         /// <summary>
-        /// The explicit Page/Social region switch (issue #215): Q on the
-        /// keyboard, the north face button (Y / Triangle) on controller. The
-        /// top bar is reached through its own route; Q/Y from the top bar
-        /// returns to the page. Skipped while a text field is editing —
-        /// never run while any text field owns editing (issue #220).
+        /// Q/Y switches between Page and Social on every frontend page,
+        /// including Home's mode buttons. Skipped while a text field edits.
         /// </summary>
         private void PollRegionSwitch()
         {
@@ -164,9 +161,7 @@ namespace SlopArena.Client.UI
             // Escape closes it before any region switch (issue #220).
             if (ChatOverlay.IsExpandedSocialOpen)
                 return;
-            UiRegion target = FrontendController.CurrentPage == FrontendPage.Home
-                ? (_region == UiRegion.Social ? UiRegion.TopBar : UiRegion.Social)
-                : _region == UiRegion.Page ? UiRegion.Social : UiRegion.Page;
+            UiRegion target = _region == UiRegion.Social ? UiRegion.Page : UiRegion.Social;
             SetActiveRegion(target, focusTarget: true);
             UISFX.PlayClick();
         }
@@ -185,8 +180,7 @@ namespace SlopArena.Client.UI
             if (!key && !pad)
                 return;
             if (_region == UiRegion.TopBar)
-                SetActiveRegion(FrontendController.CurrentPage == FrontendPage.Home
-                    ? UiRegion.Social : _regionBeforeTopBar, focusTarget: true);
+                SetActiveRegion(_regionBeforeTopBar, focusTarget: true);
             else
                 SetActiveRegion(UiRegion.TopBar, focusTarget: true);
             UISFX.PlayClick();
@@ -300,7 +294,7 @@ namespace SlopArena.Client.UI
             bool expanded = ChatOverlay.IsExpandedSocialOpen;
             bool topBar = _region == UiRegion.TopBar;
             bool social = expanded || _region == UiRegion.Social;
-            bool page = !expanded && !social;
+            bool page = !expanded && _region == UiRegion.Page;
 
             SetRegionFocusable(shell.TopBar, topBar);
             SetRegionFocusable(shell.PageContentRoot, page, exclude: shell.SocialHost);
@@ -357,8 +351,6 @@ namespace SlopArena.Client.UI
                 SetActiveRegion(UiRegion.Social, focusTarget: false);
                 return;
             }
-            if (FrontendController.CurrentPage == FrontendPage.Home)
-                return; // Home has no page-owned controls; the logo and modes own navigation.
             bool inPage = shell.PageContentRoot != null && shell.PageContentRoot.Contains(target);
             bool changed = _region != UiRegion.Page;
             SetActiveRegion(UiRegion.Page, focusTarget: false);
@@ -568,8 +560,7 @@ namespace SlopArena.Client.UI
         {
             if (ChatOverlay.IsExpandedSocialOpen)
                 return;
-            SetActiveRegion(FrontendController.CurrentPage == FrontendPage.Home
-                ? UiRegion.TopBar : UiRegion.Page, focusTarget: true);
+            SetActiveRegion(UiRegion.Page, focusTarget: true);
         }
 
         /// <summary>

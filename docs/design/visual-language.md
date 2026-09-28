@@ -25,38 +25,82 @@ settings entry points keep their existing navigation and preferences; both mount
 same `Assets/Resources/UI/SettingsOverlay.uxml` shell, with category controls generated
 from the current settings service. `SettingsOverlay.uss` supplies the tracked base
 style. Locally, `Assets/Resources/UI/LocalPack/PackSkin.uss` applies recolored FPS UI Pack
-sprites to the persistent top bar, Home, and Settings. That directory is excluded through
-local `.git/info/exclude`; clean checkouts load only project-owned styles, and local builds
-include the licensed sprites until an asset-distribution plan is agreed.
+sprites to Settings; Home uses tracked neutral USS rather than baked-color sprites.
+Credit: Lynda Mc Donald (Loudeyes Games). The license permits use in projects
+with credit but prohibits redistributing the assets themselves. That directory
+is excluded through local `.git/info/exclude`; clean checkouts use project-owned
+fallback styles until an asset-distribution plan is agreed.
 
-- **Persistent top bar:** The logo is Home when the existing Back path safely returns
-  there. ONLINE / TRAINING / SOLO share the existing mode routes and display-name gate;
-  Settings and account remain on the right. Stage Select, Rooms, and Results retain
-  their Back/Leave flow rather than allowing a tab to abandon it.
-- **Main Menu:** The mode buttons and large left-side marketing copy are gone. A
-  simple playtest greeting stays in the right-hand pack-inspired poster. Fighter
-  selection still reads the admitted cooked catalog.
+- **Persistent top bar:** The yellow Baloo wordmark plate remains the Home
+  control; TRAINING / SOLO / ONLINE sit directly on the dark bar in the same
+  order as Home, marking only the active mode with yellow text and a short
+  underline. Tabs switch modes from Home, the room browser, and local Fighter
+  or Stage Select, returning through Home's existing reset before entering a
+  different mode. The display-name gate and modal guard still apply; active
+  Rooms, online match setup, and Results retain their Back/Leave path instead
+  of abandoning a session. A muted border separates the bar from the
+  workspace. Settings, identity, and Menu remain on the right; identity
+  colors reflect offline, connected, and warning states without changing
+  presence logic.
+- **Main Menu:** Training, Solo, and Online have three large Home buttons
+  in top-tab order, using the same mode routes and display-name gate. Home
+  uses a #151219 field, #24202B announcement panel and secondary buttons,
+  #423B49 borders, #F1EBDD main text, #ABA3B2 muted text, and #FFCC22 for
+  Online and focus. The three buttons share left-aligned Baloo labels,
+  padding, and a thick bottom edge; the local licensed baked-color sprites
+  are not used on Home.
+  A fixed upper-right announcement board uses the same charcoal and
+  warm-white palette with a small yellow heading and a restrained dark edge;
+  its compact height avoids a tall empty frame. The supplied 1438×810
+  SlopArena art stays centered at native size in the workspace below the
+  persistent top bar. Fighter selection reads the admitted cooked catalog.
 - **Chat:** The presenter has no header bar; Expand/Minimize icons sit directly
   left of the top-right resize grip, and account entry lives in the shared shell.
-  A user-resized width and height are one preference shared across menu and gameplay,
-  saved across scenes and launches, with host-specific minimum and viewport bounds.
-  Menu chat stays in its bottom-left shell cell; gameplay chat mirrors to the left
-  side of the HUD. Match entry still closes interactive chat to protect gameplay
-  input; disconnected and send feedback render inside the message history instead
-  of below the composer.
+  Its menu surface is near-opaque charcoal over Home art, with warm-white copy,
+  a dark input, yellow input focus and active-tab underline, and a charcoal SEND
+  control. A user-resized width and height are one preference shared across
+  menu and gameplay, saved across scenes and launches, with host-specific
+  minimum and viewport bounds. On Home, chat overlays the page at bottom left
+  without reserving layout space; on other frontend pages it stays in its
+  bottom-left shell cell. Gameplay chat mirrors to the left side of the HUD.
+  Match entry still closes interactive chat input; disconnected and send
+  feedback render inside the message history instead of below the composer.
 - **Online:** browsing, hosting, and Join by Address converge on the registered room
   session before fighter and stage selection. Address entry accepts IPv4 plus an
   optional port; it still requires the room directory. It is not an offline bypass.
-- **Solo:** player and CPU selection are independent, with explicit edit targets and
-  Easy/Normal/Hard controls. Returning from Stage Select preserves both fighters and difficulty.
-- **Training:** fighter selection opens the shared Stage Select page. The Training arena
-  is first and preselected when admitted; otherwise the first available stage is selected.
-  Enter Training loads the chosen stage with the existing local tools. Training and Solo
-  place the player at the first baked spawn and the first NPC at the second; added Training
-  NPCs use subsequent authored spawns, cycling those NPC spawns when needed. NPC respawns
-  retain the selected marker's position, height, and facing.
-- **Stages:** cards show rendered previews of the actual project prefabs. Kistu and Bonk
-  portraits likewise come from existing character prefabs; image metadata records provenance.
+- **Solo and Training:** fighter select uses matching title-only headers:
+  `SOLO // SELECT YOUR FIGHTER` and `TRAINING // SELECT YOUR FIGHTER`.
+  The participant summary, step/status, and SELECT STAGE are grouped beneath
+  the roster.
+  In both modes, P1 and P2 are selectable editing slots; the roster assigns
+  the chosen fighter to the active slot. The charcoal config panel names that
+  slot and its PLAYER/CPU type, keeps PLAYER/CPU edit shortcuts, and shows
+  difficulty buttons only for CPU. The active slot and its roster fighter
+  share yellow emphasis; the inactive slot remains neutral. Returning from
+  Stage Select preserves both fighters and difficulty. Training uses the
+  selected CPU fighter and difficulty while retaining its idle/heuristic
+  training controls and no-win match rule.
+  Fighter cards use face-focused crops from the four character splash illustrations:
+  quiet charcoal idle frames, a thicker yellow selected edge and brighter name
+  strip, with both local-mode summaries echoing that selected treatment.
+  Full illustrations live in `Assets/UI/SplashArt/`; their 512×512 crops
+  replace `Assets/Resources/UI/Portraits/` and also appear in the gameplay HUD,
+  stage-select summary, and results.
+  Fighter selection opens the shared Stage Select page. The Training arena is
+  first and preselected when admitted; otherwise the first available stage is
+  selected. Enter Training loads the chosen stage with the existing local tools.
+  Stage Select places participant cards and the stage action side by side
+  beside chat rather than stacking them. Its compact layout drops the
+  secondary header copy and fits the nine currently admitted Training stages
+  in two rows at 1280×720 without scrolling. The chat cell keeps the user's
+  chosen size; the stage list remains scrollable when more stages are admitted
+  or the window is smaller.
+  Training and Solo place the player at the first baked spawn and the first NPC
+  at the second; added Training NPCs use subsequent authored spawns, cycling
+  those NPC spawns when needed. NPC respawns retain the selected marker's
+  position, height, and facing.
+- **Stages:** cards show rendered previews of the actual project prefabs. Fighter
+  portraits use crops of the supplied splash illustrations, not prefab renders.
 - **Recovery:** focus is visible; controller Back closes address entry before leaving the
   browser. Escape, gamepad Start, or the top-right gear opens the frontend menu on any
   pre-match page, including over address entry and chat. Resume or a second Escape/Start
@@ -307,9 +351,9 @@ Let character color and silhouette carry identity inside the shared Paper/Ink sy
 
 ### HUD
 
-Gameplay clarity outranks the poster treatment. The local HUD groups orange normals `1–4` and blue specials `A/E/R/F` into two close-set diamonds at the bottom center. Four circular slots per diamond retain the existing move icons and cooldown overlays. Prompts above the circles follow effective keyboard/gamepad bindings and switch after gameplay input; controller specials show modifier plus face button. A readable text prompt replaces artwork for unsupported keys or missing local assets. The supplied frame art does not encode gameplay state. Damage, stocks, cooldowns, and player identity remain stable while the camera moves.
+Gameplay clarity outranks the poster treatment. The local HUD groups orange normals `1–4` and blue specials `A/E/R/F` into two close-set diamonds at the bottom center. Four circular slots per diamond retain the existing move icons and cooldown overlays. Black-backed prompts above the circles follow effective keyboard/gamepad bindings and switch after gameplay input. Controller specials show only the face button in each slot; the actual gameplay input still requires LB. Physical number-row keys show their digits, even when an AZERTY layout displays punctuation there; other keyboard bindings follow their effective labels. A readable text prompt replaces artwork for unsupported keys or missing local assets. The supplied frame art does not encode gameplay state. Damage, stocks, cooldowns, and player identity remain stable while the camera moves.
 
-Kenney Input Prompts 1.5 (CC0) supplies the keyboard and Xbox sheet PNGs and XML maps. For a local build, copy `Keyboard & Mouse/keyboard-&-mouse_sheet_default.{png,xml}` to `client/Unity/Assets/Resources/InputPrompts/keyboard.{png,xml}` and `Xbox Series/xbox-series_sheet_default.{png,xml}` to `client/Unity/Assets/Resources/InputPrompts/xbox.{png,xml}`. The `InputPrompts` directory and its Unity metadata are gitignored; a clean checkout has text prompts until the sheets are provisioned. The atlas XML coordinates are in source-PNG pixels, so Unity import scaling must not change prompt selection.
+Kenney Input Prompts 1.5 (CC0) supplies the keyboard and Xbox sheet PNGs and XML maps. For a local build, copy `Keyboard & Mouse/keyboard-&-mouse_sheet_default.{png,xml}` to `client/Unity/Assets/Resources/InputPrompts/keyboard.{png,xml}` and `Xbox Series/xbox-series_sheet_default.{png,xml}` to `client/Unity/Assets/Resources/InputPrompts/xbox.{png,xml}`. The `InputPrompts` directory and its Unity metadata are gitignored; a clean checkout has text prompts until the sheets are provisioned. The supplied PNG rows are inverted relative to the XML rows; `InputPromptAtlas` accounts for this when constructing UVs. Import the sheets without NPOT scaling.
 
 ### Results
 

@@ -4,7 +4,7 @@ using UnityEngine.UIElements;
 
 namespace SlopArena.Client.UI
 {
-    /// <summary>Home's static landing art. The shared shell owns navigation and identity.</summary>
+    /// <summary>Home mode actions and announcement skin; the shell owns shared navigation and identity.</summary>
     public class MainMenuController : MonoBehaviour, IFrontendPageController
     {
         // Not serialized: the shell injects the per-activation context at
@@ -26,9 +26,9 @@ namespace SlopArena.Client.UI
                 enabled = false;
                 return;
             }
-            var packSkin = Resources.Load<StyleSheet>("UI/LocalPack/PackSkin");
-            if (packSkin != null)
-                _context.Q<VisualElement>("page-body")?.styleSheets.Add(packSkin);
+            _context.Q<Button>("menu-online")!.clicked += () => FrontendController.StartMode(GameMode.PvP);
+            _context.Q<Button>("menu-solo")!.clicked += () => FrontendController.StartMode(GameMode.Solo);
+            _context.Q<Button>("menu-training")!.clicked += () => FrontendController.StartMode(GameMode.Training);
             MenuNavigation.Configure(_context, null, ReturnToMainMenu);
         }
 

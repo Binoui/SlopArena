@@ -72,9 +72,7 @@ namespace SlopArena.Client.UI
             public readonly VisualElement Cooldown;
             public readonly Label Timer;
             public readonly Label Key;
-            public readonly Image Modifier;
             public readonly Image Button;
-            public readonly Label Plus;
             public readonly VisualElement Flash;
             public ushort MaxCooldown;
             public ushort PrevCooldown;
@@ -89,10 +87,7 @@ namespace SlopArena.Client.UI
                 Cooldown = root.Q<VisualElement>(cooldownName);
                 Timer = root.Q<Label>(timerName);
                 Key = root.Q<Label>(keyName);
-                Modifier = root.Q<Image>(root.name + "-modifier");
                 Button = root.Q<Image>(root.name + "-button");
-                Plus = root.Q<Label>(root.name + "-plus");
-                Modifier.scaleMode = ScaleMode.ScaleToFit;
                 Button.scaleMode = ScaleMode.ScaleToFit;
                 Flash = root.Q<VisualElement>(flashName);
             }
@@ -277,10 +272,6 @@ namespace SlopArena.Client.UI
             _showGamepadPrompts = HumanInputActions.LastUsedGamepad && Gamepad.current != null;
             _seenBindingRevision = HumanInputActions.BindingRevision;
             string group = _showGamepadPrompts ? HumanInputActions.GamepadGroup : HumanInputActions.KeyboardGroup;
-            string modifierLabel = _showGamepadPrompts
-                ? HumanInputActions.BindingLabel("SpecialModifier", group) : null;
-            string modifierPath = _showGamepadPrompts
-                ? BindingPath("SpecialModifier", group) : null;
 
             for (int i = 0; i < _abilitySlots.Length; i++)
             {
@@ -289,26 +280,17 @@ namespace SlopArena.Client.UI
                     ? AbilitySlotDefs[i - 4].Action : AbilitySlotDefs[i].Action;
                 string label = HumanInputActions.BindingLabel(action, group);
                 string path = BindingPath(action, group);
-                bool chord = _showGamepadPrompts && i >= 4;
+                if (!_showGamepadPrompts)
+                    label = InputPromptAtlas.KeyboardDisplayLabel(path, label);
                 bool hasButton = _showGamepadPrompts
                     ? _promptAtlas.TryXbox(path, out var buttonGlyph)
                     : _promptAtlas.TryKeyboard(path, label, out buttonGlyph);
-                InputPromptAtlas.Glyph modifierGlyph = default;
-                bool hasModifier = chord && _promptAtlas.TryXbox(modifierPath, out modifierGlyph);
-                bool useImages = hasButton && (!chord || hasModifier);
-
-                slot.Modifier.style.display = useImages && chord ? DisplayStyle.Flex : DisplayStyle.None;
-                slot.Plus.style.display = useImages && chord ? DisplayStyle.Flex : DisplayStyle.None;
-                slot.Button.style.display = useImages ? DisplayStyle.Flex : DisplayStyle.None;
-                slot.Key.style.display = useImages ? DisplayStyle.None : DisplayStyle.Flex;
-                if (useImages)
-                {
-                    if (chord) SetPromptImage(slot.Modifier, modifierGlyph);
+                slot.Button.style.display = hasButton ? DisplayStyle.Flex : DisplayStyle.None;
+                slot.Key.style.display = hasButton ? DisplayStyle.None : DisplayStyle.Flex;
+                if (hasButton)
                     SetPromptImage(slot.Button, buttonGlyph);
-                }
                 else
-                    slot.Key.text = chord && modifierLabel != "Unbound" && label != "Unbound"
-                        ? $"{modifierLabel} + {label}" : label;
+                    slot.Key.text = label;
             }
         }
 

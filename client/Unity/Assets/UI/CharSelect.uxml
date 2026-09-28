@@ -1,9 +1,8 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
-    <!-- Fighter Select page fragment (issue #219). Mounted into the
-         FrontendShell hosts: header → PageHeaderHost, portrait grid and
-         selection copy → PageBodyHost, participant cards and CPU editing →
-         PageSummaryHost, status and primary actions → PageActionsHost. Real
-         selection state lives in CharSelectController. -->
+    <!-- Fighter Select page fragment (issue #219). The shell mounts its
+         header, body, summary and actions separately. Training and Solo share
+         player/CPU selection; PvP uses its own status and actions.
+         Selection state lives in CharSelectController. -->
     <ui:VisualElement name="page-frag">
         <ui:VisualElement name="page-header" class="page-section frag-header">
         <ui:Button name="btn-back" text="BACK" class="btn-back" />
@@ -12,7 +11,7 @@
             <ui:Label name="title" text="CHARACTER SELECT" class="flow-title" />
             <ui:Label text="Pick the face you want attached to the problem." class="flow-subtitle" />
         </ui:VisualElement>
-        <ui:VisualElement class="char-header-status">
+        <ui:VisualElement name="char-header-status" class="char-header-status">
             <ui:Label name="flow-progress" text="STEP 1 OF 2" class="flow-progress" />
             <ui:Label name="roster-meta" text="4 FIGHTERS" class="char-select-meta" />
         </ui:VisualElement>
@@ -32,8 +31,6 @@
                 <ui:Button name="btn-edit-player" text="PLAYER" class="selection-target-button active" />
                 <ui:Button name="btn-edit-cpu" text="CPU" class="selection-target-button" />
             </ui:VisualElement>
-            <ui:Label name="solo-bot-label" text="Choose who gets the controller." class="pvp-status" />
-            <ui:Label name="solo-difficulty-label" text="CPU DIFFICULTY: NORMAL" class="pvp-status" />
             <ui:VisualElement name="solo-difficulty-buttons" class="solo-difficulty-buttons">
                 <ui:Button name="btn-cpu-difficulty-easy" text="EASY" class="btn-secondary solo-difficulty-button" />
                 <ui:Button name="btn-cpu-difficulty-normal" text="NORMAL" class="btn-secondary solo-difficulty-button" />
@@ -49,7 +46,7 @@
                 <ui:Button name="btn-start-match" text="SELECT STAGE" class="btn-primary pvp-btn" />
             </ui:VisualElement>
         </ui:VisualElement>
-        <ui:VisualElement class="solo-next-action">
+        <ui:VisualElement name="solo-next-action" class="solo-next-action">
             <ui:Button name="btn-select" text="SELECT STAGE" class="btn-primary" />
         </ui:VisualElement>
     </ui:VisualElement>
