@@ -196,13 +196,20 @@ def restore(target: Path, credentials: Path, storage: dict[str, str], key: str) 
         active = release.active_manifest(target, False)
         if active is None:
             raise release.ReleaseError("missing active release for Master readiness check")
+        room_env = []
+        for line in Path(active["runtime"]["master_env_file"]).read_text().splitlines():
+            if line.startswith("Room__") and "=" in line:
+                room_env.extend(["--env", line])
         master = name + "-master"
         secret = uuid.uuid4().hex + uuid.uuid4().hex
         command(["docker", "run", "-d", "--name", master, "--network", network, "--read-only",
                  "--tmpfs", "/tmp", "--env", "Deployment__Profile=development",
                  "--env", "ASPNETCORE_HTTP_PORTS=8080",
+                 "--env", "Auth__Mode=steam", "--env", "Steam__AppId=5325920",
+                 "--env", "Steam__Identity=sloparena-playtest",
+                 "--env", "Steam__ApiKey=isolated-recovery-readiness-not-a-publisher-key",
                  "--env", f"ConnectionStrings__DefaultConnection=Host={name};Port=5432;Database=postgres;Username=postgres",
-                 "--env", f"Jwt__Secret={secret}", active["images"]["master"]])
+                 "--env", f"Jwt__Secret={secret}", *room_env, active["images"]["master"]])
         probe = 'exec 3<>/dev/tcp/127.0.0.1/8080; printf \"GET /ready HTTP/1.0\\r\\nHost: localhost\\r\\n\\r\\n\" >&3; read -r line <&3; [[ \"$line\" == *\" 200 \"* ]]'
         for _ in range(30):
             if subprocess.run(["docker", "exec", master, "bash", "-ec", probe],

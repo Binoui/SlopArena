@@ -385,6 +385,45 @@ Do not claim a live runtime result from a build or static inspection alone.
 - Existing project credits, MIT license, and both font OFL licenses accompany the
   candidate. Release evidence is retained under ignored `build/playtest/0.2.0-playtest.4/`.
 - The attempted Proton player smoke was cancelled at the operator's request; no
-  subsequent player launch, Steam install, two-account match/rematch, VPS deploy,
-  or default-branch activation was exercised. Source publication, redacted history
-  scan, Steam upload, and live deployment remain separate gated operations.
+  subsequent player launch, Steam install, or two-account match/rematch was
+  exercised. Source publication, redacted history scan, Steam upload, and live
+  deployment are separate gated operations; see the rollout evidence below.
+
+### Steam Playtest rollout — 0.2.0-playtest.4
+
+- Final Windows build: **3 warnings, zero errors**, game source `f830ad2`,
+  Master source `f016616`. Steam upload succeeded as **BuildID 25663418**,
+  depot **5325921**, manifest **5276771382055694993**.
+- VPS release **`steam-playtest-20261001-4`** was deployed through the guarded
+  release procedure using the immutable images in the local release receipt.
+  Zero active matches were observed before replacement. Both Master and
+  GameHost `/ready` passed, as did public HTTPS Master readiness; fresh host
+  registration reports **protocol 4** and catalog
+  `2d31ca65507f8ce30a2fae29aa1a2bd507da6cce4905a3543f98f678ad8e441a`.
+- The database advanced from `20260926000000_AddSteamMatchRouting` to
+  `20260927000001_HashGameServerApiTokens`. A fresh off-host archive was
+  downloaded, checksum-verified, and restored on an internal-only Docker
+  network; migration history, persisted table counts, and isolated Master
+  readiness passed. Token hashing is irreversible: the older application pair
+  is not a schema-compatible rollback.
+- Initial startup failed because production images require explicit
+  `Room__AdmittedCharacters__*`, `Room__AdmittedArenas__*`, and
+  `Room__CatalogHash`. Adding the approved Manki/FightGuy/Wibou/Bonk roster,
+  `slop_pit`/`slop_court`, and the exact catalog pin to the private Master
+  environment enabled a successful guarded roll-forward. Existing secrets
+  were preserved; no public guest or gameplay UDP fallback was enabled.
+- The installed isolated recovery fixture also lacked mandatory Steam auth
+  configuration. Its explicit Steam readiness-test fields and inherited
+  non-secret room admissions are now represented in `deploy/vps/recovery.py`.
+  A readiness test key is not a publisher key and does not prove ticket admission.
+  The corrected installed fixture also completed a fresh post-migration
+  off-host restore: all seven migration IDs, persisted table counts, and
+  isolated Master readiness passed; its temporary containers/network/volume
+  were removed.
+- Authenticated Steamworks confirms **default → BuildID 25663418**, depot
+  manifest **5276771382055694993**, after the Steam mobile confirmation request.
+  The separate `test` branch remains on **25547241**. The branch observation
+  and cropped screenshot are retained in the local release evidence directory.
+- Receipts and private VPS operator evidence retain the observed release,
+  image/source identities, backups, recovery, and registration. A packaged
+  two-account match/rematch remains unverified; no player was launched.

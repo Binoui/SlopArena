@@ -102,6 +102,16 @@ sudo python3 /opt/sloparena/deploy/vps/recovery.py backup \
 
 Restore to new containers on an internal-only network with no published ports and a new volume. Run `pg_restore --exit-on-error`, compare EF migration IDs and persisted records, and require an isolated Master `/ready` response. Never replace the live database automatically, copy a running PostgreSQL data directory, or expose restored credentials on a live route.
 
+The isolated Master readiness fixture uses explicit Steam mode, Playtest AppID
+5325920, and the `sloparena-playtest` identity. Its clearly non-production API
+key is only startup configuration; the internal network has no external route
+or published ports. This proves restored database readiness, not Steam ticket
+admission. Do not copy live publisher credentials into the fixture or omit
+`Auth:Mode`: current Master images reject an unspecified authentication mode.
+The fixture inherits only `Room__*` admission fields from the selected private
+Master environment. Production images require explicit room selectors and
+catalog pins; do not rely on development `appsettings.json` defaults.
+
 To verify recovery from an actual completed archive:
 
 ```bash
