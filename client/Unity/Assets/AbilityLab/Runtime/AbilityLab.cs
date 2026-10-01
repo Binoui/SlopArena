@@ -30,6 +30,148 @@ namespace SlopArena.Client.Tools
         public static readonly string[] SlotNames = { "1", "2", "3", "4", "A", "E", "R", "F" };
 
         public static AbilityLab Instance { get; private set; }
+        public readonly struct TimelineCursor
+        {
+            internal readonly string SlotId;
+            internal readonly int Stage;
+            internal readonly ushort Tick;
+            internal readonly int SelectedHitbox;
+            internal readonly bool Playing;
+            internal readonly float PlayAccumulator;
+            internal readonly AbilityLabScenarioResult Scenario;
+            internal readonly int ScenarioFrame;
+            internal readonly bool ShowDummy, ShowHitboxes, ShowHurtboxes, ShowBakedBones, ShowTrajectory;
+            internal readonly bool PriorShowDummy;
+
+            internal TimelineCursor(string slotId, int stage, ushort tick, int selectedHitbox, bool playing, float playAccumulator,
+                AbilityLabScenarioResult scenario, int scenarioFrame, bool showDummy, bool showHitboxes,
+                bool showHurtboxes, bool showBakedBones, bool showTrajectory, bool priorShowDummy)
+            {
+                SlotId = slotId;
+                Stage = stage;
+                Tick = tick;
+                SelectedHitbox = selectedHitbox;
+                Playing = playing;
+                PlayAccumulator = playAccumulator;
+                Scenario = scenario;
+                ScenarioFrame = scenarioFrame;
+                ShowDummy = showDummy;
+                ShowHitboxes = showHitboxes;
+                ShowHurtboxes = showHurtboxes;
+                ShowBakedBones = showBakedBones;
+                ShowTrajectory = showTrajectory;
+                PriorShowDummy = priorShowDummy;
+            }
+        }
+
+        public readonly struct CameraState
+        {
+            internal readonly UnityEngine.Camera BoundCamera;
+            internal readonly UnityEngine.Camera ObservedCamera;
+            internal readonly Vector3 Position;
+            internal readonly Quaternion Rotation;
+            internal readonly RenderTexture Target;
+            internal readonly float Aspect;
+            internal readonly Vector2 OrbitAngles;
+            internal readonly float OrbitDistance;
+            internal readonly Vector3 OrbitPivot;
+
+            internal CameraState(
+                UnityEngine.Camera boundCamera,
+                UnityEngine.Camera observedCamera,
+                Vector3 position,
+                Quaternion rotation,
+                RenderTexture target,
+                float aspect,
+                Vector2 orbitAngles,
+                float orbitDistance,
+                Vector3 orbitPivot)
+            {
+                BoundCamera = boundCamera;
+                ObservedCamera = observedCamera;
+                Position = position;
+                Rotation = rotation;
+                Target = target;
+                Aspect = aspect;
+                OrbitAngles = orbitAngles;
+                OrbitDistance = orbitDistance;
+                OrbitPivot = orbitPivot;
+            }
+        }
+
+        public TimelineCursor CaptureTimelineCursor()
+            => new(SelectedSlotId, StageIndex, Tick, SelectedHitboxEventIndex, Playing, _playAccum,
+                Scenario, ScenarioFrame, ShowDummy, ShowHitboxes, ShowHurtboxes, ShowBakedBones, ShowTrajectory,
+                _scenarioPriorShowDummy);
+
+        public void RestoreTimelineCursor(TimelineCursor cursor)
+        {
+            Playing = false;
+            if (CanonicalSlotProjection.TryGet(cursor.SlotId, out var address))
+            {
+                int index = Array.IndexOf(SlotNames, address.InputLabel);
+                SelectedSlotId = address.Id;
+                Airborne = address.IsAirborne;
+                SlotIndex = SlotIndices[index];
+            }
+            StageIndex = cursor.Stage;
+            Tick = cursor.Tick;
+            SelectedHitboxEventIndex = cursor.SelectedHitbox;
+            Scenario = cursor.Scenario;
+            ScenarioFrame = cursor.ScenarioFrame;
+            ShowDummy = cursor.ShowDummy;
+            ShowHitboxes = cursor.ShowHitboxes;
+            ShowHurtboxes = cursor.ShowHurtboxes;
+            ShowBakedBones = cursor.ShowBakedBones;
+            ShowTrajectory = cursor.ShowTrajectory;
+            _scenarioPriorShowDummy = cursor.PriorShowDummy;
+            RebuildScenarioTrailHistory();
+            RefreshPose();
+            _playAccum = cursor.PlayAccumulator;
+            Playing = cursor.Playing;
+        }
+
+
+        public CameraState CaptureCameraState()
+        {
+            UnityEngine.Camera observed = _camera != null ? _camera : UnityEngine.Camera.main;
+            return new CameraState(
+                _camera,
+                observed,
+                observed != null ? observed.transform.position : default,
+                observed != null ? observed.transform.rotation : default,
+                observed != null ? observed.targetTexture : null,
+                observed != null ? observed.aspect : 0f,
+                _orbitAngles,
+                _orbitDistance,
+                _orbitPivot);
+        }
+
+        public void RestoreCameraState(CameraState state)
+        {
+            UnityEngine.Camera current = _camera;
+            if (state.BoundCamera == null && current != null && current != state.ObservedCamera &&
+                current.transform.parent == transform)
+            {
+#if UNITY_EDITOR
+                DestroyImmediate(current.gameObject);
+#else
+                Destroy(current.gameObject);
+#endif
+            }
+            _camera = state.BoundCamera;
+            _orbitAngles = state.OrbitAngles;
+            _orbitDistance = state.OrbitDistance;
+            _orbitPivot = state.OrbitPivot;
+            if (state.ObservedCamera != null)
+            {
+                state.ObservedCamera.transform.SetPositionAndRotation(state.Position, state.Rotation);
+                state.ObservedCamera.targetTexture = state.Target;
+                if (state.Aspect > 0f) state.ObservedCamera.aspect = state.Aspect;
+            }
+        }
+
+        public UnityEngine.Camera PreviewCamera => _camera;
 
         // ── Selection state ──
         public CharacterClass Character { get; private set; } = CharacterClass.None;
@@ -43,7 +185,13 @@ namespace SlopArena.Client.Tools
         public int StageIndex { get; private set; }
         public ushort Tick { get; private set; }
         public int SelectedHitboxEventIndex { get; private set; } = -1;
-        public bool Playing { get; set; }
+        public bool Playing
+        {
+            get => _playing;
+            set { _playing = value; _previewPlaybackClock = PreviewClock(); }
+        }
+        private bool _playing;
+        private double _previewPlaybackClock;
         public float PlaySpeed { get; set; } = 1f;
         public float FacingYaw { get; set; }
         public bool ShowHurtboxes { get; set; }
@@ -95,6 +243,7 @@ namespace SlopArena.Client.Tools
 
 
         private readonly List<SpellResolver.EntityData> _hurtboxes = new();
+        private readonly List<SpellResolver.EntityData> _dummyHurtboxes = new();
         private readonly List<(int index, HitboxEvent evt, Vector3 start, Vector3 end)> _hitboxes = new();
         private readonly List<(Vector3 pos, char phase)> _trajectory = new();
         private WeaponAttach _weaponAttach;
@@ -111,6 +260,136 @@ namespace SlopArena.Client.Tools
         private readonly AbilityLabSimulationController _simulationPreviewer = new();
         public int PresentationPreviewInstanceCount => _presentationPreviewer.ActiveInstanceCount;
         public IReadOnlyCollection<GameObject> PresentationPreviewInstances => _presentationPreviewer.ActiveInstances;
+
+        public AbilityLabScenarioResult Scenario { get; private set; }
+        public int ScenarioFrame { get; private set; }
+        public bool IsScenarioPreview => Scenario != null;
+        public string SelectedAction => Scenario?.Options.Action ?? SelectedSlotId;
+        public bool CanRunScenario => IsPackagePreview && Def != null && Baked != null;
+        public bool CanPreviewGrab => CanRunScenario && Def.CaptureGeometry != null;
+        private bool _scenarioPriorShowDummy;
+        private readonly List<CharacterState> _scenarioActorHistory = new();
+        private AbilityLabScenarioResult _scenarioTrajectorySource;
+
+        public AbilityLabScenarioResult RunScenario(AbilityLabScenarioOptions options)
+        {
+            if (options == null) throw new ArgumentNullException(nameof(options));
+            options.Validate();
+            if (!CanRunScenario)
+                throw new InvalidOperationException("Scenario requires an available package runtime, baked poses and rig.");
+            // Build first: malformed input or unavailable actions cannot alter selection.
+            var result = _simulationPreviewer.RunScenario(Def, Baked, options, BasePosition(), FacingYaw);
+            bool airborne = CanonicalSlotProjection.TryGet(options.Action, out var scenarioAddress) && scenarioAddress.IsAirborne;
+            foreach (var frame in result.Frames)
+                if (!_previewRenderer.CanPlayScrubbedState(frame.Actor, airborne)
+                    || !_dummyRenderer.CanPlayScrubbedState(frame.Opponent, false))
+                    throw new InvalidOperationException($"Scenario animation binding is unavailable at frame {frame.FrameIndex}.");
+            var priorCursor = CaptureTimelineCursor();
+            try
+            {
+                bool priorDummy = Scenario != null ? _scenarioPriorShowDummy : ShowDummy;
+                if (CanonicalSlotProjection.TryGet(options.Action, out var address))
+                {
+                    Airborne = address.IsAirborne;
+                    SlotIndex = SlotIndices[Array.IndexOf(SlotNames, address.InputLabel)];
+                    SelectedSlotId = address.Id;
+                    StageIndex = 0;
+                    Tick = 0;
+                }
+                Scenario = result;
+                ScenarioFrame = options.LastFrame;
+                _scenarioPriorShowDummy = priorDummy;
+                ShowDummy = true;
+                Playing = false;
+                RebuildScenarioTrailHistory();
+                RefreshPose();
+                return result;
+            }
+            catch
+            {
+                RestoreTimelineCursor(priorCursor);
+                throw;
+            }
+        }
+
+        public void SelectSharedAction(string action)
+        {
+            if (action != "grab") throw new ArgumentException("Unknown shared action.", nameof(action));
+            var old = Scenario?.Options;
+            RunScenario(new AbilityLabScenarioOptions(action, old?.LastFrame ?? 60, old?.Distance ?? DummyDistance,
+                old?.OpponentBehavior ?? AbilityLabOpponentBehavior.Idle, old?.OpponentDamage ?? 0,
+                old?.RelativeFacingDegrees ?? 180f));
+            SeekScenario(0);
+        }
+
+        public void SeekScenario(int frame)
+        {
+            if (Scenario == null) throw new InvalidOperationException("Run a scenario before seeking its frames.");
+            if (frame < 0 || frame >= Scenario.Frames.Count) throw new ArgumentOutOfRangeException(nameof(frame));
+            ScenarioFrame = frame;
+            RefreshPose();
+        }
+
+        public void ExitScenario()
+        {
+            if (Scenario == null) return;
+            ClearScenario();
+            RefreshPose();
+        }
+
+        private void ClearScenario()
+        {
+            if (Scenario == null) return;
+            ShowDummy = _scenarioPriorShowDummy;
+            Scenario = null;
+            ScenarioFrame = 0;
+            _scenarioActorHistory.Clear();
+            _scenarioTrajectorySource = null;
+            _trajectory.Clear();
+            _trajDirty = "";
+            Playing = false;
+        }
+
+        private void RebuildScenarioTrailHistory()
+        {
+            _scenarioActorHistory.Clear();
+            if (Scenario == null || _weaponAttach?.HasSwordTrail != true) return;
+            foreach (var frame in Scenario.Frames) _scenarioActorHistory.Add(frame.Actor);
+        }
+
+        private void RefreshScenarioPose()
+        {
+            var frame = Scenario.Frames[ScenarioFrame];
+            bool airborne = CanonicalSlotProjection.TryGet(Scenario.Options.Action, out var address) && address.IsAirborne;
+            _previewRenderer.EnsureModel();
+            _dummyRenderer.EnsureModel();
+            _dummyRenderer.gameObject.SetActive(ShowDummy);
+            if (!_previewRenderer.PlayScrubbedState(frame.Actor, airborne, frame.ActorPoseTicks)
+                || !_dummyRenderer.PlayScrubbedState(frame.Opponent, false, frame.OpponentPoseTicks))
+                throw new InvalidOperationException($"Scenario pose has a missing animation binding at frame {ScenarioFrame}.");
+            _weaponAttach?.SetPreviewState(frame.Actor.AttackSlot, frame.Actor.AttackElapsedTicks);
+            _weaponAttach?.SetHitboxTrailActive(frame.ActiveSwordHitboxSeconds >= 0f, frame.ActiveSwordHitboxSeconds);
+            if (_scenarioActorHistory.Count > 0)
+                _weaponAttach?.SetPreviewTrailHistory(_scenarioActorHistory, ScenarioFrame, airborne);
+            // Trail history samples the same rig. Restore the selected state
+            // after those historical samples so recovery/interruption is visible.
+            _previewRenderer.PlayScrubbedState(frame.Actor, airborne, frame.ActorPoseTicks);
+            _dummyWeaponAttach?.SetPreviewState(frame.Opponent.AttackSlot, frame.Opponent.AttackElapsedTicks);
+            _dummyWeaponAttach?.SetHitboxTrailActive(false);
+            _presentationPreviewer.SetSimulationFrame(Scenario.PresentationEvents, frame.MatchTick,
+                _presentationBindings, _previewRenderer, _previewRenderer.transform);
+            _weaponAttach?.RefreshPresentation();
+            if (ShowDummy) _dummyWeaponAttach?.RefreshPresentation();
+            QueueEditorRefresh();
+        }
+
+        private static double PreviewClock()
+        {
+#if UNITY_EDITOR
+            if (!Application.isPlaying) return EditorApplication.timeSinceStartup;
+#endif
+            return Time.realtimeSinceStartupAsDouble;
+        }
 
         private void Awake()
         {
@@ -174,6 +453,20 @@ namespace SlopArena.Client.Tools
         private void Update()
         {
             if (!Playing) return;
+            if (Scenario != null)
+            {
+                double now = PreviewClock();
+                float elapsed = Mathf.Max(0f, (float)(now - _previewPlaybackClock));
+                _previewPlaybackClock = now;
+                _playAccum += elapsed * PlaySpeed;
+                while (_playAccum >= 1f / TickRate)
+                {
+                    _playAccum -= 1f / TickRate;
+                    ScenarioFrame = (ScenarioFrame + 1) % Scenario.Frames.Count;
+                }
+                RefreshPose();
+                return;
+            }
             if (!TryGetStage(out var stage)) return;
             _playAccum += Time.deltaTime * PlaySpeed;
             while (_playAccum >= 1f / TickRate)
@@ -315,6 +608,7 @@ namespace SlopArena.Client.Tools
 
         private void ApplyLegacyPreview(MatchContentEntry entry)
         {
+            ClearScenario();
             var loadedDef = entry.Definition;
             var loadedBaked = LoadBaked(loadedDef);
             var loadedWorkingDefs = LoadWorkingDefs(loadedDef, loadedBaked);
@@ -433,6 +727,7 @@ namespace SlopArena.Client.Tools
 
             var definition = CookedCharacterRuntimeAdapter.ToCharacterDefinition(package, CharacterClass.None);
             string priorSlotId = SelectedSlotId;
+            ClearScenario();
             int priorStage = StageIndex;
             ushort priorTick = Tick;
             int priorHitbox = SelectedHitboxEventIndex;
@@ -485,6 +780,8 @@ namespace SlopArena.Client.Tools
         public void MarkPackageDraftInvalid()
         {
             _packagePreviewAvailable = false;
+            ClearScenario();
+            Playing = false;
             _liveDraftPackage = null;
             AuthoritativePreview = false;
             PreviewStatus = "Draft invalid";
@@ -504,6 +801,7 @@ namespace SlopArena.Client.Tools
             string packageId,
             string packageHash)
         {
+            ClearScenario();
             DestroyPreviewCatalog();
             _previewAnimationCatalog = animationCatalog;
             _previewRig = rig;
@@ -529,6 +827,7 @@ namespace SlopArena.Client.Tools
         public void ApplyPreviewUnavailable(IReadOnlyList<CharacterDiagnostic> diagnostics)
         {
             _presentationPreviewer.Clear();
+            ClearScenario();
             _simulationPreviewer.Clear();
             _presentationBindings = Array.Empty<CharacterAssetCatalog.PresentationBinding>();
             ReleaseRendererAttachments();
@@ -566,6 +865,7 @@ namespace SlopArena.Client.Tools
 
         public void MarkPreviewNonAuthoritative()
         {
+            ClearScenario();
             AuthoritativePreview = false;
             PreviewStatus = "Non-authoritative draft";
         }
@@ -728,6 +1028,7 @@ namespace SlopArena.Client.Tools
         {
             if (!CanonicalSlotProjection.TryGet(address.Id, out var canonical) || canonical != address)
                 return;
+            ExitScenario();
 
             int labelIndex = Array.IndexOf(SlotNames, canonical.InputLabel);
             if (labelIndex < 0) return;
@@ -813,6 +1114,12 @@ namespace SlopArena.Client.Tools
         public IReadOnlyList<SpellResolver.EntityData> ResolveHurtboxes()
         {
             _hurtboxes.Clear();
+            if (Scenario != null)
+            {
+                foreach (var shape in Scenario.Frames[ScenarioFrame].Hurtboxes)
+                    if (shape.Id == 1 && !shape.ShieldSurface && shape.Active) _hurtboxes.Add(shape);
+                return _hurtboxes;
+            }
             if (Baked == null) return _hurtboxes; // no pose data at all
 
             var spec = CurrentSpec();
@@ -836,6 +1143,20 @@ namespace SlopArena.Client.Tools
         public IReadOnlyList<(int index, HitboxEvent evt, Vector3 start, Vector3 end)> ResolveHitboxes()
         {
             _hitboxes.Clear();
+            if (Scenario != null)
+            {
+                int index = 0;
+                foreach (var hitbox in Scenario.Frames[ScenarioFrame].ActiveHitboxes)
+                {
+                    if (!hitbox.Active) continue;
+                    var evt = hitbox.SourceEvent;
+                    evt.Shape = hitbox.Shape;
+                    evt.Radius = hitbox.Radius;
+                    _hitboxes.Add((index++, evt, new Vector3(hitbox.X, hitbox.Y, hitbox.Z),
+                        new Vector3(hitbox.EndX, hitbox.EndY, hitbox.EndZ)));
+                }
+                return _hitboxes;
+            }
             var spec = CurrentSpec();
             if (spec == null || !TryGetStage(out var stage)) return _hitboxes;
 
@@ -864,10 +1185,17 @@ namespace SlopArena.Client.Tools
 
         public List<SpellResolver.EntityData> ResolveDummyHurtboxes()
         {
-            var list = new List<SpellResolver.EntityData>();
-            if (Baked == null || !ShowDummy) return list;
+            _dummyHurtboxes.Clear();
+            if (!ShowDummy) return _dummyHurtboxes;
+            if (Scenario != null)
+            {
+                foreach (var shape in Scenario.Frames[ScenarioFrame].Hurtboxes)
+                    if (shape.Id == 2 && shape.Active) _dummyHurtboxes.Add(shape);
+                return _dummyHurtboxes;
+            }
+            if (Baked == null) return _dummyHurtboxes;
             int fc = Baked.FrameCountFor("idle");
-            if (fc < 0) return list;
+            if (fc < 0) return _dummyHurtboxes;
             var state = new CharacterState
             {
                 PX = DummyPosition().x,
@@ -875,8 +1203,8 @@ namespace SlopArena.Client.Tools
                 PZ = DummyPosition().z,
                 FacingYaw = FacingYaw + Mathf.PI,
             };
-            list.AddRange(ServerSimulation.BuildEntitiesFromState(state, DisplayDef, Baked, "idle", 0, 0));
-            return list;
+            _dummyHurtboxes.AddRange(ServerSimulation.BuildEntitiesFromState(state, DisplayDef, Baked, "idle", 0, 0));
+            return _dummyHurtboxes;
         }
 
         /// <summary>
@@ -888,6 +1216,27 @@ namespace SlopArena.Client.Tools
         /// </summary>
         public IReadOnlyList<(Vector3 pos, char phase)> ResolveTrajectory()
         {
+            if (Scenario != null)
+            {
+                if (!ReferenceEquals(_scenarioTrajectorySource, Scenario))
+                {
+                    _scenarioTrajectorySource = Scenario;
+                    _trajectory.Clear();
+                    foreach (var sample in Scenario.Frames)
+                    {
+                        var opponent = sample.Opponent;
+                        _trajectory.Add((new Vector3(opponent.PX, opponent.PY, opponent.PZ),
+                            opponent.HitstunTicks > 0 ? 'H' : opponent.IsGrounded ? 'G' : 'F'));
+                    }
+                }
+                return _trajectory;
+            }
+            if (_scenarioTrajectorySource != null)
+            {
+                _scenarioTrajectorySource = null;
+                _trajectory.Clear();
+                _trajDirty = "";
+            }
             if (Def == null || Baked == null) { _trajectory.Clear(); return _trajectory; }
             var events = CurrentWorkingEvents();
             if (events.Length == 0 || PreviewHitboxIndex < 0 || PreviewHitboxIndex >= events.Length) { _trajectory.Clear(); return _trajectory; }
@@ -1033,8 +1382,14 @@ namespace SlopArena.Client.Tools
             if (_previewRenderer == null || Def == null)
             {
                 _presentationPreviewer.Clear();
+                _weaponAttach?.SetHitboxTrailActive(false);
                 _simulationPreviewer.Clear();
                 QueueEditorRefresh();
+                return;
+            }
+            if (Scenario != null)
+            {
+                RefreshScenarioPose();
                 return;
             }
             var spec = CurrentSpec();
@@ -1042,6 +1397,7 @@ namespace SlopArena.Client.Tools
             {
                 _presentationPreviewer.Clear();
                 _simulationPreviewer.Clear();
+                _weaponAttach?.SetHitboxTrailActive(false);
                 QueueEditorRefresh();
                 return;
             }
@@ -1077,6 +1433,21 @@ namespace SlopArena.Client.Tools
                     BasePosition(),
                     FacingYaw,
                     simulationTick);
+                float hitboxSeconds = _simulationPreviewer.ActiveSwordHitboxSeconds;
+                _weaponAttach?.SetHitboxTrailActive(hitboxSeconds >= 0f, hitboxSeconds);
+                _weaponAttach?.SetPreviewTrailHistory(
+                    _simulationPreviewer.StateHistory, simulationTick, Airborne);
+                if (_simulationPreviewer.StateHistory.Count > simulationTick)
+                {
+                    var previewState = _simulationPreviewer.StateHistory[simulationTick];
+                    _previewRenderer.transform.position = new Vector3(
+                        previewState.PX, previewState.PY + _previewRenderer.ModelYOffset, previewState.PZ);
+                    _previewRenderer.transform.rotation = Quaternion.Euler(
+                        0f, previewState.FacingYaw * Mathf.Rad2Deg, 0f);
+                    if (_weaponAttach?.HasSwordTrail == true
+                        && !_previewRenderer.TrySampleBakedWeaponPath(previewState, Airborne, out _, out _))
+                        _previewRenderer.PlayScrubbed(AnimNameFor(spec, StageIndex), normalized);
+                }
                 _presentationPreviewer.SetSimulationFrame(
                     _simulationPreviewer.PresentationEvents,
                     (uint)simulationTick,
@@ -1085,7 +1456,12 @@ namespace SlopArena.Client.Tools
                     _previewRenderer.transform);
             }
             else
+            {
+                _weaponAttach?.SetHitboxTrailActive(false);
                 _presentationPreviewer.SetFrame(sourceStage, Tick, _presentationBindings, _previewRenderer.transform, _previewRenderer);
+            }
+            _weaponAttach?.RefreshPresentation();
+            if (ShowDummy) _dummyWeaponAttach?.RefreshPresentation();
             QueueEditorRefresh();
         }
 
@@ -1151,7 +1527,11 @@ namespace SlopArena.Client.Tools
             {
                 GL.Color(new Color(1f, 0.35f, 0.35f));
                 foreach (var hb in ResolveDummyHurtboxes())
-                    WireSphere(new Vector3(hb.PosX, hb.PosY, hb.PosZ), hb.Radius);
+                {
+                    if (hb.Shape == HitboxShape.Capsule)
+                        WireCapsule(new Vector3(hb.PosX, hb.PosY, hb.PosZ), new Vector3(hb.EndX, hb.EndY, hb.EndZ), hb.Radius);
+                    else WireSphere(new Vector3(hb.PosX, hb.PosY, hb.PosZ), hb.Radius);
+                }
             }
             if (ShowTrajectory)
             {

@@ -11,7 +11,7 @@ namespace SlopArena.Shared
         None,
         Manki,
         FightGuy,
-        Kistu,
+        Wibou,
         Bonk,
         Nilus
     }

@@ -444,6 +444,7 @@ namespace SlopArena.Client.World
                 if (npc.Renderer != null)
                     npc.Renderer.ApplyServerState(_bridge.GetState(npc.Id));
             }
+            UpdateSwordTrailsFromResolver(_bridge.InternalSim.Resolver);
             PresentTimelineEvents();
 
             var targetState = _bridge.GetState(PlayerEntityId);

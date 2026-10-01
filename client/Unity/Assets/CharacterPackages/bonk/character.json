@@ -58,8 +58,16 @@
     "width": 0.72,
     "height": 1.22,
     "offsetY": 0.61,
-    "attackerAnchor": { "x": 0, "y": 0.61, "z": 0.27 },
-    "victimAnchor": { "x": 0, "y": 0.61, "z": 0.42 }
+    "attackerAnchor": {
+      "x": 0,
+      "y": 0.61,
+      "z": 0.27
+    },
+    "victimAnchor": {
+      "x": 0,
+      "y": 0.61,
+      "z": 0.42
+    }
   },
   "hurtboxCapsules": [
     {

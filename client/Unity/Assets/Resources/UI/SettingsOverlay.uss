@@ -6,7 +6,7 @@
     bottom: 0;
     align-items: center;
     justify-content: center;
-    background-color: rgba(13, 13, 20, 0.93);
+    background-color: rgba(22, 21, 19, 0.94);
     color: rgb(240, 238, 232);
     font-size: 15px;
 }
@@ -18,15 +18,15 @@
     max-height: 780px;
     min-height: 470px;
     padding: 22px 26px;
-    background-color: rgb(23, 19, 27);
+    background-color: rgb(240, 238, 232);
     border-left-width: 2px;
     border-top-width: 2px;
     border-right-width: 2px;
     border-bottom-width: 7px;
-    border-left-color: rgb(13, 13, 20);
-    border-top-color: rgb(13, 13, 20);
-    border-right-color: rgb(13, 13, 20);
-    border-bottom-color: rgb(224, 92, 42);
+    border-left-color: rgb(22, 21, 19);
+    border-top-color: rgb(22, 21, 19);
+    border-right-color: rgb(22, 21, 19);
+    border-bottom-color: rgb(255, 204, 34);
 }
 
 .sa-settings-header {
@@ -37,16 +37,10 @@
 }
 
 .sa-settings-title {
-    color: rgb(240, 238, 232);
+    color: rgb(27, 26, 24);
     font-size: 48px;
-    -unity-font-definition: url("../../Fonts/Baloo2.asset");
-    -unity-font-style: bold;
-}
-
-.sa-settings-mark {
-    color: rgb(255, 200, 33);
-    font-size: 11px;
-    letter-spacing: 2px;
+    -unity-font-definition: url("../../Fonts/ArchivoBlack.asset");
+    -unity-font-style: normal;
 }
 
 .sa-settings-tabs {
@@ -64,32 +58,45 @@
     margin-bottom: 6px;
     padding-left: 12px;
     padding-right: 12px;
-    background-color: rgb(36, 32, 43);
-    color: rgb(240, 238, 232);
+    background-image: none;
+    background-color: rgb(240, 238, 232);
+    color: rgb(27, 26, 24);
     border-left-width: 2px;
     border-top-width: 2px;
     border-right-width: 2px;
     border-bottom-width: 5px;
-    border-left-color: rgb(13, 13, 20);
-    border-top-color: rgb(13, 13, 20);
-    border-right-color: rgb(13, 13, 20);
-    border-bottom-color: rgb(13, 13, 20);
+    border-left-color: rgb(22, 21, 19);
+    border-top-color: rgb(22, 21, 19);
+    border-right-color: rgb(22, 21, 19);
+    border-bottom-color: rgb(22, 21, 19);
     font-size: 14px;
-    -unity-font-style: bold;
+    -unity-font-definition: url("../../Fonts/ArchivoBlack.asset");
+    -unity-font-style: normal;
 }
 
 .sa-settings-tab--selected {
-    background-color: rgb(240, 238, 232);
-    color: rgb(23, 19, 27);
-    border-bottom-color: rgb(224, 92, 42);
+    background-image: none;
+    background-color: rgb(255, 204, 34);
+    color: rgb(27, 26, 24);
+    border-bottom-color: rgb(22, 21, 19);
 }
 
-.sa-settings-tab:hover, .sa-settings-tab:focus,
-.sa-settings-action:hover, .sa-settings-action:focus {
-    border-top-color: rgb(255, 200, 33);
-    border-left-color: rgb(255, 200, 33);
-    border-right-color: rgb(255, 200, 33);
+.sa-settings-tab:hover {
+    background-color: rgb(255, 204, 34);
+    border-top-color: rgb(27, 26, 24);
+    border-left-color: rgb(27, 26, 24);
+    border-right-color: rgb(27, 26, 24);
 }
+
+.sa-settings-tab:focus {
+    background-color: rgb(27, 26, 24);
+    color: rgb(240, 238, 232);
+    border-top-color: rgb(255, 204, 34);
+    border-left-color: rgb(255, 204, 34);
+    border-right-color: rgb(255, 204, 34);
+}
+
+.sa-settings-tab:active { translate: 0 3px; }
 
 .sa-settings-scroll {
     flex-grow: 1;
@@ -98,7 +105,9 @@
     padding-right: 16px;
     padding-top: 18px;
     padding-bottom: 12px;
-    background-color: rgb(13, 13, 20);
+    background-color: rgb(22, 21, 19);
+    border-width: 2px;
+    border-color: rgb(27, 26, 24);
 }
 
 .sa-settings-body { color: rgb(240, 238, 232); }
@@ -113,7 +122,7 @@
     margin-bottom: 8px;
     padding-left: 12px;
     padding-right: 12px;
-    background-color: rgb(36, 32, 43);
+    background-color: rgb(37, 36, 34);
 }
 
 .sa-settings-row-label {
@@ -126,33 +135,70 @@
 }
 
 .sa-settings-slider { width: 38%; min-width: 100px; }
-.sa-settings-value, .sa-settings-status {
-    color: rgb(255, 200, 33);
+.sa-settings-value {
+    color: rgb(255, 204, 34);
     font-size: 14px;
 }
 .sa-settings-value { width: 52px; -unity-text-align: middle-right; }
+.sa-settings-status {
+    color: rgb(27, 26, 24);
+    font-size: 14px;
+}
 .sa-settings-binding-current { width: 140px; color: rgb(240, 238, 232); }
+
+.sa-settings-scroll .sa-settings-slider .unity-base-slider__tracker {
+    background-image: none;
+    background-color: rgb(123, 120, 114);
+}
+.sa-settings-scroll .sa-settings-slider .unity-base-slider__dragger {
+    background-image: none;
+    background-color: rgb(255, 204, 34);
+    border-color: rgb(22, 21, 19);
+}
+.sa-settings-scroll .sa-settings-slider:focus .unity-base-slider__dragger {
+    border-color: rgb(240, 238, 232);
+}
 
 .sa-settings-field {
     min-height: 44px;
     margin-bottom: 8px;
-    background-color: rgb(36, 32, 43);
+    background-color: rgb(37, 36, 34);
     color: rgb(240, 238, 232);
     border-bottom-width: 2px;
-    border-bottom-color: rgb(224, 92, 42);
+    border-bottom-color: rgb(123, 120, 114);
 }
-.sa-settings-field:focus { border-bottom-color: rgb(255, 200, 33); }
+.sa-settings-field:focus { border-bottom-color: rgb(255, 204, 34); }
 .sa-settings-field .unity-base-field__label { color: rgb(240, 238, 232); }
-.sa-settings-field .unity-base-field__input { color: rgb(240, 238, 232); }
+.sa-settings-field .unity-base-field__input {
+    background-color: rgb(22, 21, 19);
+    color: rgb(240, 238, 232);
+}
+.sa-settings-field .unity-base-field__input .unity-text-element { color: rgb(240, 238, 232); }
+.sa-settings-field .unity-base-field__input .unity-base-popup-field__text { color: rgb(240, 238, 232); }
+.sa-settings-field .unity-base-popup-field__arrow { -unity-background-image-tint-color: rgb(240, 238, 232); }
 .sa-settings-toggle {
     min-height: 44px;
     margin-bottom: 8px;
     padding-left: 12px;
-    background-color: rgb(36, 32, 43);
+    background-color: rgb(37, 36, 34);
     color: rgb(240, 238, 232);
 }
 .sa-settings-toggle .unity-base-field__label { color: rgb(240, 238, 232); }
-.sa-settings-note { color: rgb(196, 189, 197); white-space: normal; }
+.sa-settings-toggle .unity-toggle__input {
+    background-color: rgb(22, 21, 19);
+    border-color: rgb(123, 120, 114);
+}
+.sa-settings-toggle .unity-toggle__checkmark {
+    background-color: rgb(22, 21, 19);
+    border-color: rgb(123, 120, 114);
+    -unity-background-image-tint-color: rgb(27, 26, 24);
+}
+.sa-settings-toggle:checked .unity-toggle__checkmark {
+    background-color: rgb(255, 204, 34);
+    border-color: rgb(255, 204, 34);
+}
+.sa-settings-toggle:focus .unity-toggle__checkmark { border-color: rgb(240, 238, 232); }
+.sa-settings-note { color: rgb(240, 238, 232); white-space: normal; }
 
 .sa-settings-status { min-height: 18px; margin-top: 6px; white-space: normal; }
 .sa-settings-footer {
@@ -162,30 +208,92 @@
     margin-top: 12px;
 }
 .sa-settings-spacer { flex-grow: 1; }
-.sa-settings-action {
+.sa-settings-body .sa-settings-action {
     min-height: 44px;
     padding-left: 16px;
     padding-right: 16px;
-    background-color: rgb(36, 32, 43);
-    color: rgb(240, 238, 232);
+    background-image: none;
+    background-color: rgb(240, 238, 232);
+    color: rgb(27, 26, 24);
     border-left-width: 2px;
     border-top-width: 2px;
     border-right-width: 2px;
     border-bottom-width: 5px;
-    border-left-color: rgb(13, 13, 20);
-    border-top-color: rgb(13, 13, 20);
-    border-right-color: rgb(13, 13, 20);
-    border-bottom-color: rgb(13, 13, 20);
+    border-left-color: rgb(22, 21, 19);
+    border-top-color: rgb(22, 21, 19);
+    border-right-color: rgb(22, 21, 19);
+    border-bottom-color: rgb(22, 21, 19);
     font-size: 13px;
-    -unity-font-style: bold;
+    -unity-font-definition: url("../../Fonts/ArchivoBlack.asset");
+    -unity-font-style: normal;
 }
-.sa-settings-action--primary {
+.sa-settings-body .sa-settings-action:hover,
+.sa-settings-body .sa-settings-action:focus {
+    background-image: none;
+    background-color: rgb(240, 238, 232);
+    color: rgb(27, 26, 24);
+    border-top-color: rgb(255, 204, 34);
+    border-left-color: rgb(255, 204, 34);
+    border-right-color: rgb(255, 204, 34);
+}
+.sa-settings-body .sa-settings-action:active { translate: 0 3px; }
+.sa-settings-body .sa-settings-action:disabled {
+    background-image: none;
+    background-color: rgb(37, 36, 34);
+    color: rgb(240, 238, 232);
+    border-color: rgb(123, 120, 114);
+}
+.sa-settings-footer .sa-settings-action {
+    min-height: 44px;
+    padding-left: 16px;
+    padding-right: 16px;
+    background-image: none;
+    background-color: rgb(240, 238, 232);
+    color: rgb(27, 26, 24);
+    border-left-width: 2px;
+    border-top-width: 2px;
+    border-right-width: 2px;
+    border-bottom-width: 5px;
+    border-left-color: rgb(22, 21, 19);
+    border-top-color: rgb(22, 21, 19);
+    border-right-color: rgb(22, 21, 19);
+    border-bottom-color: rgb(22, 21, 19);
+    font-size: 13px;
+    -unity-font-definition: url("../../Fonts/ArchivoBlack.asset");
+    -unity-font-style: normal;
+}
+.sa-settings-footer .sa-settings-action:hover,
+.sa-settings-footer .sa-settings-action:focus {
+    background-image: none;
+    background-color: rgb(240, 238, 232);
+    color: rgb(27, 26, 24);
+    border-top-color: rgb(255, 204, 34);
+    border-left-color: rgb(255, 204, 34);
+    border-right-color: rgb(255, 204, 34);
+}
+.sa-settings-footer .sa-settings-action:active { translate: 0 3px; }
+.sa-settings-footer .sa-settings-action--primary {
     min-width: 140px;
-    background-color: rgb(255, 200, 33);
-    color: rgb(23, 19, 27);
-    border-bottom-color: rgb(224, 92, 42);
+    background-image: none;
+    background-color: rgb(255, 204, 34);
+    color: rgb(27, 26, 24);
+    border-bottom-color: rgb(22, 21, 19);
 }
-.sa-settings-action:disabled { opacity: 0.5; }
+.sa-settings-footer .sa-settings-action--primary:hover,
+.sa-settings-footer .sa-settings-action--primary:focus {
+    background-image: none;
+    background-color: rgb(27, 26, 24);
+    color: rgb(240, 238, 232);
+    border-top-color: rgb(255, 204, 34);
+    border-left-color: rgb(255, 204, 34);
+    border-right-color: rgb(255, 204, 34);
+}
+.sa-settings-footer .sa-settings-action:disabled {
+    background-image: none;
+    background-color: rgb(37, 36, 34);
+    color: rgb(240, 238, 232);
+    border-color: rgb(123, 120, 114);
+}
 
 .sa-settings-confirmation {
     position: absolute;
@@ -195,16 +303,62 @@
     bottom: 0;
     align-items: center;
     justify-content: center;
-    background-color: rgba(13, 13, 20, 0.9);
+    background-color: rgba(22, 21, 19, 0.9);
 }
 .sa-settings-confirmation-card {
     width: 90%;
     max-width: 480px;
     padding: 22px;
-    background-color: rgb(23, 19, 27);
+    background-color: rgb(240, 238, 232);
+    border-left-width: 2px;
+    border-top-width: 2px;
+    border-right-width: 2px;
     border-bottom-width: 7px;
-    border-bottom-color: rgb(224, 92, 42);
+    border-color: rgb(27, 26, 24);
 }
-.sa-settings-confirmation-title { color: rgb(240, 238, 232); font-size: 18px; white-space: normal; }
+.sa-settings-confirmation-title {
+    color: rgb(27, 26, 24);
+    font-size: 18px;
+    white-space: normal;
+}
 .sa-settings-confirmation-actions { flex-direction: row; margin-top: 18px; }
-.sa-settings-confirmation-actions .sa-settings-action { flex-grow: 1; margin-right: 8px; }
+.sa-settings-confirmation-actions .sa-settings-action {
+    flex-grow: 1;
+    margin-right: 8px;
+    min-height: 44px;
+    padding-left: 12px;
+    padding-right: 12px;
+    background-image: none;
+    background-color: rgb(37, 36, 34);
+    color: rgb(240, 238, 232);
+    border-left-width: 2px;
+    border-top-width: 2px;
+    border-right-width: 2px;
+    border-bottom-width: 5px;
+    border-left-color: rgb(22, 21, 19);
+    border-top-color: rgb(22, 21, 19);
+    border-right-color: rgb(22, 21, 19);
+    border-bottom-color: rgb(22, 21, 19);
+    -unity-font-definition: url("../../Fonts/ArchivoBlack.asset");
+    -unity-font-style: normal;
+}
+.sa-settings-confirmation-actions .sa-settings-action:hover,
+.sa-settings-confirmation-actions .sa-settings-action:focus {
+    background-image: none;
+    color: rgb(27, 26, 24);
+    background-color: rgb(255, 204, 34);
+    border-top-color: rgb(27, 26, 24);
+    border-left-color: rgb(27, 26, 24);
+    border-right-color: rgb(27, 26, 24);
+}
+.sa-settings-confirmation-actions .sa-settings-action:active { translate: 0 3px; }
+.sa-settings-confirmation-actions .sa-settings-action:disabled {
+    background-image: none;
+    background-color: rgb(37, 36, 34);
+    color: rgb(240, 238, 232);
+    border-color: rgb(123, 120, 114);
+}
+
+.sa-settings-cover .sa-settings-action:disabled:active {
+    translate: 0 0;
+}

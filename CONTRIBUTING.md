@@ -27,6 +27,43 @@ The generated Shared DLL is copied to `client/Unity/Assets/Plugins/SlopArena.Sha
 A clean clone does not include ignored licensed/local art or stage presentation prefabs.
 Supply those assets separately for a complete Unity build and visible PVP stages.
 
+## Agent tooling
+
+OMP discovers project skills from the working directory and its ancestors, not nested
+repositories. Start in this repository, or configure the enclosing workspace's
+`skills.customDirectories` to point at this repository's `.omp/skills`. Keep the
+retired Unity skill exclusions from `.omp/config.yml`, including the stale
+`agent/sloparena-*`, `agent/movement-platform-fighter-3d`, and `agent/orient` aliases.
+Do not repair project routing by rewriting user-level skill installations.
+
+Skill discovery is a startup snapshot. Start a fresh session after changing routing;
+`omp read skill://sloparena-build` is a read-only fresh-process check. It must resolve
+to the Unity CLI/Pipeline workflow, not the removed MCP workflow.
+
+Skill discovery does not change command working directories. For workspace launches,
+follow [orientation's execution-root rules](.omp/skills/orient/SKILL.md#execution-root)
+and set each game command's `cwd` to the canonical selected checkout. Keep BMAD
+configuration and planning at the supplied workspace root. Implementation handoffs
+must include both roots and the absolute spec/ticket path; a workspace worktree does
+not isolate its symlinked game repository.
+
+The navigation-only [OMP solution](.omp/SlopArena.sln) includes Shared, Server, and
+their tests. `.omp/lsp.json` points the installed OmniSharp at that explicit solution
+to avoid recursively scanning Unity asset/cache trees. Adjust executable and checkout
+paths when moving machines. An enclosing workspace needs its own `.omp/lsp.json`;
+reload the LSP configuration after changes. Through a symlinked checkout, use canonical
+absolute file paths for LSP queries so they match MSBuild's document identities.
+
+This solution does not supply Unity project metadata. Unity semantic navigation needs
+the Editor-generated projects; do not generate or refresh them while another agent owns
+the Editor. Compilation and presentation checks still use the
+[Unity CLI workflow](docs/contributing/unity-cli.md).
+
+Routine numerical tuning does not automatically require new golden tests. Prefer
+focused behavioral assertions for mechanics; use the
+[kit regression skill](.omp/skills/sloparena-kit-regression-testing/SKILL.md) for explicit
+scenario coverage and deliberate golden maintenance.
+
 ## Core rules
 
 - The Shared simulation is the gameplay authority. Do not implement gameplay mechanics only in Unity.
@@ -40,7 +77,7 @@ Supply those assets separately for a complete Unity build and visible PVP stages
 
 New characters use the package-native workflow. Start with [Adding a Character](docs/characters/adding-a-new-character.md). The editable package lives under `client/Unity/Assets/CharacterPackages/<package>/` and contains:
 
-The current product target is a playable friends demo with Manki, FightGuy, Kistu, and
+The current product target is a playable friends demo with Manki, FightGuy, Wibou, and
 Bonk. Package authoring remains technically supported, but a fifth character or the Nilus
 migration is not a demo prerequisite.
 

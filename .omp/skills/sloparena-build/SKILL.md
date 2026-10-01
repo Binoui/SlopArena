@@ -8,6 +8,10 @@ Use this skill after changes under `client/Unity/Assets/` or when Unity reports 
 compiler/runtime error. Choose the applicable verification mode in
 [`docs/testing.md`](../../../docs/testing.md).
 
+For package move preview, scrubbing, capture, or diagnostics, route through the
+[Ability Lab skill](../sloparena-ability-lab/SKILL.md) and
+[Unity CLI reference](../../../docs/contributing/unity-cli.md).
+
 ## Local iteration
 
 Use the existing Editor development content and exercise the affected Ability Lab or

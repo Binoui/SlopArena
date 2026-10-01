@@ -109,6 +109,7 @@ namespace SlopArena.Client.UI
         private void BuildPanel(VisualElement root)
         {
             _panel = new VisualElement();
+            _panel.AddToClassList("match-pause-cover");
             _panel.style.position = Position.Absolute;
             _panel.style.left = 0;
             _panel.style.right = 0;
@@ -116,7 +117,6 @@ namespace SlopArena.Client.UI
             _panel.style.bottom = 0;
             _panel.style.alignItems = Align.Center;
             _panel.style.justifyContent = Justify.Center;
-            _panel.style.backgroundColor = new Color(0f, 0f, 0f, 0.55f);
 
             // Horizontal row: optional left section (Training settings) + pause box.
             var row = new VisualElement();
@@ -128,28 +128,25 @@ namespace SlopArena.Client.UI
             row.Add(_leftSection);
 
             var box = new VisualElement();
+            box.AddToClassList("match-pause-box");
             box.style.width = 300;
             box.style.marginLeft = 12;
-            box.style.backgroundColor = new Color(0.09f, 0.09f, 0.11f, 0.96f);
-            box.style.borderTopLeftRadius = 10;
-            box.style.borderTopRightRadius = 10;
-            box.style.borderBottomLeftRadius = 10;
-            box.style.borderBottomRightRadius = 10;
             box.style.paddingTop = 24;
             box.style.paddingBottom = 24;
             box.style.paddingLeft = 24;
             box.style.paddingRight = 24;
 
             var title = new Label("PAUSED");
+            title.AddToClassList("match-pause-title");
             title.style.fontSize = 30;
-            title.style.unityFontStyleAndWeight = FontStyle.Bold;
-            title.style.color = Color.white;
             title.style.unityTextAlign = TextAnchor.MiddleCenter;
             title.style.marginBottom = 20;
             box.Add(title);
 
             box.Add(MakeButton("SETTINGS", OpenSettings));
-            box.Add(MakeButton("RESUME", () => SetPaused(false)));
+            var resume = MakeButton("RESUME", () => SetPaused(false));
+            resume.AddToClassList("match-pause-action--primary");
+            box.Add(resume);
             box.Add(MakeButton("LEAVE MATCH", LeaveMatch));
             box.Add(MakeButton("QUIT GAME", QuitGame));
 
@@ -162,6 +159,7 @@ namespace SlopArena.Client.UI
         private static Button MakeButton(string label, Action onClick)
         {
             var btn = new Button(onClick) { text = label };
+            btn.AddToClassList("match-pause-action");
             btn.style.width = 240;
             btn.style.height = 46;
             btn.style.fontSize = 20;

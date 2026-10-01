@@ -6,8 +6,8 @@ namespace SlopArena.Client.UI
 {
     /// <summary>
     /// Binds the stable FrontendShell document (issue #219): named hosts for
-    /// page header/body and the lower row's social cell plus summary/actions
-    /// cell, hidden expanded-social and modal hosts, and the one-time
+    /// page header/body, lower-row summary/actions, an absolute social
+    /// overlay, modal host, and the one-time
     /// geometry/density registration on the stable shell root. This view has
     /// no lobby, network, navigation or social logic — the controllers keep
     /// those responsibilities.
@@ -32,7 +32,6 @@ namespace SlopArena.Client.UI
         private VisualElement? _pageLowerHost;
         private VisualElement? _pageSummaryHost;
         private VisualElement? _pageActionsHost;
-        private VisualElement? _expandedSocialHost;
         private VisualElement? _modalHost;
         private VisualElement? _menuModal;
         private Button? _resumeButton;
@@ -64,11 +63,9 @@ namespace SlopArena.Client.UI
         /// </summary>
         public VisualElement? PageContentRoot { get; private set; }
 
-        /// <summary>The reserved bottom-left conversation cell.</summary>
+        /// <summary>The absolute bottom-left, user-sized conversation overlay.</summary>
         public VisualElement? SocialHost => _socialHost;
 
-        /// <summary>The hidden host for a later expanded social surface.</summary>
-        public VisualElement? ExpandedSocialHost => _expandedSocialHost;
 
         /// <summary>The hidden host for modal surfaces.</summary>
         public VisualElement? ModalHost => _modalHost;
@@ -112,7 +109,6 @@ namespace SlopArena.Client.UI
             _pageLowerHost = documentRoot.Q<VisualElement>("page-lower-host");
             _pageSummaryHost = documentRoot.Q<VisualElement>("page-summary-host");
             _pageActionsHost = documentRoot.Q<VisualElement>("page-actions-host");
-            _expandedSocialHost = documentRoot.Q<VisualElement>("expanded-social-host");
             _modalHost = documentRoot.Q<VisualElement>("modal-host");
             _menuModal = documentRoot.Q<VisualElement>("shell-escape-menu");
             _resumeButton = documentRoot.Q<Button>("shell-menu-resume");
@@ -129,7 +125,7 @@ namespace SlopArena.Client.UI
 
             if (_root == null || _pageHeaderHost == null || _pageBodyHost == null || _socialHost == null
                 || _pageLowerHost == null || _pageSummaryHost == null || _pageActionsHost == null
-                || _expandedSocialHost == null || _modalHost == null)
+                || _modalHost == null)
             {
                 Debug.LogError("[FrontendShellView] FrontendShell.uxml is missing required hosts; the shell frame cannot host pages.");
                 enabled = false;
@@ -220,7 +216,6 @@ namespace SlopArena.Client.UI
             float cellHeight = Mathf.Clamp(_preferredCellHeightPx > 0f ? _preferredCellHeightPx : defaultCellHeightPx,
                 Mathf.Min(180f, maxHeightPx), maxHeightPx) * requestedScale / scale;
             float topGap = (_compact ? 10f : 16f) * requestedScale / scale;
-            float cellGap = (_compact ? 16f : 20f) * requestedScale / scale;
 
             _topBar.style.height = barHeight;
             _topBar.style.minHeight = barHeight;
@@ -233,17 +228,18 @@ namespace SlopArena.Client.UI
 
             if (_lowerRow != null)
             {
-                bool home = _root.ClassListContains("frontend-shell--home");
-                _lowerRow.style.marginTop = home ? 0f : topGap;
-                _lowerRow.style.paddingBottom = home ? 0f : spacing;
+                _lowerRow.style.marginTop = topGap;
+                _lowerRow.style.paddingBottom = spacing;
             }
 
-            if (!_socialExpanded)
-            {
-                _socialHost.style.width = cellWidth;
-                _socialHost.style.height = cellHeight;
-                _socialHost.style.marginRight = cellGap;
-            }
+            _socialHost.style.position = Position.Absolute;
+            _socialHost.style.left = spacing;
+            _socialHost.style.right = StyleKeyword.Auto;
+            _socialHost.style.top = StyleKeyword.Auto;
+            _socialHost.style.bottom = spacing;
+            _socialHost.style.width = cellWidth;
+            _socialHost.style.height = cellHeight;
+            _socialHost.style.marginRight = 0;
             _densityGeometryApplied = true;
         }
 
@@ -255,12 +251,11 @@ namespace SlopArena.Client.UI
         {
             _preferredCellWidthPx = widthPx;
             _preferredCellHeightPx = heightPx;
-            if (!_socialExpanded)
-                ApplyDensityGeometry();
+            ApplyDensityGeometry();
         }
 
         /// <summary>
-        /// Removes mounted page sections. The social, expanded-social, top
+        /// Removes mounted page sections. The social overlay, top
         /// bar, and shell-owned identity modal survive page navigation.
         /// </summary>
         public void ClearPageHosts()
@@ -274,53 +269,6 @@ namespace SlopArena.Client.UI
         }
 
 
-        private bool _socialExpanded;
-
-        /// <summary>True while the explicit expanded social view is open.</summary>
-        public bool IsSocialExpanded => _socialExpanded;
-
-        /// <summary>
-        /// The deliberate expanded social view (issue #220): the single
-        /// attached social host is re-presented as the larger surface below
-        /// the top bar — presentation-only on that one subtree. The presenter
-        /// is never detached, reparented or rehosted, and the page beneath
-        /// keeps its controller and selections alive. Geometry is applied
-        /// inline because the density geometry already owns the cell's
-        /// inline width/height; USS cannot override it.
-        /// </summary>
-        public void SetSocialExpanded(bool expanded)
-        {
-            if (_socialExpanded == expanded)
-                return;
-            _socialExpanded = expanded;
-            if (_root != null)
-                _root.EnableInClassList("frontend-shell--social-expanded", expanded);
-            if (_socialHost != null)
-            {
-                if (expanded)
-                {
-                    // On Home the positioned lower row fills the workspace;
-                    // on other pages the workspace positions this host.
-                    _socialHost.style.position = Position.Absolute;
-                    _socialHost.style.left = 0;
-                    _socialHost.style.right = 0;
-                    _socialHost.style.top = 0;
-                    _socialHost.style.bottom = 0;
-                    _socialHost.style.width = StyleKeyword.Auto;
-                    _socialHost.style.height = StyleKeyword.Auto;
-                    _socialHost.style.marginRight = 0;
-                }
-                else
-                {
-                    _socialHost.style.position = Position.Relative;
-                    _socialHost.style.left = StyleKeyword.Auto;
-                    _socialHost.style.right = StyleKeyword.Auto;
-                    _socialHost.style.top = StyleKeyword.Auto;
-                    _socialHost.style.bottom = StyleKeyword.Auto;
-                    ApplyDensityGeometry();
-                }
-            }
-        }
 
         /// <summary>Sets the concise page/mode context in the top bar.</summary>
         public void SetPageContext(string? text)
@@ -337,6 +285,7 @@ namespace SlopArena.Client.UI
         {
             _root?.EnableInClassList("frontend-shell--home", page == FrontendPage.Home);
             _root?.EnableInClassList("frontend-shell--stage", page == FrontendPage.StageSelect);
+            _root?.EnableInClassList("frontend-shell--fighters", page == FrontendPage.FighterSelect);
             ApplyDensityGeometry();
             SetPageContext(page switch
             {
@@ -496,14 +445,12 @@ namespace SlopArena.Client.UI
             _pageLowerHost = null;
             _pageSummaryHost = null;
             _pageActionsHost = null;
-            _expandedSocialHost = null;
             _modalHost = null;
             _pageModalSection = null;
             _lowerRow = null;
             PageContentRoot = null;
             _densityBound = false;
             _densityGeometryApplied = false;
-            _socialExpanded = false;
         }
     }
 

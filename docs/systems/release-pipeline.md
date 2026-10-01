@@ -39,7 +39,7 @@ then restores `ProjectSettings.asset` and unstages `StreamingAssets/`.
 
 Both client and server staging trees contain the roster manifest and all four
 payloads (`manifest.json`, `character.runtime.json`, `poses.bin`, and
-`client.bindings`) for every admitted package: Manki, FightGuy, Kistu, and Bonk.
+`client.bindings`) for every admitted package: Manki, FightGuy, Wibou, and Bonk.
 The scripts derive package IDs from `content-cooked/roster/manifest.json`;
 they do not maintain a separate character list.
 

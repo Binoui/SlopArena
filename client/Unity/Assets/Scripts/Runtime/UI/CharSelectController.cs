@@ -98,11 +98,14 @@ namespace SlopArena.Client.UI
 
                     var name = new Label(cls.ToString().ToUpperInvariant()) { name = "char-card-name" };
                     name.AddToClassList("char-card-name");
+                    var check = new VisualElement { pickingMode = PickingMode.Ignore };
+                    check.AddToClassList("char-card-check");
                     var markers = new VisualElement { name = "char-markers" };
                     markers.AddToClassList("char-markers");
 
                     btn.Add(portrait);
                     btn.Add(name);
+                    btn.Add(check);
                     btn.Add(markers);
                     grid.Add(btn);
                     _gridButtons.Add(btn);
@@ -296,6 +299,21 @@ namespace SlopArena.Client.UI
             _rosterPanel.Clear();
             if (MenuRoster.Classes.Length == 0)
                 return;
+
+            string playerCardName = $"char-{MatchConfig.PlayerClass}";
+            string cpuCardName = $"char-{MatchConfig.SoloBotClass}";
+            foreach (var button in _gridButtons)
+            {
+                var markers = button.Q<VisualElement>("char-markers");
+                markers.Clear();
+                bool playerSelected = button.name == playerCardName;
+                bool cpuSelected = button.name == cpuCardName;
+                if (!playerSelected && !cpuSelected) continue;
+                var marker = new Label(playerSelected && cpuSelected ? "P1 / P2" : playerSelected ? "P1" : "P2");
+                marker.AddToClassList("char-marker");
+                marker.AddToClassList("char-marker--local");
+                markers.Add(marker);
+            }
 
             var player = (Button)BuildPlayerCard(
                 "P1", "YOU", MatchConfig.PlayerClass,

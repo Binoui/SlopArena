@@ -481,18 +481,18 @@ public sealed record CookedDragonBeamCapabilityParameters(
     ushort DurationTicks, ushort FireTick, float LaunchOffsetY, float BeamRange, float BeamRadius,
     float Damage, float KnockbackAngle, float KnockbackBase, float KnockbackGrowth, ushort StunTicks,
     ushort HitboxDurationTicks) : CookedCapabilityParameters;
-public sealed record CookedKistuDashSlashCapabilityParameters(
+public sealed record CookedWibouDashSlashCapabilityParameters(
     float DashDistance,
     ushort DashDurationTicks,
     ushort MaxAimTicks) : CookedCapabilityParameters;
 
-public sealed record CookedKistuRisingSlashCapabilityParameters(
+public sealed record CookedWibouRisingSlashCapabilityParameters(
     float RiseSpeed,
     ushort RiseTicks,
     float HomingRange,
     float HomingSpeed) : CookedCapabilityParameters;
 
-public sealed record CookedKistuBladeFlurryCapabilityParameters(
+public sealed record CookedWibouBladeFlurryCapabilityParameters(
     float ForwardSpeed,
     ushort MoveTicks) : CookedCapabilityParameters;
 public sealed record CookedBonkTargetedJumpSlamCapabilityParameters(

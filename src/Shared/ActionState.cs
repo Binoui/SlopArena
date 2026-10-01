@@ -10,7 +10,7 @@ namespace SlopArena.Shared
         // Wire code 5 is reserved.
         JumpSquat = 6,
         Warping = 7,
-        /// <summary>Hold-to-aim phase (Kistu E): ability active, movement unlocked, jump/dash blocked.</summary>
+        /// <summary>Hold-to-aim phase (Wibou E): ability active, movement unlocked, jump/dash blocked.</summary>
         Aiming = 8,
         Run = 9,
         LedgeHang = 10,

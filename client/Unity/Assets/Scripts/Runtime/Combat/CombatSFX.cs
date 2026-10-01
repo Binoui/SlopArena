@@ -10,7 +10,7 @@ namespace SlopArena.Client.Combat
         private readonly AudioClip[] _light = new AudioClip[3];
         private readonly AudioClip[] _medium = new AudioClip[3];
         private readonly AudioClip[] _heavy = new AudioClip[2];
-        private readonly AudioClip[] _kistuImpact = new AudioClip[3];
+        private readonly AudioClip[] _wibouImpact = new AudioClip[3];
         private readonly AudioClip[] _bonkImpact = new AudioClip[3];
         private AudioSource _source;
         private int _sequence;
@@ -21,9 +21,9 @@ namespace SlopArena.Client.Combat
                 return;
 
             AudioClip clip;
-            if (character == CharacterClass.Kistu || character == CharacterClass.Bonk)
+            if (character == CharacterClass.Wibou || character == CharacterClass.Bonk)
             {
-                AudioClip[] impacts = character == CharacterClass.Kistu ? _kistuImpact : _bonkImpact;
+                AudioClip[] impacts = character == CharacterClass.Wibou ? _wibouImpact : _bonkImpact;
                 int impactIndex = Mathf.Clamp((int)tier, 0, impacts.Length - 1);
                 clip = impacts[impactIndex];
             }
@@ -54,7 +54,7 @@ namespace SlopArena.Client.Combat
             Load(_light, "punch_light");
             Load(_medium, "punch_medium");
             Load(_heavy, "punch_heavy");
-            LoadImpact(_kistuImpact, "Kistu");
+            LoadImpact(_wibouImpact, "Wibou");
             LoadImpact(_bonkImpact, "Bonk");
         }
 

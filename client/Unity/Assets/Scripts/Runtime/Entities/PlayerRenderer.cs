@@ -27,6 +27,8 @@ namespace SlopArena.Client.Entities
 
         [SerializeField] private CharacterAnimationConfig _charConfig;
         private CharacterAnimationCatalog _animationCatalog;
+        private AnimationClip _grabClip;
+        private AnimationClip _throwClip;
 
         [Header("Thresholds")]
         [SerializeField] private float _runSpeedThreshold = 0.1f;
@@ -158,6 +160,7 @@ namespace SlopArena.Client.Entities
         public void LoadModel(CharacterDefinition def, GameObject prefabOverride = null)
         {
             if (def == null) return;
+            LoadSharedAnimations();
             string resourcePath = def.ModelResourcePath ?? "";
             if (prefabOverride == null && string.IsNullOrEmpty(resourcePath)) return;
 
@@ -284,6 +287,9 @@ namespace SlopArena.Client.Entities
             var animator = instance.GetComponentInChildren<Animator>();
             if (animator != null)
                 animator.applyRootMotion = false;
+            _weaponHips = animator != null && animator.isHuman
+                ? animator.GetBoneTransform(HumanBodyBones.Hips)
+                : FindBone("mixamorig:Hips");
         }
 
         private void ConfigureModelAnimation(CharacterDefinition def)
@@ -345,6 +351,129 @@ namespace SlopArena.Client.Entities
         /// <summary>Ticks since the current attack began (0 when not attacking). Read by weapon attach components.</summary>
         public int CurrentAttackElapsedTicks => _lastState.AttackElapsedTicks;
 
+        private bool _currentAttackAirborne;
+
+        /// <summary>
+        /// Sample the authored blade pose on the Shared tick clock. The bake is
+        /// hips-relative; cosmetic projection uses the animated hips, not the
+        /// simulation's fixed hip-height approximation.
+        /// </summary>
+        public bool TrySampleBakedWeaponPath(
+            in CharacterState state, bool airborne, out Vector3 hilt, out Vector3 tip)
+        {
+            hilt = tip = default;
+            if (_animancer == null || _weaponHips == null
+                || !TryGetBakedWeaponPose(state, airborne, out var pose, out var animationName, out int frame)
+                || !TryGetAnimation(animationName, out var clip, out _))
+                return false;
+            // History needs a valid animated origin even before the rig becomes
+            // visible to a camera; Unity's animator culling must not skip it.
+            if (_animancer.Animator.cullingMode != AnimatorCullingMode.AlwaysAnimate)
+                _animancer.Animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
+
+            var animation = _animancer.States.Current;
+            if (animation == null || animation.Clip != clip
+                || state.AttackElapsedTicks >= 3 && animation.Weight < 0.999f)
+                animation = _animancer.Play(clip, 0f);
+            // The existing 0.05s attack crossfade has finished after three Shared
+            // ticks, even when several ticks arrive in one rendered frame.
+            animation.Time = frame / 60f;
+            animation.Speed = 0f;
+            _animancer.Evaluate(0f);
+
+            Vector3 hips = Quaternion.Inverse(transform.rotation)
+                * (_weaponHips.position - transform.position);
+            int hiltOffset = _weaponHiltBoneIndex * 3;
+            int tipOffset = _weaponTipBoneIndex * 3;
+            Vector3 localHilt = hips + new Vector3(pose[hiltOffset], pose[hiltOffset + 1], pose[hiltOffset + 2]);
+            Vector3 localTip = hips + new Vector3(pose[tipOffset], pose[tipOffset + 1], pose[tipOffset + 2]);
+            float sin = Mathf.Sin(state.FacingYaw);
+            float cos = Mathf.Cos(state.FacingYaw);
+            hilt = new Vector3(
+                state.PX + localHilt.x * cos + localHilt.z * sin,
+                state.PY + _modelYOffset + localHilt.y,
+                state.PZ - localHilt.x * sin + localHilt.z * cos);
+            tip = new Vector3(
+                state.PX + localTip.x * cos + localTip.z * sin,
+                state.PY + _modelYOffset + localTip.y,
+                state.PZ - localTip.x * sin + localTip.z * cos);
+            return true;
+        }
+
+        private bool TryGetBakedWeaponPose(
+            in CharacterState state, bool airborne, out float[] pose, out string animationName, out int frame)
+        {
+            pose = null;
+            animationName = null;
+            frame = 0;
+            if (_bakedData == null || _charDef == null || state.AttackSlot == 0
+                || _weaponHiltBoneIndex < 0 || _weaponTipBoneIndex < 0)
+                return false;
+            var spec = _charDef.GetSlotAbility((byte)(state.AttackSlot - 1), airborne);
+            if (spec?.Stages is not { Length: > 0 } || spec.AnimationNames is not { Length: > 0 })
+                return false;
+            int stageIndex = Math.Min(state.ComboStage, spec.Stages.Length - 1);
+            animationName = spec.AnimationNames[stageIndex % spec.AnimationNames.Length];
+            int bakedIndex = _bakedData.FindAnimIndex(animationName);
+            if (bakedIndex < 0)
+                return false;
+            var animation = _bakedData.Animations[bakedIndex];
+            if (animation.FrameCount <= 0)
+                return false;
+            int durationTicks = spec.Stages[stageIndex].DurationTicks;
+            frame = durationTicks > 0
+                ? Math.Min(state.AttackElapsedTicks * animation.FrameCount / durationTicks, animation.FrameCount - 1)
+                : Math.Min(state.AttackElapsedTicks, animation.FrameCount - 1);
+            pose = animation.Frames[frame];
+            return _weaponHiltBoneIndex * 3 + 2 < pose.Length
+                && _weaponTipBoneIndex * 3 + 2 < pose.Length;
+        }
+
+        public bool IsSwordWindowTick(CharacterState state, bool airborne)
+        {
+            if (state.State != ActionState.Attacking || state.AttackSlot == 0 || _charDef == null)
+                return false;
+            var spec = _charDef.GetSlotAbility((byte)(state.AttackSlot - 1), airborne);
+            if (spec?.Stages is not { Length: > 0 })
+                return false;
+            var events = spec.Stages[Math.Min(state.ComboStage, spec.Stages.Length - 1)].HitboxEvents;
+            if (events == null)
+                return false;
+            foreach (var hitbox in events)
+                if (hitbox.BoneName == "_weapon_hilt"
+                    && hitbox.EndBoneName == "_weapon_tip"
+                    && state.AttackElapsedTicks >= hitbox.TriggerTick
+                    && state.AttackElapsedTicks < hitbox.TriggerTick + hitbox.DurationTicks)
+                    return true;
+            return false;
+        }
+
+        private void CaptureWeaponTrailState(CharacterState state)
+        {
+            if (_weaponAttach == null)
+                _weaponAttach = GetComponent<WeaponAttach>();
+            if (_weaponAttach == null || !_weaponAttach.HasSwordTrail) return;
+            Vector3 hilt = default, tip = default;
+            bool hasPose = state.State == ActionState.Attacking
+                && TrySampleBakedWeaponPath(state, _currentAttackAirborne, out hilt, out tip);
+            _weaponAttach.CaptureState(state, _currentAttackAirborne, hasPose, hilt, tip);
+        }
+
+        private void CaptureAttackAirborneIdentity(CharacterState state)
+        {
+            if (state.State == ActionState.Attacking
+                && (_lastState.State != ActionState.Attacking
+                    || state.AttackSequence != _lastState.AttackSequence
+                    || state.AttackSlot != _lastState.AttackSlot
+                    || state.ComboStage != _lastState.ComboStage
+                    || state.AttackElapsedTicks < _lastState.AttackElapsedTicks))
+                _currentAttackAirborne = !state.IsGrounded;
+        }
+
+
+
+
+        public BakedAnimationData? BakedData => _bakedData;
 
         /// <summary>Expose the Animator for external access (e.g. VFX hooks).</summary>
         public Animator Animator => _animancer != null ? _animancer.Animator : null;
@@ -389,8 +518,8 @@ namespace SlopArena.Client.Entities
         private float _hitstopPausedSpeed = 1f;
         private AudioSource _sfxSource;
         private AudioClip _jumpSfx;
-        private readonly AudioClip[] _kistuSwordHitboxSfx = new AudioClip[7];
-        private int _kistuSwordSfxSequence;
+        private readonly AudioClip[] _wibouSwordHitboxSfx = new AudioClip[7];
+        private int _wibouSwordSfxSequence;
         private readonly AudioClip[] _bonkSwooshSfx = new AudioClip[7];
         private readonly AudioClip[] _commonSwooshSfx = new AudioClip[13];
 
@@ -401,12 +530,13 @@ namespace SlopArena.Client.Entities
                 _animancer = GetComponent<AnimancerComponent>();
             if (_modelInstance == null && transform.childCount > 0)
                 _modelInstance = transform.GetChild(0).gameObject;
+            LoadSharedAnimations();
             _sfxSource = gameObject.AddComponent<AudioSource>();
             _sfxSource.outputAudioMixerGroup = ClientSettingsService.Instance.FindBus("SFX");
             _sfxSource.playOnAwake = false;
-            for (int i = 0; i < _kistuSwordHitboxSfx.Length; i++)
-                _kistuSwordHitboxSfx[i] = Resources.Load<AudioClip>(
-                    $"Audio/SFX/Kistu/hit_{i + 1:00}");
+            for (int i = 0; i < _wibouSwordHitboxSfx.Length; i++)
+                _wibouSwordHitboxSfx[i] = Resources.Load<AudioClip>(
+                    $"Audio/SFX/Wibou/hit_{i + 1:00}");
             for (int i = 0; i < _bonkSwooshSfx.Length; i++)
                 _bonkSwooshSfx[i] = Resources.Load<AudioClip>(
                     $"Audio/SFX/Bonk/bonk_swoosh_{i + 1:00}");
@@ -421,12 +551,23 @@ namespace SlopArena.Client.Entities
         // ── Frame-by-frame animation control ──
 
         private BakedAnimationData? _bakedData;
+        private int _weaponHiltBoneIndex = -1;
+        private int _weaponTipBoneIndex = -1;
+        private WeaponAttach _weaponAttach;
+        private Transform _weaponHips;
 
         /// <summary>
         /// Set baked skeleton data for frame-accurate animation.
         /// Must be called before first ApplyServerState.
         /// </summary>
-        public void SetBakedData(BakedAnimationData? data) => _bakedData = data;
+        public void SetBakedData(BakedAnimationData? data)
+        {
+            _bakedData = data;
+            _weaponHiltBoneIndex = data?.BoneNames != null
+                ? Array.IndexOf(data.BoneNames, "_weapon_hilt") : -1;
+            _weaponTipBoneIndex = data?.BoneNames != null
+                ? Array.IndexOf(data.BoneNames, "_weapon_tip") : -1;
+        }
 
         /// <summary>
         /// Play a clip at a fixed normalized time with zero speed — Ability Lab frame
@@ -438,9 +579,116 @@ namespace SlopArena.Client.Entities
         public void PlayScrubbed(string clipName, float normalizedTime)
         {
             if (_animancer == null || !TryGetAnimation(clipName, out var clip, out _)) return;
+            if (!Application.isPlaying) HideShield();
             var state = _animancer.Play(clip, 0f);
             state.Time = clip.length > 0f ? normalizedTime * clip.length : 0f;
             state.Speed = 0f;
+            _animancer.Evaluate(0f);
+        }
+
+        private void LoadSharedAnimations()
+        {
+            if (_grabClip != null && _throwClip != null) return;
+            var shared = Resources.Load<CharacterAnimationConfig>("AnimationConfigs/Shared_AnimConfig");
+            _grabClip = shared?.GetClipByName("grab");
+            _throwClip = shared?.GetClipByName("throw");
+        }
+
+        /// <summary>Sample a recorded Shared state without Play Mode audio or movement effects.</summary>
+        private bool TryResolveScrubbedState(in CharacterState snapshot, bool airborne, int poseTicks,
+            out AnimationClip clip, out float time)
+        {
+            clip = null;
+            time = 0f;
+            if (_animancer == null || _charDef == null) return false;
+            if (snapshot.State is ActionState.GrabAttempt or ActionState.Throwing)
+            {
+                LoadSharedAnimations();
+                clip = snapshot.State == ActionState.GrabAttempt ? _grabClip : _throwClip;
+                if (clip == null) return false;
+                int duration = snapshot.State == ActionState.GrabAttempt
+                    ? DefenseConfig.GrabStartupTicks + DefenseConfig.GrabActiveTicks + DefenseConfig.GrabWhiffRecoveryTicks
+                    : DefenseConfig.ThrowReleaseTicks;
+                time = clip.length * Mathf.Clamp01((duration - snapshot.StateTicks) / (float)duration);
+            }
+            else
+            {
+                string id;
+                int duration = 0;
+                int elapsed = poseTicks;
+                if (snapshot.State is ActionState.Attacking or ActionState.Aiming && snapshot.AttackSlot > 0)
+                {
+                    var spec = _charDef.GetSlotAbility(snapshot.AttackSlot - 1, airborne);
+                    if (spec?.AnimationNames is not { Length: > 0 } || spec.Stages is not { Length: > 0 })
+                        return false;
+                    int stage = Math.Min(snapshot.ComboStage, spec.Stages.Length - 1);
+                    id = snapshot.State == ActionState.Aiming && !string.IsNullOrEmpty(spec.AimAnimationId)
+                        ? spec.AimAnimationId : spec.AnimationNames[stage % spec.AnimationNames.Length];
+                    if (snapshot.State == ActionState.Attacking)
+                    {
+                        duration = spec.Stages[stage].DurationTicks;
+                        elapsed = snapshot.AttackElapsedTicks;
+                    }
+                }
+                else if (snapshot.State == ActionState.Hitstun)
+                {
+                    id = !snapshot.IsGrounded && (snapshot.KVX * snapshot.KVX + snapshot.KVZ * snapshot.KVZ > 0.001f)
+                        && TryGetAnimation(_charDef.TumbleAnim, out _, out _)
+                        ? _charDef.TumbleAnim
+                        : snapshot.HitstunLevel switch
+                        {
+                            1 => _charDef.HitMediumAnim,
+                            2 => _charDef.HitHardAnim,
+                            _ => _charDef.HitSmallAnim,
+                        };
+                }
+                else if (snapshot.State == ActionState.Crouching) id = _charDef.CrouchAnim;
+                else if (snapshot.State == ActionState.Sliding) id = _charDef.SlideAnim;
+                else if (snapshot.State == ActionState.Grabbed) id = _charDef.IdleAnim;
+                else if (!snapshot.IsGrounded) id = snapshot.VY > 0f ? _charDef.JumpAnim : _charDef.FallAnim;
+                else id = snapshot.VX * snapshot.VX + snapshot.VZ * snapshot.VZ > _runSpeedThreshold * _runSpeedThreshold
+                    ? _charDef.RunAnim : _charDef.IdleAnim;
+                if (!TryGetAnimation(id, out clip, out _)) return false;
+                time = elapsed / 60f;
+                if (duration > 0 && _bakedData != null)
+                {
+                    int index = _bakedData.FindAnimIndex(id);
+                    if (index >= 0)
+                    {
+                        int count = _bakedData.Animations[index].FrameCount;
+                        time = Math.Min(elapsed * count / duration, Math.Max(0, count - 1)) / 60f;
+                    }
+                }
+            }
+            return true;
+        }
+
+        public bool CanPlayScrubbedState(in CharacterState snapshot, bool airborne)
+            => TryResolveScrubbedState(snapshot, airborne, 0, out _, out _);
+
+        public bool PlayScrubbedState(in CharacterState snapshot, bool airborne, int poseTicks)
+        {
+            if (!TryResolveScrubbedState(snapshot, airborne, poseTicks, out var clip, out float time))
+                return false;
+            transform.SetPositionAndRotation(
+                new Vector3(snapshot.PX, snapshot.PY + _modelYOffset, snapshot.PZ),
+                Quaternion.Euler(0f, snapshot.FacingYaw * Mathf.Rad2Deg, 0f));
+            var animation = _animancer.Play(clip, 0f);
+            animation.Time = clip.isLooping ? time : Mathf.Min(time, clip.length);
+            animation.Speed = 0f;
+            _currentAnimState = animation;
+            _activeExtrapolator = null;
+            _currentExtrapolationMode = ExtrapolationMode.None;
+            _lastState = snapshot;
+            _lastAnimState = snapshot.State;
+            _lastAttackSlot = snapshot.AttackSlot;
+            _lastComboStage = snapshot.ComboStage;
+            _currentAttackAirborne = airborne;
+            _wasAttacking = snapshot.State == ActionState.Attacking;
+            _wasGrounded = snapshot.IsGrounded;
+            UpdateShield(snapshot);
+            _animancer.Evaluate(0f);
+            return true;
         }
 
         private bool TryGetAnimation(
@@ -503,11 +751,11 @@ namespace SlopArena.Client.Entities
         /// </summary>
         private void EmitSwordHitboxSfx(CharacterState state)
         {
-            bool kistu = _charDef?.Class == CharacterClass.Kistu;
+            bool wibou = _charDef?.Class == CharacterClass.Wibou;
             bool bonk = _charDef?.Class == CharacterClass.Bonk;
             bool common = _charDef?.Class is CharacterClass.Manki or CharacterClass.FightGuy;
             if (!_hasAppliedState
-                || (!kistu && !bonk && !common)
+                || (!wibou && !bonk && !common)
                 || state.AttackSlot == 0
                 || (state.State != ActionState.Attacking && state.State != ActionState.Aiming))
                 return;
@@ -532,10 +780,10 @@ namespace SlopArena.Client.Entities
                     || state.AttackElapsedTicks < hitbox.TriggerTick)
                     continue;
 
-                AudioClip[] pool = kistu
-                    ? _kistuSwordHitboxSfx
+                AudioClip[] pool = wibou
+                    ? _wibouSwordHitboxSfx
                     : bonk ? _bonkSwooshSfx : _commonSwooshSfx;
-                AudioClip clip = pool[_kistuSwordSfxSequence++ % pool.Length];
+                AudioClip clip = pool[_wibouSwordSfxSequence++ % pool.Length];
                 if (clip != null)
                     _sfxSource.PlayOneShot(clip);
                 return;
@@ -598,10 +846,12 @@ namespace SlopArena.Client.Entities
             }
 
 
+            CaptureAttackAirborneIdentity(state);
             UpdateAnimationState(state);
             MaintainTumbleLoop();
 
             UpdateShield(state);
+            CaptureWeaponTrailState(state);
             _lastState = state;
             _hasAppliedState = true;
             if (!_hasPresentedDeaths)
@@ -653,7 +903,7 @@ namespace SlopArena.Client.Entities
         {
             CharacterClass.Manki => new Color(1f, 0.36f, 0.08f, 0.95f),
             CharacterClass.FightGuy => new Color(0.28f, 0.72f, 1f, 0.95f),
-            CharacterClass.Kistu => new Color(0.76f, 0.9f, 1f, 0.95f),
+            CharacterClass.Wibou => new Color(0.76f, 0.9f, 1f, 0.95f),
             CharacterClass.Bonk => new Color(0.96f, 0.58f, 0.18f, 0.95f),
             CharacterClass.Nilus => new Color(0.72f, 0.36f, 1f, 0.95f),
         };
@@ -1126,6 +1376,35 @@ namespace SlopArena.Client.Entities
                 // The authoritative zero is the handoff tick. Do not hold the
                 // landing fade or wait for clip completion before locomotion resumes.
                 ClearLandingLagPresentation();
+            }
+
+            if (state.State is ActionState.GrabAttempt or ActionState.Throwing)
+            {
+                _jumpArcActive = false;
+                var clip = state.State == ActionState.GrabAttempt ? _grabClip : _throwClip;
+                if (clip != null)
+                {
+                    int durationTicks = state.State == ActionState.GrabAttempt
+                        ? DefenseConfig.GrabStartupTicks + DefenseConfig.GrabActiveTicks
+                            + DefenseConfig.GrabWhiffRecoveryTicks
+                        : DefenseConfig.ThrowReleaseTicks;
+                    var animation = _animancer.States.Current;
+                    if (animation == null || animation.Clip != clip)
+                        animation = _animancer.Play(clip, 0.05f);
+                    // Replicated phase time owns the pose, including late snapshots,
+                    // whiffs and rollback rewinds. No animation callback drives capture.
+                    animation.NormalizedTime = Mathf.Clamp01(
+                        (durationTicks - state.StateTicks) / (float)durationTicks);
+                    animation.Speed = 0f;
+                    _animancer.Evaluate(0f);
+                }
+                UpdateAttackAccents(state, _lastComboStage);
+                _lastComboStage = state.ComboStage;
+                _lastAttackSlot = state.AttackSlot;
+                _wasAttacking = false;
+                _lastAnimState = state.State;
+                _wasGrounded = state.IsGrounded;
+                return;
             }
 
             // ── Non-combat: ground/air state machine ──

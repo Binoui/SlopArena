@@ -27,6 +27,20 @@
         <ui:VisualElement name="move-list" class="move-list" />
       </ui:VisualElement>
       <ui:VisualElement name="moves-content" class="moves-content">
+        <ui:Foldout name="scenario-controls" text="Shared scenario" value="true" class="scenario-controls">
+          <ui:Label name="scenario-action" text="Action: —" />
+          <ui:FloatField name="scenario-distance" label="Opponent distance (m)" value="2.5" />
+          <ui:FloatField name="scenario-facing" label="Opponent relative facing (°)" value="180" />
+          <ui:IntegerField name="scenario-damage" label="Opponent starting damage (%)" value="0" />
+          <ui:DropdownField name="scenario-opponent" label="Opponent behavior" />
+          <ui:IntegerField name="scenario-horizon" label="Last frame" value="60" />
+          <ui:VisualElement name="scenario-buttons" class="scenario-buttons">
+            <ui:Button name="scenario-run" text="Run scenario" />
+            <ui:Button name="scenario-exit" text="Exit to authoring" />
+          </ui:VisualElement>
+          <ui:Label name="scenario-outcomes" text="No scenario run." class="scenario-outcomes" />
+        </ui:Foldout>
+
         <ui:ScrollView name="inspector" class="inspector">
           <ui:DropdownField name="stage-selector" label="Stage" />
         </ui:ScrollView>
@@ -123,6 +137,9 @@
         <uie:ObjectField name="assets-rig-field" label="Rig" object-type="UnityEngine.GameObject" allow-scene-objects="false" />
         <ui:Label name="assets-rig-status" text="No catalog rig." />
         <ui:Foldout name="assets-skeleton" text="Baked required bones" value="true" />
+      </ui:Foldout>
+      <ui:Foldout name="assets-weapon-trails-group" text="Weapon trails" value="true" class="asset-group">
+        <ui:VisualElement name="assets-weapon-trails" />
       </ui:Foldout>
       <ui:Foldout name="assets-locomotion-group" text="Locomotion" value="true" class="asset-group">
         <ui:VisualElement name="assets-locomotion-bindings" />

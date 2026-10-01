@@ -56,6 +56,8 @@ namespace SlopArena.Client.Network
         private volatile bool _running;
         private readonly ConcurrentQueue<MatchResultPacket> _matchResultQueue = new();
         private readonly ConcurrentQueue<TimelinePresentationEvent> _presentationEventQueue = new();
+        private readonly ConcurrentQueue<ProjectileVisualPacket> _projectileVisualQueue = new();
+        private readonly ConcurrentQueue<SwordTrailSnapshotPacket> _swordTrailQueue = new();
 
         private long _nextPingNonce;
         private long _lastPingSentAt;
@@ -331,6 +333,25 @@ namespace SlopArena.Client.Network
                 result.Add(entry);
             return result;
         }
+        /// <summary>Latest authoritative projectile surface; an empty snapshot removes all visuals.</summary>
+        public ProjectileVisualPacket? ReceiveProjectileVisuals()
+        {
+            ProjectileVisualPacket? latest = null;
+            while (_projectileVisualQueue.TryDequeue(out var entry))
+                if (latest == null || entry.Tick > latest.Value.Tick)
+                    latest = entry;
+            return latest;
+        }
+        /// <summary>Latest authoritative sword-hitbox owners; empty snapshots remove all trails.</summary>
+        public SwordTrailSnapshotPacket? ReceiveSwordTrailSnapshot()
+        {
+            SwordTrailSnapshotPacket? latest = null;
+            while (_swordTrailQueue.TryDequeue(out var entry))
+                if (latest == null || entry.Tick > latest.Value.Tick)
+                    latest = entry;
+            return latest;
+        }
+
         /// <summary>Drain authoritative final match snapshots received from the server.</summary>
         public List<MatchResultPacket> ReceiveMatchResults()
         {
@@ -377,6 +398,17 @@ namespace SlopArena.Client.Network
                     if (PresentationEventPacket.TryDeserialize(buf, out var presentationPacket))
                     {
                         _presentationEventQueue.Enqueue(presentationPacket!.Value.ToEvent());
+                        continue;
+                    }
+
+                    if (ProjectileVisualPacket.TryDeserialize(buf, out var projectileVisual))
+                    {
+                        _projectileVisualQueue.Enqueue(projectileVisual);
+                        continue;
+                    }
+                    if (SwordTrailSnapshotPacket.TryDeserialize(buf, out var swordTrail))
+                    {
+                        _swordTrailQueue.Enqueue(swordTrail);
                         continue;
                     }
 
@@ -627,6 +659,14 @@ namespace SlopArena.Client.Network
                     if (PresentationEventPacket.TryDeserialize(payload, out var presentation))
                         _presentationEventQueue.Enqueue(presentation!.Value.ToEvent());
                     break;
+                case SteamGameplayWire.Projectile:
+                    if (ProjectileVisualPacket.TryDeserialize(payload, out var projectileVisual))
+                        _projectileVisualQueue.Enqueue(projectileVisual);
+                    break;
+                case SteamGameplayWire.SwordTrail:
+                    if (SwordTrailSnapshotPacket.TryDeserialize(payload, out var swordTrail))
+                        _swordTrailQueue.Enqueue(swordTrail);
+                    break;
                 case SteamGameplayWire.Result:
                     if (!_steamResultReceived && MatchResultPacket.TryDeserialize(payload, out var result))
                     {
@@ -696,14 +736,17 @@ namespace SlopArena.Client.Network
         {
             while (_receivedQueue.TryDequeue(out _)) { }
             while (_presentationEventQueue.TryDequeue(out _)) { }
+            while (_projectileVisualQueue.TryDequeue(out _)) { }
             while (_matchResultQueue.TryDequeue(out _)) { }
+            while (_swordTrailQueue.TryDequeue(out _)) { }
         }
         private void ClearTransientReceiveQueues()
         {
             while (_receivedQueue.TryDequeue(out _)) { }
             while (_presentationEventQueue.TryDequeue(out _)) { }
+            while (_projectileVisualQueue.TryDequeue(out _)) { }
+            while (_swordTrailQueue.TryDequeue(out _)) { }
         }
-
 
         // ── Socket retry ──
         private void SendPingRequest()

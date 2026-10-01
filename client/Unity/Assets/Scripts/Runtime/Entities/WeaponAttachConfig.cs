@@ -26,6 +26,19 @@ namespace SlopArena.Client.Entities
         public Vector3 RotationOffset;
         [Tooltip("Hide the prop this many ticks after the attack starts (0 = keep for the whole attack).")]
         public int HideAfterTicks;
+        [Tooltip("Optional prefab supplying the TECH material and color for a blade-motion trail.")]
+        public GameObject TrailStylePrefab;
+        [Tooltip("How much recent blade movement stays visible, in seconds.")]
+        public float HitboxMotionTime = 0.12f;
+        [Range(0.01f, 1f), Tooltip("Fraction of blade length covered by the trail, measured inward from the tip. TECH Thin Spiral uses a narrow outer edge.")]
+        public float TrailBladeWidth = 0.8f;
+
+        [Tooltip("Optional blade hilt transform name used to position the hitbox trail.")]
+        public string TrailHiltAnchor;
+
+        [Tooltip("Optional blade tip transform name used to position the hitbox trail.")]
+        public string TrailTipAnchor;
+
 
     }
 

@@ -1,9 +1,0 @@
-{
-  "manifestSchemaVersion": 1,
-  "packageId": "kistu",
-  "version": "0.0.0-dev",
-  "creator": "Binoui",
-  "license": "MIT",
-  "attribution": "SlopArena",
-  "dependencies": []
-}

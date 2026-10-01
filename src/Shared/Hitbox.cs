@@ -60,6 +60,8 @@ namespace SlopArena.Shared
 
         /// <summary>Originating attack slot for presentation routing (0 = unspecified).</summary>
         public byte AttackSlot;
+        /// <summary>Cooked projectile operation that spawned this visual (stable within an activation).</summary>
+        public int VisualOperationIndex;
 
         public bool Active;
 

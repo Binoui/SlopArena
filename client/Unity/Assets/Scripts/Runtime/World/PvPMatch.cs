@@ -28,6 +28,7 @@ namespace SlopArena.Client.World
         [SerializeField] private NetworkClient _networkClient;
         [Header("Combat")]
         [SerializeField] private CombatFeedback _combatFeedback;
+        private ProjectileVFXManager _projectileVFX;
 
 
         private readonly Dictionary<ulong, PlayerRenderer> _opponentRenderers = new();
@@ -128,6 +129,8 @@ namespace SlopArena.Client.World
             if (_combatFeedback == null)
                 _combatFeedback = gameObject.AddComponent<CombatFeedback>();
             _combatFeedback.SetSimulation(_bridge);
+            _projectileVFX = gameObject.AddComponent<ProjectileVFXManager>();
+            _projectileVFX.SetRemoteSnapshots();
 
             // Character definitions come only from the admitted match catalog.
             var contentCatalog = SlopArena.Client.ClientSession.MatchContentCatalog;
@@ -311,6 +314,10 @@ namespace SlopArena.Client.World
             {
                 { PlayerEntityId, input }
             });
+            var projectileSnapshot = _networkClient.ReceiveProjectileVisuals();
+            if (projectileSnapshot.HasValue)
+                _projectileVFX.OnSnapshot(projectileSnapshot.Value);
+            var swordTrailSnapshot = _networkClient.ReceiveSwordTrailSnapshot();
             _combatFeedback?.OnTick();
 
             if (_bridge.LatestMatchResult != null && ClientSession.CurrentMatchResults == null)
@@ -322,6 +329,8 @@ namespace SlopArena.Client.World
             _playerRenderer.ApplyServerState(_bridge.GetState(PlayerEntityId));
             foreach (var kv in _opponentRenderers)
                 kv.Value.ApplyServerState(_bridge.GetState(kv.Key));
+            if (swordTrailSnapshot.HasValue)
+                ApplySwordTrailSnapshot(swordTrailSnapshot.Value);
             PresentTimelineEvents();
 
             var presentationState = _bridge.GetState(PlayerEntityId);

@@ -19,19 +19,21 @@ Run the simulation test suite. Always rebuild Shared first so Unity and tests st
 
 ## Steps
 
+First resolve and validate the game checkout using the [execution-root rules](../orient/SKILL.md#execution-root). Read that section only; a test run does not require repeating session orientation. Run every command below with the shell tool's `cwd` set to the canonical game root. Never use the workspace's Git root as the test root, and never silently replace an explicit worktree.
+
 1. Rebuild Shared:
    ```bash
-   cd "$(git rev-parse --show-toplevel)" && dotnet build src/Shared/ --nologo -v q
+   dotnet build src/Shared/ --nologo -v q
    ```
    Expected last line: `Build succeeded.`
 
 2. Run tests (with optional filter):
    ```bash
    # No filter:
-   cd "$(git rev-parse --show-toplevel)" && dotnet test tests/Shared.Tests/ --nologo -v q 2>&1
+   dotnet test tests/Shared.Tests/ --nologo -v q
 
    # With filter (replace FILTER with the argument the user passed):
-   cd "$(git rev-parse --show-toplevel)" && dotnet test tests/Shared.Tests/ --nologo --filter "FullyQualifiedName~FILTER" -v q 2>&1
+   dotnet test tests/Shared.Tests/ --nologo --filter "FullyQualifiedName~FILTER" -v q
    ```
    Expected: `Passed: N` (where N is the number of tests run)
 
@@ -39,16 +41,7 @@ Run the simulation test suite. Always rebuild Shared first so Unity and tests st
    `No test matches the given testcase filter …`
    There will be no 'Passed!' line. Surface this to the user as "filter matched nothing" — do not treat it as a test failure.
 
-3. If tests fail, print the full output:
-
-   ```bash
-   # Full suite (no filter was used):
-   cd "$(git rev-parse --show-toplevel)" && dotnet test tests/Shared.Tests/ --nologo 2>&1
-
-   # Filtered run:
-   cd "$(git rev-parse --show-toplevel)" && dotnet test tests/Shared.Tests/ --nologo --filter "FullyQualifiedName~FILTER" 2>&1
-   ```
-   Then analyse the assertion and the relevant source file before reporting back.
+3. If tests fail, read the full output from the original run, using its retained artifact if the inline output was truncated. Do not rerun the same failure just to recover verbose output. Analyse the assertion and the relevant source before reporting.
 
 ## Test files
 

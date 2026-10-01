@@ -67,7 +67,7 @@ namespace SlopArena.Client.UI
                 {
                     if (!context.Valid)
                         return;
-                    if (!UiModalState.Presented && !ChatOverlay.IsExpandedSocialOpen
+                    if (!UiModalState.Presented
                         && FrontendController.FocusRouter?.SocialRegionActive != true
                         && initial.panel != null)
                         initial.Focus();

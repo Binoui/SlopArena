@@ -1,0 +1,14 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SlopArena.Shared", "../src/Shared/SlopArena.Shared.csproj", "{D27569B2-E906-43F2-A57C-4D8E9F591201}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SlopArena.Server", "../src/Server/SlopArena.Server.csproj", "{D27569B2-E906-43F2-A57C-4D8E9F591202}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Shared.Tests", "../tests/Shared.Tests/Shared.Tests.csproj", "{D27569B2-E906-43F2-A57C-4D8E9F591203}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Server.Tests", "../tests/Server.Tests/Server.Tests.csproj", "{D27569B2-E906-43F2-A57C-4D8E9F591204}"
+EndProject
+Global
+EndGlobal

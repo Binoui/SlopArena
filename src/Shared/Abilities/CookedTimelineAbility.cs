@@ -207,7 +207,7 @@ public sealed class CookedTimelineAbility : ServerAbility
                     SpawnCookedHitbox(ref s, hitbox.Hitbox);
                     break;
                 case CookedSpawnProjectileOperation projectile:
-                    SpawnCookedProjectile(ref s, projectile.Projectile);
+                    SpawnCookedProjectile(ref s, projectile.Projectile, flattenedOperationIndex);
                     break;
                 case CookedSetAimStateOperation aim:
                     s.IsAiming = aim.AimState != AuthoringAimMode.None;
@@ -290,7 +290,7 @@ public sealed class CookedTimelineAbility : ServerAbility
         });
     }
 
-    private void SpawnCookedProjectile(ref CharacterState s, CookedProjectile projectile)
+    private void SpawnCookedProjectile(ref CharacterState s, CookedProjectile projectile, int operationIndex)
     {
         float aimYaw = s.AimYaw + projectile.YawOffsetDegrees * MathF.PI / 180f;
         float cosPitch = MathF.Cos(s.AimPitch);
@@ -321,6 +321,7 @@ public sealed class CookedTimelineAbility : ServerAbility
             DurationTicks = projectile.MaxFlightTicks,
             OwnerId = s.EntityId,
             AttackSlot = (byte)(Slot + 1),
+            VisualOperationIndex = operationIndex,
             Gravity = projectile.Gravity,
         });
     }

@@ -383,6 +383,23 @@ PvPMatch / Training
 Animation, VFX, and audio remain presentation-only. They do not infer gameplay from raw
 input and do not feed results back into Shared simulation.
 
+Wibou Q projectile visuals also use a dedicated, presentation-only
+`ProjectileVisualPacket`: the GameServer snapshots each active kunai's owner,
+activation, authored operation index, position, and velocity every simulation
+tick, including empty snapshots that remove expired or impacted visuals.
+`PvPMatch` renders these server snapshots for both players; Training follows its
+local Shared resolver. The packet never feeds Unity position or collision back
+into the Shared simulation. `ProjectileVFXConfig` maps Wibou slot A to the same
+kunai model on ground and in air.
+
+Wibou sword trails use the separate presentation-only `SwordTrailSnapshotPacket`.
+Its per-tick active-owner set is derived from server-owned `_weapon_hilt` →
+`_weapon_tip` hitboxes; empty snapshots clear trails after expiration, interruption,
+or match end. Training and Ability Lab read the same Shared resolver directly.
+The TECH asset supplies the cosmetic material, mask texture, color, and dissolve
+curves; Unity renders a short-lived blade sweep from the attached sword's
+hilt/tip poses while active. VFX never owns hit timing or collision.
+
 ---
 
 ## 9. Debug visualization

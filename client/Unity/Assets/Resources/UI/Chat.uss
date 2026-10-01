@@ -1,13 +1,13 @@
 :root {
-    --chat-ink: rgb(23, 19, 27);
-    --chat-deep-ink: rgb(13, 13, 20);
+    --chat-ink: rgb(27, 26, 24);
+    --chat-deep-ink: rgb(22, 21, 19);
     --chat-paper: rgb(240, 238, 232);
-    --chat-acid: rgb(255, 200, 33);
-    --chat-orange: rgb(224, 92, 42);
-    --chat-green: rgb(76, 221, 136);
-    --chat-muted: rgb(175, 168, 178);
-    --chat-border: rgb(98, 92, 107);
-    --chat-surface: rgb(36, 32, 43);
+    --chat-acid: rgb(255, 204, 34);
+    --chat-orange: rgb(255, 151, 119);
+    --chat-green: rgb(117, 230, 165);
+    --chat-muted: rgb(194, 191, 185);
+    --chat-border: rgb(123, 120, 114);
+    --chat-surface: rgb(37, 36, 34);
 }
 
 .chat-root {
@@ -30,7 +30,7 @@
     left: 16px;
     bottom: 12px;
     padding: 4px 9px;
-    background-color: rgba(13, 13, 20, 0.88);
+    background-color: rgba(22, 21, 19, 0.96);
     border-left-width: 3px;
     border-left-color: var(--chat-acid);
     color: var(--chat-muted);
@@ -44,8 +44,8 @@
     min-height: 42px;
     flex-direction: row;
     align-items: center;
-    align-self: flex-end;
-    justify-content: flex-end;
+    align-self: flex-start;
+    justify-content: flex-start;
     padding: 4px;
     background-color: var(--chat-deep-ink);
 }
@@ -53,24 +53,26 @@
 .chat-open {
     width: 88px;
     min-height: 38px;
-    margin-left: 8px;
+    margin-left: 0;
     border-width: 2px;
-    border-color: var(--chat-deep-ink);
+    border-color: var(--chat-ink);
     border-bottom-width: 5px;
     background-color: var(--chat-acid);
     color: var(--chat-ink);
     font-size: 14px;
     letter-spacing: 2px;
-    -unity-font-style: bold;
+    -unity-font-definition: url("../../Fonts/ArchivoBlack.asset");
+    -unity-font-style: normal;
     -unity-text-align: middle-center;
 }
 
 .chat-open:hover,
 .chat-open:focus {
-    background-color: rgb(255, 217, 92);
+    background-color: rgb(255, 220, 92);
     border-color: var(--chat-paper);
-    translate: 0 -2px;
 }
+
+.chat-open:active { translate: 0 3px; }
 
 
 .chat-unread {
@@ -87,9 +89,8 @@
     -unity-text-align: middle-center;
 }
 
-.chat-unread--visible {
-    display: flex;
-}
+.chat-unread--visible { display: flex; }
+
 
 .chat-public-feed {
     position: absolute;
@@ -107,7 +108,7 @@
     min-height: 22px;
     margin-top: 4px;
     padding: 5px 8px;
-    background-color: rgba(13, 13, 20, 0.92);
+    background-color: rgba(22, 21, 19, 0.96);
     border-left-width: 3px;
     border-left-color: var(--chat-acid);
     color: var(--chat-paper);
@@ -119,10 +120,6 @@
 
 /* Gameplay anchors left: the compact strip and public feed follow the
    frame instead of staying right-aligned inside it. */
-.chat-root--gameplay .chat-collapsed {
-    align-self: flex-start;
-    justify-content: flex-start;
-}
 .chat-root--gameplay .chat-public-feed {
     right: auto;
     left: 0;
@@ -133,33 +130,30 @@
     display: none;
     flex-grow: 1;
     min-height: 0;
-    padding: 12px;
+    padding: 4px;
     position: relative;
     flex-direction: column;
-    background-color: rgba(13, 13, 20, 0.97);
+    background-color: rgba(22, 21, 19, 0.97);
     border-width: 2px;
     border-color: var(--chat-paper);
-    border-bottom-width: 6px;
-    border-bottom-color: var(--chat-orange);
+    border-bottom-width: 2px;
+    border-bottom-color: var(--chat-paper);
 }
 
-/* Docked and compact-replacement chat is opaque: the reserved band or the
-   replaced page must not show through the conversation (issue #214). */
-.chat-panel--solid {
-    background-color: rgb(13, 13, 20);
-}
+/* Docked and compact-replacement chat stays opaque over its host surface. */
+.chat-panel--solid { background-color: var(--chat-deep-ink); }
 
 .chat-resize-grip {
-    position: absolute;
-    top: 0;
-    right: 0;
-    width: 19px;
-    height: 19px;
+    position: relative;
+    width: 26px;
+    height: 26px;
+    margin-left: 4px;
     border-width: 1px;
-    border-color: var(--chat-border);
-    background-color: var(--chat-surface);
+    border-color: var(--chat-ink);
+    background-color: var(--chat-paper);
 }
-.chat-resize-grip:hover { border-color: var(--chat-acid); }
+.chat-resize-grip:hover,
+.chat-resize-grip:focus { border-color: var(--chat-acid); }
 .chat-resize-mark {
     position: absolute;
     left: 2px;
@@ -167,15 +161,14 @@
     width: 13px;
     height: 2px;
     rotate: -45deg;
-    background-color: var(--chat-acid);
+    background-color: var(--chat-ink);
 }
 .chat-resize-mark--second { left: 6px; top: 11px; width: 8px; }
-.chat-root--expanded .chat-resize-grip { display: none; }
 
 .chat-corner-actions {
     position: absolute;
-    top: 0;
-    right: 24px;
+    top: 4px;
+    right: 4px;
     flex-direction: row;
     align-items: center;
 }
@@ -184,7 +177,8 @@
     color: var(--chat-acid);
     font-size: 10px;
     letter-spacing: 2px;
-    -unity-font-style: bold;
+    -unity-font-definition: url("../../Fonts/SpaceMono.asset");
+    -unity-font-style: normal;
 }
 
 .chat-icon-button {
@@ -196,23 +190,12 @@
     align-items: center;
     justify-content: center;
     border-width: 1px;
-    border-color: var(--chat-border);
-    background-color: var(--chat-surface);
+    border-color: var(--chat-ink);
+    background-color: var(--chat-paper);
 }
 .chat-icon-button:hover, .chat-icon-button:focus { border-color: var(--chat-acid); }
 
-.chat-icon-expand { width: 14px; height: 14px; position: relative; }
-.chat-icon-expand-corner { position: absolute; width: 7px; height: 7px; border-color: var(--chat-paper); }
-.chat-icon-expand-corner--top { top: 0; left: 0; border-top-width: 2px; border-left-width: 2px; }
-.chat-icon-expand-corner--bottom { bottom: 0; right: 0; border-bottom-width: 2px; border-right-width: 2px; }
-.chat-icon-minimize { width: 14px; height: 2px; background-color: var(--chat-paper); }
-.chat-icon-minimize--collapse {
-    width: 12px;
-    height: 10px;
-    background-color: transparent;
-    border-width: 1px;
-    border-color: var(--chat-paper);
-}
+.chat-icon-minimize { width: 14px; height: 2px; background-color: var(--chat-ink); }
 
 .chat-action--small,
 .chat-newest,
@@ -226,7 +209,8 @@
     color: var(--chat-paper);
     font-size: 10px;
     letter-spacing: 1px;
-    -unity-font-style: bold;
+    -unity-font-definition: url("../../Fonts/ArchivoBlack.asset");
+    -unity-font-style: normal;
     -unity-text-align: middle-center;
 }
 
@@ -243,29 +227,36 @@
 .chat-action {
     min-height: 36px;
     border-width: 2px;
-    border-color: var(--chat-deep-ink);
+    border-color: var(--chat-ink);
     border-bottom-width: 4px;
     background-color: var(--chat-acid);
     color: var(--chat-ink);
     font-size: 11px;
     letter-spacing: 1px;
-    -unity-font-style: bold;
+    -unity-font-definition: url("../../Fonts/ArchivoBlack.asset");
+    -unity-font-style: normal;
     -unity-text-align: middle-center;
 }
 
 .chat-action--primary:hover,
 .chat-action--primary:focus {
-    background-color: rgb(255, 217, 92);
+    background-color: rgb(255, 220, 92);
     border-color: var(--chat-paper);
-    translate: 0 -2px;
 }
 
 .chat-action:disabled,
 .chat-tab:disabled,
-.chat-open:disabled {
-    background-color: rgb(83, 77, 91);
-    border-color: rgb(83, 77, 91);
-    color: rgb(165, 158, 168);
+.chat-open:disabled,
+.chat-action--small:disabled,
+.chat-newest:disabled,
+.chat-mute:disabled,
+.chat-icon-button:disabled,
+.conversation-select:disabled,
+.online-player:disabled {
+    background-color: var(--chat-surface);
+    border-color: var(--chat-border);
+    color: var(--chat-muted);
+    translate: 0 0;
 }
 
 .chat-feedback {
@@ -282,6 +273,8 @@
     color: var(--chat-orange);
     font-size: 11px;
 }
+.chat-feedback--success { color: var(--chat-green); }
+.chat-feedback--pending { color: var(--chat-muted); }
 
 .chat-main {
     display: none;
@@ -290,77 +283,29 @@
     flex-direction: column;
 }
 
-/* Menu chat sits over Home artwork; gameplay keeps its own panel treatment. */
+/* Menu and gameplay share the paper frame and high-contrast controls. */
 .chat-panel--menu {
-    --chat-paper: rgb(241, 235, 221);
-    --chat-acid: rgb(255, 204, 34);
-    --chat-muted: rgb(171, 163, 178);
-    --chat-border: rgb(66, 59, 73);
-    background-color: rgba(36, 32, 43, 0.98);
-    border-width: 1px;
-    border-color: var(--chat-border);
-    border-bottom-width: 3px;
-    border-bottom-color: var(--chat-border);
+    background-color: var(--chat-deep-ink);
 }
 
-.chat-panel--menu-opaque { background-color: var(--chat-surface); }
-
-.chat-panel--menu .chat-corner-actions { right: 24px; }
-
-.chat-panel--menu .chat-icon-button {
-    width: 23px;
-    height: 22px;
-    min-height: 22px;
-    border-color: var(--chat-border);
-    background-color: var(--chat-surface);
-}
 
 .chat-panel--menu .chat-icon-button:hover,
 .chat-panel--menu .chat-icon-button:focus,
 .chat-panel--menu .chat-resize-grip:hover {
     border-color: var(--chat-acid);
-    background-color: rgb(55, 49, 62);
-}
-
-.chat-panel--menu .chat-icon-expand-corner,
-.chat-panel--menu .chat-icon-minimize,
-.chat-panel--menu .chat-icon-minimize--collapse { border-color: var(--chat-paper); }
-.chat-panel--menu .chat-icon-minimize { background-color: var(--chat-paper); }
-.chat-panel--menu .chat-icon-minimize--collapse { background-color: transparent; }
-.chat-panel--menu .chat-resize-mark { background-color: var(--chat-paper); }
-
-.chat-panel--menu .chat-tab {
-    border-color: transparent;
-    background-color: transparent;
-    color: var(--chat-muted);
-}
-.chat-panel--menu .chat-tab--active {
-    color: var(--chat-acid);
-}
-.chat-panel--menu .chat-tab--active .chat-tab-underline {
     background-color: var(--chat-acid);
 }
-.chat-panel--menu .chat-tab:hover,
-.chat-panel--menu .chat-tab:focus {
-    border-color: var(--chat-border);
-    background-color: rgb(55, 49, 62);
-    color: var(--chat-acid);
-}
-.chat-panel--menu .chat-tab:focus { border-color: var(--chat-acid); }
-.chat-panel--menu .chat-tab:disabled {
-    background-color: transparent;
-    border-color: transparent;
-    color: var(--chat-muted);
-    opacity: 0.65;
-}
+
+.chat-panel--menu .chat-icon-minimize { background-color: var(--chat-ink); }
+.chat-panel--menu .chat-resize-mark { background-color: var(--chat-ink); }
 
 .chat-panel--menu .chat-draft,
 .chat-panel--menu .chat-draft .unity-base-text-field__input {
-    background-color: rgb(29, 26, 35);
+    background-color: var(--chat-deep-ink);
     color: var(--chat-paper);
 }
 .chat-panel--menu .chat-draft {
-    border-color: var(--chat-border);
+    border-color: var(--chat-paper);
 }
 .chat-panel--menu .chat-draft:focus {
     border-color: var(--chat-acid);
@@ -373,24 +318,62 @@
     color: var(--chat-muted);
 }
 
-.chat-panel--menu .chat-compose .chat-action {
-    background-color: var(--chat-surface);
-    border-color: var(--chat-border);
-    color: var(--chat-paper);
+.chat-compose .chat-action {
+    background-color: var(--chat-acid);
+    border-color: var(--chat-ink);
+    color: var(--chat-ink);
 }
-.chat-panel--menu .chat-compose .chat-action:hover,
-.chat-panel--menu .chat-compose .chat-action:focus {
-    background-color: rgb(55, 49, 62);
+.chat-compose .chat-action:hover,
+.chat-compose .chat-action:focus {
+    background-color: var(--chat-paper);
     border-color: var(--chat-acid);
-    color: var(--chat-acid);
+    color: var(--chat-ink);
     translate: 0 0;
 }
-.chat-panel--menu .chat-compose .chat-action:disabled {
-    background-color: rgb(36, 32, 43);
-    border-color: var(--chat-border);
-    color: var(--chat-muted);
-    opacity: 0.65;
+.chat-compose .chat-action:disabled {
+    background-color: var(--chat-paper);
+    border-color: var(--chat-ink);
+    color: rgb(85, 83, 79);
+    opacity: 1;
 }
+.chat-compose .chat-action:active { translate: 0 3px; }
+
+/* Short utility controls share a clear focus treatment and physical press. */
+.chat-icon-button:hover,
+.chat-icon-button:focus,
+.chat-action--small:hover,
+.chat-action--small:focus,
+.chat-newest:hover,
+.chat-newest:focus,
+.chat-mute:hover,
+.chat-mute:focus {
+    border-color: var(--chat-acid);
+    color: var(--chat-acid);
+}
+
+.chat-open:active,
+.chat-action:active,
+.chat-action--small:active,
+.chat-newest:active,
+.chat-mute:active,
+.chat-icon-button:active,
+.chat-tab:active,
+.conversation-select:active,
+.online-player:active {
+    translate: 0 3px;
+}
+.chat-action:disabled,
+.chat-tab:disabled,
+.chat-open:disabled,
+.chat-action--small:disabled,
+.chat-newest:disabled,
+.chat-mute:disabled,
+.chat-icon-button:disabled,
+.conversation-select:disabled,
+.online-player:disabled {
+    translate: 0 0;
+}
+.chat-compose .chat-action:disabled { translate: 0 0; }
 
 /* Directory section labels inside the explicit DIRECT view. */
 .online-list .chat-section-label {
@@ -400,24 +383,23 @@
 
 .chat-tabs {
     height: 38px;
-    margin-top: 10px;
-    margin-right: 62px;
+    margin-top: 0;
+    margin-right: 64px;
     flex-direction: row;
 }
-/* Gameplay shows only Minimize/Close; reserve one icon slot, not two. */
-.chat-root--gameplay .chat-tabs { margin-right: 34px; }
 
 .chat-tab {
     flex-grow: 1;
     min-height: 32px;
     margin-right: 4px;
     border-width: 1px;
-    border-color: var(--chat-border);
-    background-color: var(--chat-surface);
-    color: var(--chat-muted);
-    font-size: 10px;
-    letter-spacing: 1px;
-    -unity-font-style: bold;
+    border-color: var(--chat-ink);
+    background-color: var(--chat-paper);
+    color: var(--chat-ink);
+    font-size: 11px;
+    letter-spacing: 0;
+    -unity-font-definition: url("../../Fonts/ArchivoBlack.asset");
+    -unity-font-style: normal;
     -unity-text-align: middle-center;
 }
 
@@ -443,6 +425,13 @@
     color: var(--chat-ink);
 }
 
+.chat-tab:disabled {
+    background-color: var(--chat-paper);
+    border-color: var(--chat-ink);
+    color: rgb(85, 83, 79);
+    opacity: 1;
+}
+
 .chat-body {
     flex-grow: 1;
     min-height: 0;
@@ -450,16 +439,6 @@
     flex-direction: row;
 }
 
-.conversation-list {
-    width: 128px;
-    min-width: 128px;
-    margin-right: 8px;
-    padding: 4px;
-    overflow: hidden;
-    background-color: rgba(36, 32, 43, 0.72);
-    border-right-width: 1px;
-    border-right-color: var(--chat-border);
-}
 
 .conversation-row {
     min-height: 32px;
@@ -483,14 +462,13 @@
     background-color: transparent;
     color: var(--chat-paper);
     font-size: 10px;
-    -unity-font-style: bold;
     -unity-text-align: middle-left;
     white-space: normal;
 }
 
 .conversation-select:hover,
 .conversation-select:focus {
-    background-color: rgba(255, 200, 33, 0.18);
+    background-color: rgb(50, 49, 46);
     color: var(--chat-acid);
 }
 
@@ -522,7 +500,7 @@
     margin-top: 4px;
     padding: 4px;
     overflow: hidden;
-    background-color: rgba(36, 32, 43, 0.88);
+    background-color: var(--chat-surface);
     border-width: 1px;
     border-color: var(--chat-border);
 }
@@ -558,9 +536,9 @@
     min-height: 130px;
     margin-top: 6px;
     padding: 5px;
-    background-color: rgba(240, 238, 232, 0.06);
+    background-color: var(--chat-deep-ink);
     border-width: 1px;
-    border-color: rgba(240, 238, 232, 0.22);
+    border-color: var(--chat-paper);
 }
 .chat-empty {
     padding: 8px;
@@ -577,7 +555,7 @@
     flex-direction: row;
     align-items: flex-start;
     border-bottom-width: 1px;
-    border-bottom-color: rgba(240, 238, 232, 0.14);
+    border-bottom-color: rgba(123, 120, 114, 0.35);
 }
 
 .chat-message__text {
@@ -621,15 +599,25 @@
     padding-left: 8px;
     padding-right: 8px;
     border-width: 1px;
-    border-color: var(--chat-border);
-    background-color: var(--chat-paper);
-    color: var(--chat-ink);
+    border-color: var(--chat-paper);
+    background-color: var(--chat-deep-ink);
+    color: var(--chat-paper);
     font-size: 13px;
 }
 
-.chat-draft:focus {
+.chat-draft .unity-base-text-field__input {
+    background-color: var(--chat-deep-ink);
+    color: var(--chat-paper);
+}
+
+.chat-draft:focus,
+.chat-draft .unity-base-text-field__input:focus {
     border-color: var(--chat-acid);
-    background-color: rgb(255, 249, 230);
+    background-color: var(--chat-surface);
+}
+
+.chat-draft .unity-base-text-field__input--placeholder {
+    color: var(--chat-muted);
 }
 
 .chat-compose .chat-action {

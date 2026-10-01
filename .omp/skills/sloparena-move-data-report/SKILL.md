@@ -61,7 +61,7 @@ scripts/move-data.sh <char> --json report.json --html report.html   # visual rep
 scripts/move-data.sh <char> --truecombos --di --html report.html    # + true-combo graph + DI escape-space
 ```
 
-- `<char>`: `fightguy` (default) | `kistu`. `manki`/`nilus` resolve but produce empty reports — they are not
+- `<char>`: `fightguy` (default) | `wibou`. `manki`/`nilus` resolve but produce empty reports — they are not
   Melee-converted to Custom-knockback normals yet (see caveats).
 - Default markdown output: `docs/generated/<char>-move-data.md`.
 
@@ -134,10 +134,10 @@ scaled nothing while .NET tests were green.
 - **Every move is included regardless of knockback profile.** Frame data (active / duration / IASA / stun)
   is always exact. Trajectories use the resolved launch: Custom/Adaptive use their authored base/growth;
   named profiles (Light/Medium/…) resolve from the profile table.
-- **Adaptive (Melee-361) moves** (e.g. Kistu's Quick Slash / Air Slash / Reverse Slash) are simulated with
+- **Adaptive (Melee-361) moves** (e.g. Wibou's Quick Slash / Air Slash / Reverse Slash) are simulated with
   their **authored angle as a representative** — the real launch angle varies with hit position (a level hit
   sends flatter). Tagged `adaptive` in the HTML report with an in-report caveat; frame data is unaffected.
-- **Multi-hit moves false-positive parity.** A 2-hit starter (e.g. Kistu g2 Double Slash) re-launches the
+- **Multi-hit moves false-positive parity.** A 2-hit starter (e.g. Wibou g2 Double Slash) re-launches the
   victim with hit 2 in the pipeline run, inflating pipeline apex vs the single-hit direct row → `DIVERGE`.
   KV/stun still matching is the signal it's an artifact, not a real drift.
 - **Manki / Nilus produce empty reports** until their kits are Melee-converted. That is correct, not broken.
@@ -174,7 +174,7 @@ definition; for legacy Nilus maintenance, use the existing
   gameplay behavior solely from a client animation.
 - Ability Lab is the visual truth surface: it scrubs the same sim-tick pose, green hurtboxes,
   and orange hitboxes that the server resolves. See `docs/systems/ability-lab.md`.
-- The report requires usable normal data. Kistu's Adaptive moves are representative-angle
+- The report requires usable normal data. Wibou's Adaptive moves are representative-angle
   trajectories; Manki/Nilus currently produce empty reports until their normals are
   Melee-converted. Record that as a prerequisite, not as a balance verdict.
 

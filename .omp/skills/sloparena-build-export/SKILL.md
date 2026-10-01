@@ -32,7 +32,7 @@ General Shared, Server, and Unity verification follows [`docs/testing.md`](../..
 Use this skill for release packaging and deployment operations, not ordinary Shared tests
 or Unity compilation.
 
-The current admitted roster is Manki, FightGuy, Kistu, and Bonk. The server
+The current admitted roster is Manki, FightGuy, Wibou, and Bonk. The server
 project and both release scripts derive required package IDs from the roster
 manifest and verify all four payloads in every publish/staging tree.
 

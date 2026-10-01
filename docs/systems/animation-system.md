@@ -48,5 +48,5 @@ poses, bone-attached collision, and server timing on the same package hash.
 ## Weapon attachment
 
 Weapon props use destination humanoid bones and the shared bind-space conversion
-implemented by `WeaponAttachConfig` and `SlopArenaBaker`. Kistu remains the reference
+implemented by `WeaponAttachConfig` and `SlopArenaBaker`. Wibou remains the reference
 for retargeted hand orientation.

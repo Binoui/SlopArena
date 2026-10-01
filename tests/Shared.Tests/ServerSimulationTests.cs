@@ -749,7 +749,7 @@ public class ServerSimulationTests
     [Theory]
     [InlineData(CharacterClass.FightGuy, 20f, 6.666667f, 11f, 1.833333f)]
     [InlineData(CharacterClass.Manki, 20f, 6f, 11f, 1.833333f)]
-    [InlineData(CharacterClass.Kistu, 22f, 5.866667f, 12.1f, 2.016667f)]
+    [InlineData(CharacterClass.Wibou, 22f, 5.866667f, 12.1f, 2.016667f)]
     [InlineData(CharacterClass.Bonk, 20f, 6.666667f, 11f, 1.833333f)]
     public void CookedAirDodgeIsSlowerAndShorterThanOldAirDash(
         CharacterClass character, float oldPeakSpeed, float oldTravel,
@@ -1298,7 +1298,7 @@ public class ServerSimulationTests
     [Theory]
     [InlineData(CharacterClass.FightGuy)]
     [InlineData(CharacterClass.Manki)]
-    [InlineData(CharacterClass.Kistu)]
+    [InlineData(CharacterClass.Wibou)]
     [InlineData(CharacterClass.Bonk)]
     public void CookedRosterCaptureGeometryReachesCloseFrontTarget(CharacterClass character)
     {

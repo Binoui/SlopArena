@@ -4,7 +4,19 @@ This document covers character art, imported assets, animation bindings, and rep
 
 ## Visual direction
 
-Readability comes first: a fighter's silhouette, pose, weapon, and attack tell must work from the gameplay camera. Keep character identity clear against stage dressing and UI. The admitted roster and stages mix authored and licensed low-poly art; there is no universal pixel-art, three-tone shader, or outline requirement. Use each character's approved presentation brief and the shared visual language rather than imposing one material style on every asset.
+Readability comes first: a fighter's silhouette, pose, weapon, and attack tell must work from the gameplay camera. The approved direction is **low-poly underground toy-fight-club, with DIY internet-game energy**: chunky simplified geometry, exaggerated readable proportions, strong character colors, and a premise that is cool at first glance and increasingly stupid on inspection.
+
+“Toy” is a scavenged construction metaphor, not a requirement for literal toys, plastic shaders, cute proportions, or cozy worlds. Asset-pack collage is intentional: authored and licensed low-poly kits can coexist when scale, lighting, material response, palette/value hierarchy, and composition make them belong to the same fight. Curated junkyard, not a vendor demo scene.
+
+Use each character's approved brief and preserve its identity. There is no universal pixel-art, three-tone shader, or outline requirement. Harmonization may improve a weaker existing treatment, but this approved direction does not assert that existing assets have already been restyled. Avoid realism, hyperdetail, and generic generated gloss as default goals; AI assistance is a production method, not the visual identity.
+
+Stages share an improvised fighting premise, not one mandatory environment palette. Rooftops, industrial junk, strange pools, night cities, and a child's tabletop may all belong. Keep play space legible, background contrast subordinate, and landmarks purposeful; grime and generic graffiti alone do not create SlopArena.
+
+### Reusable production before bespoke replacement
+
+Solo-development cost and authoring friction are constraints on the visual direction. Prefer reusable lighting, scale, material response, value hierarchy, and framing adjustments before replacing source assets or requiring bespoke illustration. A faithful model render can supply a portrait or marketing image; splash illustration is an option, not a character-admission requirement. Rework an asset when reusable treatment cannot preserve its identity or gameplay readability, not merely because it came from another pack.
+
+The approved [rooftop study](../design/references/sloparena-visual-identity/visual-reference-study.png) demonstrates graphic/world coherence and a memorable landmark, not gameplay acceptance or a mandatory production template. Follow the [shared reference boundaries](../design/visual-language.md#approved-visual-board--rough-edges-clear-decisions); the direction should remain cheap to reproduce without compromising readable silhouettes or move tells.
 
 ## Character source assets
 
@@ -17,7 +29,7 @@ The [character import guide](../characters/adding-a-new-character.md) owns the c
 
 ## Animation identity and bindings
 
-Package semantic IDs such as `anim.kistu.g1` and `anim.bonk.a2` identify the intended animation. `character.json` references those IDs, and `CharacterAssetCatalog.asset` binds each to an imported clip and deterministic pose track. Filenames, Unity paths, pack names, and generated catalogs are not persisted move identities. Keep the ID and binding in sync when replacing a clip.
+Package semantic IDs such as `anim.wibou.g1` and `anim.bonk.a2` identify the intended animation. `character.json` references those IDs, and `CharacterAssetCatalog.asset` binds each to an imported clip and deterministic pose track. Filenames, Unity paths, pack names, and generated catalogs are not persisted move identities. Keep the ID and binding in sync when replacing a clip.
 
 ## Package asset ownership
 
@@ -36,6 +48,10 @@ Keep purchased and restricted source packs out of Git, including Unity Asset Sto
 - Test silhouettes and move tells from the actual gameplay camera.
 - Keep weapons, flames, particles, and cloth separate from the base mesh so they can be replaced or disabled cleanly.
 - Prefer authored key poses and clear anticipation/recovery over extra detail.
+- Keep signature colors and exaggerated proportions consistent across model, portrait, splash art, and marketing render. Illustration may amplify the fighter but must not turn it into a glossy cinematic promise of a different game.
+- Curate kit differences through scale, lighting, material response, and detail hierarchy before adding texture or effects. Preserve separate fighter and gameplay colors; the graphic Action Yellow palette does not recolor the 3D roster.
+- Keep imperfections in authored shapes and secondary details, not ambiguous silhouettes or unreadable attack effects.
+- Ask: would someone want to main this ridiculous fighter, and can they immediately read what it is doing?
 - Keep visual effects client-only; do not encode gameplay in a material, particle system, or animation callback.
 
 ## Repository and commits

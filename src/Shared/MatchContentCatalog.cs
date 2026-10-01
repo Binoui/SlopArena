@@ -167,7 +167,7 @@ public sealed class MatchContentCatalogBuilder
 
     private static void ValidateManifest(BuiltInRosterManifest manifest, List<CharacterDiagnostic> d)
     {
-        var required = new[] { CharacterClass.Manki, CharacterClass.FightGuy, CharacterClass.Kistu, CharacterClass.Bonk };
+        var required = new[] { CharacterClass.Manki, CharacterClass.FightGuy, CharacterClass.Wibou, CharacterClass.Bonk };
         foreach (var selector in required)
             if (manifest.Resolve(selector) == null) d.Add(Error("catalog.selector.missing", selector.ToString(), "Built-in roster selector is missing."));
         foreach (var entry in manifest.Entries)
@@ -278,7 +278,7 @@ public static class BuiltInRosterManifestCodec
 
     private static CharacterClass ParseSelector(string value) => value switch
     {
-        "Manki" => CharacterClass.Manki, "FightGuy" => CharacterClass.FightGuy, "Kistu" => CharacterClass.Kistu, "Bonk" => CharacterClass.Bonk, "Nilus" => CharacterClass.Nilus,
+        "Manki" => CharacterClass.Manki, "FightGuy" => CharacterClass.FightGuy, "Wibou" => CharacterClass.Wibou, "Bonk" => CharacterClass.Bonk, "Nilus" => CharacterClass.Nilus,
         _ => throw new InvalidDataException("Unknown roster selector.")
     };
     private static Dictionary<string, JsonElement> ParseObject(string json, string path)

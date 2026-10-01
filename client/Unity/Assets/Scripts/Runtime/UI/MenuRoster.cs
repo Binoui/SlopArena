@@ -54,7 +54,7 @@ namespace SlopArena.Client.UI
             {
                 CharacterClass.FightGuy => "Loves punching stuff. But also kicking stuff.",
                 CharacterClass.Manki => "There's nothing a few explosives can't fix.",
-                CharacterClass.Kistu => "He studied the blade. A lot.",
+                CharacterClass.Wibou => "He studied the blade. A lot.",
                 CharacterClass.Bonk => "Bonk do bonky bonks.",
                 CharacterClass.Nilus => "Nature control that shapes space and sets traps.",
                 _ => "Admitted fighter with a style all its own.",

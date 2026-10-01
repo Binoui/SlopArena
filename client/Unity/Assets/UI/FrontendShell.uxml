@@ -26,14 +26,13 @@
             <ui:VisualElement name="page-header-host" class="shell-host shell-header-host" />
             <ui:VisualElement name="page-body-host" class="shell-host shell-body-host" />
             <ui:VisualElement name="shell-lower-row" class="shell-lower-row">
-                <ui:VisualElement name="social-host" class="shell-host shell-social-host" />
                 <ui:VisualElement name="page-lower-host" class="shell-host shell-page-lower-host">
                     <ui:VisualElement name="page-summary-host" class="shell-host shell-summary-host" />
                     <ui:VisualElement name="page-actions-host" class="shell-host shell-actions-host" />
                 </ui:VisualElement>
             </ui:VisualElement>
+            <ui:VisualElement name="social-host" class="shell-host shell-social-host" picking-mode="Ignore" />
         </ui:VisualElement>
-        <ui:VisualElement name="expanded-social-host" class="shell-hidden" picking-mode="Ignore" />
         <ui:VisualElement name="modal-host" class="shell-modal-host" picking-mode="Ignore">
             <ui:VisualElement name="shell-escape-menu" class="shell-escape-menu">
                 <ui:VisualElement class="shell-escape-card">

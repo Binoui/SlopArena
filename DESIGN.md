@@ -1,11 +1,11 @@
 ---
 name: SlopArena
-description: An underground fight-poster interface for a playful, deterministic 3D platform fighter.
+description: Bold DIY graphics for an unreleased low-poly underground toy-fight-club.
 colors:
   ink: "#17131B"
   deep-ink: "#0D0D14"
   paper: "#F0EEE8"
-  acid: "#FFC821"
+  action-yellow: "#FFCC22"
   combat-orange: "#E05C2A"
   online-green: "#4CDD88"
   utility-surface: "#24202B"
@@ -13,8 +13,7 @@ colors:
   highlight: "#FFFFFF"
 typography:
   display:
-    fontFamily: "Baloo 2"
-    fontSize: "148px"
+    fontFamily: "Archivo Black"
     fontWeight: 700
     letterSpacing: "-4px"
   label:
@@ -31,13 +30,13 @@ spacing:
   lg: "18px"
 components:
   button-primary:
-    backgroundColor: "{colors.acid}"
+    backgroundColor: "{colors.action-yellow}"
     textColor: "{colors.ink}"
     rounded: "{rounded.none}"
     padding: "18px"
     height: "56px"
   button-hot:
-    backgroundColor: "{colors.combat-orange}"
+    backgroundColor: "{colors.action-yellow}"
     textColor: "{colors.ink}"
     rounded: "{rounded.none}"
     padding: "18px"
@@ -51,55 +50,77 @@ components:
 
 # Design System: SlopArena
 
+**Authority and status:** [Visual Language](docs/design/visual-language.md) owns the shared identity; [Art and Asset Conventions](docs/contributing/conventions.md) own 3D presentation and assets. This document specifies the native approved target, mirrored by `.impeccable/design.json` and its surface brief. The unreleased solo-developed game is not on Steam. The player-facing identity rollout is implemented across Home, shared shell, fighter/stage selection, Results, browser/lobby, Settings, pause/Training controls, chat, and entry/confirmation dialogs. HUD neutral chrome is harmonized without changing geometry or functional colors. Creator/Ability Lab tools, website migration, connected-room acceptance, and release-copy changes are not claimed.
+
 ## Overview
 
-**Creative North Star: "The Questionable Fight Flyer"**
+**Creative North Star: "Low-poly underground toy-fight-club, with DIY internet-game energy."**
 
-SlopArena's interface feels like a handmade fight poster that became a live game broadcast. It is mischievous, energetic, and slightly unruly, but never confused about what the player should see or do next. The roughness is deliberate: offset blocks, clipped silhouettes, hard borders, tape-like labels, signal annotations, and small visual misregistrations give the system personality without turning it into generic esports branding or meme UI.
+SlopArena's interface and imagery feel like an improvised fighting world assembled from scavenged pieces: chunky low-poly forms, exaggerated silhouettes, and a curated collage of assets. “Toy” describes that construction metaphor, not a requirement for literal plastic or cute styling. Slightly crappy on purpose, but extremely readable.
 
-The governing voice is **cool first, joke second**. A screen must work as a fighting-game composition before its annotations are read. Paper and ink establish the field; acid marks action and availability; combat orange marks impact and expressive emphasis. Information remains aligned to a stable grid while one or two elements break it through overlap, rotation, or cropping.
+**Cool first, joke second.** Treat the website as the strongest existing graphic reference, not a fully approved implementation. Use authored asymmetry, hard edges, and controlled print offsets to create personality without compromising stable interaction geometry or clear player actions.
+
+**Approved visual reference:** inspect the [offline board's interface and type specimens](docs/design/references/sloparena-visual-identity/visual-reference-board.html), approved on 2026-09-30. Use the aligned controls, hard press depth, clear selection/readiness treatment, and declaration/annotation/information hierarchy as target-treatment evidence. Its tab labels, layout, timings, and starter neutral/orange shades are illustrative—not approved navigation changes, replacement tokens, or shipped Unity UI. [Shared reference boundaries](docs/design/visual-language.md#approved-visual-board--rough-edges-clear-decisions) govern what to copy. This reference does not make the identity migration a release prerequisite.
 
 **Key Characteristics:**
-- Underground fight-poster energy with disciplined hierarchy.
-- Square geometry, heavy borders, and offset physical layering.
-- Rounded, heavy display type paired with compact utility labels.
-- Characters treated as graphic cutouts, not decorative wallpaper.
-- Dry, self-aware copy that never obscures an action or status.
+- Underground fight-club energy with DIY internet-game construction.
+- Chunky low-poly silhouettes and curated asset-pack collage, harmonized through scale, lighting, material response, palette/value hierarchy, and composition—not a compulsory universal shader.
+- Bold Archivo Black name mark and target display voice, with readable utility type.
+- Character forms remain recognizable and gameplay-readable.
+- Dry, self-aware copy never obscures an action or status.
 
 ## Colors
 
-The palette is warm paper and near-black ink interrupted by rare hazard acid and combat orange. Use the accents as semantic signals, not as a general saturation wash.
+The palette uses local paper and ink values, with Action Yellow reserved for primary actions and selection. Combat Orange remains a local accent; do not replace it with a shared orange value.
 
 ### Primary
-- **Acid** (`#FFC821`): Primary actions, available states, selection emphasis, stock markers, and the loudest signal in a region.
-- **Combat Orange** (`#E05C2A`): Hit energy, hot actions, combat accents, numbering, and structural impact bars.
+- **Action Yellow** (`#FFCC22`): Graphic primary actions and selection emphasis.
+- **Combat Orange** (`#E05C2A`): Native local impact and expressive emphasis.
 
 ### Secondary
 - **Online Green** (`#4CDD88`): Live/online status only. Pair with text or structure; never make it the sole status channel.
 
 ### Neutral
-- **Paper** (`#F0EEE8`): Light type, tape labels, cutout fields, and warm contrast against ink.
-- **Ink** (`#17131B`): Main dark field, utility panels, text, and structural grouping.
-- **Deep Ink** (`#0D0D14`): Hard borders, outlines, and maximum contrast.
-- **Utility Surface** (`#24202B`): Dense HUD tiles and secondary utility controls.
-- **Utility Border** (`#625C6B`): Muted inactive slot and utility boundaries.
+- **Paper** (`#F0EEE8`): Frontend canvas/header and light control/card fields; readable text on dark panels.
+- **Ink** (`#1B1A18`): Dark text/framing and calm recessed regions; never globally inverted to make a light page.
+- **Deep Ink** (`#161513`): Recessed fields, hard backing, and neutral HUD outlines.
+- **Utility Surface** (`#252422`): Dense utility fields and secondary controls.
+- **Utility Border** (`#7B7872`): Quiet boundaries and inactive structure.
 - **Highlight** (`#FFFFFF`): Hover/focus lift only; do not replace Paper as the default light field.
 
+**Implemented paper/ink roles:** The frontend is paper-led, with the user-authored `Assets/UI/FrontendPaperBackground.png` behind every shell page. Shared `--shell-page`, page-ink/muted/warning/error roles distinguish the outer surface from dark content fields. Existing `--shell-canvas` retains exact ink `#1B1A18`; surface/recess/rule remain `#252422`, `#161513`, `#7B7872`. Paper controls remain `#F0EEE8`, Action Yellow `#FFCC22`. Settings, chat, match overlays, and HUD keep their calm dark-field and functional-color semantics; 3D arenas are not wallpapered or recolored.
+
 ### Named Rules
-**The One Accent Rule.** Acid and Combat Orange may both exist on a screen, but one accent owns each region. If both compete equally, neither communicates anything.
+**The One Accent Rule.** Action Yellow and Combat Orange may both exist on a screen, but one accent owns each region.
 
 **The Paper-on-Ink Rule.** Small text and gameplay status belong on calm, high-contrast fields. Texture and decoration never carry critical information.
 
 ## Typography
 
-**Display Font:** Bundled Baloo 2, through the native TextCore `Assets/Fonts/Baloo2.asset`; bold treatment for pre-match titles.
-**Body Font:** Unity UI default sans-serif, compact utility treatment.
-**Label/Mono Font:** No bundled mono face is currently established; utility labels use the same UI family with uppercase, tracking, and weight to create a technical voice.
+**Display Font:** Archivo Black is implemented on player-facing menu, selection, outcome, Settings, pause, and dialog declarations/actions. Chat uses it only for short actions. Settings rows, message bodies, percentages, stocks, cooldowns, bindings, and other dense utility remain readable sans or quiet utility mono.
+**Body Font:** Native utility sans-serif remains allowed, especially where readability or dense information benefits.
+**Label/Mono Font:** Marketing pairs Archivo Black with Space Mono. Short native utility labels may use mono where practical; dense settings and HUD text should stay readable sans.
 
-**Character:** Broad, playful, and printed rather than tactical. Display type makes one statement at a time; utility type carries short actions, status, and annotations.
+**Home and shared-shell treatment:** Mode buttons form the left column, original artwork sits fully visible in an aspect-fitted paper/ink frame at center, and announcements form the right column. The poster uses available page height without reserving chat space; two yellow attachment strips and a yellow announcement heading connect it to the printed world. The authored background continues behind the transparent top bar; individual navigation controls retain paper backing and an ink border for legibility over black marks, with yellow selected modes. Calm page-header fields remain. Native evidence: `.impeccable/review/paper-shell-unity-20261001/`, `.impeccable/review/selection-chat-header-20261001/`, and `.impeccable/review/chat-contrast-controls-20261001/`.
+
+**Chat overlay rule:** Chat is an absolute user-sized bottom-left overlay in every scene. The frontend social host is a workspace sibling, not part of the page's lower row; gameplay was already absolute. Resize and hide never reserve page space or reposition the content underneath. Author selection pages with the bottom-left clear: fighter P1/P2, Player/CPU configuration, and stage participants/actions belong in the bottom middle/right. This is a fixed responsive layout, not a reaction to chat dimensions. User-enlarged overlays may still cover content; do not clamp their size or shrink Home's poster. Shared saved dimensions, channel/input ownership, modal guards, and viewport limits remain.
+
+**Chat controls and contrast:** Paper outer frame, paper/ink channel tabs, dark message/input fields with paper rules, yellow active channel and available SEND. Unavailable SEND/server chat remain visibly disabled and readable. Hide and resize share one top-right row; maximize and its expanded-state/focus/host code are removed. Hidden chat's CHAT reopen button stays at the bottom-left. Conversation/mute management remains in the existing Direct view, without a second sidebar.
+
+**Stage-select treatment:** Existing admitted preview assets and grid/scroll layout remain. Full-opacity previews have paper name strips; selected stages retain a yellow strip while keyboard focus uses a paper frame. Local participant paper fields and deeper green readiness text preserve state meaning and contrast. Back and confirmation use the shared physical control language. Stage-only styles now live together in `FrontendShell.uss`, not as competing overrides in two sheets.
+
+**Results treatment:** Keep the winner-left/standings-right composition, actual snapshot bindings, ranking colors, portrait assets, and local/online return semantics. Archivo outcome/winner/player declarations and readable statistics take priority; empty bursts/grid, fake feed annotations, redundant eyebrow, and speculative broadcast footer were removed. No winner, score, duration, or shared-victory data is invented. Native evidence for both surfaces: `.impeccable/review/stage-results-20261001/`, including a recorded genuine Solo snapshot reused for before/after rendering.
+
+**Online-flow treatment:** Preserve room discovery/create columns, roster order, actual membership/phase/capacity/IDs, host/leader gating, and network routes. Paper room/player name fields and form/dialog cards sit on near-neutral ink; Action Yellow owns create/join/continue actions. Room-mode name-only children are styled alongside legacy class-based rows. The address modal's mounted wrapper fills the shell without intercepting the page while closed; native scrolling keeps Editor-only tools reachable. Identity and frontend join confirmation share paper cards, dark fields, and physical controls. Native evidence: `.impeccable/review/online-flow-20261001/`. Steam was unavailable: actual connection failures and local interactions were checked, not connected-room admission. Explicitly labelled layout specimens are not live-room evidence.
+
+**Settings, match overlays, and chat:** Settings now uses paper outer framing, ink Archivo title, bordered paper category tabs, yellow selection, and a quiet dark scroll/control field. Keyboard-focused tabs and Back use ink/paper contrast with a yellow frame; outer status text is ink, not yellow on paper. All five categories retain actual values, controls, scrolling, remap, reset, and display-revert behavior. Migrated controls out-specify optional local licensed-study images without editing those excluded assets. Training/Solo pause retains paper controls and yellow Resume; Training utility stays quieter ink. Gameplay join dialogs preserve input/modal/pause ownership. Chat retains channel/history/draft/mute/resize and hide/reopen behavior; maximize is removed. Native evidence: `.impeccable/review/remaining-ui-20261001/`, `.impeccable/review/settings-paper-20261001/`, and `.impeccable/review/chat-contrast-controls-20261001/`.
+
+**Restrained HUD finish:** Only neutral text/background/outline/decorative edges changed. Billboard/portrait/diamond/slot/readout geometry, assets, rotations, animations, P1–P4 identity colors, damage-tier/target colors, living/lost stocks, and normal-orange/special-blue ability semantics remain. Ordinary utility typography remains; combat numbers are not turned into menu declarations.
+
+**Character:** Heavy, blocky declarations paired with clear utility typography. Display type makes one statement at a time; utility type carries actions, status, and annotations.
 
 ### Hierarchy
-- **Display** (bold Baloo 2, `148px`, `-4px` tracking): Main title declaration, with a `7px` print offset. Flow titles use a smaller screen-specific size.
+- **Display** (Archivo Black target): Main title declaration; size and tracking are surface-specific, not a universal fixed 148px prescription.
 - **Headline** (bold, screen-specific): Results, fighter names, and major state changes. Keep it materially larger than metadata.
 - **Title** (bold, screen-specific): Section and flow titles such as Character Select or Lobby Room.
 - **Body** (regular/bold, screen-specific): Short explanatory copy, status messages, and join instructions. Keep it brief and readable.
@@ -142,16 +163,16 @@ Rotation is authored and restrained: typically under three degrees for grouped c
 ### Buttons
 - **Character:** Tactile and declarative; a button should feel stamped into the poster.
 - **Shape:** Square corners, `2px` dark border, and a `6px` bottom edge on pre-match controls.
-- **Primary:** Acid background, Ink text, uppercase bold label, `56px` minimum height, and `18px` horizontal padding.
-- **Main-menu actions:** `80px` minimum height, with distinct Online, Solo vs CPU, and Training labels. Ink text on acid, paper, and orange.
-- **Hot:** Combat Orange background with Ink text for host/join actions: `5.01:1` contrast. Paper text on this orange is only `3.16:1` and must not be used for small action labels.
-- **Hover / Focus:** Lighten the field and translate upward by about `2px`. Paper focus borders remain distinct from acid selection borders on stage cards.
+- **Primary:** Action Yellow background, Ink text, uppercase bold label; stable interaction geometry is more important than any fixed menu sizing.
+- **Main-menu actions:** Training/Solo use paper controls; Online uses Action Yellow. Existing mode order, artwork, and routes remain.
+- **Hot:** Host/join primary actions use Action Yellow; Combat Orange remains a gameplay/impact accent, not a competing primary-action field.
+- **Hover / Focus:** Use clear field/frame contrast without moving the control upward. Paper stage focus remains distinct from yellow selection; Settings keyboard focus uses ink/paper with a yellow frame rather than disappearing into its paper outer panel.
 - **Active:** Translate downward by about `3px` so press has a physical response.
 - **Secondary:** Paper field with Ink text; retain the same border and geometry so hierarchy comes from color, not a different control language.
 
 ### Chips
 - **Style:** Flat Ink or Paper strips with uppercase bold text, wide tracking, and a left accent bar when they represent status.
-- **State:** Acid indicates action/availability; Online Green indicates live presence; Combat Orange indicates hot or combat state. Add text or structural change so color is not the only cue.
+- **State:** Action Yellow indicates action/selection; Online Green indicates live presence; Combat Orange indicates hot or combat state. Add text or structural change so color is not the only cue.
 
 ### Cards / Containers
 - **Corner Style:** Square.
@@ -162,24 +183,25 @@ Rotation is authored and restrained: typically under three degrees for grouped c
 
 ### Inputs / Fields
 - **Style:** Rectangular, high-contrast, and compact. Keep the field readable against the panel rather than decorating the input itself.
-- **Focus:** Acid border or clear field lift; preserve the same focus treatment as buttons.
-- **Error / Disabled:** Use explicit status copy and reduced opacity/contrast, not color alone.
+- **Focus:** Action Yellow border or clear field lift; preserve the same focus treatment as buttons.
+- **Error / Disabled:** Use explicit status copy and readable utility colors with inactive structure; do not make required disabled labels legible only through opacity.
 
 ### Navigation
 
-Navigation is a stable action stack or flow-specific footer, not a decorative poster collage. Primary actions stay in a predictable region; secondary actions may be smaller or nested. Labels are short, uppercase, and explicit: `JOIN A FIGHT`, `HOST A MATCH`, `RETURN TO LOBBY`, `LOCK IN`.
+Navigation stays stable: the current persistent Training/Solo/Online tabs and flow-specific Back/Leave paths are implementation evidence, not a decorative collage. Preserve predictable routes and active-session guards; this visual direction does not approve a navigation redesign. Labels remain short, uppercase, and explicit.
 
 ### HUD Billboards
 
-Player identity, damage, and stocks live in stable left-side billboard cards with portrait cutouts, accent edges, and large outlined percentage readouts. The local kit uses an orange normal diamond (`1–4`) beside a blue special diamond (`A/E/R/F`) at the bottom center. Each has four circular slots ordered top, right, bottom, left, with an effective-binding prompt above each slot and cooldown feedback inside it. Keyboard prompts follow the active layout; Xbox controller specials show modifier plus face button. Unsupported glyphs fall back to text. Slot readiness uses scale/translation pulses rather than constant animation.
+Player identity, damage, and stocks live in stable left-side billboard cards with portrait cutouts, accent edges, and large outlined percentage readouts. The local kit uses an orange normal diamond (`1–4`) beside a blue special diamond (`A/E/R/F`) at the bottom center. Each has four circular slots ordered top, right, bottom, left, with an effective-binding prompt above each slot and cooldown feedback inside it. Physical number-row keys show digits even when the keyboard layout displays punctuation; other prompts follow effective labels. Controller specials show only the face button; actual gameplay input still requires LB. Unsupported glyphs fall back to text. Slot readiness uses brief feedback rather than constant decorative animation.
 
 ## Do's and Don'ts
 
 ### Do:
 - **Do** establish the grid before adding crooked poster gestures.
-- **Do** use Ink, Paper, Acid, and Combat Orange as semantic roles rather than equal decoration.
+- **Do** use Ink, Paper, Action Yellow, and Combat Orange as semantic roles rather than equal decoration.
 - **Do** make focus, selected state, disabled state, and confirmation more obvious than texture.
 - **Do** treat character renders as graphic material while preserving face, weapon, and gameplay silhouette.
+- **Do** preserve actual model proportions, costume, weapon, signature colors, and chunky forms in splash art; amplification must not promise a glossy cinematic version of another game.
 - **Do** keep gameplay HUD texture restrained and information stable while the camera moves.
 - **Do** use short, honest, self-aware copy after the useful information.
 - **Do** preserve readability for damage, stocks, cooldowns, player identity, and match flow.

@@ -10,7 +10,7 @@ public sealed class RosterLowPoseTests
     [InlineData(CharacterClass.FightGuy)]
     [InlineData(CharacterClass.Manki)]
     [InlineData(CharacterClass.Bonk)]
-    [InlineData(CharacterClass.Kistu)]
+    [InlineData(CharacterClass.Wibou)]
     public void AdmittedLowPostures_DuckHighContactButRemainHittableLow(CharacterClass character)
     {
         var entry = BuiltInContentResolver.Resolve(character);

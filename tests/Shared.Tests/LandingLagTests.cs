@@ -79,10 +79,10 @@ public class LandingLagTests : KitScenarioTests
         float lunge = 0f,
         float airFloatGravity = 0f)
     {
-        var def = TestHelpers.CloneDef(TestHelpers.KistuDef);
+        var def = TestHelpers.CloneDef(TestHelpers.WibouDef);
         if (airFloatGravity != 0f)
             def.Movement = def.Movement with { AirFloatGravity = airFloatGravity };
-        var slots = TestHelpers.KistuDef.CookedSlots!.ToArray();
+        var slots = TestHelpers.WibouDef.CookedSlots!.ToArray();
         slots[8] = AirSlot1(lag, before, after, lunge);
         def.CookedSlots = slots;
         return def;
@@ -103,7 +103,7 @@ public class LandingLagTests : KitScenarioTests
     private static readonly CharacterDefinition FreezeDef =
         MakeDef(AirSlot1Lag, AirSlot1Before, AirSlot1After, lunge: 4f, airFloatGravity: 36f);
 
-    private static float Gpy => TestHelpers.GroundPY(TestHelpers.KistuDef);
+    private static float Gpy => TestHelpers.GroundPY(TestHelpers.WibouDef);
 
     /// <summary>Airborne falling start: heightAbove above ground, straight down, no horizontal input.</summary>
     private static CharacterState FallingStart(float heightAbove)

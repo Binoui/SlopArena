@@ -73,7 +73,7 @@ Working contract:
 - Share timing and pooling infrastructure while permitting different surfaces:
   - FightGuy: blunt crescents and compressed blue-white afterimages.
   - Manki: rough arcs with sparse sparks or smoke wisps.
-  - Kistu: narrow blade arcs and glints.
+  - Wibou: narrow blade arcs and glints.
   - Nilus: thin unstable void tears.
 
 **Gate:** Project-owner approval in the normal gameplay camera.

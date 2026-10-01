@@ -1,72 +1,57 @@
 ---
 name: sloparena-kit-regression-testing
-description: Write and maintain golden-snapshot regression tests for character kits (KitScenario, AssertGoldenScenario, REGENERATE_GOLDENS) in tests/Shared.Tests. Use whenever adding a new character/ability, changing damage/knockback/timing numbers, or the user asks to "pin down", "lock in", "add regression coverage for", or "add golden tests for" a kit — also trigger on any mention of REGENERATE_GOLDENS, KitScenario, or a failing/stale golden diff.
+description: Use for explicit kit regression coverage, KitScenario or AssertGoldenScenario maintenance, REGENERATE_GOLDENS, and diagnosing failing golden diffs. Not for routine numerical move tuning, adding content alone, or Unity-only presentation changes; use docs/testing.md for those verification modes.
 ---
 
 # SlopArena Kit Regression Testing
 
-`tests/Shared.Tests/` has a golden-snapshot harness (`KitScenario` + `AssertGoldenScenario`) purpose-built for `ServerSimulation.Tick()` — pure C#, deterministic, no Unity, no RNG. It runs N ticks of canned input against a character (optionally vs. an NPC dummy) and diffs the resulting `CharacterState` against a committed JSON file in `tests/Shared.Tests/Golden/`. This is the standard way new abilities and characters get regression-protected; every existing kit (Manki, FightGuy, Kistu, Nilus) uses it.
+`tests/Shared.Tests/` has a deterministic scenario harness (`KitScenario` + `ScenarioRunner`) for the real `ServerSimulation.Tick()`. It accepts sparse per-tick inputs, initial state, an optional arena and default-input NPC, and returns mid-run and final states. `KitScenarioTests` supports focused behavioral assertions and optional JSON goldens under `tests/Shared.Tests/Golden/`.
 
-**Nothing auto-discovers characters.** No harness enumerates `CharacterClass` — a new character or ability only gets covered when you hand-write its `<Character>KitRegressionTests.cs`. Don't assume adding a `CharacterDefinition` "just works" with existing tests.
+Coverage is explicit: adding a character or ability does not create a scenario. Extend the relevant existing test file; do not assume a class naming pattern or historical coverage count.
+
+## Choose coverage before writing tests
+
+- **Numerical tuning:** use the affected Ability Lab/Training path and existing move-data reports. Do not add or regenerate goldens just because a number changed. Follow [Testing and verification](../../../docs/testing.md) for local versus accepted content.
+- **Mechanic changes:** prefer focused assertions for observable state transitions, contacts, timing boundaries, interruption, precedence, or errors. Add coverage only where a plausible consumer-visible regression would otherwise escape.
+- **Golden maintenance:** use snapshots when preserving meaningful behavior across a deliberately chosen scenario. Investigate unexpected diffs before changing expectations; generation is not correctness evidence.
+- **Unity presentation:** use the affected runtime surface and visual evidence, not a Shared golden as a substitute.
+
+Do not pin incidental implementation details or defaults. Remove such assertions instead of re-pinning them; retain or add coverage for the actual gameplay contract where needed.
 
 ## The pieces
 
 | File | Role |
 |---|---|
-| `KitScenario.cs` | `KitScenario` record (Def, Setup, Inputs, SnapshotTick, TotalTicks, optional NpcSetup/NpcDef/NpcAssert); `InputSequence` (sparse per-tick input via `.Press(tick, slot)` / `.Set(tick, InputState)`); `ScenarioRunner.Run()` drives the sim loop. |
-| `KitScenarioTests.cs` | Base class every `<Character>KitRegressionTests` extends. `AssertScenario` runs + calls your inline `Assert` — use for a single sharp numeric invariant. `AssertGoldenScenario` runs + diffs against the JSON file — use for broad kit-behavior pinning (the default). Also holds `MankiGpy`/`FightGuyGpy`/`NilusGpy` ground-Y helpers. |
-| `GoldenSnapshot.cs` | `EntitySnapshot` — the gameplay-relevant subset of `CharacterState` that gets pinned (position, velocity, damage, deaths, combo stage, hitstun, airtime, charge, cooldowns×6, buff timer, jump/dash resources, invincibility). Deliberately excludes noisy/transient fields (raw input, facing yaw, warp data). Float fields compare to 3 decimal places, so animation-timing float drift doesn't false-fail. |
-| `TestHelpers.cs` | `PlayerState()`/`NpcState()` (PY defaults to 0 — ungrounded, you must set `PY = Gpy`), `GroundPY(def)`, `CombatDef` (a Manki clone with a plain full-body capsule hurtbox — use as `NpcDef` for hit-confirm scenarios so you don't need baked skeleton data), `TestArena()`. |
+| `KitScenario.cs` | Scenario setup, sparse `InputSequence.Press`/`Set`, snapshot/final states, optional NPC and arena. Unspecified ticks and NPC inputs are default input; hold buttons explicitly across required windows. |
+| `KitScenarioTests.cs` | `AssertScenario` calls the player's final-state assertion; `ScenarioRunner` calls `NpcAssert` when provided. `AssertGoldenScenario` compares snapshots instead of invoking the player's `Assert`; do not put a mechanic assertion there and assume it ran. |
+| `GoldenSnapshot.cs` | Serialization of selected gameplay state. `KitScenarioTests` is the source of truth for compared fields and float precision. |
+| `TestHelpers.cs` | Existing definitions, initial states, ground-height helpers, baked data, and test arenas. Choose fixtures appropriate to the changed contract rather than incidental roster tuning. |
 | `Golden/*.json` | One file per scenario, named from `KitScenario.Name` (spaces/slashes → `_`). Renaming `Name` orphans the old file — delete it by hand. |
 
-## Writing a new regression file
+## Writing a scenario
 
-Create `tests/Shared.Tests/<Character>KitRegressionTests.cs` extending `KitScenarioTests`. One `[Fact]` per ability stage/branch you want pinned. Shape, from `FightGuyKitRegressionTests.cs`:
+Start with the nearest existing behavioral test, such as `MankiKitTests.cs`, `BonkKitTests.cs`, or `MankiKitScenarioTests.cs`. Keep setup isolated and inputs explicit.
 
-```csharp
-public class KistuKitRegressionTests : KitScenarioTests
-{
-    private static readonly CharacterDefinition Def = TestHelpers.KistuDef;
-    private static float Gpy => TestHelpers.GroundPY(Def);
+Use `AssertScenario` for final-state contracts, `NpcAssert` for victim outcomes, or inspect `ScenarioRunner.Run()` snapshot results for a specific timing boundary. Assert the relevant result directly; do not substitute a whole-state golden for one uncertain mechanic.
 
-    [Fact]
-    public void LMB_Stage1_HitsNpcForDamage()
-    {
-        AssertGoldenScenario(new KitScenario
-        {
-            Name = "Kistu LMB Hit Confirm",
-            Def = Def,
-            Setup = () => TestHelpers.PlayerState() with { PY = Gpy },
-            Inputs = new InputSequence().Press(0, 1),
-            Assert = _ => { },                     // golden covers assertions; leave empty
-            NpcSetup = () => TestHelpers.NpcState()
-                with { PX = 0, PZ = 1.5f, PY = TestHelpers.CombatGroundPY },
-            NpcAssert = _ => { },
-            NpcDef = TestHelpers.CombatDef,
-            SnapshotTick = 12,                      // comment WHY: stage1 hitbox active (trigger=6, dur=6)
-            TotalTicks = 80,
-        });
-    }
-}
-```
+For a golden, choose `SnapshotTick` from the behavior being protected: active contact, a transition boundary, or another meaningful mid-run state. Explain the choice. An arbitrary idle snapshot does not prove the move worked.
 
-**`SnapshotTick` is the whole point — get it from the ability spec, not by guessing.** It must land while the hitbox/effect is actually active (mid-ability), otherwise the golden pins a boring settled/idle state and the test stops meaningfully protecting anything. Look up the ability's trigger tick + duration and comment the reasoning inline (see the `// stage 1 hitbox active (trigger=7, dur=6)` style comments in the existing files) — the next person changing timing needs that context to know if their change should move the tick too.
+Goldens only cover their selected states and inputs. They do not prove visual contact, arbitrary match interactions, human gamefeel, or networking.
 
-Use `AssertScenario` + a hand-written `Assert.Equal(...)` instead of golden when you're locking down one specific invariant on genuinely new infrastructure (e.g. "self-damage is capped") rather than broad kit behavior — see `MankiKitTests.cs`'s bazooka self-damage test for the pattern. Golden scenarios are for "this kit behaves the same as before"; hand-written asserts are for "this one new mechanic does exactly X."
+## Scoped golden workflow
 
-## The regenerate workflow (follow every step — skipping steps is how a wrong golden gets committed)
+Only use this workflow after deciding a golden is appropriate. Replace `<ScenarioTestClass>` with the actual class from the current tree; confirm the filtered run executes the intended tests.
 
-1. **Run filtered, expect FAIL.** `dotnet test tests/Shared.Tests/ --filter "FullyQualifiedName~<Character>KitRegressionTests" --nologo`. Expected: `Golden file not found` for each new scenario. This proves the test is actually consulting the golden mechanism, not silently passing against nothing.
-2. **Generate.** `REGENERATE_GOLDENS=1 dotnet test tests/Shared.Tests/ --filter "FullyQualifiedName~<Character>KitRegressionTests" --nologo`. Writes the JSON files, test run reports PASS (it always passes on generation — that's not a signal of correctness).
-3. **Inspect before trusting — this is the step people skip.** Open every generated `Golden/*.json` and check the numbers against the character's design spec (`docs/characters/<name>.md`) or the ability's intended damage/knockback/distance. A golden that pins *wrong* behavior is worse than no golden at all — it actively defends a bug against future fixes. If a value contradicts the spec, fix the implementation, not the assertion, then regenerate.
-4. **Re-run without the env var, expect PASS.** `dotnet test tests/Shared.Tests/ --filter "FullyQualifiedName~<Character>KitRegressionTests" --nologo`. Now it's comparing against the committed file — confirms the harness round-trips (serializes/deserializes/compares) cleanly.
-5. **Run the full suite.** `dotnet test tests/Shared.Tests/ --nologo`. Confirms your change didn't silently regress an unrelated kit's golden.
-6. **Rebuild Shared if you touched sim code.** `dotnet build src/Shared/ --nologo` — Unity only sees the DLL, not the source.
-7. **Commit the test file and its `Golden/*.json` together**, same commit as the implementation change. Reviewers read the JSON diff as the changelog ("NPC DamagePercent 4→6") — never split code and golden across commits.
+1. Run `dotnet test tests/Shared.Tests/ --filter "FullyQualifiedName~<ScenarioTestClass>" --nologo` without regeneration. Inspect the failure or existing snapshot against the intended gameplay contract.
+2. For an approved new snapshot or intentional behavior change, run `REGENERATE_GOLDENS=1 dotnet test tests/Shared.Tests/ --filter "FullyQualifiedName~<ScenarioTestClass>" --nologo`. Generation writes expectations; its passing result does not establish correctness.
+3. Inspect every affected JSON diff against the approved behavior and simulated outcome. Fix incorrect behavior, not its expectation. Never regenerate the whole suite to clear failures.
+4. Re-run the same filter without `REGENERATE_GOLDENS` and require the intended tests to pass.
+5. At delivery, run the applicable build, full-suite, and runtime checks from [Testing and verification](../../../docs/testing.md). Do not build/cook for a skill or documentation edit.
+6. Deliver the scenario and its approved golden changes together. Commit or push only with explicit user authorization.
 
 ## Updating goldens for an intentional behavior change
 
-When a balance/timing change legitimately breaks an existing golden (test fails, diff shows real numbers moved): verify the new numbers are correct first, `REGENERATE_GOLDENS=1` scoped to just the affected test class, review the JSON diff line-by-line (this IS the code review artifact — "PZ changed from 2.1 to 2.5" tells the reviewer exactly what shifted), then commit the regenerated golden alongside the behavior change. Never regenerate broadly ("just to be safe") — a wide regenerate silently swallows unrelated regressions that should have failed loudly.
+When an intentional damage or timing change breaks an existing meaningful golden, first prove the new gameplay behavior, then follow the scoped workflow above. Do not move snapshot ticks or regenerate unrelated values merely to make a test pass. If the failure only pins an incidental default or implementation detail, remove that assertion rather than preserving it.
 
 ## Reference material
 

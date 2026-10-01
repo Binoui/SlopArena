@@ -1,6 +1,6 @@
 # Kistu — Implementation Plan (code only, no art/anim/model)
 
-> Character design: `docs/characters/kistu.md` (Kistu, The Kitsune Blade — agile katana spacing duelist, launch→juggle payoff).
+> Character design: `docs/characters/wibou.md` (Wibou, The Kitsune Blade — agile katana spacing duelist, launch→juggle payoff).
 > This plan covers **code only**: Shared sim registration, all 8 abilities, the two pieces of genuinely new infra, tests, and the *placeholder* client config that makes Kistu playable without art. Art/anim/model/VFX are explicitly deferred.
 > All file:line refs verified against the current tree (2026-07-27), not the docs. **`docs/characters/adding-a-new-character.md` and `character-import-checklist.md` are STALE** (they describe an obsolete flat `AttackStage` and a numeric `AbilityTypeId` factory) — author against `AttackData.cs` / `AbilitySpec.cs` / `KnockbackProfile.cs` and the `(CharacterClass, slot, airborne)` factory.
 
@@ -158,7 +158,7 @@
 ### Phase 7 — Full verification + cleanup
 - `dotnet build src/Shared/ --nologo` (auto-copies DLL to Unity Plugins) then `dotnet test tests/Shared.Tests/ --nologo` (<3s, ~151 tests + new ones) — all green.
 - Regenerate goldens for new standard-ability scenarios: `REGENERATE_GOLDENS=1 dotnet test ...`, then re-run to confirm byte-stable.
-- Docs cleanup: add a **Kistu** column to the slot table in `docs/systems/ability-architecture.md`; note the counter as a new pattern; optionally promote the *predictable-KB / emergent-combos* pillar into `docs/systems/combat-systems.md` (flagged in the design doc). Flip `docs/characters/kistu.md` status from "Design" to "Implemented (sim; art pending)".
+- Docs cleanup: add a **Kistu** column to the slot table in `docs/systems/ability-architecture.md`; note the counter as a new pattern; optionally promote the *predictable-KB / emergent-combos* pillar into `docs/systems/combat-systems.md` (flagged in the design doc). Flip `docs/characters/wibou.md` status from "Design" to "Implemented (sim; art pending)".
 
 ---
 

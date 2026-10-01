@@ -44,7 +44,7 @@ namespace SlopArena.Shared.Abilities;
 /// Idle entity with no AnimLockTicks guard (only dash and new-attack activation are gated,
 /// Simulation.cs:252) — so Nilus walked freely from tick 18 of a 34-tick commitment, and a
 /// HitboxEvent past tick 17 would have been dropped silently, since the trigger match at
-/// :77 is == rather than >=. KistuUltFlurry.cs:53 is the in-repo model for the cached form;
+/// :77 is == rather than >=. WibouUltFlurry.cs:53 is the in-repo model for the cached form;
 /// this ability still carries the trap.
 ///
 /// Params: pull_force, pull_angle, pull_stun_ticks.

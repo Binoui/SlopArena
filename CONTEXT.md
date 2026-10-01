@@ -106,7 +106,7 @@ _Avoid_: up-B, getup move, escape move
 
 **Clash**:
 The symmetric commit resolution (phase 2, ADR-0015): two simultaneous Interruptible hitboxes connecting within a few ticks resolve as a mutual bounce — no damage, short mutual stun + pushback, reset to neutral — instead of a random trade. The timing-model substitute for whiff-punish in free-camera 3D.
-_Avoid_: parry (Kistu-specific), counter, trade
+_Avoid_: parry (Wibou-specific), counter, trade
 
 **Slot**:
 One canonical move entry in the 16-entry grid: ground/air × `1`-`4`, `A`, `E`, `R`, `F`. The kit has twelve button concepts—eight normals and four specials—each with grounded and aerial entries. `LMB` and `RMB` are camera controls, not attack slots. Normals are single moves; there are no automatic LMB chains or charged RMB attacks. `A` is the signature special, `E` is recovery-capable mobility, `R` is the playmaking special, and `F` is the long-cooldown power special.

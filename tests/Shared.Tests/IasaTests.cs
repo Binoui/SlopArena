@@ -65,13 +65,13 @@ public class IasaTests : KitScenarioTests
             .ToArray();
 
     /// <summary>
-    /// Kistu movement/body data with cooked Slot1 (IASA at 16) and Slot2 timelines.
+    /// Wibou movement/body data with cooked Slot1 (IASA at 16) and Slot2 timelines.
     /// The synthetic cooked fixtures exercise the engine gate without legacy factory behavior.
     /// </summary>
     private static CharacterDefinition MakeIasaDef(bool iasa)
     {
-        var def = TestHelpers.CloneDef(TestHelpers.KistuDef);
-        var slots = TestHelpers.KistuDef.CookedSlots!.ToArray();
+        var def = TestHelpers.CloneDef(TestHelpers.WibouDef);
+        var slots = TestHelpers.WibouDef.CookedSlots!.ToArray();
         slots[0] = TestSlot(0, "ground.1", Slot1Duration, iasa ? Slot1Iasa : (ushort)0, VelocityOperations(Slot1Lunge));
         slots[1] = TestSlot(1, "ground.2", Slot2Duration, 0, VelocityOperations(Slot2Lunge));
         def.CookedSlots = slots;
@@ -79,16 +79,16 @@ public class IasaTests : KitScenarioTests
     }
     private static CharacterDefinition MakeGroundRecoveryDef()
     {
-        var def = TestHelpers.CloneDef(TestHelpers.KistuDef);
-        var slots = TestHelpers.KistuDef.CookedSlots!.ToArray();
+        var def = TestHelpers.CloneDef(TestHelpers.WibouDef);
+        var slots = TestHelpers.WibouDef.CookedSlots!.ToArray();
         slots[0] = TestSlot(0, "ground.1", Slot1Duration, 0);
         def.CookedSlots = slots;
         return def;
     }
     private static CharacterDefinition MakeIasaHitboxDef()
     {
-        var def = TestHelpers.CloneDef(TestHelpers.KistuDef);
-        var slots = TestHelpers.KistuDef.CookedSlots!.ToArray();
+        var def = TestHelpers.CloneDef(TestHelpers.WibouDef);
+        var slots = TestHelpers.WibouDef.CookedSlots!.ToArray();
         slots[0] = TestSlot(
             0,
             "ground.1",
@@ -258,8 +258,8 @@ public class IasaTests : KitScenarioTests
     [Fact]
     public void Iasa_DoesNotInterruptDuringAttackerHitstop_ButDoesAfterFreeze()
     {
-        var def = TestHelpers.CloneDef(TestHelpers.KistuDef);
-        var slots = TestHelpers.KistuDef.CookedSlots!.ToArray();
+        var def = TestHelpers.CloneDef(TestHelpers.WibouDef);
+        var slots = TestHelpers.WibouDef.CookedSlots!.ToArray();
         slots[0] = TestSlot(
             0,
             "ground.1",

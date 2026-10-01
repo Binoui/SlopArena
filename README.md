@@ -6,7 +6,7 @@ SlopArena takes the platform-fighter fundamentals of movement, damage percent, r
 
 The goal is a game that is readable and competitive without taking itself too seriously: strong character identities, generous 3D hitboxes, expressive movement, and plenty of room for stupid things to happen.
 
-> **Current state:** SlopArena is preparing a playable friends demo with four admitted cooked demo-roster packages: FightGuy, Manki, Kistu, and Bonk. Package admission does not prove kit completeness or player acceptance. Nilus remains a legacy compatibility implementation, not part of the four-character demo roster. See the [playable friends demo reset](docs/plans/2026-09-05-playable-demo-reset.md) for current product work.
+> **Current state:** SlopArena is preparing a playable friends demo with four admitted cooked demo-roster packages: FightGuy, Manki, Wibou, and Bonk. Package admission does not prove kit completeness or player acceptance. Nilus remains a legacy compatibility implementation, not part of the four-character demo roster. See the [playable friends demo reset](docs/plans/2026-09-05-playable-demo-reset.md) for current product work.
 
 ## The game
 
@@ -29,7 +29,7 @@ Left Stick moves; Right Stick controls the camera and ability aim. Face buttons 
 | --- | --- | --- |
 | [**FightGuy**](docs/characters/fightguy.md) | Close-range martial-arts brawler with Ki Shot, Rising Dragon, Cyclone Kick, and Fist of Fury | Admitted cooked package |
 | [**Manki**](docs/characters/manki.md) | Explosive all-rounder / jetpack-bazooka skirmisher with bombs and aerosol area denial | Admitted cooked package |
-| [**Kistu**](docs/characters/kistu.md) | Mid-range kitsune sword-spacing duelist focused on launches and air juggles | Admitted cooked package |
+| [**Wibou**](docs/characters/wibou.md) | Mid-range kitsune sword-spacing duelist focused on launches and air juggles | Admitted cooked package |
 | [**Bonk**](docs/characters/bonk.md) | Greatsword fighter with sword-reach normals, targeted jump-slam recovery, and Blade Storm | Admitted cooked package; avatar visual/pose review pending |
 | [**Nilus**](docs/characters/nilus.md) | Legacy compatibility implementation | Not part of the four-character demo roster |
 

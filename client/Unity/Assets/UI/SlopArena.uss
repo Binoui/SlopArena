@@ -73,6 +73,11 @@
     white-space: normal;
 }
 
+.frontend-shell .flow-eyebrow,
+.frontend-shell .flow-progress {
+    color: var(--shell-page-muted);
+}
+
 .flow-context {
     max-width: 360px;
     margin-left: auto;
@@ -196,11 +201,11 @@
 .lobby-panel {
     min-width: 0;
     padding: 20px;
-    background-color: rgb(13, 13, 20);
+    background-color: rgb(37, 36, 34);
     border-width: 3px;
-    border-color: rgb(240, 238, 232);
+    border-color: rgb(123, 120, 114);
     border-bottom-width: 9px;
-    border-bottom-color: rgb(224, 92, 42);
+    border-bottom-color: rgb(255, 204, 34);
 }
 
 .browser-panel__header,
@@ -241,11 +246,11 @@
     padding: 0 14px;
     flex-direction: row;
     align-items: center;
-    background-color: rgb(35, 30, 40);
+    background-color: rgb(22, 21, 19);
     border-left-width: 6px;
-    border-left-color: rgb(255, 200, 33);
+    border-left-color: rgb(255, 204, 34);
     border-bottom-width: 4px;
-    border-bottom-color: rgb(13, 13, 20);
+    border-bottom-color: rgb(37, 36, 34);
 }
 
 .server-row.unity-first-child,
@@ -264,7 +269,8 @@
     min-width: 0;
     color: rgb(240, 238, 232);
     font-size: 20px;
-    -unity-font-style: bold;
+    -unity-font-definition: url("../Fonts/ArchivoBlack.asset");
+    -unity-font-style: normal;
     white-space: normal;
 }
 
@@ -280,35 +286,40 @@
     width: 112px;
     min-height: 48px;
     flex-shrink: 0;
-    background-color: rgb(224, 92, 42);
-    color: rgb(240, 238, 232);
+    background-color: rgb(255, 204, 34);
+    color: rgb(22, 21, 19);
     font-size: 16px;
+    -unity-font-definition: url("../Fonts/ArchivoBlack.asset");
+    -unity-font-style: normal;
 }
 
 .server-join:hover,
 .server-join:focus {
-    background-color: rgb(255, 118, 80);
-    border-color: rgb(255, 200, 33);
+    background-color: rgb(255, 217, 92);
+    border-color: rgb(240, 238, 232);
 }
 
-.browser-status,
-.lobby-status {
-    min-height: 24px;
-    margin-top: 10px;
-    color: rgb(255, 200, 33);
-    font-size: 18px;
-    white-space: normal;
+.server-join:disabled {
+    background-color: rgb(83, 77, 70);
+    border-color: rgb(123, 120, 114);
+    color: rgb(240, 238, 232);
 }
 
-.browser-status.error,
-.lobby-status.error {
-    color: rgb(255, 118, 80);
+.frontend-shell .browser-summary-section .browser-status,
+.frontend-shell .lobby-summary-section .lobby-status {
+    color: var(--shell-page-warning);
 }
 
-.browser-hint {
+.frontend-shell .browser-summary-section .browser-status.error,
+.frontend-shell .lobby-summary-section .lobby-status.error {
+    color: var(--shell-page-error);
+}
+
+
+.frontend-shell .browser-hint {
     flex-grow: 1;
     min-width: 0;
-    color: rgb(240, 238, 232);
+    color: var(--shell-page-ink);
     font-size: 18px;
     white-space: normal;
 }
@@ -316,11 +327,10 @@
 .field-help {
     flex-grow: 1;
     min-width: 0;
-    color: rgb(72, 65, 76);
+    color: rgb(37, 36, 34);
     font-size: 17px;
     white-space: normal;
 }
-
 .browser-refresh {
     width: 145px;
     flex-shrink: 0;
@@ -339,9 +349,9 @@
     padding: 20px;
     background-color: rgb(240, 238, 232);
     border-width: 3px;
-    border-color: rgb(13, 13, 20);
+    border-color: rgb(22, 21, 19);
     border-bottom-width: 8px;
-    border-bottom-color: rgb(255, 200, 33);
+    border-bottom-color: rgb(255, 204, 34);
 }
 
 .browser-host-panel {
@@ -350,32 +360,43 @@
 
 .browser-direct-panel {
     margin-top: 14px;
-    background-color: rgb(224, 92, 42);
-    border-bottom-color: rgb(13, 13, 20);
+    background-color: rgb(240, 238, 232);
+    border-bottom-color: rgb(22, 21, 19);
 }
 
 .browser-tool .panel-title {
-    color: rgb(25, 19, 27);
+    color: rgb(22, 21, 19);
+    -unity-font-definition: url("../Fonts/ArchivoBlack.asset");
+    -unity-font-style: normal;
+}
+
+.browser-tool .panel-title {
+    white-space: normal;
+    font-size: 19px;
+}
+
+.browser-tool .tool-copy {
+    font-size: 15px;
 }
 
 .browser-direct-panel .panel-title {
-    color: rgb(23, 19, 27);
+    color: rgb(22, 21, 19);
 }
 
 .tool-copy {
     margin-top: 8px;
-    color: rgb(72, 65, 76);
+    color: rgb(37, 36, 34);
     font-size: 18px;
     white-space: normal;
 }
 
 .browser-direct-panel .tool-copy {
-    color: rgb(23, 19, 27);
+    color: rgb(37, 36, 34);
 }
 
 .field-label {
     margin-top: 18px;
-    color: rgb(72, 65, 76);
+    color: rgb(37, 36, 34);
     font-size: 14px;
 }
 
@@ -387,24 +408,129 @@
     padding-left: 12px;
     padding-right: 12px;
     border-width: 2px;
-    border-color: rgb(13, 13, 20);
-    background-color: rgb(255, 255, 255);
-    color: rgb(25, 19, 27);
+    border-color: rgb(123, 120, 114);
+    background-color: rgb(37, 36, 34);
+    color: rgb(240, 238, 232);
     font-size: 18px;
 }
 
-.browser-input:focus,
-.direct-connect-input:focus {
-    border-color: rgb(255, 200, 33);
-    background-color: rgb(255, 249, 230);
+.browser-input .unity-base-text-field__input,
+.direct-connect-input .unity-base-text-field__input {
+    background-color: rgb(37, 36, 34);
+    color: rgb(240, 238, 232);
 }
 
-.host-status {
+.browser-input .unity-base-text-field__input--placeholder,
+.direct-connect-input .unity-base-text-field__input--placeholder {
+    color: rgb(196, 189, 179);
+}
+
+.browser-input:focus,
+.direct-connect-input:focus,
+.browser-input:focus .unity-base-text-field__input,
+.direct-connect-input:focus .unity-base-text-field__input {
+    border-color: rgb(255, 204, 34);
+    background-color: rgb(22, 21, 19);
+}
+
+.frontend-shell .browser-summary-section .host-status {
     min-height: 25px;
     margin-top: 8px;
-    color: rgb(25, 19, 27);
+    color: var(--shell-page-ink);
     font-size: 17px;
     white-space: normal;
+}
+
+.browser-tool .btn-hot,
+.browser-actions-section .btn-hot,
+.direct-connect-actions > .btn-hot {
+    background-color: rgb(255, 204, 34);
+    color: rgb(22, 21, 19);
+    -unity-font-definition: url("../Fonts/ArchivoBlack.asset");
+    -unity-font-style: normal;
+}
+
+.browser-tool .btn-hot:hover,
+.browser-tool .btn-hot:focus,
+.browser-actions-section .btn-hot:hover,
+.browser-actions-section .btn-hot:focus,
+.direct-connect-actions > .btn-hot:hover,
+.direct-connect-actions > .btn-hot:focus {
+    background-color: rgb(255, 217, 92);
+    border-color: rgb(240, 238, 232);
+}
+
+.browser-tool .btn-hot:disabled,
+.browser-actions-section .btn-hot:disabled,
+.direct-connect-actions > .btn-hot:disabled {
+    background-color: rgb(83, 77, 70);
+    border-color: rgb(123, 120, 114);
+    color: rgb(240, 238, 232);
+}
+
+.browser-header-section .btn-back,
+.browser-panel .panel-title,
+.browser-refresh,
+.browser-actions-section .btn-secondary,
+.direct-connect-actions > .btn-secondary {
+    -unity-font-definition: url("../Fonts/ArchivoBlack.asset");
+    -unity-font-style: normal;
+    letter-spacing: 0;
+}
+
+.browser-header-section .btn-back {
+    background-color: rgb(240, 238, 232);
+    color: rgb(27, 26, 24);
+    border-color: rgb(13, 13, 20);
+}
+
+.browser-header-section .btn-back:hover,
+.browser-header-section .btn-back:focus,
+.browser-refresh:focus,
+.browser-actions-section .btn-secondary:focus,
+.direct-connect-actions > .btn-secondary:focus {
+    background-color: rgb(27, 26, 24);
+    color: rgb(240, 238, 232);
+    border-color: rgb(255, 204, 34);
+    translate: 0 0;
+}
+
+.browser-header-section .btn-back:active,
+.browser-refresh:active,
+.browser-actions-section .btn-secondary:active,
+.direct-connect-actions > .btn-secondary:active {
+    translate: 0 3px;
+}
+
+.browser-input .unity-base-text-field__input:focus,
+.direct-connect-input .unity-base-text-field__input:focus {
+    border-color: rgb(255, 204, 34);
+    border-width: 2px;
+}
+
+.browser-refresh:disabled,
+.browser-actions-section .btn-secondary:disabled,
+.direct-connect-actions > .btn-secondary:disabled {
+    background-color: rgb(37, 36, 34);
+    color: rgb(183, 180, 173);
+    border-color: rgb(123, 120, 114);
+    translate: 0 0;
+}
+
+.browser-tool .btn-hot:disabled:active,
+.browser-actions-section .btn-hot:disabled:active,
+.server-join:disabled:active,
+.direct-connect-actions > .btn-hot:disabled:active {
+    translate: 0 0;
+}
+
+
+.page-modal-layer {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
 }
 
 .direct-connect-modal {
@@ -415,7 +541,7 @@
     bottom: 0;
     align-items: center;
     justify-content: center;
-    background-color: rgba(13, 13, 20, 0.84);
+    background-color: rgba(22, 21, 19, 0.84);
 }
 
 .direct-connect-card {
@@ -424,31 +550,33 @@
     padding: 28px;
     background-color: rgb(240, 238, 232);
     border-width: 3px;
-    border-color: rgb(13, 13, 20);
+    border-color: rgb(22, 21, 19);
     border-bottom-width: 9px;
-    border-bottom-color: rgb(224, 92, 42);
+    border-bottom-color: rgb(255, 204, 34);
 }
 
 .direct-connect-title {
-    color: rgb(25, 19, 27);
+    color: rgb(22, 21, 19);
     font-size: 38px;
+    -unity-font-definition: url("../Fonts/ArchivoBlack.asset");
+    -unity-font-style: normal;
 }
 
 .direct-connect-copy {
     margin-top: 10px;
-    color: rgb(72, 65, 76);
+    color: rgb(37, 36, 34);
     font-size: 19px;
     white-space: normal;
 }
 
 .direct-connect-card .field-label {
-    color: rgb(72, 65, 76);
+    color: rgb(37, 36, 34);
 }
 
 .direct-connect-status {
     min-height: 25px;
     margin-top: 9px;
-    color: rgb(142, 85, 0);
+    color: rgb(123, 85, 0);
     font-size: 17px;
     white-space: normal;
 }
@@ -458,7 +586,7 @@
 }
 
 .direct-connect-status.success {
-    color: rgb(35, 119, 69);
+    color: rgb(28, 104, 59);
 }
 
 .direct-connect-actions {
@@ -477,7 +605,7 @@
 }
 
 .lobby-panel__capacity {
-    color: rgb(183, 174, 184);
+    color: rgb(240, 238, 232);
     font-size: 14px;
 }
 
@@ -500,21 +628,21 @@
 .slot-index,
 .player-id {
     width: 52px;
-    color: rgb(255, 200, 33);
+    color: rgb(255, 204, 34);
     font-size: 18px;
     -unity-font-style: bold;
 }
 
 .slot-name--empty {
-    color: rgb(183, 174, 184);
+    color: rgb(196, 189, 179);
     -unity-font-style: normal;
 }
 
 .host-badge {
     margin-left: 10px;
     padding: 5px 8px;
-    background-color: rgb(255, 200, 33);
-    color: rgb(25, 19, 27);
+    background-color: rgb(255, 204, 34);
+    color: rgb(22, 21, 19);
     font-size: 13px;
     letter-spacing: 1px;
     -unity-font-style: bold;
@@ -543,9 +671,9 @@
     align-items: flex-end;
 }
 
-.char-select-meta {
+.frontend-shell .char-select-meta {
     margin-top: 13px;
-    color: rgb(183, 174, 184);
+    color: var(--shell-page-muted);
     font-size: 14px;
 }
 
@@ -575,20 +703,19 @@
     margin: 0 7px;
     padding: 0;
     background-color: rgb(36, 32, 43);
-    border-width: 2px;
-    border-color: rgb(66, 59, 73);
-    border-bottom-width: 6px;
-    overflow: hidden;
+    border-width: 3px;
+    border-color: rgb(240, 238, 232);
+    border-bottom-width: 7px;
+    border-bottom-color: rgb(13, 13, 20);
     transition-duration: 0.12s;
-    transition-property: translate, border-color, background-color, scale;
+    transition-property: translate, border-color, background-color;
 }
 
 .char-card--selected {
     translate: 0 -7px;
-    scale: 1.02;
-    background-color: rgb(48, 42, 52);
-    border-width: 3px;
-    border-bottom-width: 7px;
+    background-color: rgb(13, 13, 20);
+    border-width: 5px;
+    border-bottom-width: 8px;
     border-color: rgb(255, 204, 34);
 }
 
@@ -598,12 +725,13 @@
 }
 .char-card:focus {
     translate: 0 -5px;
-    border-color: rgb(255, 204, 34);
+    border-width: 5px;
+    border-color: rgb(255, 255, 255);
 }
 .char-card--selected:hover,
 .char-card--selected:focus {
     translate: 0 -7px;
-    border-color: rgb(255, 218, 74);
+    border-color: rgb(255, 255, 255);
     border-bottom-color: rgb(255, 204, 34);
 }
 
@@ -629,25 +757,38 @@
     left: 0;
     right: 0;
     bottom: 0;
-    min-height: 50px;
+    min-height: 56px;
     padding-left: 14px;
-    padding-right: 8px;
-    color: rgb(214, 207, 218);
-    background-color: rgba(29, 26, 35, 0.97);
-    font-size: 19px;
-    letter-spacing: 1px;
-    -unity-font-style: bold;
+    padding-right: 48px;
+    border-top-width: 3px;
+    border-top-color: rgb(13, 13, 20);
+    color: rgb(23, 19, 27);
+    background-color: rgb(240, 238, 232);
+    font-size: 25px;
+    letter-spacing: 0;
+    -unity-font-definition: url("../Fonts/ArchivoBlack.asset");
+    -unity-font-style: normal;
     -unity-text-align: middle-left;
 }
 .char-card--selected .char-card-name {
-    color: rgb(255, 218, 74);
-    background-color: rgba(41, 36, 46, 0.98);
-    font-size: 20px;
+    color: rgb(23, 19, 27);
+    background-color: rgb(255, 204, 34);
 }
 .char-card:hover .char-card-name,
-.char-card:focus .char-card-name { color: rgb(241, 235, 221); }
-.char-card--selected:hover .char-card-name,
-.char-card--selected:focus .char-card-name { color: rgb(255, 218, 74); }
+.char-card:focus .char-card-name { color: rgb(23, 19, 27); }
+
+.char-card-check {
+    position: absolute;
+    right: 14px;
+    bottom: 16px;
+    width: 24px;
+    height: 24px;
+    background-image: url("SelectionCheck.png");
+    -unity-background-scale-mode: scale-to-fit;
+    -unity-background-image-tint-color: rgb(23, 19, 27);
+    display: none;
+}
+.char-card--selected .char-card-check { display: flex; }
 
 .char-markers {
     position: absolute;
@@ -676,6 +817,15 @@
     background-color: rgb(76, 221, 136);
 }
 
+.char-marker--local {
+    border-width: 2px;
+    border-color: rgb(240, 238, 232);
+    background-color: rgb(23, 19, 27);
+    color: rgb(240, 238, 232);
+    -unity-font-definition: url("../Fonts/SpaceMono.asset");
+    -unity-font-style: normal;
+}
+
 .selection-copy {
     min-height: 53px;
     align-items: center;
@@ -690,7 +840,7 @@
 
 .char-role {
     margin-top: 3px;
-    color: rgb(255, 200, 33);
+    color: rgb(196, 189, 197);
     font-size: 18px;
     white-space: normal;
 }
@@ -823,18 +973,19 @@
     min-width: 440px;
     margin-left: 10px;
     padding: 16px 18px;
-    background-color: rgb(36, 32, 43);
-    border-width: 2px;
-    border-color: rgb(66, 59, 73);
-    border-bottom-width: 6px;
+    background-color: rgb(240, 238, 232);
+    border-width: 3px;
+    border-color: rgb(13, 13, 20);
+    border-bottom-width: 7px;
+    border-right-width: 6px;
     align-items: stretch;
     display: none;
 }
 
 .selection-target {
-    color: rgb(241, 235, 221);
-    font-size: 17px;
-    letter-spacing: 1px;
+    color: rgb(23, 19, 27);
+    font-size: 21px;
+    letter-spacing: 0;
     -unity-font-style: bold;
 }
 
@@ -844,32 +995,39 @@
 }
 
 .selection-target-button {
-    width: 50%;
+    width: 0;
+    min-width: 0;
+    flex-grow: 1;
     min-height: 42px;
     padding-left: 5px;
     padding-right: 5px;
-    background-color: rgb(36, 32, 43);
-    color: rgb(241, 235, 221);
+    background-color: rgb(240, 238, 232);
+    color: rgb(23, 19, 27);
     border-width: 2px;
-    border-color: rgb(66, 59, 73);
-    border-bottom-width: 4px;
+    border-color: rgb(23, 19, 27);
+    border-bottom-width: 6px;
+    border-right-width: 4px;
     font-size: 15px;
 }
 #btn-edit-player { margin-right: 6px; }
 .selection-target-button:hover,
 .selection-target-button:focus {
-    background-color: rgb(55, 49, 62);
-    border-color: rgb(255, 204, 34);
+    background-color: rgb(255, 255, 255);
+    border-color: rgb(23, 19, 27);
+    translate: 0 -2px;
 }
 .selection-target-button.active {
     background-color: rgb(255, 204, 34);
-    border-color: rgb(255, 204, 34);
-    color: rgb(21, 18, 25);
+    border-color: rgb(23, 19, 27);
+    color: rgb(23, 19, 27);
 }
 .selection-target-button.active:hover,
 .selection-target-button.active:focus {
     background-color: rgb(255, 218, 74);
-    border-color: rgb(241, 235, 221);
+    border-color: rgb(23, 19, 27);
+}
+.selection-target-button:active {
+    translate: 0 3px;
 }
 
 .solo-difficulty-buttons {
@@ -878,33 +1036,35 @@
     flex-direction: row;
 }
 .solo-difficulty-button {
-    width: 33%;
+    width: 0;
+    min-width: 0;
+    flex-grow: 1;
     min-height: 42px;
     margin-right: 5px;
     padding-left: 3px;
     padding-right: 3px;
-    background-color: rgb(36, 32, 43);
-    border-color: rgb(66, 59, 73);
-    color: rgb(241, 235, 221);
+    background-color: rgb(240, 238, 232);
+    border-color: rgb(23, 19, 27);
+    color: rgb(23, 19, 27);
     font-size: 14px;
     letter-spacing: 0;
 }
 #btn-cpu-difficulty-hard { margin-right: 0; }
 .solo-difficulty-button:hover,
 .solo-difficulty-button:focus {
-    background-color: rgb(55, 49, 62);
-    border-color: rgb(255, 204, 34);
-    color: rgb(241, 235, 221);
+    background-color: rgb(255, 255, 255);
+    border-color: rgb(23, 19, 27);
+    color: rgb(23, 19, 27);
 }
 .solo-difficulty-button.active {
     background-color: rgb(255, 204, 34);
-    border-color: rgb(255, 204, 34);
-    color: rgb(21, 18, 25);
+    border-color: rgb(23, 19, 27);
+    color: rgb(23, 19, 27);
 }
 .solo-difficulty-button.active:hover,
 .solo-difficulty-button.active:focus {
     background-color: rgb(255, 218, 74);
-    border-color: rgb(241, 235, 221);
+    border-color: rgb(23, 19, 27);
 }
 
 .pvp-action-area {
@@ -914,9 +1074,9 @@
     align-items: stretch;
 }
 
-.pvp-status {
+.frontend-shell .pvp-status {
     margin-bottom: 8px;
-    color: rgb(196, 189, 197);
+    color: var(--shell-page-ink);
     font-size: 16px;
     white-space: normal;
 }
@@ -946,106 +1106,6 @@
     min-height: 57px;
 }
 
-.stage-host-status {
-    margin-top: 14px;
-    padding: 8px 11px;
-    background-color: rgb(13, 13, 20);
-    color: rgb(255, 200, 33);
-    font-size: 14px;
-}
-
-.stage-grid {
-    flex-direction: row;
-    flex-wrap: wrap;
-    align-content: flex-start;
-    justify-content: center;
-    padding: 4px;
-}
-
-.stage-card {
-    width: 22%;
-    min-width: 0;
-    height: 180px;
-    margin: 6px;
-    flex-shrink: 0;
-    background-color: rgb(35, 30, 40);
-    border-width: 2px;
-    border-color: rgb(83, 77, 91);
-    border-bottom-width: 5px;
-    border-bottom-color: rgb(224, 92, 42);
-    flex-direction: column;
-    align-items: stretch;
-    justify-content: flex-end;
-    overflow: hidden;
-    transition-duration: 0.12s;
-    transition-property: translate, border-color, background-color;
-}
-
-.stage-card:hover,
-.stage-card:focus {
-    translate: 0 -4px;
-    border-color: rgb(240, 238, 232);
-    background-color: rgb(52, 45, 55);
-}
-
-.stage-card--selected {
-    translate: 0 -6px;
-    border-color: rgb(255, 200, 33);
-    border-width: 3px;
-    background-color: rgb(52, 45, 55);
-}
-
-.stage-swatch {
-    position: absolute;
-    left: 0;
-    right: 0;
-    top: 0;
-    bottom: 0;
-    opacity: 0.72;
-    -unity-background-scale-mode: scale-and-crop;
-}
-
-.stage-card .stage-name {
-    min-height: 43px;
-    padding: 10px 10px 7px;
-    background-color: rgba(13, 13, 20, 0.88);
-    color: rgb(240, 238, 232);
-    font-size: 18px;
-    letter-spacing: 1px;
-    -unity-font-style: bold;
-    -unity-text-align: middle-center;
-}
-
-.stage-player-cards {
-    flex-grow: 1;
-    min-width: 0;
-    flex-direction: row;
-    align-items: stretch;
-}
-
-.stage-player-cards .player-card {
-    width: 176px;
-    min-height: 174px;
-}
-
-.stage-selected-label,
-.stage-waiting {
-    margin-bottom: 9px;
-    color: rgb(240, 238, 232);
-    font-size: 17px;
-    letter-spacing: 1px;
-    white-space: normal;
-}
-
-.stage-waiting {
-    color: rgb(255, 200, 33);
-}
-
-.stage-confirm {
-    width: 100%;
-    min-height: 52px;
-    font-size: 17px;
-}
 
 
 .results-background {
@@ -1055,109 +1115,47 @@
     top: 0;
     bottom: 0;
     overflow: hidden;
-    background-color: rgb(20, 17, 24);
-}
-
-.results-grid {
-    position: absolute;
-    left: 36%;
-    right: -18%;
-    top: -38%;
-    bottom: -46%;
-    rotate: -17deg;
-    opacity: 0.13;
-    border-width: 2px;
-    border-color: rgba(240, 238, 232, 0.16);
-    background-color: rgba(240, 238, 232, 0.04);
-}
-
-.results-burst {
-    position: absolute;
-    border-width: 4px;
-    border-color: rgb(13, 13, 20);
-    rotate: -8deg;
-}
-
-.results-burst--orange {
-    width: 520px;
-    height: 320px;
-    right: -30px;
-    top: 110px;
-    background-color: rgb(224, 92, 42);
-    opacity: 0.8;
-}
-
-.results-burst--yellow {
-    width: 380px;
-    height: 180px;
-    right: 230px;
-    bottom: -40px;
-    rotate: 12deg;
-    background-color: rgb(255, 200, 33);
-    opacity: 0.78;
-}
-
-.results-background-note {
-    position: absolute;
-    color: rgb(255, 200, 33);
-    font-size: 11px;
-    letter-spacing: 2px;
-    -unity-font-style: bold;
-}
-
-.results-background-note--left {
-    left: 38%;
-    bottom: 25%;
-    rotate: -7deg;
-}
-
-.results-background-note--right {
-    right: 8%;
-    top: 31%;
-    color: rgb(224, 92, 42);
-    rotate: 7deg;
+    background-color: var(--shell-canvas);
 }
 
 .results-header-copy {
     flex-direction: column;
     align-items: flex-start;
-    rotate: -2deg;
-}
-
-.results-eyebrow {
-    padding: 7px 12px;
-    background-color: rgb(240, 238, 232);
-    color: rgb(20, 17, 24);
-    font-size: 11px;
-    letter-spacing: 2px;
-    -unity-font-style: bold;
 }
 
 .results-headline {
-    margin-top: 8px;
     color: rgb(240, 238, 232);
     font-size: 48px;
-    line-height: 0.82;
-    letter-spacing: -2px;
+    letter-spacing: -1px;
+    -unity-font-definition: url("../Fonts/ArchivoBlack.asset");
+}
+
+.frontend-shell .results-stage {
+    margin-top: 10px;
+    color: var(--shell-page-ink);
+    font-size: 12px;
+    letter-spacing: 1px;
     -unity-font-style: bold;
 }
 
-.results-stage {
-    margin-top: 10px;
-    color: rgb(255, 200, 33);
+.frontend-shell .results-metadata {
+    margin-top: 8px;
+    padding: 8px 12px;
+    background-color: transparent;
+    color: var(--shell-page-muted);
     font-size: 11px;
-    letter-spacing: 2px;
-    -unity-font-style: bold;
+    letter-spacing: 1px;
+    -unity-font-definition: url("../Fonts/SpaceMono.asset");
 }
 
 .results-metadata {
     margin-top: 8px;
     padding: 8px 12px;
-    background-color: rgb(25, 19, 27);
-    color: rgb(240, 238, 232);
+    background-color: var(--shell-surface);
+    color: var(--shell-paper);
     font-size: 11px;
-    letter-spacing: 2px;
-    -unity-font-style: bold;
+    letter-spacing: 1px;
+    -unity-font-definition: url("../Fonts/SpaceMono.asset");
 }
 
 .results-content {
@@ -1165,7 +1163,6 @@
     min-width: 0;
     position: relative;
     flex-direction: row;
-    z-index: 2;
 }
 
 .results-winner {
@@ -1180,11 +1177,11 @@
     flex-direction: row;
     align-items: stretch;
     overflow: hidden;
-    background-color: rgb(240, 238, 232);
+    background-color: var(--shell-paper);
     border-width: 3px;
-    border-color: rgb(13, 13, 20);
-    border-left-width: 12px;
-    border-bottom-width: 9px;
+    border-color: var(--shell-canvas);
+    border-left-width: 8px;
+    border-bottom-width: 8px;
     translate: -36px 0;
     opacity: 0;
     transition-duration: 0.28s;
@@ -1198,86 +1195,86 @@
 
 .results-winner-placement {
     position: absolute;
-    left: 22px;
-    top: 12px;
-    z-index: 2;
-    color: rgb(224, 92, 42);
-    font-size: 86px;
-    line-height: 0.8;
-    letter-spacing: -5px;
-    -unity-font-style: bold;
+    left: 24px;
+    top: 16px;
+    color: var(--shell-surface);
+    font-size: 20px;
+    letter-spacing: 1px;
+    -unity-font-definition: url("../Fonts/ArchivoBlack.asset");
 }
 
 .results-winner-label {
     position: absolute;
-    left: 28px;
-    top: 100px;
-    z-index: 2;
-    color: rgb(20, 17, 24);
-    font-size: 12px;
-    letter-spacing: 3px;
-    -unity-font-style: bold;
+    left: 24px;
+    top: 48px;
+    color: var(--shell-canvas);
+    font-size: 28px;
+    letter-spacing: 1px;
+    -unity-font-definition: url("../Fonts/ArchivoBlack.asset");
 }
 
 .results-winner-portrait {
-    width: 48%;
+    width: 35%;
     height: 100%;
     margin-left: auto;
     margin-right: 0;
-    background-color: rgb(44, 40, 49);
+    background-color: var(--shell-surface);
     -unity-background-scale-mode: scale-and-crop;
 }
 
 .results-winner-copy {
     position: absolute;
-    left: 28px;
-    right: 48%;
-    bottom: 22px;
+    left: 24px;
+    right: 36%;
+    bottom: 20px;
     align-items: flex-start;
 }
 
 .results-winner-player {
-    color: rgb(20, 17, 24);
-    font-size: 26px;
-    letter-spacing: 2px;
-    -unity-font-style: bold;
+    color: var(--shell-canvas);
+    font-size: 40px;
+    letter-spacing: 0;
+    -unity-font-definition: url("../Fonts/ArchivoBlack.asset");
     white-space: nowrap;
     overflow: hidden;
+    max-width: 100%;
+    min-width: 0;
+    text-overflow: ellipsis;
 }
 
-.results-winner-fighter {
+.frontend-shell .results-winner-fighter {
     margin-top: 4px;
-    color: rgb(224, 92, 42);
-    font-size: 13px;
-    letter-spacing: 3px;
+    color: var(--shell-canvas);
+    font-size: 12px;
+    letter-spacing: 1px;
     -unity-font-style: bold;
 }
 
 .results-winner-stats {
     flex-direction: row;
-    margin-top: 22px;
+    margin-top: 16px;
 }
 
 .results-stat {
     min-width: 64px;
     margin-right: 16px;
     padding-top: 6px;
-    border-top-width: 3px;
-    border-top-color: rgb(20, 17, 24);
+    border-top-width: 2px;
+    border-top-color: var(--shell-rule);
 }
 
 .results-stat-value {
-    color: rgb(20, 17, 24);
-    font-size: 24px;
-    -unity-font-style: bold;
+    color: var(--shell-canvas);
+    font-size: 22px;
+    -unity-font-definition: url("../Fonts/ArchivoBlack.asset");
 }
 
 .results-stat-label {
     margin-top: 2px;
-    color: rgb(20, 17, 24);
-    font-size: 9px;
+    color: var(--shell-surface);
+    font-size: 11px;
     letter-spacing: 1px;
-    -unity-font-style: bold;
+    -unity-font-definition: url("../Fonts/SpaceMono.asset");
 }
 
 .results-standings {
@@ -1289,12 +1286,12 @@
 }
 
 .results-standings-label {
-    height: 26px;
-    padding: 7px 10px;
-    background-color: rgb(25, 19, 27);
-    color: rgb(255, 200, 33);
-    font-size: 10px;
-    letter-spacing: 2px;
+    height: 30px;
+    padding: 8px 10px;
+    background-color: var(--shell-surface);
+    color: var(--shell-paper);
+    font-size: 11px;
+    letter-spacing: 1px;
     -unity-font-style: bold;
 }
 
@@ -1304,10 +1301,10 @@
     padding: 8px 12px;
     flex-direction: row;
     align-items: center;
-    background-color: rgb(240, 238, 232);
+    background-color: var(--shell-paper);
     border-width: 2px;
-    border-color: rgb(13, 13, 20);
-    border-left-width: 8px;
+    border-color: var(--shell-canvas);
+    border-left-width: 6px;
     border-bottom-width: 5px;
     translate: 30px 0;
     opacity: 0;
@@ -1321,17 +1318,16 @@
 }
 
 .results-row-placement {
-    width: 42px;
-    color: rgb(224, 92, 42);
-    font-size: 28px;
-    letter-spacing: -1px;
-    -unity-font-style: bold;
+    width: 38px;
+    color: var(--shell-canvas);
+    font-size: 20px;
+    -unity-font-definition: url("../Fonts/ArchivoBlack.asset");
 }
 
 .results-row-portrait {
     width: 54px;
     height: 62px;
-    background-color: rgb(44, 40, 49);
+    background-color: var(--shell-surface);
     -unity-background-scale-mode: scale-and-crop;
 }
 
@@ -1343,19 +1339,21 @@
 }
 
 .results-row-player {
-    color: rgb(20, 17, 24);
+    color: var(--shell-canvas);
     font-size: 14px;
-    letter-spacing: 1px;
-    -unity-font-style: bold;
+    letter-spacing: 0;
+    -unity-font-definition: url("../Fonts/ArchivoBlack.asset");
     white-space: nowrap;
     overflow: hidden;
+    max-width: 100%;
+    text-overflow: ellipsis;
 }
 
 .results-row-fighter {
     margin-top: 4px;
-    color: rgb(224, 92, 42);
+    color: var(--shell-surface);
     font-size: 10px;
-    letter-spacing: 2px;
+    letter-spacing: 1px;
     -unity-font-style: bold;
 }
 
@@ -1368,15 +1366,14 @@
     min-width: 42px;
     margin-right: 8px;
     padding-top: 4px;
-    border-top-width: 2px;
 }
 
 .results-row-stats .results-stat-value {
-    font-size: 18px;
+    font-size: 17px;
 }
 
 .results-row-stats .results-stat-label {
-    font-size: 8px;
+    font-size: 11px;
 }
 
 .results-actions {
@@ -1395,43 +1392,44 @@
     translate: 0 0;
 }
 
-.results-actions-eyebrow,
-.results-actions-future {
-    color: rgb(240, 238, 232);
-    font-size: 10px;
-    letter-spacing: 2px;
-    -unity-font-style: bold;
-}
-
-.results-actions-eyebrow {
-    color: rgb(255, 200, 33);
-}
-
-.results-actions-future {
-    margin-top: 8px;
-    margin-bottom: 12px;
-    color: rgba(240, 238, 232, 0.56);
-}
-
 .results-return {
     width: 260px;
     height: 52px;
+    padding: 0 16px;
     border-radius: 0;
     border-width: 3px;
-    border-color: rgb(13, 13, 20);
-    border-bottom-width: 7px;
-    background-color: rgb(255, 200, 33);
-    color: rgb(20, 17, 24);
-    font-size: 13px;
-    letter-spacing: 2px;
-    -unity-font-style: bold;
+    border-color: var(--shell-canvas);
+    border-bottom-width: 6px;
+    border-right-width: 5px;
+    background-color: var(--shell-action);
+    color: var(--shell-canvas);
+    font-size: 12px;
+    letter-spacing: 1px;
+    -unity-font-definition: url("../Fonts/ArchivoBlack.asset");
     -unity-text-align: middle-center;
 }
 
 .results-return:hover,
 .results-return:focus {
-    background-color: rgb(255, 217, 92);
-    translate: 0 -2px;
+    background-color: var(--shell-paper);
+    border-color: var(--shell-canvas);
+}
+
+.results-return:focus {
+    border-color: var(--shell-action);
+}
+
+.results-return:active {
+    translate: 0 3px;
+    border-bottom-width: 3px;
+    border-right-width: 3px;
+}
+
+.results-return:disabled {
+    background-color: var(--shell-surface);
+    color: var(--shell-paper);
+    border-color: var(--shell-rule);
+    opacity: 0.72;
 }
 
 .results-count-2 .results-winner {
@@ -1452,3 +1450,14 @@
     width: 46px;
     height: 52px;
 }
+
+/* Page color roles do not raise the specificity of geometry rules above. */
+.frontend-shell .flow-title,
+.frontend-shell .char-name,
+.frontend-shell .char-role,
+.frontend-shell .results-headline {
+    color: var(--shell-page-ink);
+}
+.frontend-shell .flow-subtitle { color: var(--shell-page-muted); }
+
+.frontend-shell .browser-panel .browser-hint { color: var(--shell-paper); }

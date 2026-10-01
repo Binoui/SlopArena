@@ -28,14 +28,14 @@ public static class InternalCapabilityRegistry
             case "slop.internal.fightguy.dragon-beam.v1" when parameters is CookedDragonBeamCapabilityParameters beam:
                 capability = new FightGuyDragonBeam(beam);
                 return true;
-            case "slop.internal.kistu.dash-slash.v1" when parameters is CookedKistuDashSlashCapabilityParameters dash:
-                capability = new KistuDashSlash(dash);
+            case "slop.internal.wibou.dash-slash.v1" when parameters is CookedWibouDashSlashCapabilityParameters dash:
+                capability = new WibouDashSlash(dash);
                 return true;
-            case "slop.internal.kistu.rising-slash.v1" when parameters is CookedKistuRisingSlashCapabilityParameters rising:
-                capability = new KistuRisingSlash(rising);
+            case "slop.internal.wibou.rising-slash.v1" when parameters is CookedWibouRisingSlashCapabilityParameters rising:
+                capability = new WibouRisingSlash(rising);
                 return true;
-            case "slop.internal.kistu.blade-flurry.v1" when parameters is CookedKistuBladeFlurryCapabilityParameters flurry:
-                capability = new KistuUltFlurry(flurry);
+            case "slop.internal.wibou.blade-flurry.v1" when parameters is CookedWibouBladeFlurryCapabilityParameters flurry:
+                capability = new WibouUltFlurry(flurry);
                 return true;
             case "slop.internal.bonk.targeted-jump-slam.v1" when parameters is CookedBonkTargetedJumpSlamCapabilityParameters bonk:
                 capability = new BonkTargetedJumpSlam(bonk);

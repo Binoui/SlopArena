@@ -19,3 +19,8 @@ MonoBehaviour:
     PositionOffset: {x: -0.24, y: 0.11, z: 0.1}
     RotationOffset: {x: -90, y: 188, z: -45}
     HideAfterTicks: 0
+    TrailStylePrefab: {fileID: 8706298800739245467, guid: 184c205d2320abc4c938b11f1b75f17c, type: 3}
+    HitboxMotionTime: 0.12
+    TrailBladeWidth: 1
+    TrailHiltAnchor: bladeHilt
+    TrailTipAnchor: bladeEnd

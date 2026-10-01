@@ -15,7 +15,7 @@ namespace SlopArena.SpectateView;
 /// SelfPlayMatch — deterministic bots, seeded RNG) and renders a top-down XZ view
 /// in the terminal with ANSI colors. No Unity, no network.
 ///
-/// Usage: dotnet run --project tools/SpectateView -- [--char fightguy|kistu|manki|bonk|nilus]
+/// Usage: dotnet run --project tools/SpectateView -- [--char fightguy|wibou|manki|bonk|nilus]
 ///        [--seed N] [--speed N] [--stocks N] [--max-ticks N]
 ///   --speed N   ticks per rendered frame (1 = realtime 60fps, 4 = 4x at 15fps). 0 = headless
 ///               (no render, just the final result — useful for determinism checks).
@@ -43,7 +43,7 @@ internal static class Program
         CharacterClass cls = charName.ToLowerInvariant() switch
         {
             "fightguy" or "fg" => CharacterClass.FightGuy,
-            "kistu" => CharacterClass.Kistu,
+            "wibou" => CharacterClass.Wibou,
             "manki" => CharacterClass.Manki,
             "nilus" => CharacterClass.Nilus,
             "bonk" => CharacterClass.Bonk,

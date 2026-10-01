@@ -2,27 +2,26 @@
     width: 300px;
     padding: 14px 16px 16px 16px;
     flex-direction: column;
-    background-color: rgba(13, 13, 20, 0.94);
+    background-color: rgba(27, 26, 24, 0.98);
+    border-width: 2px;
+    border-color: #161513;
     border-bottom-width: 5px;
-    border-bottom-color: #e05c2a;
-    border-top-left-radius: 6px;
-    border-bottom-left-radius: 6px;
-    border-top-right-radius: 6px;
-    border-bottom-right-radius: 6px;
+    border-bottom-color: #7b7872;
 }
 
 .ts-title {
     font-size: 20px;
-    letter-spacing: 1px;
-    -unity-font-style: bold;
+    letter-spacing: 0;
+    -unity-font-definition: url("../../Fonts/ArchivoBlack.asset");
+    -unity-font-style: normal;
     -unity-text-align: middle-center;
-    color: #fffcee;
+    color: #f0eee8;
     margin-bottom: 12px;
 }
 
 .ts-toggle {
     font-size: 14px;
-    color: #fffcee;
+    color: #f0eee8;
     margin-bottom: 12px;
 }
 
@@ -30,7 +29,7 @@
     font-size: 13px;
     letter-spacing: 1px;
     -unity-font-style: bold;
-    color: rgba(240, 238, 232, 0.86);
+    color: #f0eee8;
     margin-bottom: 4px;
 }
 
@@ -63,24 +62,56 @@
     margin-right: 6px;
     margin-bottom: 6px;
     font-size: 12px;
-    letter-spacing: 1px;
-    -unity-font-style: bold;
-    color: #fffcee;
-    background-color: #24202b;
+    letter-spacing: 0;
+    -unity-font-definition: url("../../Fonts/ArchivoBlack.asset");
+    -unity-font-style: normal;
+    color: #1b1a18;
+    background-color: #f0eee8;
+    border-width: 1px;
+    border-color: #161513;
     border-bottom-width: 3px;
-    border-bottom-color: #625c6b;
     -unity-text-align: middle-center;
 }
 
-.ts-btn:hover {
-    background-color: #35303f;
-}
-
-.ts-btn:disabled {
-    opacity: 0.35;
+.ts-btn:hover,
+.ts-btn:focus {
+    background-color: #1b1a18;
+    color: #f0eee8;
+    border-color: #ffcc22;
 }
 
 .ts-mode-btn.active {
-    background-color: #3b6fe0;
-    border-bottom-color: #2c4fb0;
+    background-color: #ffcc22;
+    color: #1b1a18;
+}
+
+.ts-mode-btn.active:focus {
+    border-color: #f0eee8;
+}
+
+.ts-btn:active { translate: 0 3px; }
+
+.ts-btn:disabled {
+    opacity: 1;
+    background-color: #252422;
+    color: #b7b4ad;
+    border-color: #7b7872;
+    translate: 0 0;
+}
+
+.ts-toggle .unity-toggle__input {
+    background-color: #161513;
+    border-color: #7b7872;
+}
+
+.ts-toggle .unity-toggle__checkmark {
+    background-color: #161513;
+    border-color: #7b7872;
+    -unity-background-image-tint-color: #1b1a18;
+}
+
+.ts-toggle:focus .unity-toggle__checkmark { border-color: #f0eee8; }
+.ts-toggle:checked .unity-toggle__checkmark {
+    background-color: #ffcc22;
+    border-color: #ffcc22;
 }

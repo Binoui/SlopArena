@@ -26,7 +26,7 @@ internal static class Program
     {
         CharacterClass.Manki,
         CharacterClass.FightGuy,
-        CharacterClass.Kistu,
+        CharacterClass.Wibou,
         CharacterClass.Bonk,
     };
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -1282,7 +1282,7 @@ internal static class Program
         {
             "manki" => CharacterClass.Manki,
             "fightguy" => CharacterClass.FightGuy,
-            "kistu" => CharacterClass.Kistu,
+            "wibou" => CharacterClass.Wibou,
             "bonk" => CharacterClass.Bonk,
             _ => throw new InvalidDataException($"unknown admitted package '{packageId}'"),
         };

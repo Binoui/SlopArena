@@ -29,9 +29,16 @@ namespace SlopArena.Client.Combat
         private SpellResolver _resolver;
         private ProjectileVFXConfig _config;
 
-        // Active projectile visuals keyed by stable hash from (ownerId + spawn origin)
+        // Local Training visuals follow the Shared resolver; PvP visuals follow server snapshots.
         private readonly Dictionary<int, GameObject> _activeVisuals = new();
         private readonly Dictionary<int, CharacterClass> _activeProjectileClasses = new();
+        private readonly HashSet<int> _matchedLocal = new();
+        private readonly List<int> _goneLocal = new();
+        private readonly Dictionary<(ulong owner, ulong activation, int operation), GameObject> _remoteVisuals = new();
+        private readonly HashSet<(ulong owner, ulong activation, int operation)> _matchedRemote = new();
+        private readonly List<(ulong owner, ulong activation, int operation)> _goneRemote = new();
+        private uint _lastRemoteTick;
+        private bool _hasRemoteTick;
 
         public void SetSimulation(ServerSimulation sim)
         {
@@ -42,13 +49,48 @@ namespace SlopArena.Client.Combat
                 _resolver.OnHitboxRemoved += OnHitboxRemoved;
         }
 
+        public void SetRemoteSnapshots()
+        {
+            _config = Resources.Load<ProjectileVFXConfig>("VFXConfigs/ProjectileVisuals");
+        }
+
+        /// <summary>Use only server projectile positions in PvP; missing entries despawn.</summary>
+        public void OnSnapshot(ProjectileVisualPacket snapshot)
+        {
+            if (_hasRemoteTick && snapshot.Tick <= _lastRemoteTick) return;
+            _lastRemoteTick = snapshot.Tick;
+            _hasRemoteTick = true;
+            _matchedRemote.Clear();
+            foreach (var projectile in snapshot.Projectiles)
+            {
+                var key = (projectile.OwnerId, projectile.ActivationId, projectile.OperationIndex);
+                _matchedRemote.Add(key);
+                if (!_remoteVisuals.TryGetValue(key, out var visual))
+                {
+                    visual = CreateProjectileVisual(projectile.Character, projectile.AttackSlot, projectile.Airborne);
+                    _remoteVisuals.Add(key, visual);
+                }
+                visual.transform.position = new Vector3(projectile.X, projectile.Y, projectile.Z);
+                OrientProjectile(visual.transform, projectile.Character, projectile.AttackSlot,
+                    projectile.VX, projectile.VY, projectile.VZ);
+            }
+            _goneRemote.Clear();
+            foreach (var visual in _remoteVisuals)
+                if (!_matchedRemote.Contains(visual.Key))
+                {
+                    DestroyVisual(visual.Value);
+                    _goneRemote.Add(visual.Key);
+                }
+            foreach (var key in _goneRemote) _remoteVisuals.Remove(key);
+        }
+
         /// <summary>Call after _sim.Tick() each FixedUpdate.</summary>
         public void OnTick()
         {
             if (_resolver == null) return;
 
             var hitboxes = _resolver.GetActiveHitboxes();
-            var matched = new HashSet<int>();
+            _matchedLocal.Clear();
             for (int i = 0; i < hitboxes.Count; i++)
             {
                 var hb = hitboxes[i];
@@ -58,26 +100,26 @@ namespace SlopArena.Client.Combat
                     continue;
 
                 int projectileKey = ComputeHitboxKey(hb);
-                matched.Add(projectileKey);
+                _matchedLocal.Add(projectileKey);
                 if (!_activeVisuals.TryGetValue(projectileKey, out var vis))
                 {
-                    vis = CreateProjectileVisual(hb);
+                    vis = CreateProjectileVisual(character, hb.AttackSlot, hb.ActivationAirborne);
                     _activeVisuals[projectileKey] = vis;
                     _activeProjectileClasses[projectileKey] = character;
                 }
                 vis.transform.position = new Vector3(hb.X, hb.Y, hb.Z);
+                OrientProjectile(vis.transform, character, hb.AttackSlot, hb.VX, hb.VY, hb.VZ);
             }
 
-            List<int> gone = null;
+            _goneLocal.Clear();
             foreach (var kv in _activeVisuals)
             {
-                if (matched.Contains(kv.Key)) continue;
-                (gone ??= new List<int>()).Add(kv.Key);
-                Destroy(kv.Value);
+                if (_matchedLocal.Contains(kv.Key)) continue;
+                _goneLocal.Add(kv.Key);
+                DestroyVisual(kv.Value);
                 _activeProjectileClasses.Remove(kv.Key);
             }
-            if (gone != null)
-                foreach (var id in gone) _activeVisuals.Remove(id);
+            foreach (var id in _goneLocal) _activeVisuals.Remove(id);
         }
 
 
@@ -95,19 +137,20 @@ namespace SlopArena.Client.Combat
             // Manual hash combine (System.HashCode unavailable in Unity profile)
             int hash = 17;
             hash = hash * 31 + (int)hb.OwnerId;
+            hash = hash * 31 + (int)hb.ActivationId;
+            hash = hash * 31 + (int)(hb.ActivationId >> 32);
+            hash = hash * 31 + hb.VisualOperationIndex;
             hash = hash * 31 + Mathf.RoundToInt(ox * 10f);
             hash = hash * 31 + Mathf.RoundToInt(oy * 10f);
             hash = hash * 31 + Mathf.RoundToInt(oz * 10f);
             return hash;
         }
 
-        private GameObject CreateProjectileVisual(Hitbox hb)
+        private GameObject CreateProjectileVisual(CharacterClass character, byte attackSlot, bool airborne)
         {
             if (_config != null)
             {
-                var owner = _sim.GetState(hb.OwnerId);
-                var def = _sim.GetDefinition(hb.OwnerId);
-                var entry = FindProjectileEntry(def?.Class ?? CharacterClass.None, hb.AttackSlot, !owner.IsGrounded);
+                var entry = FindProjectileEntry(character, attackSlot, airborne);
                 if (entry != null && entry.Prefab != null)
                 {
                     try
@@ -127,7 +170,7 @@ namespace SlopArena.Client.Combat
 
         private ProjectileVisualEntry FindProjectileEntry(CharacterClass character, byte attackSlot, bool airborne)
         {
-            if (_config.ProjectileEntries == null) return null;
+            if (_config?.ProjectileEntries == null) return null;
             for (int i = 0; i < _config.ProjectileEntries.Length; i++)
             {
                 var e = _config.ProjectileEntries[i];
@@ -136,6 +179,22 @@ namespace SlopArena.Client.Combat
             }
             return null;
         }
+        private static void OrientProjectile(Transform visual, CharacterClass character, byte slot,
+            float vx, float vy, float vz)
+        {
+            if (character != CharacterClass.Wibou || slot != AbilitySlots.A) return;
+            var velocity = new Vector3(vx, vy, vz);
+            if (velocity.sqrMagnitude > 0.0001f)
+                visual.rotation = Quaternion.LookRotation(velocity) * Quaternion.Euler(90f, 0f, 0f);
+        }
+
+        private static void DestroyVisual(GameObject visual)
+        {
+            if (visual == null) return;
+            if (Application.isPlaying) UnityEngine.Object.Destroy(visual);
+            else UnityEngine.Object.DestroyImmediate(visual);
+        }
+
 
         /// <summary>
         /// Build a glowing projectile visual GameObject.
@@ -315,6 +374,8 @@ namespace SlopArena.Client.Combat
         {
             if (_resolver != null)
                 _resolver.OnHitboxRemoved -= OnHitboxRemoved;
+            foreach (var visual in _activeVisuals.Values) DestroyVisual(visual);
+            foreach (var visual in _remoteVisuals.Values) DestroyVisual(visual);
         }
     }
 }

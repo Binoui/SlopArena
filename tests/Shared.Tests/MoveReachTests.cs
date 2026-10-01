@@ -155,11 +155,11 @@ public class MoveReachTests
     }
 
     [Fact]
-    public void ReachOrdering_KistuWeaponCapsule_ExtendsBeyondEntityFallback()
+    public void ReachOrdering_WibouWeaponCapsule_ExtendsBeyondEntityFallback()
     {
-        var def = TestHelpers.KistuDef;
+        var def = TestHelpers.WibouDef;
         var baked = TestHelpers.LoadBakedData(def);
-        Assert.NotNull(baked); // data/kistu_skeleton.bin is committed — the bake is the geometry source for bone-anchored moves
+        Assert.NotNull(baked); // data/wibou_skeleton.bin is committed — the bake is the geometry source for bone-anchored moves
 
         // g1 Quick Slash: blade-anchored capsule _weapon_hilt → _weapon_tip, r 0.25, offZ 0.
         var evt = def.Slot1!.Stages[0].HitboxEvents[0];

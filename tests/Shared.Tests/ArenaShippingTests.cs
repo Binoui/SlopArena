@@ -126,11 +126,11 @@ public class ArenaShippingTests
     [Theory]
     [InlineData(CharacterClass.FightGuy, -7.5f, 1f)]
     [InlineData(CharacterClass.Manki, -7.5f, 1f)]
-    [InlineData(CharacterClass.Kistu, -7.5f, 1f)]
+    [InlineData(CharacterClass.Wibou, -7.5f, 1f)]
     [InlineData(CharacterClass.Bonk, -7.5f, 1f)]
     [InlineData(CharacterClass.FightGuy, 7.5f, -1f)]
     [InlineData(CharacterClass.Manki, 7.5f, -1f)]
-    [InlineData(CharacterClass.Kistu, 7.5f, -1f)]
+    [InlineData(CharacterClass.Wibou, 7.5f, -1f)]
     [InlineData(CharacterClass.Bonk, 7.5f, -1f)]
     public void ScifiCity_HeldRunCrossesRoofJoinsAndBridge(
         CharacterClass cls, float startX, float direction)
@@ -257,7 +257,7 @@ public class ArenaShippingTests
     [Theory]
     [InlineData(CharacterClass.FightGuy)]
     [InlineData(CharacterClass.Manki)]
-    [InlineData(CharacterClass.Kistu)]
+    [InlineData(CharacterClass.Wibou)]
     [InlineData(CharacterClass.Bonk)]
     public void IndustrialRooftop_HeldRunStopsAtPenthouseWall(CharacterClass cls)
     {
@@ -316,7 +316,7 @@ public class ArenaShippingTests
     [Theory]
     [InlineData(CharacterClass.FightGuy)]
     [InlineData(CharacterClass.Manki)]
-    [InlineData(CharacterClass.Kistu)]
+    [InlineData(CharacterClass.Wibou)]
     [InlineData(CharacterClass.Bonk)]
     public void IndustrialRooftop_RunOffRoofFallsImmediately(CharacterClass cls)
     {
@@ -375,7 +375,7 @@ public class ArenaShippingTests
     [Theory]
     [InlineData(CharacterClass.FightGuy)]
     [InlineData(CharacterClass.Manki)]
-    [InlineData(CharacterClass.Kistu)]
+    [InlineData(CharacterClass.Wibou)]
     [InlineData(CharacterClass.Bonk)]
     public void IndustrialRooftop_JumpBetweenServiceDecksLands(CharacterClass cls)
     {

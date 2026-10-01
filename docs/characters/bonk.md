@@ -71,7 +71,7 @@ The capability requirement is
 `slop.internal.bonk.targeted-jump-slam.v1` version `1`. It is admitted only
 for the trusted built-in Bonk profile; Workshop content cannot use it.
 
-Assets remain in the existing shared Bonk art tree, matching the FightGuy/Kistu convention,
+Assets remain in the existing shared Bonk art tree, matching the FightGuy/Wibou convention,
 with their Unity `.meta` files preserved:
 
 - `Assets/Art/Characters/bonk/Models/bonk.fbx`.
@@ -248,9 +248,9 @@ deployment remain release-gated.
 | Problem | Evidence | Impact | Fix or prerequisite |
 | --- | --- | --- | --- |
 | Editor status was hard-coded to FightGuy | `CharacterAssetCatalogEditor.OnEnable` and stale help text | Bonk could show the wrong status and diagnostics context | Status now reads only after catalog selection and names the selected package |
-| Cook profile policy was duplicated | Service and catalog editor profile expressions | New packages could diverge in trust policy | Shared internal profile helper; `fightguy`, `kistu`, and `bonk` use the trusted built-in profile |
+| Cook profile policy was duplicated | Service and catalog editor profile expressions | New packages could diverge in trust policy | Shared internal profile helper; `fightguy`, `wibou`, and `bonk` use the trusted built-in profile |
 | Dependency tracking only inspected FightGuy | `CharacterCookAssetPostprocessor` | Bonk changes were not queued or isolated | Postprocessor now discovers every catalog and matches its persisted dependencies |
-| Shared dash/hit clips were initially unresolved | Four `asset-catalog.clip.missing` diagnostics | Cook could not reach pose validation | Bound the existing shared clips used by FightGuy/Kistu |
+| Shared dash/hit clips were initially unresolved | Four `asset-catalog.clip.missing` diagnostics | Cook could not reach pose validation | Bound the existing shared clips used by FightGuy/Wibou |
 | Temporary clip imports report bone-length mismatch warnings | `Animations/*.FBX.meta` `rigImportWarnings` | Pose quality is not yet approved | Re-author/import clips against the validated Bonk Avatar |
 | No package creation control exists in Ability Lab | `AbilityLabPackageWorkspace.NewPackage` is the existing creation seam | Onboarding needs an editor-side API call | Add a UI control only when package onboarding is explicitly scoped |
 

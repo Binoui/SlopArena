@@ -49,9 +49,9 @@ Use him to validate shared systems:
 - Movement dust and trails.
 - HUD presentation.
 
-### Kistu
+### Wibou
 
-Kistu provides the sharp/bladed contrast case: narrow glints, blade arcs, cleaner directional shapes, and restrained character-specific accents layered over the shared hit grammar.
+Wibou provides the sharp/bladed contrast case: narrow glints, blade arcs, cleaner directional shapes, and restrained character-specific accents layered over the shared hit grammar.
 
 ## Shared combat-VFX grammar
 
@@ -66,7 +66,7 @@ Every character uses common rules for gameplay meaning:
 Character identity is a second layer:
 
 - Manki: fire, smoke, sparks, debris, unstable explosives.
-- Kistu: blade arcs, glints, sharp fragments.
+- Wibou: blade arcs, glints, sharp fragments.
 - FightGuy: compressed blunt-force shapes plus disciplined blue-white ki.
 - Nilus: cold-violet void tears with a colder cyan rim; energy remains VFX rather than model geometry.
 

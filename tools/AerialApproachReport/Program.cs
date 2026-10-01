@@ -18,7 +18,7 @@ internal static partial class Program
     private const float LowInputMagnitude = 0f;
     private const int RunupTicks = 30;
 
-    private static readonly string[] Characters = { "fightguy", "manki", "kistu", "bonk" };
+    private static readonly string[] Characters = { "fightguy", "manki", "wibou", "bonk" };
     private static readonly float[] GridX = { -1f, -0.5f, 0f, 0.5f, 1f };
     private static readonly float[] GridZ = { 0.5f, 1f, 1.5f, 2f, 2.5f, 3f };
     private static readonly float[] TargetDistanceGrid = { 0.75f, 1.25f, 1.75f, 2.25f };
@@ -451,7 +451,7 @@ internal static partial class Program
         {
             "fightguy" => BuiltInContentResolver.Resolve(CharacterClass.FightGuy),
             "manki" => BuiltInContentResolver.Resolve(CharacterClass.Manki),
-            "kistu" => BuiltInContentResolver.Resolve(CharacterClass.Kistu),
+            "wibou" => BuiltInContentResolver.Resolve(CharacterClass.Wibou),
             "bonk" => BuiltInContentResolver.Resolve(CharacterClass.Bonk),
             _ => throw new InvalidDataException($"unknown admitted selector '{selector}'"),
         };

@@ -10,7 +10,7 @@
 
 ## Comparison
 
-| metric | Manki | FightGuy | Kistu | Nilus |
+| metric | Manki | FightGuy | Wibou | Nilus |
 |---|---|---|---|
 | Run max speed (m/s) | 12.0 (12) | 14.0 (14) | 15.0 (15) | 13.0 (13) |
 | Run time-to-max | instant (rush kick-off) | instant (rush kick-off) | instant (rush kick-off) | instant (rush kick-off) |
@@ -48,10 +48,10 @@ What the numbers mean, per character (computed from the measured values above):
 
 - **Manki**: run 12 m/s, dash 4.7 m (15% of stage), jump 1.35 m, air/run 54%, stop 1.7 m. Best at: safest stop. Weakest at: longest dash, highest jump, fastest run, longest airtime, largest air drift, largest stage share per dash.
 - **FightGuy**: run 14 m/s, dash 6.3 m (21% of stage), jump 1.90 m, air/run 54%, stop 2.4 m. Best at: longest dash, largest stage share per dash. Weakest at: most ground-dominant (lowest air/run).
-- **Kistu**: run 15 m/s, dash 6.0 m (20% of stage), jump 2.24 m, air/run 57%, stop 2.8 m. Best at: highest jump, fastest run, longest airtime, largest air drift. Weakest at: safest stop.
+- **Wibou**: run 15 m/s, dash 6.0 m (20% of stage), jump 2.24 m, air/run 57%, stop 2.8 m. Best at: highest jump, fastest run, longest airtime, largest air drift. Weakest at: safest stop.
 - **Nilus**: run 13 m/s, dash 4.9 m (16% of stage), jump 2.02 m, air/run 54%, stop 2.0 m.
 
-- **Too fast?** Run crosses 31 m in Manki 2.55 s / FightGuy 2.19 s / Kistu 2.04 s / Nilus 2.35 s. Full-hop airtime is 0.53 s / 0.63 s / 0.68 s / 0.67 s vs ~0.25 s reaction — reactable but tight (2-3×). Fast-fall from jump apex: 0.05 s / 0.05 s / 0.07 s / 0.07 s — under reaction, so a fast-fall landing cannot be reacted to; reads must come from the jump start, not the landing.
+- **Too fast?** Run crosses 31 m in Manki 2.55 s / FightGuy 2.19 s / Wibou 2.04 s / Nilus 2.35 s. Full-hop airtime is 0.53 s / 0.63 s / 0.68 s / 0.67 s vs ~0.25 s reaction — reactable but tight (2-3×). Fast-fall from jump apex: 0.05 s / 0.05 s / 0.07 s / 0.07 s — under reaction, so a fast-fall landing cannot be reacted to; reads must come from the jump start, not the landing.
 - **Broken short hop: Manki** — the short-hop impulse rises under the 0.10 m PlatformLandTolerance on the first airborne tick (no upward-velocity gate in the non-hitstun ground snap), so the sim snaps the character back down and the hop never leaves the ground. Fix candidates: raise the impulse above ~6.7 m/s, or add the hitstun-branch's `VY <= 0` gate to the snap.
 
 
@@ -62,7 +62,7 @@ Melee values: docs/research/melee-movement-audit.md (SSBWiki \[community\]; deri
 | metric | SlopArena (measured) | Melee reference | read |
 |---|---|---|---|
 | Jump squat | 6 t–4 t–4 t–5 t | 3–8 f (Fox 3, Marth 4, Puff 5, Bowser 8) | in Melee range |
-| Full-hop airtime | 0.53 s–0.63 s–0.68 s–0.67 s | Fox ~33 f, Marth 57–59 f | FG/Kistu ≈ Fox-fast, Manki ≈ Marth |
+| Full-hop airtime | 0.53 s–0.63 s–0.68 s–0.67 s | Fox ~33 f, Marth 57–59 f | FG/Wibou ≈ Fox-fast, Manki ≈ Marth |
 | Short-hop airtime | 0.00 s–0.37 s–0.40 s–0.38 s | Fox ~19 f, Marth 36–38 f | short hop in the fast band |
 | Short/full jump force | 0.60–0.60–0.60–0.60 | ≈ 0.58 (derived) | Melee-shaped (0.7 was the pre-audit value) |
 | Fast fall / fall | 1.20–1.21–1.21–1.20 | 1.14–1.26 (Fox 3.4/2.8 … Puff 1.6/1.3) | Melee-shaped, adopted (audit §3.4) |
@@ -98,7 +98,7 @@ Melee values: docs/research/melee-movement-audit.md (SSBWiki \[community\]; deri
 - **Reversal** (cruise → opposite cruise): 0.62 s, 2.05 m covered (pivot skid + re-accel)
 - **Stop** (cruise → standstill): 0.38 s, 2.38 m; dash+stop commit = 28% of stage
 
-## Kistu
+## Wibou
 
 - **Run**: 15.0 m/s (authored 15) — instant cruise — Rush kick-off sets RunSpeed on the first tick (no ramp); the soft-start accel only shows after a turnaround skid
 - **Dash**: 16 ticks, 6.00 m = 20%, actionable on tick 16 (hard stop; authored 24 m/s for 16 ticks)

@@ -20,11 +20,11 @@ namespace SlopArena.Shared.Abilities
     ///     s.ChargeTicks against — so the auto-release can't drift from the clamp
     ///     (see the original NilusVoidRift note for why a Param would).
     ///   - Throw phase: fire once at throw_trigger_tick (IsAiming=false) in the
-    ///     Attacking state (action phase, mirroring KistuDashSlash's Aiming → Attacking
+    ///     Attacking state (action phase, mirroring WibouDashSlash's Aiming → Attacking
     ///     dash transition), end at throw_duration.
     ///
     /// Subclasses only implement the hooks. MankiBazooka keeps its own
-    /// three-phase FSM (firing/recovery doesn't fit this shape); KistuDashSlash
+    /// three-phase FSM (firing/recovery doesn't fit this shape); WibouDashSlash
     /// is an aim-to-dash, not a projectile, and stays standalone — both carry
     /// the same ascent-stop inline.
     /// </summary>
@@ -100,7 +100,7 @@ namespace SlopArena.Shared.Abilities
                 {
                     OnRelease(ref s, def);
                     // Throw phase is an action phase — re-enter Attacking (mirrors
-                    // KistuDashSlash.StartDash: Aiming → Attacking).
+                    // WibouDashSlash.StartDash: Aiming → Attacking).
                     s.State = ActionState.Attacking;
                     s.ComboStage = 1;
                     AnimIndex = GetReleaseAnimIndex(def);

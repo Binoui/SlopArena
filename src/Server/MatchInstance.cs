@@ -26,6 +26,9 @@ namespace SlopArena.Server
 		private readonly string _arenaName;
 		private readonly MatchContentCatalog _contentCatalog;
 		private readonly List<PlayerSlot> _slots;
+        private readonly bool _hasWibou;
+        private readonly List<ProjectileVisualState> _projectileVisuals = new(12);
+        private readonly List<ulong> _swordTrailOwners = new(4);
 		private UdpClient? _udpServer;
 		private volatile bool _running = true;
 
@@ -109,6 +112,7 @@ namespace SlopArena.Server
 				var content = _contentCatalog.Resolve(p.CharacterClass)
 					?? throw new InvalidDataException($"Roster selector '{p.CharacterClass}' is not in the match content catalog.");
 				_slots.Add(new PlayerSlot((ulong)p.EntityId, p.CharacterClass, p.SteamId, content));
+                _hasWibou |= p.CharacterClass == CharacterClass.Wibou;
 			}
 		}
 
@@ -671,6 +675,50 @@ namespace SlopArena.Server
 				presentationPackets.Add((eventBuffer, eventBuffer.Length));
 			}
 
+            byte[]? swordTrailBuffer = null;
+            if (_hasWibou)
+            {
+                _swordTrailOwners.Clear();
+                if (_matchState == MatchState.Playing)
+                {
+                    foreach (var hitbox in _sim.Resolver.GetActiveHitboxes())
+                    {
+                        if (!hitbox.Active || hitbox.SourceEvent.BoneName != "_weapon_hilt"
+                            || hitbox.SourceEvent.EndBoneName != "_weapon_tip"
+                            || _sim.GetDefinition(hitbox.OwnerId)?.Class != CharacterClass.Wibou
+                            || _swordTrailOwners.Contains(hitbox.OwnerId))
+                            continue;
+                        _swordTrailOwners.Add(hitbox.OwnerId);
+                    }
+                }
+                var snapshot = new SwordTrailSnapshotPacket(_serverTick, _swordTrailOwners);
+                int offset = _steamSend is null ? 0 : 1;
+                swordTrailBuffer = new byte[snapshot.WireSize + offset];
+                if (offset != 0) swordTrailBuffer[0] = SteamGameplayWire.SwordTrail;
+                snapshot.Serialize(swordTrailBuffer.AsSpan(offset));
+            }
+
+            byte[]? projectileBuffer = null;
+            if (_hasWibou)
+            {
+                _projectileVisuals.Clear();
+                foreach (var hitbox in _sim.Resolver.GetActiveHitboxes())
+                {
+                    if (_matchState != MatchState.Playing || hitbox.AttackSlot != AbilitySlots.A || !hitbox.Active
+                        || _sim.GetDefinition(hitbox.OwnerId)?.Class != CharacterClass.Wibou)
+                        continue;
+                    _projectileVisuals.Add(new ProjectileVisualState(
+                        hitbox.OwnerId, hitbox.ActivationId, hitbox.VisualOperationIndex,
+                        CharacterClass.Wibou, hitbox.AttackSlot, hitbox.ActivationAirborne,
+                        hitbox.X, hitbox.Y, hitbox.Z, hitbox.VX, hitbox.VY, hitbox.VZ));
+                }
+                var snapshot = new ProjectileVisualPacket(_serverTick, _projectileVisuals);
+                int offset = _steamSend is null ? 0 : 1;
+                projectileBuffer = new byte[snapshot.WireSize + offset];
+                if (offset != 0) projectileBuffer[0] = SteamGameplayWire.Projectile;
+                snapshot.Serialize(projectileBuffer.AsSpan(offset));
+            }
+
 			byte[]? steamResult = null;
 			if (_steamSend is not null && _matchState == MatchState.Ended && _matchResultPacket != null && !_steamResultSent)
 			{
@@ -710,6 +758,16 @@ namespace SlopArena.Server
 						if (_steamSend is null) _udpServer!.Send(evt.buffer, evt.length, slot.EndPoint!);
 						else _steamSend(_steamMatchGuid, slot.EntityId, evt.buffer, false);
 					}
+                    if (projectileBuffer != null)
+                    {
+                        if (_steamSend is null) _udpServer!.Send(projectileBuffer, projectileBuffer.Length, slot.EndPoint!);
+                        else _steamSend(_steamMatchGuid, slot.EntityId, projectileBuffer, false);
+                    }
+                    if (swordTrailBuffer != null)
+                    {
+                        if (_steamSend is null) _udpServer!.Send(swordTrailBuffer, swordTrailBuffer.Length, slot.EndPoint!);
+                        else _steamSend(_steamMatchGuid, slot.EntityId, swordTrailBuffer, false);
+                    }
 				}
 			}
 			catch (Exception ex)

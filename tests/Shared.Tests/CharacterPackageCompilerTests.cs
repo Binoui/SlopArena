@@ -87,7 +87,7 @@ public sealed class CharacterPackageCompilerTests
     {
         foreach (var (packageId, expected) in new[]
         {
-            ("fightguy", 1.05f), ("kistu", 1.05f), ("bonk", 1.05f), ("manki", 0.95f),
+            ("fightguy", 1.05f), ("wibou", 1.05f), ("bonk", 1.05f), ("manki", 0.95f),
         })
         {
             var result = CharacterPackageCompiler.Compile(
@@ -240,11 +240,11 @@ public sealed class CharacterPackageCompilerTests
         Assert.Equal(result.CookedPackage.CanonicalBytes, repeated.CookedPackage!.CanonicalBytes);
     }
     [Fact]
-    public void Kistu_Package_CooksCanonicalSlotsAttachmentsSpreadAndChargePool()
+    public void Wibou_Package_CooksCanonicalSlotsAttachmentsSpreadAndChargePool()
     {
         var result = CharacterPackageCompiler.Compile(
-            File.ReadAllText(FindRepoFile("client/Unity/Assets/CharacterPackages/kistu/package.json")),
-            File.ReadAllText(FindRepoFile("client/Unity/Assets/CharacterPackages/kistu/character.json")),
+            File.ReadAllText(FindRepoFile("client/Unity/Assets/CharacterPackages/wibou/package.json")),
+            File.ReadAllText(FindRepoFile("client/Unity/Assets/CharacterPackages/wibou/character.json")),
             CharacterCookProfile.TrustedBuiltIn);
         Assert.NotNull(result.CookedPackage);
         var package = result.CookedPackage!;

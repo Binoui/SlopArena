@@ -129,6 +129,7 @@ client/Unity/Assets/Shared/*.deps.json
 client/Unity/Assets/Shared/*.meta
 client/Unity/Assets/Generated/CharacterPackages/
 client/Unity/Assets/Resources/Generated/CharacterPackages/
+/.ability-lab-cache/
 client/Unity/Assets/Shared/*.runtimeconfig.json
 
 # Root Unity artifacts (orphaned)
@@ -181,6 +182,9 @@ client/Unity/Assets/Art.meta
 # Root-level prototype assets
 /assets/
 
+# Local Unity asset-import sandbox
+/My project/
+
 # Unity directories without tracked content
 client/Unity/Assets/Editor.meta
 client/Unity/Assets/Samples.meta
@@ -206,10 +210,11 @@ client/Unity/Assets/Plugins/**/NuGet/.nuget-installed.json
 !client/Unity/Assets/CharacterPackages/fightguy/Animations/fightguy_crouch.anim
 !client/Unity/Assets/CharacterPackages/manki/Animations/manki_crouch.anim
 !client/Unity/Assets/CharacterPackages/bonk/Animations/bonk_crouch.anim
-!client/Unity/Assets/CharacterPackages/kistu/Animations/kistu_crouch.anim
+!client/Unity/Assets/CharacterPackages/wibou/Animations/wibou_crouch.anim
 *.png
 !client/Unity/Assets/UI/SplashArt/*.png
 !client/Unity/Assets/UI/MenuGear.png
+!client/Unity/Assets/UI/SelectionCheck.png
 !client/Unity/Assets/UI/HUDNormalDiamond.png
 !client/Unity/Assets/UI/HUDSpecialDiamond.png
 !client/Unity/Assets/UI/HUDSlotBase.png

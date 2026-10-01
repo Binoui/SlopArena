@@ -1165,7 +1165,7 @@ public sealed class CharacterPackageAuthoringService
 
 
     internal static CharacterCookProfile ProfileFor(string packageId)
-        => packageId == "fightguy" || packageId == "kistu" || packageId == "bonk" || packageId == "manki" ? CharacterCookProfile.TrustedBuiltIn : CharacterCookProfile.Workshop;
+        => packageId == "fightguy" || packageId == "wibou" || packageId == "bonk" || packageId == "manki" ? CharacterCookProfile.TrustedBuiltIn : CharacterCookProfile.Workshop;
 
     private string CharacterPackagesFullRoot() => Path.Combine(_projectRoot, CharacterPackagesRoot.Replace('/', Path.DirectorySeparatorChar));
     private string PackageRootFor(string packageId) => CharacterPackagesRoot + "/" + packageId;
@@ -1415,7 +1415,7 @@ public static class CharacterPackageAssetOwnershipRegistry
         new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal)
         {
             ["fightguy"] = new[] { "Assets/Art/Characters/fightguy/", "Assets/Resources/Characters/FightGuy.prefab" },
-            ["kistu"] = new[] { "Assets/Art/Characters/kistu/", "Assets/Resources/Characters/Kistu.prefab" },
+            ["wibou"] = new[] { "Assets/Art/Characters/wibou/", "Assets/Resources/Characters/Wibou.prefab" },
             ["bonk"] = new[] { "Assets/Art/Characters/bonk/", "Assets/Resources/Characters/bonk.prefab" },
             ["manki"] = new[] { "Assets/Art/Characters/manki/", "Assets/CharacterPackages/manki/", "Assets/Resources/Characters/Manki.prefab", "Assets/Resources/WeaponConfigs/Manki.asset" },
         };

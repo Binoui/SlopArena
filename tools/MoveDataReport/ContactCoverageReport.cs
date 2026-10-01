@@ -308,7 +308,7 @@ internal static partial class ContactCoverageReport
             var parsed = ParseArgs(args);
             if (parsed.Experiment == "normals")
                 return RunNormals(parsed);
-            string[] selectors = parsed.Character == "all" ? new[] { "fightguy", "manki", "kistu", "bonk" } : new[] { parsed.Character };
+            string[] selectors = parsed.Character == "all" ? new[] { "fightguy", "manki", "wibou", "bonk" } : new[] { parsed.Character };
             var attackers = selectors.Select(Program.ResolveEntry).ToArray();
             var victim = Program.ResolveEntry(parsed.Victim);
             var arena = Program.NoRespawn(Program.BuildArena());
@@ -739,8 +739,8 @@ internal static partial class ContactCoverageReport
                 case "--html": html = value; break;
             }
         }
-        if (character is not ("all" or "fightguy" or "manki" or "kistu" or "bonk")) throw new CoverageArgumentException($"unknown character: {character} (expected all, fightguy, manki, kistu, bonk)");
-        if (victim is not ("fightguy" or "manki" or "kistu" or "bonk")) throw new CoverageArgumentException($"unknown victim: {victim}");
+        if (character is not ("all" or "fightguy" or "manki" or "wibou" or "bonk")) throw new CoverageArgumentException($"unknown character: {character} (expected all, fightguy, manki, wibou, bonk)");
+        if (victim is not ("fightguy" or "manki" or "wibou" or "bonk")) throw new CoverageArgumentException($"unknown victim: {victim}");
         if (slots.Count == 0) slots.AddRange(CanonicalSlotProjection.All.Where(x => x.InputLabel is "1" or "2" or "3" or "4"));
         if (experiment == "normals")
         {

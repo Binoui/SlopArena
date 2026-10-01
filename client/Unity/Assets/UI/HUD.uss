@@ -1,5 +1,4 @@
-/* SlopArena broadcast HUD — underground fight-poster prototype.
-   The local kit uses two ability diamonds below the match readouts. */
+/* Gameplay HUD: stable match readouts, player identity, and ability feedback. */
 
 .hud-root {
     flex-grow: 1;
@@ -16,10 +15,10 @@
     padding-left: 12px;
     padding-right: 12px;
     display: none;
-    color: #fffcee;
-    background-color: rgba(13, 13, 20, 0.94);
+    color: #F0EEE8;
+    background-color: rgba(22, 21, 19, 0.94);
     border-left-width: 5px;
-    border-left-color: #fbbf24;
+    border-left-color: #7B7872;
     font-size: 20px;
     -unity-font-style: bold;
     -unity-text-align: middle-left;
@@ -63,14 +62,14 @@
 }
 
 .overhead-panel .overhead-damage-outline {
-    color: #0d0d14;
+    color: #161513;
     -unity-text-outline-width: 4px;
-    -unity-text-outline-color: rgba(13, 13, 20, 0.95);
+    -unity-text-outline-color: rgba(22, 21, 19, 0.95);
 }
 
 .overhead-panel .overhead-damage {
     -unity-text-outline-width: 2px;
-    -unity-text-outline-color: rgba(255, 252, 238, 0.96);
+    -unity-text-outline-color: rgba(240, 238, 232, 0.96);
     transition-property: color, translate;
     transition-duration: 0.12s;
 }
@@ -96,9 +95,9 @@
     overflow: visible;
     flex-direction: row;
     align-items: stretch;
-    background-color: rgba(13, 13, 20, 0.93);
+    background-color: rgba(22, 21, 19, 0.93);
     border-bottom-width: 5px;
-    border-bottom-color: #e05c2a;
+    border-bottom-color: #7B7872;
     transition-property: opacity, translate;
     transition-duration: 0.15s;
 }
@@ -111,8 +110,8 @@
     height: 30px;
     padding-left: 8px;
     padding-right: 8px;
-    color: #fffcee;
-    background-color: rgba(13, 13, 20, 0.94);
+    color: #F0EEE8;
+    background-color: rgba(22, 21, 19, 0.94);
     border-left-width: 4px;
     font-size: 15px;
     -unity-font-style: bold;
@@ -125,7 +124,7 @@
     rotate: -0.6deg;
     padding-left: 66px;
     border-right-width: 2px;
-    border-right-color: #f0eee8;
+    border-right-color: #7B7872;
 }
 
 
@@ -182,7 +181,7 @@
     align-items: center;
     align-self: flex-start;
     margin-bottom: -1px;
-    background-color: #f0eee8;
+    background-color: #F0EEE8;
     rotate: -0.5deg;
 }
 
@@ -195,7 +194,7 @@
     letter-spacing: 1px;
     -unity-font-style: bold;
     -unity-text-align: middle-center;
-    color: #19131b;
+    color: #161513;
 }
 
 
@@ -204,7 +203,7 @@
     font-size: 10px;
     letter-spacing: 1px;
     -unity-font-style: bold;
-    color: rgba(240, 238, 232, 0.76);
+    color: #F0EEE8;
 }
 
 
@@ -219,8 +218,8 @@
     -unity-font-style: bold;
     -unity-text-align: middle-center;
     -unity-text-outline-width: 1px;
-    -unity-text-outline-color: #19131b;
-    color: #f0eee8;
+    -unity-text-outline-color: #161513;
+    color: #F0EEE8;
     transition-property: color, translate;
     transition-duration: 0.12s;
 }
@@ -240,7 +239,7 @@
     rotate: -8deg;
     background-color: #ffc821;
     border-bottom-width: 2px;
-    border-bottom-color: #e05c2a;
+    border-bottom-color: #7B7872;
 }
 
 .stock-icon.lost {
@@ -355,7 +354,7 @@
     display: none;
     transform-origin: bottom center;
     scale: 1 1;
-    background-color: rgba(6, 5, 9, 0.82);
+    background-color: rgba(22, 21, 19, 0.82);
 }
 
 .slot-timer {
@@ -367,8 +366,8 @@
     -unity-font-style: bold;
     -unity-text-align: middle-center;
     -unity-text-outline-width: 1px;
-    -unity-text-outline-color: #19131b;
-    color: #f0eee8;
+    -unity-text-outline-color: #161513;
+    color: #F0EEE8;
 }
 
 .slot-prompt {
@@ -387,7 +386,7 @@
     width: 32.2px;
     height: 32.2px;
     padding: 2.3px;
-    background-color: #19131b;
+    background-color: #161513;
     border-radius: 16.1px;
     -unity-background-scale-mode: scale-to-fit;
 }
@@ -400,8 +399,8 @@
     font-size: 12.65px;
     -unity-font-style: bold;
     -unity-text-align: middle-center;
-    color: #f0eee8;
-    background-color: #19131b;
+    color: #F0EEE8;
+    background-color: #161513;
     border-radius: 11.5px;
 }
 
@@ -430,11 +429,138 @@
 }
 
 .target-lock-damage {
-    color: #FFFCEE;
+    color: #F0EEE8;
     height: 28px;
     font-size: 24px;
     -unity-font-style: bold;
     -unity-text-align: middle-center;
     -unity-text-outline-width: 2px;
-    -unity-text-outline-color: rgba(13, 13, 20, 0.95);
+    -unity-text-outline-color: rgba(22, 21, 19, 0.95);
+}
+
+/* Match overlays share the frontend control language, not gameplay colors. */
+.match-pause-cover {
+    background-color: rgba(22, 21, 19, 0.72);
+}
+
+.match-pause-box {
+    background-color: #f0eee8;
+    border-width: 3px;
+    border-color: #161513;
+    border-bottom-width: 8px;
+}
+
+.match-pause-title {
+    color: #1b1a18;
+    -unity-font-definition: url("../Fonts/ArchivoBlack.asset");
+    -unity-font-style: normal;
+}
+
+.match-pause-action {
+    background-color: #f0eee8;
+    color: #1b1a18;
+    border-width: 2px;
+    border-color: #161513;
+    border-bottom-width: 5px;
+    -unity-font-definition: url("../Fonts/ArchivoBlack.asset");
+    -unity-font-style: normal;
+}
+
+.match-pause-action--primary { background-color: #ffcc22; }
+
+.match-pause-action:hover,
+.match-pause-action:focus {
+    background-color: #1b1a18;
+    color: #f0eee8;
+    border-color: #ffcc22;
+}
+
+.match-pause-action:active { translate: 0 3px; }
+
+.match-pause-action:disabled {
+    background-color: #252422;
+    color: #b7b4ad;
+    border-color: #7b7872;
+    translate: 0 0;
+}
+
+.shell-modal {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(22, 21, 19, 0.8);
+}
+
+.shell-modal-box {
+    min-width: 320px;
+    max-width: 560px;
+    padding: 20px 24px;
+    background-color: #f0eee8;
+    border-width: 3px;
+    border-color: #161513;
+    border-bottom-width: 8px;
+}
+
+.shell-modal-title {
+    color: #1b1a18;
+    font-size: 24px;
+    -unity-font-definition: url("../Fonts/ArchivoBlack.asset");
+    -unity-font-style: normal;
+    white-space: normal;
+}
+
+.shell-modal-help {
+    margin-top: 8px;
+    margin-bottom: 14px;
+    color: #252422;
+    font-size: 15px;
+    white-space: normal;
+}
+
+.shell-modal-row {
+    flex-direction: row;
+    align-items: stretch;
+}
+
+.shell-modal-submit {
+    flex-grow: 1;
+    min-height: 40px;
+    margin-right: 6px;
+    padding: 0 16px;
+    background-color: #ffcc22;
+    color: #1b1a18;
+    border-width: 2px;
+    border-color: #161513;
+    border-bottom-width: 4px;
+    -unity-font-definition: url("../Fonts/ArchivoBlack.asset");
+    -unity-font-style: normal;
+}
+
+.shell-modal-submit--secondary { background-color: #f0eee8; }
+
+.shell-modal-submit:hover,
+.shell-modal-submit:focus {
+    background-color: #1b1a18;
+    color: #f0eee8;
+    border-color: #ffcc22;
+}
+
+.shell-modal-submit:active { translate: 0 3px; }
+
+.shell-modal-submit:disabled {
+    background-color: #252422;
+    color: #b7b4ad;
+    border-color: #7b7872;
+    translate: 0 0;
+}
+
+#steam-room-join-notice {
+    background-color: rgba(22, 21, 19, 0.96);
+    color: #f0eee8;
+    border-width: 1px;
+    border-color: #7b7872;
 }

@@ -110,6 +110,7 @@ public sealed class AbilityLabWindow : EditorWindow
     private ObjectField _assetsRigField = null!;
     private Label _assetsRigStatus = null!;
     private VisualElement _assetsSkeleton = null!;
+    private VisualElement _assetsWeaponTrails = null!;
     private VisualElement _assetsLocomotionBindings = null!;
     private VisualElement _assetsHitReactionBindings = null!;
     private VisualElement _assetsMoveBindings = null!;
@@ -142,13 +143,132 @@ public sealed class AbilityLabWindow : EditorWindow
     private PresentationPlacement _scenePresentationPending = new();
     private int _scenePresentationStageIndex = -1;
     private int _scenePresentationOperationIndex = -1;
+    private Label _scenarioAction = null!;
+    private FloatField _scenarioDistance = null!;
+    private FloatField _scenarioFacing = null!;
+    private IntegerField _scenarioDamage = null!;
+    private DropdownField _scenarioOpponent = null!;
+    private IntegerField _scenarioHorizon = null!;
+    private Button _scenarioRun = null!;
+    private Button _scenarioExit = null!;
+    private Label _scenarioOutcomes = null!;
+    private bool _refreshingScenarioControls;
+    private bool _hadScenario;
+    private string _displayedSharedAction = "";
     private CharacterPackageInspectionResult? _inspection;
     private bool _updatingControls;
+    private bool _uiReady;
+    private bool _suppressInitialPackage;
+    private static bool _openingForCommand;
+
+    internal AbilityLabPackageWorkspace CommandWorkspace => _workspace;
+    internal AbilityLab? CommandLab => _lab != null ? _lab : AbilityLab.Instance;
+
+    internal static AbilityLabWindow? FindExistingForCommand()
+        => Resources.FindObjectsOfTypeAll<AbilityLabWindow>()
+            .Where(window => window != null)
+            .OrderByDescending(window => window.hasFocus)
+            .FirstOrDefault();
+
+    internal static AbilityLabWindow OpenForCommand()
+    {
+        _openingForCommand = true;
+        try
+        {
+            return GetWindow<AbilityLabWindow>("Ability Lab");
+        }
+        finally
+        {
+            _openingForCommand = false;
+        }
+    }
+
+    internal bool EnsureCommandUi()
+    {
+        if (!_uiReady || _root == null || !ReferenceEquals(_root, rootVisualElement))
+            CreateGUI();
+        return _uiReady;
+    }
+
+    internal bool TryBuildCommandTimeline(string slotId, out SlotAddress address, out AbilityLabTimelineProjection projection)
+    {
+        address = default;
+        projection = null!;
+        if (!CanonicalSlotProjection.TryGet(slotId, out address) ||
+            !_workspace.TryResolveCanonicalSlot(slotId, out _, out var sourceSlot))
+            return false;
+        projection = AbilityLabTimelineProjection.Build(sourceSlot);
+        return projection.Stages.Count > 0;
+    }
+
+    internal bool EnsureLabForCommand(out AbilityLab? lab, out bool created)
+    {
+        _lab = FindLab();
+        created = false;
+        if (_lab == null)
+        {
+            var go = new GameObject("AbilityLab") { hideFlags = HideFlags.HideAndDontSave };
+            _lab = go.AddComponent<AbilityLab>();
+            _ownsLab = true;
+            created = true;
+        }
+        lab = _lab;
+        if (created) RefreshAll();
+        lab = _lab;
+        return lab != null;
+    }
+
+    internal void DestroyTemporaryLabForCommand(AbilityLab lab, bool created)
+    {
+        if (created && _lab == lab && _ownsLab)
+            DestroyOwnedLab();
+    }
+
+    internal void ApplyCommandTimeline(string slotId, SlotAddress address, AbilityLabTimelineProjection projection, int cumulativeTick)
+    {
+        if (_lab == null) throw new InvalidOperationException("Ability Lab rig is unavailable.");
+        bool grabbed = _grabSelected;
+        _grabSelected = false;
+        try
+        {
+            _lab.SetSlot(address);
+            _timelineProjection = projection;
+            _timelineProjectionSlotId = slotId;
+            _timelineProjectionDraft = _workspace.Draft;
+            ApplyCumulativeTick(cumulativeTick);
+        }
+        finally
+        {
+            _grabSelected = grabbed;
+        }
+    }
+
+    internal void CompleteCommandPreview(SlotAddress address)
+    {
+        if (_grabSelected && _lab != null) _lab.ShowHitboxes = _grabPriorShowHitboxes;
+        _grabSelected = false;
+        _selectedOperation = null;
+        _airborneSelector = address.IsAirborne;
+        if (_activePage == "compatibility-page") SelectTab("moves-page");
+        UpdateMoveModeButtons();
+        BuildMoveButtons(_airborneSelector);
+        UpdateTimelineControls();
+        RefreshInspector();
+    }
+
+    internal void RefreshCommandTimeline()
+    {
+        if (_uiReady) UpdateTimelineControls();
+    }
 
     [MenuItem("Tools/SlopArena/Ability Lab")]
     public static void Open() => GetWindow<AbilityLabWindow>("Ability Lab");
 
-    private void OnEnable() => SceneView.duringSceneGui += OnSceneGUI;
+    private void OnEnable()
+    {
+        _suppressInitialPackage = _openingForCommand;
+        SceneView.duringSceneGui += OnSceneGUI;
+    }
     private void OnDisable()
     {
         SceneView.duringSceneGui -= OnSceneGUI;
@@ -158,6 +278,8 @@ public sealed class AbilityLabWindow : EditorWindow
 
     public void CreateGUI()
     {
+        if (_uiReady && ReferenceEquals(_root, rootVisualElement)) return;
+        _uiReady = false;
         _root = rootVisualElement;
         _root.Clear();
         var tree = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>("Assets/AbilityLab/Editor/AbilityLabWindow.uxml");
@@ -178,12 +300,13 @@ public sealed class AbilityLabWindow : EditorWindow
         BindCharacterPage();
         BindAssetsPage();
         BindAdvancedPage();
-        if (_packages.Any(option => option.PackageId == "fightguy"))
+        if (!_workspace.HasPackage && !_suppressInitialPackage && _packages.Any(option => option.PackageId == "fightguy"))
             OpenPackage("fightguy");
         else
             RefreshAll();
         _workspace.StatusChanged -= RefreshAll;
         _workspace.StatusChanged += RefreshAll;
+        _uiReady = true;
     }
 
     private void Update()
@@ -233,6 +356,15 @@ public sealed class AbilityLabWindow : EditorWindow
         _compatibilityShowHitboxes = Required<Toggle>("compatibility-show-hitboxes");
         _compatibilityShowBakedBones = Required<Toggle>("compatibility-show-baked-bones");
         _compatibilityShowDummy = Required<Toggle>("compatibility-show-dummy");
+        _scenarioAction = Required<Label>("scenario-action");
+        _scenarioDistance = Required<FloatField>("scenario-distance");
+        _scenarioFacing = Required<FloatField>("scenario-facing");
+        _scenarioDamage = Required<IntegerField>("scenario-damage");
+        _scenarioOpponent = Required<DropdownField>("scenario-opponent");
+        _scenarioHorizon = Required<IntegerField>("scenario-horizon");
+        _scenarioRun = Required<Button>("scenario-run");
+        _scenarioExit = Required<Button>("scenario-exit");
+        _scenarioOutcomes = Required<Label>("scenario-outcomes");
         var timelinePlaceholder = Required<VisualElement>("timeline-track");
         _timelineTrack = new AbilityLabTimelineElement { name = "timeline-track" };
         _timelineTrack.AddToClassList("timeline-track");
@@ -253,6 +385,7 @@ public sealed class AbilityLabWindow : EditorWindow
         _assetsRigField = Required<ObjectField>("assets-rig-field");
         _assetsRigStatus = Required<Label>("assets-rig-status");
         _assetsSkeleton = Required<VisualElement>("assets-skeleton");
+        _assetsWeaponTrails = Required<VisualElement>("assets-weapon-trails");
         _assetsLocomotionBindings = Required<VisualElement>("assets-locomotion-bindings");
         _assetsHitReactionBindings = Required<VisualElement>("assets-hit-reaction-bindings");
         _assetsMoveBindings = Required<VisualElement>("assets-move-bindings");
@@ -435,13 +568,23 @@ public sealed class AbilityLabWindow : EditorWindow
 
     private void BindMovesPage()
     {
+        _scenarioOpponent.choices = new List<string> { "Idle", "Shield" };
+        _scenarioOpponent.SetValueWithoutNotify("Idle");
+        _scenarioRun.clicked += RunScenarioFromControls;
+        _scenarioExit.clicked += ExitScenarioToAuthoring;
+        _scenarioDistance.RegisterValueChangedCallback(_ => InvalidateScenarioControls());
+        _scenarioFacing.RegisterValueChangedCallback(_ => InvalidateScenarioControls());
+        _scenarioDamage.RegisterValueChangedCallback(_ => InvalidateScenarioControls());
+        _scenarioOpponent.RegisterValueChangedCallback(_ => InvalidateScenarioControls());
+        _scenarioHorizon.RegisterValueChangedCallback(_ => InvalidateScenarioControls());
         _groundMovesButton.clicked += () => SelectMoveMode(false);
         _airMovesButton.clicked += () => SelectMoveMode(true);
         _timelinePlay.clicked += () =>
         {
-            if (_lab == null || !_lab.IsPackagePreview) return;
+            if (_lab == null || (!_lab.IsScenarioPreview && !_lab.IsPackagePreview)) return;
             _lab.Playing = !_lab.Playing;
             UpdateTimelineControls();
+            RefreshScenarioControls();
         };
         Required<Button>("timeline-step-back").clicked += () => SetTickDelta(-1);
         Required<Button>("timeline-step-forward").clicked += () => SetTickDelta(1);
@@ -453,13 +596,165 @@ public sealed class AbilityLabWindow : EditorWindow
         SetTimelineZoom(_timelineZoom.value);
         _stageSelector.RegisterValueChangedCallback(evt =>
         {
-            if (!_updatingControls && int.TryParse(evt.newValue.Replace("Stage ", ""), out var stage))
+            if (!_updatingControls && _lab?.IsScenarioPreview != true &&
+                int.TryParse(evt.newValue.Replace("Stage ", ""), out var stage))
             {
                 _lab?.SetStage(stage - 1);
                 UpdateTimelineControls();
                 RefreshInspector();
             }
         });
+    }
+    private string CurrentSharedAction()
+        => _lab == null ? "" : (_lab.Scenario?.Options.Action ?? (_grabSelected ? "grab" : _lab.SelectedAction));
+
+    private void RunScenarioFromControls()
+    {
+        if (_lab == null || !_lab.CanRunScenario || string.IsNullOrEmpty(CurrentSharedAction()))
+        {
+            _scenarioOutcomes.text = "Open a valid package preview before running a scenario.";
+            return;
+        }
+        if (_scenarioDamage.value < 0 || _scenarioDamage.value > ushort.MaxValue)
+        {
+            _scenarioOutcomes.text = $"Starting damage must be in [0, {ushort.MaxValue}].";
+            return;
+        }
+        try
+        {
+            var options = new AbilityLabScenarioOptions(
+                CurrentSharedAction(),
+                _scenarioHorizon.value,
+                _scenarioDistance.value,
+                _scenarioOpponent.value == "Shield" ? AbilityLabOpponentBehavior.Shield : AbilityLabOpponentBehavior.Idle,
+                (ushort)_scenarioDamage.value,
+                _scenarioFacing.value);
+            options.Validate();
+            _lab.Playing = false;
+            _lab.RunScenario(options);
+            RefreshScenarioControls();
+            SceneView.RepaintAll();
+        }
+        catch (Exception exception)
+        {
+            _scenarioOutcomes.text = $"Scenario failed: {exception.Message}";
+        }
+    }
+
+    private void ExitScenarioToAuthoring()
+    {
+        if (_lab == null) return;
+        bool exitingGrab = _lab.Scenario?.Options.Action == "grab";
+        _hadScenario = false;
+        if (exitingGrab && _grabSelected)
+        {
+            _lab.ShowHitboxes = _grabPriorShowHitboxes;
+            _grabSelected = false;
+            _airborneSelector = _lab.SelectedSlotId.StartsWith("air.", StringComparison.Ordinal);
+            UpdateMoveModeButtons();
+            BuildMoveButtons(_airborneSelector);
+        }
+        _lab.ExitScenario();
+        RefreshScenarioControls();
+        RefreshInspector();
+        SceneView.RepaintAll();
+    }
+
+    private void InvalidateScenarioControls()
+    {
+        if (_refreshingScenarioControls || _lab?.Scenario == null) return;
+        _hadScenario = false;
+        _lab.ExitScenario();
+        _scenarioOutcomes.text = "Scenario options changed; run again to record new results.";
+        RefreshInspector();
+        UpdateTimelineControls();
+        SceneView.RepaintAll();
+    }
+
+    internal void RefreshScenarioControls()
+    {
+        if (!_uiReady && _scenarioAction == null) return;
+        _lab = FindLab();
+        string action = CurrentSharedAction();
+        _scenarioAction.text = string.IsNullOrEmpty(action) ? "Action: —" : $"Action: {action}";
+        bool available = _lab != null && _lab.CanRunScenario;
+        _scenarioRun.SetEnabled(available);
+        bool hasScenario = _lab?.Scenario != null;
+        bool scenarioEnded = _hadScenario && !hasScenario;
+        bool scenarioStarted = hasScenario && !_hadScenario;
+        if (hasScenario) _hadScenario = true;
+        _scenarioExit.SetEnabled(hasScenario);
+        bool selectionChanged = !string.Equals(action, _displayedSharedAction, StringComparison.Ordinal);
+        if (selectionChanged)
+        {
+            bool grab = action == "grab";
+            if (grab != _grabSelected)
+            {
+                if (grab)
+                {
+                    _grabPriorShowHitboxes = _lab?.ShowHitboxes ?? false;
+                    if (_lab != null) _lab.ShowHitboxes = false;
+                }
+                else if (_grabSelected && _lab != null)
+                {
+                    _lab.ShowHitboxes = _grabPriorShowHitboxes;
+                }
+                _grabSelected = grab;
+                _selectedOperation = null;
+            }
+            _airborneSelector = action.StartsWith("air.", StringComparison.Ordinal);
+            _displayedSharedAction = action;
+        }
+        if (hasScenario && action != "grab" && _selectedOperation != null)
+        {
+            _selectedOperation = null;
+            selectionChanged = true;
+        }
+        if (scenarioStarted && action != "grab")
+        {
+            _selectedOperation = null;
+            selectionChanged = true;
+        }
+        _refreshingScenarioControls = true;
+        if (hasScenario)
+        {
+            var result = _lab!.Scenario!;
+            var options = result.Options;
+            _scenarioDistance.SetValueWithoutNotify(options.Distance);
+            _scenarioFacing.SetValueWithoutNotify(options.RelativeFacingDegrees);
+            _scenarioDamage.SetValueWithoutNotify(options.OpponentDamage);
+            _scenarioOpponent.SetValueWithoutNotify(options.OpponentBehavior == AbilityLabOpponentBehavior.Shield ? "Shield" : "Idle");
+            _scenarioHorizon.SetValueWithoutNotify(options.LastFrame);
+            var contacts = result.Contacts.Select(contact =>
+                $"{(contact.Hit.Blocked ? "Block" : "Hit")} frame {contact.FrameIndex} · {contact.Hit.Damage:0.##}%");
+            var interactions = result.Interactions.Select(interaction =>
+                $"{interaction.Kind} frame {interaction.FrameIndex} (tick {interaction.MatchTick})");
+            var outcomes = contacts.Concat(interactions).ToList();
+            if (outcomes.Count == 0) outcomes.Add("No contact or grab interaction observed.");
+            outcomes.Add($"{result.PresentationEvents.Count} presentation event(s) · {result.Deaths.Count} death(s)");
+            _scenarioOutcomes.text = string.Join("\n", outcomes);
+        }
+        else if (_hadScenario)
+        {
+            _scenarioOutcomes.text = "Scenario invalidated by preview changes; run again.";
+            _hadScenario = false;
+        }
+        else if (_lab?.IsScenarioPreview != true &&
+                 !_scenarioOutcomes.text.StartsWith("Scenario options changed", StringComparison.Ordinal) &&
+                 !_scenarioOutcomes.text.StartsWith("Scenario invalidated", StringComparison.Ordinal) &&
+                 !_scenarioOutcomes.text.StartsWith("Scenario failed:", StringComparison.Ordinal))
+        {
+            _scenarioOutcomes.text = "No scenario run.";
+        }
+        _refreshingScenarioControls = false;
+        if (selectionChanged)
+        {
+            UpdateMoveModeButtons();
+            BuildMoveButtons(_airborneSelector);
+            RefreshInspector();
+        }
+        if (scenarioEnded) RefreshInspector();
+        UpdateTimelineControls();
     }
     private void SelectMoveMode(bool airborne)
     {
@@ -473,6 +768,7 @@ public sealed class AbilityLabWindow : EditorWindow
         UpdateMoveModeButtons();
         UpdateTimelineControls();
         RefreshInspector();
+        RefreshScenarioControls();
         BuildMoveButtons(airborne);
     }
 
@@ -944,6 +1240,30 @@ public sealed class AbilityLabWindow : EditorWindow
         }
         RefreshAll();
     }
+    internal bool OpenPackageForCommand(
+        CharacterPackageInspectionResult inspection,
+        out string errorCode,
+        out string errorMessage)
+    {
+        errorCode = "";
+        errorMessage = "";
+        if (!CanCommandOpenPackage(_workspace.HasPackage, _workspace.PackageId, _workspace.IsDirty, inspection.PackageId))
+        {
+            errorCode = "workspace.dirty";
+            errorMessage = $"Cannot switch from dirty package '{_workspace.PackageId}' to '{inspection.PackageId}'.";
+            return false;
+        }
+        if (_workspace.HasPackage && _workspace.PackageId == inspection.PackageId && _workspace.IsDirty)
+            return true;
+        if (!_workspace.OpenPackage(inspection))
+        {
+            errorCode = "package.open.failed";
+            errorMessage = string.Join("; ", _workspace.Diagnostics.Select(diagnostic => diagnostic.Message));
+            return false;
+        }
+        if (_uiReady) RefreshAll();
+        return true;
+    }
 
     private void RefreshAll()
     {
@@ -961,6 +1281,7 @@ public sealed class AbilityLabWindow : EditorWindow
         RefreshDiagnostics();
         RefreshRigState();
         UpdateTimelineControls();
+        RefreshScenarioControls();
         RefreshCompatibilityControls();
         if (_grabSelected) RefreshInspector();
         RestoreFocus(focusedName);
@@ -1013,6 +1334,8 @@ public sealed class AbilityLabWindow : EditorWindow
         _preview = _workspace.Preview;
         if (_activePage == "compatibility-page")
             return;
+        if (_workspace.HasPackage && _workspace.Preview?.IsAvailable == true)
+            _workspace.PrepareScenarioPreview();
         if (_workspace.LiveDraftPackage != null && _preview?.IsAvailable == true)
         {
             _lab?.ApplyPackageDraftPreview(_workspace.LiveDraftPackage, _preview);
@@ -1030,10 +1353,12 @@ public sealed class AbilityLabWindow : EditorWindow
             string priorSlot = _lab?.SelectedSlotId ?? CanonicalSlotProjection.All[0].Id;
             bool previewChanged = _lab != null &&
                 (_lab.SelectedPackageId != _preview.Identity.PackageId ||
-                 _lab.SelectedPackageHash != _preview.Identity.PackageHash);
+                 _lab.SelectedPackageHash != _preview.Identity.PackageHash || !_lab.AuthoritativePreview);
             if (_lab != null && previewChanged)
             {
                 _lab.ApplyPackagePreview(_preview);
+                _lab.SetSourceDocument(new CharacterPackageSource(_workspace.Manifest, _workspace.Draft));
+                _lab.SetPresentationBindings(_workspace.Catalog.Presentations);
                 if (CanonicalSlotProjection.TryGet(priorSlot, out var priorAddress))
                     _lab.SetSlot(priorAddress);
             }
@@ -1150,6 +1475,7 @@ public sealed class AbilityLabWindow : EditorWindow
                 if (_grabSelected && _lab != null) _lab.ShowHitboxes = _grabPriorShowHitboxes;
                 _grabSelected = false;
                 _lab?.SetSlot(address);
+                RefreshScenarioControls();
                 UpdateTimelineControls();
                 RefreshInspector();
                 BuildMoveButtons(airborne);
@@ -1176,9 +1502,11 @@ public sealed class AbilityLabWindow : EditorWindow
                     if (!_grabSelected) _grabPriorShowHitboxes = _lab.ShowHitboxes;
                     _lab.ShowHitboxes = false;
                     _lab.Playing = false;
+                    if (_lab.CanPreviewGrab) _lab.SelectSharedAction("grab");
                 }
                 _grabSelected = true;
                 _selectedOperation = null;
+                RefreshScenarioControls();
                 UpdateTimelineControls();
                 RefreshInspector();
                 BuildMoveButtons(false);
@@ -1188,6 +1516,7 @@ public sealed class AbilityLabWindow : EditorWindow
                 name = "selected-grab",
                 text = "Grab",
             };
+            grab.SetEnabled(_lab?.CanPreviewGrab == true);
             if (_grabSelected) grab.AddToClassList("move-slot-selected");
             _moveList.Add(grab);
         }
@@ -1213,6 +1542,71 @@ public sealed class AbilityLabWindow : EditorWindow
             foreach (string name in names)
                 _assetsSkeleton.Add(new Label(name));
         }
+
+        _assetsWeaponTrails.Clear();
+        var weaponConfig = available ? _workspace.Catalog.WeaponConfig : null;
+        if (weaponConfig?.Entries != null)
+        {
+            var serialized = new SerializedObject(weaponConfig);
+            for (int i = 0; i < weaponConfig.Entries.Length; i++)
+            {
+                var entry = weaponConfig.Entries[i];
+                if (entry == null) continue;
+                int entryIndex = i;
+                var style = new ObjectField($"Trail style · {entry.BoneName}")
+                {
+                    name = $"trail-style-{i}",
+                    objectType = typeof(GameObject),
+                    allowSceneObjects = false,
+                    value = entry.TrailStylePrefab,
+                    tooltip = "Vendor sword trail prefab supplying material, dissolve, background and glints. Saves to the weapon asset.",
+                };
+                style.RegisterValueChangedCallback(evt =>
+                {
+                    if (_updatingControls) return;
+                    if (!_workspace.ReplaceTrailStyle(entryIndex, evt.newValue as GameObject))
+                    {
+                        style.SetValueWithoutNotify(entry.TrailStylePrefab);
+                        return;
+                    }
+                    _lab?.RefreshPose();
+                    RefreshWorkspaceControls();
+                    SceneView.RepaintAll();
+                });
+                style.TrackPropertyValue(
+                    serialized.FindProperty($"Entries.Array.data[{i}].TrailStylePrefab"), property =>
+                    {
+                        style.SetValueWithoutNotify(property.objectReferenceValue);
+                        _lab?.RefreshPose();
+                        SceneView.RepaintAll();
+                    });
+                _assetsWeaponTrails.Add(style);
+                var width = new Slider($"Blade width · {entry.BoneName}", 0.01f, 1f)
+                {
+                    name = $"trail-blade-width-{i}",
+                    showInputField = true,
+                    value = entry.TrailBladeWidth,
+                    tooltip = "Fraction of blade length inward from the tip. Updates live and edits the weapon asset; no preview-only override.",
+                };
+                width.RegisterValueChangedCallback(evt =>
+                {
+                    if (_updatingControls || !_workspace.ReplaceTrailBladeWidth(entryIndex, evt.newValue)) return;
+                    _lab?.RefreshPose();
+                    RefreshWorkspaceControls();
+                    SceneView.RepaintAll();
+                });
+                width.TrackPropertyValue(
+                    serialized.FindProperty($"Entries.Array.data[{i}].TrailBladeWidth"), property =>
+                    {
+                        width.SetValueWithoutNotify(property.floatValue);
+                        _lab?.RefreshPose();
+                        SceneView.RepaintAll();
+                    });
+                _assetsWeaponTrails.Add(width);
+            }
+        }
+        if (_assetsWeaponTrails.childCount == 0)
+            _assetsWeaponTrails.Add(new Label("No weapon trail configured for this package."));
 
         _assetsLocomotionBindings.Clear();
         var presentation = available ? _workspace.Draft.Presentation : null;
@@ -1460,14 +1854,42 @@ public sealed class AbilityLabWindow : EditorWindow
     }
     private void UpdateTimelineControls()
     {
+        if (_lab?.IsScenarioPreview == true && _lab.Scenario != null)
+        {
+            var result = _lab.Scenario;
+            int frame = Mathf.Clamp(_lab.ScenarioFrame, 0, result.Frames.Count - 1);
+            var sample = result.Frames[frame];
+            int lastFrame = result.Options.LastFrame;
+            _timelineProjection = null;
+            _moveTimeline.style.display = DisplayStyle.Flex;
+            _updatingControls = true;
+            _timelineSlider.lowValue = 0;
+            _timelineSlider.highValue = lastFrame;
+            _timelineSlider.SetValueWithoutNotify(frame);
+            _timelineSlider.SetEnabled(true);
+            _timelinePlay.SetEnabled(true);
+            _timelinePlay.text = _lab.Playing ? "Pause" : "Play";
+            _timelineTick.text = $"Frame {sample.FrameIndex} · Match tick {sample.MatchTick}";
+            _timelineDuration.text = $"Recorded {result.Frames.Count} frames · {result.Frames.Count / (float)AbilityLab.TickRate:0.00}s";
+            _stageSelector.style.display = DisplayStyle.None;
+            _stageSelector.SetEnabled(false);
+            _timelineTrack.style.display = DisplayStyle.None;
+            _timelineTrack.Projection = EmptyTimeline();
+            _timelineTrack.SelectedOperation = _selectedOperation = null;
+            _updatingControls = false;
+            return;
+        }
+        _timelineTrack.style.display = DisplayStyle.Flex;
         if (_grabSelected)
         {
             _timelineProjection = null;
             _timelineSlider.SetEnabled(false);
             _timelinePlay.SetEnabled(false);
             _stageSelector.style.display = DisplayStyle.None;
+            _moveTimeline.style.display = DisplayStyle.None;
             return;
         }
+        _moveTimeline.style.display = DisplayStyle.Flex;
         _timelineProjection = BuildTimelineProjection();
         if (_lab == null || !_lab.IsPackagePreview || _timelineProjection == null || _timelineProjection.Stages.Count == 0)
         {
@@ -1539,16 +1961,44 @@ public sealed class AbilityLabWindow : EditorWindow
         _timelineTrack.MarkDirtyRepaint();
     }
 
+    internal static bool TryResolveCumulativeTick(
+        AbilityLabTimelineProjection projection,
+        int requestedTick,
+        out AbilityLabStageProjection stage,
+        out ushort localTick,
+        out int appliedCumulativeTick)
+    {
+        stage = null!;
+        localTick = 0;
+        appliedCumulativeTick = 0;
+        if (projection == null || projection.Stages.Count == 0) return false;
+        int clamped = Mathf.Clamp(requestedTick, 0, projection.DurationTicks);
+        stage = projection.Stages[^1];
+        foreach (var candidate in projection.Stages)
+            if (clamped < candidate.EndTick) { stage = candidate; break; }
+        localTick = (ushort)Mathf.Clamp(clamped - stage.StartTick, 0, Mathf.Max(0, stage.DurationTicks - 1));
+        appliedCumulativeTick = stage.StartTick + localTick;
+        return true;
+    }
+
+    internal static bool CanCommandOpenPackage(bool hasPackage, string currentPackageId, bool dirty, string targetPackageId)
+        => !hasPackage || !dirty || currentPackageId == targetPackageId;
+
     private void ApplyCumulativeTick(int cumulativeTick)
     {
-        if (_updatingControls || _lab == null || _timelineProjection == null || _timelineProjection.Stages.Count == 0) return;
-        int clamped = Mathf.Clamp(cumulativeTick, 0, _timelineProjection.DurationTicks);
-        var stage = _timelineProjection.Stages[^1];
-        foreach (var candidate in _timelineProjection.Stages)
-            if (clamped < candidate.EndTick) { stage = candidate; break; }
-        int local = Mathf.Clamp(clamped - stage.StartTick, 0, Mathf.Max(0, stage.DurationTicks - 1));
+        if (_updatingControls || _lab == null) return;
+        if (_lab.IsScenarioPreview && _lab.Scenario != null)
+        {
+            _lab.SeekScenario(Mathf.Clamp(cumulativeTick, 0, _lab.Scenario.Options.LastFrame));
+            UpdateTimelineControls();
+            SceneView.RepaintAll();
+            return;
+        }
+        if (_timelineProjection == null ||
+            !TryResolveCumulativeTick(_timelineProjection, cumulativeTick, out var stage, out ushort local, out _))
+            return;
         _lab.SetStage(stage.SourceStageIndex);
-        _lab.SetTick((ushort)local);
+        _lab.SetTick(local);
         UpdateTimelineControls();
     }
 
@@ -1572,8 +2022,14 @@ public sealed class AbilityLabWindow : EditorWindow
 
     private void SetTickDelta(int delta)
     {
-        if (_timelineProjection == null || _lab == null) return;
-        ApplyCumulativeTick(CumulativeTick(_timelineProjection, _lab.StageIndex, _lab.Tick) + delta);
+        if (_lab == null) return;
+        if (_lab.IsScenarioPreview && _lab.Scenario != null)
+        {
+            ApplyCumulativeTick(_lab.ScenarioFrame + delta);
+            return;
+        }
+        if (_timelineProjection != null)
+            ApplyCumulativeTick(CumulativeTick(_timelineProjection, _lab.StageIndex, _lab.Tick) + delta);
     }
 
     private void OnRootKeyDown(KeyDownEvent evt)
@@ -1608,7 +2064,8 @@ public sealed class AbilityLabWindow : EditorWindow
             evt.StopPropagation();
             return;
         }
-        if (packageMode && _lab != null && _lab.IsPackagePreview &&
+        if (packageMode && _lab != null &&
+            (_lab.IsPackagePreview || _lab.IsScenarioPreview) &&
             (evt.keyCode == KeyCode.LeftArrow || evt.keyCode == KeyCode.RightArrow))
         {
             SetTickDelta(evt.keyCode == KeyCode.LeftArrow ? -1 : 1);
@@ -1626,6 +2083,7 @@ public sealed class AbilityLabWindow : EditorWindow
 
     private void SelectOperation(AbilityLabOperationProjection operation)
     {
+        if (_lab?.IsScenarioPreview == true) return;
         _selectedOperation = operation;
         if (_lab == null) return;
         _lab.SetStage(operation.SourceStageIndex);
@@ -1653,6 +2111,7 @@ public sealed class AbilityLabWindow : EditorWindow
     }
     private void CompleteTimelineDrag(AbilityLabTimelineDrag drag)
     {
+        if (_lab?.IsScenarioPreview == true) return;
         if (_lab == null || !_lab.IsPackagePreview || !_workspace.HasPackage) return;
         bool accepted = drag.Mode switch
         {
@@ -1697,7 +2156,14 @@ public sealed class AbilityLabWindow : EditorWindow
     private void RefreshInspector()
     {
         _inspector.Clear();
-        _moveTimeline.style.display = _grabSelected ? DisplayStyle.None : DisplayStyle.Flex;
+        _moveTimeline.style.display = _grabSelected && _lab?.IsScenarioPreview != true
+            ? DisplayStyle.None
+            : DisplayStyle.Flex;
+        if (_lab?.IsScenarioPreview == true && !_grabSelected)
+        {
+            _inspector.Add(new Label("Recorded Shared scenario preview · timeline and outcomes are read-only. Exit to authoring to edit move stages."));
+            return;
+        }
         if (_grabSelected)
         {
             _stageSelector.style.display = DisplayStyle.None;

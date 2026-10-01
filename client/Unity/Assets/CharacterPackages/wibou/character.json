@@ -1,0 +1,1065 @@
+{
+  "authoringSchemaVersion": 3,
+  "displayName": "Wibou",
+  "weight": 100,
+  "movement": {
+    "runSpeed": 15,
+    "runAccelerationA": 20,
+    "runAccelerationB": 12,
+    "dashSpeed": 22,
+    "airDodgeSpeed": 12.1,
+    "airSpeedMax": 7,
+    "airAccelStick": 16,
+    "airAccelBase": 3.2,
+    "jumpForce": 12,
+    "shortHopForce": 7.8,
+    "airJumpVMultiplier": 0.8,
+    "airJumpHMultiplier": 0.85,
+    "gravity": 36,
+    "airFloatGravity": 0,
+    "dashDurationTicks": 16,
+    "dashCooldownTicks": 52,
+    "groundFriction": 8,
+    "airFriction": 6,
+    "maxFallSpeed": 14,
+    "fastFallSpeed": 22,
+    "maxJumps": 2,
+    "jumpSquatTicks": 4,
+    "floatWindowTicks": 35,
+    "rushTicks": 10
+  },
+  "presentation": {
+    "idle": "anim.wibou.idle",
+    "run": "anim.wibou.run",
+    "dash": "anim.wibou.dash",
+    "jump": "anim.wibou.jump",
+    "fall": "anim.wibou.fall",
+    "hitSmall": "anim.wibou.hit-small",
+    "hitMedium": "anim.wibou.hit-medium",
+    "hitHard": "anim.wibou.hit-hard",
+    "tumble": "anim.wibou.tumble",
+    "crouch": "anim.wibou.crouch",
+    "slide": "anim.wibou.slide",
+    "landStartOffsetSeconds": 0.49,
+    "modelResourcePath": "Characters/Wibou",
+    "visualScale": 1,
+    "hurtboxBoneScale": 0.85,
+    "modelYOffset": 0.194,
+    "modelSoleOffset": 0,
+    "autoModelYOffset": false
+  },
+  "capsuleRadius": 0.35,
+  "capsuleHeight": 1.7,
+  "hipHeight": 0.82,
+  "hurtboxRadius": 1,
+  "shieldRadius": 1.05,
+  "captureGeometry": {
+    "reach": 0.78,
+    "width": 0.66,
+    "height": 1.12,
+    "offsetY": 0.56,
+    "attackerAnchor": {
+      "x": 0,
+      "y": 0.56,
+      "z": 0.25
+    },
+    "victimAnchor": {
+      "x": 0,
+      "y": 0.56,
+      "z": 0.38
+    }
+  },
+  "hurtboxCapsules": [
+    {
+      "startX": 0,
+      "startY": 0.2,
+      "startZ": 0,
+      "endX": 0,
+      "endY": 0.9,
+      "endZ": 0,
+      "radius": 0.3
+    },
+    {
+      "startX": 0,
+      "startY": 1.2,
+      "startZ": 0,
+      "endX": 0,
+      "endY": 1.2,
+      "endZ": 0,
+      "radius": 0.22
+    },
+    {
+      "startX": 0.3,
+      "startY": 0.8,
+      "startZ": 0,
+      "endX": 0.6,
+      "endY": 0.6,
+      "endZ": 0.2,
+      "radius": 0.12
+    },
+    {
+      "startX": -0.3,
+      "startY": 0.8,
+      "startZ": 0,
+      "endX": -0.6,
+      "endY": 0.6,
+      "endZ": 0.2,
+      "radius": 0.12
+    },
+    {
+      "startX": 0.15,
+      "startY": 0,
+      "startZ": 0,
+      "endX": 0.15,
+      "endY": -0.8,
+      "endZ": 0,
+      "radius": 0.16
+    },
+    {
+      "startX": -0.15,
+      "startY": 0,
+      "startZ": 0,
+      "endX": -0.15,
+      "endY": -0.8,
+      "endZ": 0,
+      "radius": 0.16
+    }
+  ],
+  "hurtboxBoneDefs": [
+    {
+      "boneId": "bone.head",
+      "offsetX": 0,
+      "offsetY": 0,
+      "offsetZ": 0,
+      "radius": 0.22
+    },
+    {
+      "boneId": "bone.spine2",
+      "offsetX": 0,
+      "offsetY": 0,
+      "offsetZ": 0,
+      "radius": 0.26
+    },
+    {
+      "boneId": "bone.hips",
+      "offsetX": 0,
+      "offsetY": 0,
+      "offsetZ": 0,
+      "radius": 0.26
+    },
+    {
+      "boneId": "bone.right-hand",
+      "offsetX": 0,
+      "offsetY": 0,
+      "offsetZ": 0,
+      "radius": 0.16
+    },
+    {
+      "boneId": "bone.left-hand",
+      "offsetX": 0,
+      "offsetY": 0,
+      "offsetZ": 0,
+      "radius": 0.16
+    },
+    {
+      "boneId": "bone.right-foot",
+      "offsetX": 0,
+      "offsetY": 0,
+      "offsetZ": 0,
+      "radius": 0.16
+    },
+    {
+      "boneId": "bone.left-foot",
+      "offsetX": 0,
+      "offsetY": 0,
+      "offsetZ": 0,
+      "radius": 0.16
+    }
+  ],
+  "attachmentBoneIds": [
+    "_weapon_tip",
+    "_weapon_hilt"
+  ],
+  "presentationIds": [],
+  "capabilityRequirements": [
+    {
+      "capabilityId": "slop.internal.wibou.dash-slash.v1",
+      "capabilityVersion": "1"
+    },
+    {
+      "capabilityId": "slop.internal.wibou.rising-slash.v1",
+      "capabilityVersion": "1"
+    },
+    {
+      "capabilityId": "slop.internal.wibou.blade-flurry.v1",
+      "capabilityVersion": "1"
+    }
+  ],
+  "slots": [
+    {
+      "id": "ground.1",
+      "name": "Quick Slash",
+      "description": "Quick Slash",
+      "iconId": "icon.1",
+      "behavior": "meleeCombo",
+      "aimMode": "none",
+      "aimMovement": "fixed",
+      "cooldownTicks": 0,
+      "isRecoveryMove": false,
+      "preserveMomentumOnStart": false,
+      "allowSlideCarry": true,
+      "timeline": {
+        "stages": [
+          {
+            "durationTicks": 60,
+            "iasaTicks": 24,
+            "landingLagTicks": 0,
+            "autoCancelBeforeTicks": 0,
+            "autoCancelAfterTicks": 0,
+            "attackRange": 2.5,
+            "warpRange": 0,
+            "useTargetLock": true,
+            "rotateTowardTarget": true,
+            "trackingStrength": 0.85,
+            "animationIds": [
+              "anim.wibou.g1"
+            ],
+            "operations": [
+              {
+                "kind": "spawnHitbox",
+                "tick": 12,
+                "unit": "meters",
+                "hitbox": {
+                  "shape": "capsule",
+                  "radius": 0.35,
+                  "offsetX": 0,
+                  "offsetY": 0,
+                  "offsetZ": 0,
+                  "endOffsetX": 0,
+                  "endOffsetY": 0,
+                  "endOffsetZ": 0,
+                  "startBoneId": "_weapon_hilt",
+                  "endBoneId": "_weapon_tip",
+                  "damage": 4,
+                  "angle": 30,
+                  "baseKnockback": 4,
+                  "knockbackGrowth": 20,
+                  "stunTicks": 14,
+                  "durationTicks": 12,
+                  "interruptible": true,
+                  "hitGroup": 0,
+                  "knockbackDirection": "awayFromOwner"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "ground.2",
+      "name": "Double Slash",
+      "description": "Double Slash",
+      "iconId": "icon.2",
+      "behavior": "meleeCombo",
+      "aimMode": "none",
+      "aimMovement": "fixed",
+      "cooldownTicks": 0,
+      "isRecoveryMove": false,
+      "preserveMomentumOnStart": false,
+      "allowSlideCarry": true,
+      "timeline": {
+        "stages": [
+          {
+            "durationTicks": 60,
+            "iasaTicks": 22,
+            "landingLagTicks": 0,
+            "autoCancelBeforeTicks": 0,
+            "autoCancelAfterTicks": 0,
+            "attackRange": 2.75,
+            "warpRange": 0,
+            "useTargetLock": true,
+            "rotateTowardTarget": true,
+            "trackingStrength": 0.85,
+            "animationIds": [
+              "anim.wibou.g2"
+            ],
+            "operations": [
+              {
+                "kind": "spawnHitbox",
+                "tick": 9,
+                "unit": "meters",
+                "hitbox": {
+                  "shape": "capsule",
+                  "radius": 0.35,
+                  "offsetX": 0,
+                  "offsetY": 0,
+                  "offsetZ": 0,
+                  "endOffsetX": 0,
+                  "endOffsetY": 0,
+                  "endOffsetZ": 0,
+                  "startBoneId": "_weapon_hilt",
+                  "endBoneId": "_weapon_tip",
+                  "damage": 3,
+                  "angle": 25,
+                  "baseKnockback": 3,
+                  "knockbackGrowth": 16,
+                  "stunTicks": 10,
+                  "durationTicks": 6,
+                  "interruptible": true,
+                  "hitGroup": 0,
+                  "knockbackDirection": "awayFromOwner"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "ground.3",
+      "name": "Up Slash",
+      "description": "Up Slash",
+      "iconId": "icon.3",
+      "behavior": "meleeCombo",
+      "aimMode": "none",
+      "aimMovement": "fixed",
+      "cooldownTicks": 0,
+      "isRecoveryMove": false,
+      "preserveMomentumOnStart": false,
+      "allowSlideCarry": true,
+      "timeline": {
+        "stages": [
+          {
+            "durationTicks": 60,
+            "iasaTicks": 25,
+            "landingLagTicks": 0,
+            "autoCancelBeforeTicks": 0,
+            "autoCancelAfterTicks": 0,
+            "attackRange": 2.5,
+            "warpRange": 0,
+            "useTargetLock": true,
+            "rotateTowardTarget": true,
+            "trackingStrength": 0.8,
+            "animationIds": [
+              "anim.wibou.g3"
+            ],
+            "operations": [
+              {
+                "kind": "spawnHitbox",
+                "tick": 13,
+                "unit": "meters",
+                "hitbox": {
+                  "shape": "capsule",
+                  "radius": 0.35,
+                  "offsetX": 0,
+                  "offsetY": 0,
+                  "offsetZ": 0,
+                  "endOffsetX": 0,
+                  "endOffsetY": 0,
+                  "endOffsetZ": 0,
+                  "startBoneId": "_weapon_hilt",
+                  "endBoneId": "_weapon_tip",
+                  "damage": 8,
+                  "angle": 80,
+                  "baseKnockback": 6,
+                  "knockbackGrowth": 24,
+                  "stunTicks": 18,
+                  "durationTicks": 7,
+                  "interruptible": true,
+                  "hitGroup": 0,
+                  "knockbackDirection": "awayFromOwner"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "ground.4",
+      "name": "Heavy Down Slash",
+      "description": "Heavy Down Slash",
+      "iconId": "icon.4",
+      "behavior": "meleeCombo",
+      "aimMode": "none",
+      "aimMovement": "fixed",
+      "cooldownTicks": 0,
+      "isRecoveryMove": false,
+      "preserveMomentumOnStart": false,
+      "allowSlideCarry": true,
+      "timeline": {
+        "stages": [
+          {
+            "durationTicks": 70,
+            "iasaTicks": 53,
+            "landingLagTicks": 0,
+            "autoCancelBeforeTicks": 0,
+            "autoCancelAfterTicks": 0,
+            "attackRange": 2.75,
+            "warpRange": 0,
+            "useTargetLock": true,
+            "rotateTowardTarget": true,
+            "trackingStrength": 0.8,
+            "animationIds": [
+              "anim.wibou.g4"
+            ],
+            "operations": [
+              {
+                "kind": "spawnHitbox",
+                "tick": 39,
+                "unit": "meters",
+                "hitbox": {
+                  "shape": "capsule",
+                  "radius": 0.25,
+                  "offsetX": 0,
+                  "offsetY": 0,
+                  "offsetZ": 0,
+                  "endOffsetX": 0,
+                  "endOffsetY": 0,
+                  "endOffsetZ": 0,
+                  "startBoneId": "_weapon_hilt",
+                  "endBoneId": "_weapon_tip",
+                  "damage": 12,
+                  "angle": 8,
+                  "baseKnockback": 8,
+                  "knockbackGrowth": 32,
+                  "stunTicks": 22,
+                  "durationTicks": 14,
+                  "interruptible": true,
+                  "hitGroup": 0,
+                  "knockbackDirection": "awayFromOwner"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "air.1",
+      "name": "Air Slash",
+      "description": "Air Slash",
+      "iconId": "icon.1",
+      "behavior": "meleeCombo",
+      "aimMode": "none",
+      "aimMovement": "fixed",
+      "cooldownTicks": 0,
+      "isRecoveryMove": false,
+      "preserveMomentumOnStart": false,
+      "allowSlideCarry": false,
+      "timeline": {
+        "stages": [
+          {
+            "durationTicks": 26,
+            "iasaTicks": 22,
+            "landingLagTicks": 9,
+            "autoCancelBeforeTicks": 5,
+            "autoCancelAfterTicks": 15,
+            "attackRange": 2.25,
+            "warpRange": 0,
+            "useTargetLock": true,
+            "rotateTowardTarget": true,
+            "trackingStrength": 0.8,
+            "animationIds": [
+              "anim.wibou.a1"
+            ],
+            "operations": [
+              {
+                "kind": "spawnHitbox",
+                "tick": 6,
+                "unit": "meters",
+                "hitbox": {
+                  "shape": "capsule",
+                  "radius": 0.35,
+                  "offsetX": 0,
+                  "offsetY": 0,
+                  "offsetZ": 0,
+                  "endOffsetX": 0,
+                  "endOffsetY": 0,
+                  "endOffsetZ": 0,
+                  "startBoneId": "_weapon_hilt",
+                  "endBoneId": "_weapon_tip",
+                  "damage": 5,
+                  "angle": 30,
+                  "baseKnockback": 4,
+                  "knockbackGrowth": 20,
+                  "stunTicks": 14,
+                  "durationTicks": 7,
+                  "interruptible": true,
+                  "hitGroup": 0,
+                  "knockbackDirection": "awayFromOwner"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "air.2",
+      "name": "Reverse Slash",
+      "description": "Reverse Slash",
+      "iconId": "icon.2",
+      "behavior": "meleeCombo",
+      "aimMode": "none",
+      "aimMovement": "fixed",
+      "cooldownTicks": 0,
+      "isRecoveryMove": false,
+      "preserveMomentumOnStart": false,
+      "allowSlideCarry": false,
+      "timeline": {
+        "stages": [
+          {
+            "durationTicks": 24,
+            "iasaTicks": 20,
+            "landingLagTicks": 9,
+            "autoCancelBeforeTicks": 4,
+            "autoCancelAfterTicks": 14,
+            "attackRange": 2.5,
+            "warpRange": 0,
+            "useTargetLock": true,
+            "rotateTowardTarget": true,
+            "trackingStrength": 0.8,
+            "animationIds": [
+              "anim.wibou.a2"
+            ],
+            "operations": [
+              {
+                "kind": "spawnHitbox",
+                "tick": 4,
+                "unit": "meters",
+                "hitbox": {
+                  "shape": "capsule",
+                  "radius": 0.35,
+                  "offsetX": 0,
+                  "offsetY": 0,
+                  "offsetZ": 0,
+                  "endOffsetX": 0,
+                  "endOffsetY": 0,
+                  "endOffsetZ": 0,
+                  "startBoneId": "_weapon_hilt",
+                  "endBoneId": "_weapon_tip",
+                  "damage": 7,
+                  "angle": 40,
+                  "baseKnockback": 5,
+                  "knockbackGrowth": 24,
+                  "stunTicks": 16,
+                  "durationTicks": 5,
+                  "interruptible": true,
+                  "hitGroup": 0,
+                  "knockbackDirection": "awayFromOwner"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "air.3",
+      "name": "Air Up Slash",
+      "description": "Air Up Slash",
+      "iconId": "icon.3",
+      "behavior": "meleeCombo",
+      "aimMode": "none",
+      "aimMovement": "fixed",
+      "cooldownTicks": 0,
+      "isRecoveryMove": false,
+      "preserveMomentumOnStart": false,
+      "allowSlideCarry": false,
+      "timeline": {
+        "stages": [
+          {
+            "durationTicks": 26,
+            "iasaTicks": 22,
+            "landingLagTicks": 9,
+            "autoCancelBeforeTicks": 3,
+            "autoCancelAfterTicks": 14,
+            "attackRange": 2.25,
+            "warpRange": 0,
+            "useTargetLock": true,
+            "rotateTowardTarget": true,
+            "trackingStrength": 0.8,
+            "animationIds": [
+              "anim.wibou.a3"
+            ],
+            "operations": [
+              {
+                "kind": "spawnHitbox",
+                "tick": 10,
+                "unit": "meters",
+                "hitbox": {
+                  "shape": "capsule",
+                  "radius": 0.35,
+                  "offsetX": 0,
+                  "offsetY": 0,
+                  "offsetZ": 0,
+                  "endOffsetX": 0,
+                  "endOffsetY": 0,
+                  "endOffsetZ": 0,
+                  "startBoneId": "_weapon_hilt",
+                  "endBoneId": "_weapon_tip",
+                  "damage": 7,
+                  "angle": 78,
+                  "baseKnockback": 5,
+                  "knockbackGrowth": 22,
+                  "stunTicks": 16,
+                  "durationTicks": 6,
+                  "interruptible": true,
+                  "hitGroup": 0,
+                  "knockbackDirection": "awayFromOwner"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "air.4",
+      "name": "Air Heavy Down Slash",
+      "description": "Air Heavy Down Slash",
+      "iconId": "icon.4",
+      "behavior": "meleeCombo",
+      "aimMode": "none",
+      "aimMovement": "fixed",
+      "cooldownTicks": 0,
+      "isRecoveryMove": false,
+      "preserveMomentumOnStart": false,
+      "allowSlideCarry": false,
+      "timeline": {
+        "stages": [
+          {
+            "durationTicks": 34,
+            "iasaTicks": 29,
+            "landingLagTicks": 9,
+            "autoCancelBeforeTicks": 5,
+            "autoCancelAfterTicks": 22,
+            "attackRange": 2.5,
+            "warpRange": 0,
+            "useTargetLock": true,
+            "rotateTowardTarget": true,
+            "trackingStrength": 0.8,
+            "animationIds": [
+              "anim.wibou.a4"
+            ],
+            "operations": [
+              {
+                "kind": "spawnHitbox",
+                "tick": 8,
+                "unit": "meters",
+                "hitbox": {
+                  "shape": "capsule",
+                  "radius": 0.35,
+                  "offsetX": 0,
+                  "offsetY": 0,
+                  "offsetZ": 0,
+                  "endOffsetX": 0,
+                  "endOffsetY": 0,
+                  "endOffsetZ": 0,
+                  "startBoneId": "_weapon_hilt",
+                  "endBoneId": "_weapon_tip",
+                  "damage": 10,
+                  "angle": -65,
+                  "baseKnockback": 6,
+                  "knockbackGrowth": 26,
+                  "stunTicks": 20,
+                  "durationTicks": 7,
+                  "interruptible": true,
+                  "hitGroup": 0,
+                  "knockbackDirection": "awayFromOwner"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "ground.A",
+      "name": "Shuriken Toss",
+      "description": "Shuriken Toss",
+      "iconId": "icon.a",
+      "behavior": "aimedProjectile",
+      "aimMode": "cameraForward3D",
+      "aimMovement": "fixed",
+      "cooldownTicks": 120,
+      "isRecoveryMove": false,
+      "preserveMomentumOnStart": false,
+      "allowSlideCarry": false,
+      "timeline": {
+        "stages": [
+          {
+            "durationTicks": 24,
+            "iasaTicks": 16,
+            "landingLagTicks": 0,
+            "autoCancelBeforeTicks": 0,
+            "autoCancelAfterTicks": 0,
+            "attackRange": 0,
+            "warpRange": 0,
+            "useTargetLock": false,
+            "rotateTowardTarget": false,
+            "trackingStrength": 0,
+            "animationIds": [
+              "anim.wibou.shuriken"
+            ],
+            "operations": [
+              {
+                "kind": "setAimState",
+                "tick": 0,
+                "unit": "ticks",
+                "aimState": "cameraForward3D"
+              },
+              {
+                "kind": "spawnProjectile",
+                "tick": 8,
+                "unit": "meters",
+                "projectile": {
+                  "launchOffsetX": 0,
+                  "launchOffsetY": 1.2,
+                  "launchOffsetZ": 0.6,
+                  "speed": 20,
+                  "gravity": 0,
+                  "radius": 0.2,
+                  "damage": 4,
+                  "angle": 35,
+                  "baseKnockback": 4,
+                  "knockbackGrowth": 18,
+                  "stunTicks": 12,
+                  "maxFlightTicks": 90,
+                  "yawOffsetDegrees": 0
+                }
+              },
+              {
+                "kind": "spawnProjectile",
+                "tick": 8,
+                "unit": "meters",
+                "projectile": {
+                  "launchOffsetX": 0,
+                  "launchOffsetY": 1.2,
+                  "launchOffsetZ": 0.6,
+                  "speed": 20,
+                  "gravity": 0,
+                  "radius": 0.2,
+                  "damage": 4,
+                  "angle": 35,
+                  "baseKnockback": 4,
+                  "knockbackGrowth": 18,
+                  "stunTicks": 12,
+                  "maxFlightTicks": 90,
+                  "yawOffsetDegrees": -15
+                }
+              },
+              {
+                "kind": "spawnProjectile",
+                "tick": 8,
+                "unit": "meters",
+                "projectile": {
+                  "launchOffsetX": 0,
+                  "launchOffsetY": 1.2,
+                  "launchOffsetZ": 0.6,
+                  "speed": 20,
+                  "gravity": 0,
+                  "radius": 0.2,
+                  "damage": 4,
+                  "angle": 35,
+                  "baseKnockback": 4,
+                  "knockbackGrowth": 18,
+                  "stunTicks": 12,
+                  "maxFlightTicks": 90,
+                  "yawOffsetDegrees": 15
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "ground.E",
+      "name": "Rising Slash",
+      "description": "An upward recovery slash that carries Wibou into the air.",
+      "iconId": "icon.e",
+      "behavior": "meleeCombo",
+      "aimMode": "none",
+      "aimMovement": "mobile",
+      "cooldownTicks": 90,
+      "isRecoveryMove": true,
+      "preserveMomentumOnStart": false,
+      "allowSlideCarry": false,
+      "chargePool": {
+        "maxCharges": 2,
+        "regenTicks": 240
+      },
+      "timeline": {
+        "stages": [
+          {
+            "durationTicks": 60,
+            "iasaTicks": 0,
+            "landingLagTicks": 0,
+            "autoCancelBeforeTicks": 0,
+            "autoCancelAfterTicks": 0,
+            "attackRange": 0,
+            "warpRange": 0,
+            "useTargetLock": false,
+            "rotateTowardTarget": false,
+            "trackingStrength": 0,
+            "animationIds": [
+              "anim.wibou.e"
+            ],
+            "operations": [
+              {
+                "kind": "startCapability",
+                "tick": 0,
+                "unit": "ticks",
+                "capabilityId": "slop.internal.wibou.rising-slash.v1",
+                "capabilityVersion": "1",
+                "parameters": {
+                  "riseSpeed": 8,
+                  "riseTicks": 30,
+                  "homingRange": 7,
+                  "homingSpeed": 10
+                }
+              },
+              {
+                "kind": "spawnHitbox",
+                "tick": 19,
+                "unit": "meters",
+                "hitbox": {
+                  "shape": "capsule",
+                  "radius": 0.5,
+                  "offsetX": 0,
+                  "offsetY": 0,
+                  "offsetZ": 0,
+                  "endOffsetX": 0,
+                  "endOffsetY": 0,
+                  "endOffsetZ": 0,
+                  "startBoneId": "_weapon_hilt",
+                  "endBoneId": "_weapon_tip",
+                  "damage": 1,
+                  "angle": 45,
+                  "baseKnockback": 5,
+                  "knockbackGrowth": 80,
+                  "stunTicks": 8,
+                  "durationTicks": 20,
+                  "interruptible": false,
+                  "hitGroup": 0,
+                  "knockbackDirection": "awayFromOwner"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "ground.R",
+      "name": "Dash Slash",
+      "description": "Aim a direction, then dash and slash.",
+      "iconId": "icon.r",
+      "behavior": "directionalDash",
+      "aimMode": "groundVector",
+      "aimMovement": "mobile",
+      "cooldownTicks": 90,
+      "isRecoveryMove": false,
+      "preserveMomentumOnStart": false,
+      "allowSlideCarry": false,
+      "timeline": {
+        "stages": [
+          {
+            "durationTicks": 80,
+            "iasaTicks": 65,
+            "landingLagTicks": 0,
+            "autoCancelBeforeTicks": 0,
+            "autoCancelAfterTicks": 0,
+            "attackRange": 0,
+            "warpRange": 0,
+            "useTargetLock": false,
+            "rotateTowardTarget": false,
+            "trackingStrength": 0,
+            "animationIds": [
+              "anim.wibou.r"
+            ],
+            "operations": [
+              {
+                "kind": "startCapability",
+                "tick": 0,
+                "unit": "ticks",
+                "capabilityId": "slop.internal.wibou.dash-slash.v1",
+                "capabilityVersion": "1",
+                "parameters": {
+                  "dashDistance": 6.4,
+                  "dashDurationTicks": 50,
+                  "maxAimTicks": 60
+                }
+              },
+              {
+                "kind": "spawnHitbox",
+                "tick": 31,
+                "unit": "meters",
+                "hitbox": {
+                  "shape": "capsule",
+                  "radius": 0.5,
+                  "offsetX": 0,
+                  "offsetY": 0,
+                  "offsetZ": 0,
+                  "endOffsetX": 0,
+                  "endOffsetY": 0,
+                  "endOffsetZ": 0,
+                  "startBoneId": "_weapon_hilt",
+                  "endBoneId": "_weapon_tip",
+                  "damage": 1,
+                  "angle": 45,
+                  "baseKnockback": 5,
+                  "knockbackGrowth": 80,
+                  "stunTicks": 8,
+                  "durationTicks": 9,
+                  "interruptible": false,
+                  "hitGroup": 0,
+                  "knockbackDirection": "awayFromOwner"
+                }
+              },
+              {
+                "kind": "forwardLunge",
+                "tick": 1,
+                "unit": "metersPerSecond",
+                "speed": 5,
+                "durationTicks": 6
+              },
+              {
+                "kind": "forwardLunge",
+                "tick": 7,
+                "unit": "metersPerSecond",
+                "speed": 10.5,
+                "durationTicks": 25
+              },
+              {
+                "kind": "forwardLunge",
+                "tick": 32,
+                "unit": "metersPerSecond",
+                "speed": 5.1,
+                "durationTicks": 18
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "ground.F",
+      "name": "Skyfall",
+      "description": "Launch the opponent upward, follow into the air, then spike them straight down.",
+      "iconId": "icon.f",
+      "behavior": "meleeCombo",
+      "aimMode": "none",
+      "aimMovement": "fixed",
+      "cooldownTicks": 540,
+      "isRecoveryMove": false,
+      "preserveMomentumOnStart": false,
+      "allowSlideCarry": false,
+      "timeline": {
+        "stages": [
+          {
+            "durationTicks": 128,
+            "iasaTicks": 0,
+            "landingLagTicks": 0,
+            "autoCancelBeforeTicks": 0,
+            "autoCancelAfterTicks": 0,
+            "attackRange": 0,
+            "warpRange": 0,
+            "useTargetLock": false,
+            "rotateTowardTarget": false,
+            "trackingStrength": 0,
+            "animationIds": [
+              "anim.wibou.f"
+            ],
+            "operations": [
+              {
+                "kind": "startCapability",
+                "tick": 0,
+                "unit": "ticks",
+                "capabilityId": "slop.internal.wibou.blade-flurry.v1",
+                "capabilityVersion": "1",
+                "parameters": {
+                  "forwardSpeed": 0,
+                  "moveTicks": 24
+                }
+              },
+              {
+                "kind": "spawnHitbox",
+                "tick": 14,
+                "unit": "meters",
+                "hitbox": {
+                  "shape": "capsule",
+                  "radius": 0.5,
+                  "offsetX": 0,
+                  "offsetY": 0,
+                  "offsetZ": 0,
+                  "endOffsetX": 0,
+                  "endOffsetY": 0,
+                  "endOffsetZ": 0,
+                  "startBoneId": "_weapon_hilt",
+                  "endBoneId": "_weapon_tip",
+                  "damage": 4,
+                  "angle": 90,
+                  "baseKnockback": 8,
+                  "knockbackGrowth": 0,
+                  "stunTicks": 30,
+                  "durationTicks": 5,
+                  "interruptible": false,
+                  "hitGroup": 0,
+                  "knockbackDirection": "awayFromOwner"
+                }
+              },
+              {
+                "kind": "spawnHitbox",
+                "tick": 60,
+                "unit": "meters",
+                "hitbox": {
+                  "shape": "capsule",
+                  "radius": 0.5,
+                  "offsetX": 0,
+                  "offsetY": 0,
+                  "offsetZ": 0,
+                  "endOffsetX": 0,
+                  "endOffsetY": 0,
+                  "endOffsetZ": 0,
+                  "startBoneId": "_weapon_hilt",
+                  "endBoneId": "_weapon_tip",
+                  "damage": 16,
+                  "angle": -90,
+                  "baseKnockback": 16,
+                  "knockbackGrowth": 18,
+                  "stunTicks": 36,
+                  "durationTicks": 8,
+                  "interruptible": false,
+                  "hitGroup": 1,
+                  "knockbackDirection": "awayFromOwner"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "aliases": [
+    {
+      "from": "air.A",
+      "to": "ground.A"
+    },
+    {
+      "from": "air.E",
+      "to": "ground.E"
+    },
+    {
+      "from": "air.R",
+      "to": "ground.R"
+    },
+    {
+      "from": "air.F",
+      "to": "ground.F"
+    }
+  ]
+}

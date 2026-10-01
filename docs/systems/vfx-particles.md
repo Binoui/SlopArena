@@ -58,6 +58,79 @@ AbilitySpec.BoneTrails[]    ← per-ability data (BoneTrailDef struct)
 - Additive blending, short lifetime (0.1-0.3s), emission disabled by default
 - Trails are toggled on/off via emission module, not created/destroyed per swing
 
+### Wibou blade sweep
+
+`PlayerRenderer` resolves `_weapon_hilt` and `_weapon_tip` from the baked attack
+pose track. `WeaponAttach` captures simulation presentation ticks, including ticks
+between rendered frames. Training resolver hitboxes and PvP sword-owner snapshots
+gate emission after current character states have been presented; the ribbon never
+decides damage or extends the sword's active window.
+
+The trail-enabled renderer samples its attack animation on the baked 60 Hz frame
+clock. Weapon positions are hips-relative, so cosmetic projection uses the animated
+hips origin and the renderer's model offset. This avoids playback-clock drift and
+the fixed-hip-height offset without changing Shared collision geometry.
+
+`SwordSweepTrail` replaces the Cartoon FX prefab's authored ring geometry with
+world-fixed blade history. It retains the TECH material, textures, start color,
+color/dissolve curves, background slash, and dots. The source radial UV range is
+`0..0.5`; longitudinal coordinates stay attached to samples as older sections
+expire. Blade orientation is interpolated between recorded poses to round the
+ribbon without shortening the blade or moving recorded endpoints. Dissolve is
+adapted from whole-arc reveal to section age.
+Artwork advances at a fixed scale based on half the source effect duration,
+bounded below by the mesh history lifetime. This exposes more texture detail
+without refitting surviving samples as the tail expires; the existing section-age
+dissolve, width, and particle treatment are unchanged.
+
+The prefab supplies appearance, not the generated sweep's width. Weapon entries
+expose `TrailBladeWidth` (fraction of blade length inward from the tip) and
+`HitboxMotionTime` (mesh history in seconds).
+Dots use local size scaling so Wibou's large weapon import scale cannot enlarge
+them, but their positions and simulation remain world-space. They are manually
+emitted and advanced, without the prefab's circular emitter or automatic stepping.
+
+In Ability Lab, **Assets → Weapon trails → Blade width** edits the selected
+package's actual weapon asset, with a slider and numeric input. The change is
+saved to that asset and uses the workspace's Undo/Redo; it is not a preview-only
+override. Width changes redraw the existing foreground/background meshes live,
+including when the preview is paused. Inspector edits are tracked by the same
+control. Changing a C# field initializer does not overwrite a loaded asset value.
+**Trail style** beside the width control selects a vendor prefab on the same weapon
+asset, with Undo/Redo. Switching rebuilds the cosmetic trail and redraws paused
+history; it does not replace the sword or use the vendor's authored spiral mesh.
+Wibou can compare TECH (360 Thin Spiral) and TECH (360 Spiral) this way.
+
+Editor previews own an animation-catalog snapshot so asset refresh cannot unload
+their live animation bindings during trail tuning.
+
+Stopping emission leaves the tail and glints to expire. New attack/stage identity,
+respawn, teleport, or character replacement clears old sweep history; separate
+active windows are not connected. Ability Lab rebuilds recent baked history and
+the longer-lived glints when scrubbing, including frames after the sword window.
+The airborne authoring arena places its virtual floor below the character, so a
+selected air move is not canceled immediately by landing. Authoritative preview
+states drive the displayed model's position and facing.
+No publishing cook is required for these presentation-code changes.
+
+### Bonk SLASH sweep
+
+Bonk's `BonkWeaponAttachConfig.asset` selects **CFXR4 Sword Trail SLASH (360 Spiral)**
+with `bladeHilt` / `bladeEnd`, 0.8 blade coverage, and 0.12-second mesh history.
+The existing baked `_weapon_hilt` → `_weapon_tip` hitbox windows gate emission.
+
+The shared sweep also accepts SLASH's `Background trail`, `Lines`, and `Lines black`
+layers. Its background starts after the authored 0.04-second delay; dark line
+emission starts after 0.05 seconds. Line layers retain their materials, tint,
+size/lifetime curves, and rate-over-time curves. Their circular emitter/orbit is
+replaced by world-space emission along the moving blade, with trailing velocity.
+Their particles outlive emission and expire naturally; separate hit windows
+restart layer timing without joining the ribbons.
+
+TECH keeps its existing `Background slash` and five dots per moving pose sample.
+Style and width remain editable through Ability Lab's weapon-trail controls.
+
+
 ---
 ## Match Text VFX
 
@@ -192,7 +265,7 @@ reused `Mesh`, and the same material. Vertex geometry and colors are rebuilt in 
 no child strokes or per-hit materials are allocated. The effect holds through hitstop, then
 expands and fades using unscaled time.
 
-The shared tier is deliberately character-neutral. Manki smoke/fire, Kistu blade fragments,
+The shared tier is deliberately character-neutral. Manki smoke/fire, Wibou blade fragments,
 FightGuy ki, and Nilus void effects must layer over it without changing its gameplay meaning.
 
 ## BoneTrail Prefab
@@ -271,6 +344,7 @@ No code changes needed — PlayerRenderer picks it up automatically.
 |-----|--------|------|
 | Shared impact tiers | Implemented | `GraphicHitEffect.cs` + `CombatFeedback.cs` |
 | Bone trails | Implemented | `BoneTrail.prefab` + `PlayerRenderer.cs` |
+| Wibou baked blade sweep | Implemented | `SwordSweepTrail.cs` + `WeaponAttach.cs` |
 | Match-start text broadcasts | Implemented | `MatchTextVFX.cs` + `MatchTextVFX/MatchText*.prefab` |
 | Character-specific hit layers | Not implemented | — |
 
@@ -288,7 +362,7 @@ No code changes needed — PlayerRenderer picks it up automatically.
 | Dash start and trail | Not implemented |
 | Jump and landing dust | Not implemented |
 | Manki flame and explosions | Not implemented |
-| Kistu blade fragments and glints | Not implemented |
+| Wibou blade fragments and glints | Not implemented |
 | FightGuy ki layer | Not implemented |
 | Nilus void layer | Not implemented |
 | KO and respawn presentation | Not implemented |

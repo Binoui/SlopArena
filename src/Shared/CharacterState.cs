@@ -131,7 +131,7 @@ namespace SlopArena.Shared
         /// </summary>
         public ushort ChargeTicks;
         /// <summary>
-        /// ── Charge-stock pool (refundable ability charges, e.g. Kistu Rising Slash) ──
+        /// ── Charge-stock pool (refundable ability charges, e.g. Wibou Rising Slash) ──
         /// Number of charges currently spent/unavailable (0 = full pool). The pool max
         /// and regen cadence come from the ability spec's "max_charges"/"charge_regen_ticks"
         /// params. Refunded on hit by the ability's OnHitEntity. Server-sim only (not on the wire).

@@ -10,6 +10,8 @@ namespace SlopArena.Client.UI
         // Not serialized: the shell injects the per-activation context at
         // mount time (issue #219).
         private FrontendPageContext _context = null!;
+        private VisualElement? _artworkColumn;
+        private VisualElement? _artwork;
 
 
         public void InjectPageContext(FrontendPageContext context)
@@ -30,6 +32,30 @@ namespace SlopArena.Client.UI
             _context.Q<Button>("menu-solo")!.clicked += () => FrontendController.StartMode(GameMode.Solo);
             _context.Q<Button>("menu-training")!.clicked += () => FrontendController.StartMode(GameMode.Training);
             MenuNavigation.Configure(_context, null, ReturnToMainMenu);
+            _artworkColumn = _context.Q<VisualElement>("menu-artwork-column");
+            _artwork = _context.Q<VisualElement>("menu-artwork");
+            _artworkColumn?.RegisterCallback<GeometryChangedEvent>(FitArtwork);
+        }
+
+        private void FitArtwork(GeometryChangedEvent _)
+        {
+            if (_artworkColumn == null || _artwork == null)
+                return;
+            var available = _artworkColumn.contentRect.size;
+            if (available.x <= 0 || available.y <= 31)
+                return;
+            // Image aspect plus frame/padding: no cropped art or empty side slabs.
+            const float imageAspect = 1438f / 810f;
+            float width = Mathf.Min(Mathf.Min(1464f, available.x), (available.y - 31f) * imageAspect + 26f);
+            _artwork.style.width = width;
+            _artwork.style.height = (width - 26f) / imageAspect + 31f;
+        }
+
+        private void OnDisable()
+        {
+            _artworkColumn?.UnregisterCallback<GeometryChangedEvent>(FitArtwork);
+            _artworkColumn = null;
+            _artwork = null;
         }
 
 

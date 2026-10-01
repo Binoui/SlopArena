@@ -46,9 +46,9 @@ public static class CharacterPackageCompiler
         "slop.internal.fightguy.rising-dragon.v1",
         "slop.internal.fightguy.cyclone-kick.v1",
         "slop.internal.fightguy.dragon-beam.v1",
-        "slop.internal.kistu.dash-slash.v1",
-        "slop.internal.kistu.rising-slash.v1",
-        "slop.internal.kistu.blade-flurry.v1",
+        "slop.internal.wibou.dash-slash.v1",
+        "slop.internal.wibou.rising-slash.v1",
+        "slop.internal.wibou.blade-flurry.v1",
         "slop.internal.bonk.targeted-jump-slam.v1",
         "slop.internal.manki.round-bomb.v1",
         "slop.internal.manki.jetpack-boost.v1",
@@ -365,9 +365,9 @@ public static class CharacterPackageCompiler
             RisingDragonCapabilityParameters x => new[] { x.RiseSpeed },
             CycloneKickCapabilityParameters x => new[] { x.ForwardSpeed, x.BodyRadius, x.SideRadius, x.SideOffset, x.Damage, x.KnockbackAngle, x.KnockbackBase, x.KnockbackGrowth, x.BodyY, x.SideY },
             DragonBeamCapabilityParameters x => new[] { x.LaunchOffsetY, x.BeamRange, x.BeamRadius, x.Damage, x.KnockbackAngle, x.KnockbackBase, x.KnockbackGrowth },
-            KistuDashSlashCapabilityParameters x => new[] { x.DashDistance },
-            KistuRisingSlashCapabilityParameters x => new[] { x.RiseSpeed, x.HomingRange, x.HomingSpeed },
-            KistuBladeFlurryCapabilityParameters x => new[] { x.ForwardSpeed },
+            WibouDashSlashCapabilityParameters x => new[] { x.DashDistance },
+            WibouRisingSlashCapabilityParameters x => new[] { x.RiseSpeed, x.HomingRange, x.HomingSpeed },
+            WibouBladeFlurryCapabilityParameters x => new[] { x.ForwardSpeed },
             BonkTargetedJumpSlamCapabilityParameters x => new[] { x.MinRange, x.MaxRange, x.LaunchVerticalSpeed, x.SlamRadius, x.SlamDamage, x.SlamBaseKnockback, x.SlamKnockbackGrowth },
             MankiRoundBombCapabilityParameters x => new[] { x.MaxRange, x.LaunchAngle, x.Gravity, x.HitboxRadius, x.Damage, x.KbAngle, x.ExplosionDamage, x.ExplosionRadius, x.ExplosionKbBase, x.ExplosionKbGrowth, x.ExplosionKbAngle },
             MankiJetpackBoostCapabilityParameters x => new[] { x.VerticalSpeed, x.HorizontalSpeed, x.ExplosionRadius, x.ExplosionDamage, x.ExplosionKbAngle, x.ExplosionKbBase, x.ExplosionKbGrowth },
@@ -522,9 +522,9 @@ public static class CharacterPackageCompiler
             RisingDragonCapabilityParameters x => x with { },
             CycloneKickCapabilityParameters x => x with { },
             DragonBeamCapabilityParameters x => x with { },
-            KistuDashSlashCapabilityParameters x => x with { },
-            KistuRisingSlashCapabilityParameters x => x with { },
-            KistuBladeFlurryCapabilityParameters x => x with { },
+            WibouDashSlashCapabilityParameters x => x with { },
+            WibouRisingSlashCapabilityParameters x => x with { },
+            WibouBladeFlurryCapabilityParameters x => x with { },
             BonkTargetedJumpSlamCapabilityParameters x => x with { },
             MankiRoundBombCapabilityParameters x => x with { },
             MankiJetpackBoostCapabilityParameters x => x with { },
@@ -572,9 +572,9 @@ public static class CharacterPackageCompiler
         RisingDragonCapabilityParameters x => new CookedRisingDragonCapabilityParameters(x.RiseSpeed, x.RiseTicks, x.RiseDelay),
         CycloneKickCapabilityParameters x => new CookedCycloneKickCapabilityParameters(x.ForwardSpeed, x.WindupTicks, x.HitboxEndTick, x.DurationTicks, x.BodyRadius, x.SideRadius, x.SideOffset, x.Damage, x.KnockbackAngle, x.KnockbackBase, x.KnockbackGrowth, x.StunTicks, x.BodyY, x.SideY),
         DragonBeamCapabilityParameters x => new CookedDragonBeamCapabilityParameters(x.DurationTicks, x.FireTick, x.LaunchOffsetY, x.BeamRange, x.BeamRadius, x.Damage, x.KnockbackAngle, x.KnockbackBase, x.KnockbackGrowth, x.StunTicks, x.HitboxDurationTicks),
-        KistuDashSlashCapabilityParameters x => new CookedKistuDashSlashCapabilityParameters(x.DashDistance, x.DashDurationTicks, x.MaxAimTicks),
-        KistuRisingSlashCapabilityParameters x => new CookedKistuRisingSlashCapabilityParameters(x.RiseSpeed, x.RiseTicks, x.HomingRange, x.HomingSpeed),
-        KistuBladeFlurryCapabilityParameters x => new CookedKistuBladeFlurryCapabilityParameters(x.ForwardSpeed, x.MoveTicks),
+        WibouDashSlashCapabilityParameters x => new CookedWibouDashSlashCapabilityParameters(x.DashDistance, x.DashDurationTicks, x.MaxAimTicks),
+        WibouRisingSlashCapabilityParameters x => new CookedWibouRisingSlashCapabilityParameters(x.RiseSpeed, x.RiseTicks, x.HomingRange, x.HomingSpeed),
+        WibouBladeFlurryCapabilityParameters x => new CookedWibouBladeFlurryCapabilityParameters(x.ForwardSpeed, x.MoveTicks),
         BonkTargetedJumpSlamCapabilityParameters x => new CookedBonkTargetedJumpSlamCapabilityParameters(x.MaxAimTicks, x.MaxFlightTicks, x.MinRange, x.MaxRange, x.LaunchVerticalSpeed, x.SlamRadius, x.SlamDamage, x.SlamAngle, x.SlamBaseKnockback, x.SlamKnockbackGrowth, x.SlamStunTicks, x.SlamDurationTicks),
         MankiRoundBombCapabilityParameters x => new CookedMankiRoundBombCapabilityParameters(x.ThrowTriggerTick, x.MaxRange, x.LaunchAngle, x.Gravity, x.HitboxRadius, x.Damage, x.StunTicks, x.MaxFlightTicks, x.KbAngle, x.ExplosionDamage, x.ExplosionRadius, x.ExplosionKbBase, x.ExplosionKbGrowth, x.ExplosionStunTicks, x.ExplosionDurationTicks, x.ExplosionKbAngle, x.ExplosionPresentationId),
         MankiJetpackBoostCapabilityParameters x => new CookedMankiJetpackBoostCapabilityParameters(x.StartupTicks, x.VerticalSpeed, x.HorizontalSpeed, x.ExplosionRadius, x.ExplosionDamage, x.ExplosionKbAngle, x.ExplosionKbBase, x.ExplosionKbGrowth, x.ExplosionStunTicks, x.ExplosionDurationTicks, x.ExplosionPresentationId),
@@ -781,9 +781,9 @@ public static class CharacterPackageCompiler
             case CookedRisingDragonCapabilityParameters x: Number(w, "riseSpeed", x.RiseSpeed); w.WriteNumber("riseTicks", x.RiseTicks); w.WriteNumber("riseDelay", x.RiseDelay); break;
             case CookedCycloneKickCapabilityParameters x: Number(w, "forwardSpeed", x.ForwardSpeed); w.WriteNumber("windupTicks", x.WindupTicks); w.WriteNumber("hitboxEndTick", x.HitboxEndTick); w.WriteNumber("durationTicks", x.DurationTicks); Number(w, "bodyRadius", x.BodyRadius); Number(w, "sideRadius", x.SideRadius); Number(w, "sideOffset", x.SideOffset); Number(w, "damage", x.Damage); Number(w, "knockbackAngle", x.KnockbackAngle); Number(w, "knockbackBase", x.KnockbackBase); Number(w, "knockbackGrowth", x.KnockbackGrowth); w.WriteNumber("stunTicks", x.StunTicks); Number(w, "bodyY", x.BodyY); Number(w, "sideY", x.SideY); break;
             case CookedDragonBeamCapabilityParameters x: w.WriteNumber("durationTicks", x.DurationTicks); w.WriteNumber("fireTick", x.FireTick); Number(w, "launchOffsetY", x.LaunchOffsetY); Number(w, "beamRange", x.BeamRange); Number(w, "beamRadius", x.BeamRadius); Number(w, "damage", x.Damage); Number(w, "knockbackAngle", x.KnockbackAngle); Number(w, "knockbackBase", x.KnockbackBase); Number(w, "knockbackGrowth", x.KnockbackGrowth); w.WriteNumber("stunTicks", x.StunTicks); w.WriteNumber("hitboxDurationTicks", x.HitboxDurationTicks); break;
-            case CookedKistuDashSlashCapabilityParameters x: Number(w, "dashDistance", x.DashDistance); w.WriteNumber("dashDurationTicks", x.DashDurationTicks); w.WriteNumber("maxAimTicks", x.MaxAimTicks); break;
-            case CookedKistuRisingSlashCapabilityParameters x: Number(w, "riseSpeed", x.RiseSpeed); w.WriteNumber("riseTicks", x.RiseTicks); Number(w, "homingRange", x.HomingRange); Number(w, "homingSpeed", x.HomingSpeed); break;
-            case CookedKistuBladeFlurryCapabilityParameters x: Number(w, "forwardSpeed", x.ForwardSpeed); w.WriteNumber("moveTicks", x.MoveTicks); break;
+            case CookedWibouDashSlashCapabilityParameters x: Number(w, "dashDistance", x.DashDistance); w.WriteNumber("dashDurationTicks", x.DashDurationTicks); w.WriteNumber("maxAimTicks", x.MaxAimTicks); break;
+            case CookedWibouRisingSlashCapabilityParameters x: Number(w, "riseSpeed", x.RiseSpeed); w.WriteNumber("riseTicks", x.RiseTicks); Number(w, "homingRange", x.HomingRange); Number(w, "homingSpeed", x.HomingSpeed); break;
+            case CookedWibouBladeFlurryCapabilityParameters x: Number(w, "forwardSpeed", x.ForwardSpeed); w.WriteNumber("moveTicks", x.MoveTicks); break;
             case CookedBonkTargetedJumpSlamCapabilityParameters x: w.WriteNumber("maxAimTicks", x.MaxAimTicks); w.WriteNumber("maxFlightTicks", x.MaxFlightTicks); Number(w, "minRange", x.MinRange); Number(w, "maxRange", x.MaxRange); Number(w, "launchVerticalSpeed", x.LaunchVerticalSpeed); Number(w, "slamRadius", x.SlamRadius); Number(w, "slamDamage", x.SlamDamage); Number(w, "slamAngle", x.SlamAngle); Number(w, "slamBaseKnockback", x.SlamBaseKnockback); Number(w, "slamKnockbackGrowth", x.SlamKnockbackGrowth); w.WriteNumber("slamStunTicks", x.SlamStunTicks); w.WriteNumber("slamDurationTicks", x.SlamDurationTicks); break;
             case CookedMankiRoundBombCapabilityParameters x: w.WriteNumber("throwTriggerTick", x.ThrowTriggerTick); Number(w, "maxRange", x.MaxRange); Number(w, "launchAngle", x.LaunchAngle); Number(w, "gravity", x.Gravity); Number(w, "hitboxRadius", x.HitboxRadius); Number(w, "damage", x.Damage); w.WriteNumber("stunTicks", x.StunTicks); w.WriteNumber("maxFlightTicks", x.MaxFlightTicks); Number(w, "kbAngle", x.KbAngle); Number(w, "explosionDamage", x.ExplosionDamage); Number(w, "explosionRadius", x.ExplosionRadius); Number(w, "explosionKbBase", x.ExplosionKbBase); Number(w, "explosionKbGrowth", x.ExplosionKbGrowth); w.WriteNumber("explosionStunTicks", x.ExplosionStunTicks); w.WriteNumber("explosionDurationTicks", x.ExplosionDurationTicks); Number(w, "explosionKbAngle", x.ExplosionKbAngle); OptionalString(w, "explosionPresentationId", x.ExplosionPresentationId); break;
             case CookedMankiJetpackBoostCapabilityParameters x: w.WriteNumber("startupTicks", x.StartupTicks); Number(w, "verticalSpeed", x.VerticalSpeed); Number(w, "horizontalSpeed", x.HorizontalSpeed); Number(w, "explosionRadius", x.ExplosionRadius); Number(w, "explosionDamage", x.ExplosionDamage); Number(w, "explosionKbAngle", x.ExplosionKbAngle); Number(w, "explosionKbBase", x.ExplosionKbBase); Number(w, "explosionKbGrowth", x.ExplosionKbGrowth); w.WriteNumber("explosionStunTicks", x.ExplosionStunTicks); w.WriteNumber("explosionDurationTicks", x.ExplosionDurationTicks); OptionalString(w, "explosionPresentationId", x.ExplosionPresentationId); break;

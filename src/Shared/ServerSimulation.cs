@@ -51,6 +51,9 @@ namespace SlopArena.Shared
 		private readonly List<SpellResolver.EntityData> _attackEntities = new();
 		private readonly HashSet<ulong> _shieldSurfaceEntities = new();
 		public List<SpellResolver.HitResult> LastTickHits { get; } = new();
+		/// <summary>Exact surfaces consumed by the latest attack collision pass, including active shields.</summary>
+		public IReadOnlyList<SpellResolver.EntityData> LastTickAttackEntities { get; private set; }
+			= Array.Empty<SpellResolver.EntityData>();
 		private readonly HashSet<ulong> _lastTickAcceptedActions = new();
 		private readonly HashSet<ulong> _damagedThisTick = new();
 		/// <summary>Entity IDs whose actions were accepted during the most recent tick.</summary>
@@ -2058,7 +2061,9 @@ namespace SlopArena.Shared
 			_spellResolver.UpdateBoneHitboxes(_states);
 
 			// ── Step 3: Resolve hitboxes ──
-			var hits = _spellResolver.Tick(BuildAttackEntities(entityList));
+			var attackEntities = BuildAttackEntities(entityList);
+			LastTickAttackEntities = attackEntities;
+			var hits = _spellResolver.Tick(attackEntities);
 			LastTickHits.Clear();
 			foreach (var hit in hits)
 			{

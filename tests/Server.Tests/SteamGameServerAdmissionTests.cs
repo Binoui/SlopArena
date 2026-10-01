@@ -147,6 +147,68 @@ public class SteamGameServerAdmissionTests
     }
 
     [Fact]
+    public async Task SteamOpponentReceivesWibouKunaiUntilServerRemovesThem()
+    {
+        var clock = new TestClock(DateTimeOffset.Parse("2026-09-26T12:00:00Z"));
+        var playing = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var spawned = new TaskCompletionSource<ProjectileVisualPacket>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var removed = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var swordActive = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var swordRemoved = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var match = new MatchInstance(0, Guid.NewGuid().ToString("D"), "slop_court",
+            new[] { new MatchPlayer(1001, CharacterClass.Wibou, 1),
+                new MatchPlayer(1002, CharacterClass.FightGuy, 2) },
+            LoadCatalog(), _ => { }, contentHash: ContentHash,
+            admissionDeadlineUtc: clock.GetUtcNow().AddSeconds(60),
+            steamSend: (_, recipient, frame, _) =>
+            {
+                if (recipient != 2) return;
+                if (frame[0] == SteamGameplayWire.State
+                    && ServerEntityPacket.Deserialize(frame.AsSpan(1)).State.MatchState == MatchState.Playing)
+                    playing.TrySetResult(true);
+                if (frame[0] == SteamGameplayWire.Projectile
+                    && ProjectileVisualPacket.TryDeserialize(frame.AsSpan(1), out var packet))
+                {
+                    if (packet.Projectiles.Count == 3) spawned.TrySetResult(packet);
+                    else if (packet.Projectiles.Count == 0 && spawned.Task.IsCompleted)
+                        removed.TrySetResult(true);
+                }
+                if (frame[0] == SteamGameplayWire.SwordTrail
+                    && SwordTrailSnapshotPacket.TryDeserialize(frame.AsSpan(1), out var sword))
+                {
+                    if (sword.ActiveOwnerIds.Count == 1 && sword.ActiveOwnerIds[0] == 1)
+                        swordActive.TrySetResult(true);
+                    else if (sword.ActiveOwnerIds.Count == 0 && swordActive.Task.IsCompleted)
+                        swordRemoved.TrySetResult(true);
+                }
+            }, clock: clock);
+        match.Start();
+        try
+        {
+            Assert.True(match.TryBindSteamPlayer(1001, 11, ContentHash, out _, out _, out _));
+            Assert.True(match.TryBindSteamPlayer(1002, 22, ContentHash, out _, out _, out _));
+            await playing.Task.WaitAsync(TimeSpan.FromSeconds(8));
+            for (uint tick = 1; tick <= 120; tick++)
+                Assert.True(match.TryQueueSteamInput(11, tick,
+                    tick == 1 ? new InputState { ActiveSlot = AbilitySlots.A, IsAiming = true } : default));
+            var packet = await spawned.Task.WaitAsync(TimeSpan.FromSeconds(3));
+            Assert.Equal(3, packet.Projectiles.Select(x => x.OperationIndex).Distinct().Count());
+            Assert.All(packet.Projectiles, x => Assert.Equal(CharacterClass.Wibou, x.Character));
+            await removed.Task.WaitAsync(TimeSpan.FromSeconds(4));
+            for (uint tick = 121; tick <= 200; tick++)
+                Assert.True(match.TryQueueSteamInput(11, tick,
+                    tick == 121 ? new InputState { ActiveSlot = AbilitySlots.Slot1 } : default));
+            await swordActive.Task.WaitAsync(TimeSpan.FromSeconds(3));
+            await swordRemoved.Task.WaitAsync(TimeSpan.FromSeconds(3));
+        }
+        finally
+        {
+            match.Stop();
+            Assert.True(SpinWait.SpinUntil(() => !match.IsRunning, 2000));
+        }
+    }
+
+    [Fact]
     public async Task SteamWaitingAndOpponentAbsenceAbortWithoutCompetitiveResult()
     {
         var clock = new TestClock(DateTimeOffset.Parse("2026-09-26T12:00:00Z"));

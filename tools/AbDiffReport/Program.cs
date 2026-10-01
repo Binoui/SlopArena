@@ -74,7 +74,7 @@ internal static class Program
         CharacterClass cls = charName.ToLowerInvariant() switch
         {
             "fightguy" or "fg" => CharacterClass.FightGuy,
-            "kistu" => CharacterClass.Kistu,
+            "wibou" => CharacterClass.Wibou,
             "manki" => CharacterClass.Manki,
             "nilus" => CharacterClass.Nilus,
             _ => CharacterClass.FightGuy,

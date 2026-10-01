@@ -14,7 +14,7 @@ namespace SlopArena.Shared
         None,            // No aim input; camera free, cursor locked
         GroundCursor,    // Cursor unlocked; raycast ground → AimYaw + AimDistance
         CameraForward3D, // Cursor locked; camera yaw+pitch → AimYaw + AimPitch
-        /// <summary>Camera locked; mouse delta rotates a ground direction vector around the character (Kistu E).</summary>
+        /// <summary>Camera locked; mouse delta rotates a ground direction vector around the character (Wibou E).</summary>
         GroundVector,    // Camera frozen; mouse delta → AimYaw, fixed distance
     }
     public enum AimMovementMode : byte
@@ -33,7 +33,7 @@ namespace SlopArena.Shared
         AirGroundProjectile, // Behaves differently when airborne vs grounded.
         SelfBuff,            // Applies a buff to self.
         AreaDenial,          // Places persistent hazard (mine, flame wall).
-        DirectionalDash,     // Hold to aim a ground direction, release to dash a set distance (Kistu E).
+        DirectionalDash,     // Hold to aim a ground direction, release to dash a set distance (Wibou E).
     }
 
     /// <summary>Describes a bone trail particle VFX for an ability stage.</summary>

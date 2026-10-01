@@ -1,24 +1,33 @@
 # SlopArena Visual Language
 
 **Status:** living guide  
-**Scope:** graphic identity, UI presentation, marketing surfaces, community/Workshop surfaces, and presentation copy  
-**Canonical reference implementation:** [SlopArena Web](https://github.com/Binoui/SlopArena-web) and its [live landing page](https://binoui.github.io/SlopArena-web/)
+**Scope:** shared visual identity, 3D art intent, UI presentation, marketing, community/Workshop surfaces, and presentation copy  
+**Graphic reference:** [SlopArena Web](https://github.com/Binoui/SlopArena-web) and its [live landing page](https://binoui.github.io/SlopArena-web/) are the strongest existing marketing expression, not a template for every surface or proof of release availability.
 
 ## Purpose
 
 SlopArena needs to look like the same game across menus, results, trailers, web pages, Workshop documentation, social images, and future creator tools. This guide defines the reusable visual grammar behind those surfaces.
 
-It does not prescribe one layout. New work should preserve the identity while adapting composition to the job of the screen.
+It does not prescribe one layout or shader. Reconcile weaker existing choices when that strengthens the identity; this unreleased solo-developed project is not bound to preserve every incumbent treatment.
 
 The separate [Art and Asset Conventions](../contributing/conventions.md) remain authoritative for 3D character rendering, source assets, animation naming, licensing, and package hygiene. The two guides meet at readability, palette, silhouette, and presentation tone.
 
-## Native pre-match flow
+## Approved direction and implementation status
+
+The direction reconciled on 2026-09-30 is **low-poly underground toy-fight-club, with DIY internet-game energy**. SlopArena is not on Steam yet. Release copy must describe actual access rather than imply a public storefront or available Steam demo.
+
+The shared graphic anchors are the **Archivo Black name mark and menu declarations**, **Action Yellow `#FFCC22`**, warm Paper/dark Ink, and Orange impact. This is an approved direction, not a claim that every surface implements it. Native UI still uses Baloo 2 and older yellow shades in places; the website still uses chartreuse and misleading Steam availability copy. This documentation reconciliation does not change fonts, styles, assets, or release copy in the running products.
+
+The owning `DESIGN.md` files specify each surface's realization; Impeccable surface briefs and JSON sidecars mirror those decisions. They do not establish competing brand guides.
+
+## Current native pre-match implementation
 
 The Unity implementation lives in `Assets/UI/SlopArena.uss` and the Main Menu, Server Browser,
 Lobby Room, Character Select, and Stage Select UXML screens. The menu uses the bundled
 Baloo 2 display face through `Assets/Fonts/Baloo2.asset`; utility text retains Unity's UI
-face. Ink, paper, acid, and orange carry the fight-flyer identity without tactical grit
-or invented social activity.
+face. Ink, paper, yellow, and orange carry the fight-flyer identity without tactical grit
+or invented social activity. Baloo is current implementation evidence, not the approved
+display direction for future reconciliation.
 
 Settings is the first page-by-page pack-inspired layout pass. The frontend and match
 settings entry points keep their existing navigation and preferences; both mount the
@@ -31,38 +40,40 @@ with credit but prohibits redistributing the assets themselves. That directory
 is excluded through local `.git/info/exclude`; clean checkouts use project-owned
 fallback styles until an asset-distribution plan is agreed.
 
-- **Persistent top bar:** The yellow Baloo wordmark plate remains the Home
-  control; TRAINING / SOLO / ONLINE sit directly on the dark bar in the same
-  order as Home, marking only the active mode with yellow text and a short
-  underline. Tabs switch modes from Home, the room browser, and local Fighter
-  or Stage Select, returning through Home's existing reset before entering a
-  different mode. The display-name gate and modal guard still apply; active
-  Rooms, online match setup, and Results retain their Back/Leave path instead
-  of abandoning a session. A muted border separates the bar from the
-  workspace. Settings, identity, and Menu remain on the right; identity
-  colors reflect offline, connected, and warning states without changing
-  presence logic.
-- **Main Menu:** Training, Solo, and Online have three large Home buttons
-  in top-tab order, using the same mode routes and display-name gate. Home
-  uses a #151219 field, #24202B announcement panel and secondary buttons,
-  #423B49 borders, #F1EBDD main text, #ABA3B2 muted text, and #FFCC22 for
-  Online and focus. The three buttons share left-aligned Baloo labels,
-  padding, and a thick bottom edge; the local licensed baked-color sprites
-  are not used on Home.
-  A fixed upper-right announcement board uses the same charcoal and
-  warm-white palette with a small yellow heading and a restrained dark edge;
-  its compact height avoids a tall empty frame. The supplied 1438×810
-  SlopArena art stays centered at native size in the workspace below the
-  persistent top bar. Fighter selection reads the admitted cooked catalog.
-- **Chat:** The presenter has no header bar; Expand/Minimize icons sit directly
-  left of the top-right resize grip, and account entry lives in the shared shell.
-  Its menu surface is near-opaque charcoal over Home art, with warm-white copy,
-  a dark input, yellow input focus and active-tab underline, and a charcoal SEND
-  control. A user-resized width and height are one preference shared across
-  menu and gameplay, saved across scenes and launches, with host-specific
-  minimum and viewport bounds. On Home, chat overlays the page at bottom left
-  without reserving layout space; on other frontend pages it stays in its
-  bottom-left shell cell. Gameplay chat mirrors to the left side of the HUD.
+- **Persistent top bar:** The yellow Archivo wordmark remains the Home
+  control; TRAINING / SOLO / ONLINE retain their order. The authored wallpaper
+  continues behind the transparent bar; navigation has local paper backing
+  and a visible ink border.
+  Active mode uses an ink-on-yellow field and ink underline; exposed identity
+  and utility labels use readable paper-surface roles rather than pale text.
+  Existing display-name/modal/session guards and Back/Leave routes remain.
+  Settings, identity, and Menu stay on the right; semantic connection colors
+  change only for contrast, not presence logic.
+- **Main Menu:** Training, Solo, and Online keep their original routes and
+  display-name gate, with paper Training/Solo controls and yellow Online.
+  The approved 2026-10-01 layout separates left mode buttons, center artwork,
+  and right announcements instead of stacking controls over the illustration.
+  Original 1438×810 art remains fully visible in an aspect-fitted ink/paper
+  frame; yellow attachment strips and an announcement heading add print character.
+  The larger poster uses available page height independently of chat size.
+  The user-authored `Assets/UI/FrontendPaperBackground.png` is shared behind
+  every frontend shell page, not substituted for the 3D gameplay arenas.
+  `#F0EEE8` controls/header fields, exact `#1B1A18` ink, Archivo declarations,
+  and `#FFCC22` actions remain; no local licensed sprites are required for Home.
+  Fighter selection continues to read the admitted cooked catalog.
+- **Chat:** Hide and resize form one top-right control row; there is no maximize.
+  Hidden chat reopens with CHAT at bottom-left. Account entry stays in the shell.
+  Paper frame/channel tabs and ink text contrast with dark history/input fields.
+  Active channel and available SEND are yellow; unavailable controls remain
+  readable and disabled. Direct retains conversation and mute management.
+  Shared user-resized dimensions persist across menus, gameplay, scenes, and launches within viewport bounds.
+  Chat is an absolute overlay everywhere: it never reserves page space or
+  moves/resizes the composition underneath, including Home's poster.
+  Selection pages keep default bottom-left chat space free of essential controls:
+  fighter P1/P2, Player/CPU configuration, and stage participants/actions
+  sit in the bottom middle/right. This layout never tracks resized chat dimensions.
+  User-enlarged overlap remains permitted; do not rebalance controls dynamically.
+  Frontend and gameplay keep their established left-side anchoring.
   Match entry still closes interactive chat input; disconnected and send
   feedback render inside the message history instead of below the composer.
 - **Online:** browsing, hosting, and Join by Address converge on the registered room
@@ -90,11 +101,11 @@ fallback styles until an asset-distribution plan is agreed.
   first and preselected when admitted; otherwise the first available stage is
   selected. Enter Training loads the chosen stage with the existing local tools.
   Stage Select places participant cards and the stage action side by side
-  beside chat rather than stacking them. Its compact layout drops the
-  secondary header copy and fits the nine currently admitted Training stages
-  in two rows at 1280×720 without scrolling. The chat cell keeps the user's
-  chosen size; the stage list remains scrollable when more stages are admitted
-  or the window is smaller.
+  in the bottom middle/right, leaving the default bottom-left chat area clear.
+  Compact density drops secondary header copy; the admitted stage list remains
+  scrollable when more stages are admitted or the window is smaller.
+  Chat's absolute overlay has no role in the stage page's geometry; players
+  choose its dimensions even when it covers page content.
   Training and Solo place the player at the first baked spawn and the first NPC
   at the second; added Training NPCs use subsequent authored spawns, cycling
   those NPC spawns when needed. NPC respawns retain the selected marker's
@@ -114,7 +125,7 @@ Results and in-match HUD presentation are outside this pre-match refresh.
 
 ## One-sentence definition
 
-> Underground fight-poster energy filtered through a playful, self-aware prototype: uneven and handmade, but structured enough to stay readable and cool.
+> A ridiculous underground fight club built from scavenged low-poly characters, held together by bold DIY graphics. Cool enough to main. Stupid enough to remember.
 
 ## Core tensions
 
@@ -131,6 +142,19 @@ SlopArena should hold these pairs at the same time:
 
 If one side takes over, the identity weakens. Pure cool becomes generic esports branding. Pure jokes become disposable meme UI. Pure disorder becomes difficult to use.
 
+## Shared invariants
+
+- The same Archivo Black SlopArena name mark across game and marketing; its plate, scale, and placement adapt to the surface.
+- Chunky, readable fighter identities with specific silhouettes, signature colors, weapons, and clear move tells.
+- Cool first, joke second: a legitimate fighting-game composition with increasingly ridiculous details.
+- Paper/Ink graphic construction, scarce Action Yellow, Orange impact, hard boundaries, and physical print offsets.
+- Authored imperfection around a stable hierarchy and interaction geometry. Wonky art is allowed; unclear controls and random spacing are not.
+- Real gameplay, honest status, and useful copy. Solo-development and unreleased status are facts, not apologies or fabricated launch claims.
+
+“Toy” describes the scavenged construction attitude, not mandatory plastic materials, literal toy characters, cute proportions, or cozy worlds. “Underground” describes an improvised competition, not a requirement that every arena be grimy or behind a warehouse.
+
+The reference axes have separate jobs: Smash-like readability; low-poly indie kitsch for construction; skate/punk DIY for graphic language; PS2 multiplayer weirdness for premises; internet shitpost culture for secondary details. Do not apply all five as competing treatments on every screen.
+
 ## Principles
 
 ### 1. Information first
@@ -141,13 +165,13 @@ A screen may look crooked. Its hierarchy must not be crooked.
 
 ### 2. Deliberate imperfection
 
-Use slight rotations, offset shadows, pasted cutouts, scribbles, uneven rules, and imperfect spacing as controlled accents. Most elements should still align to a clear grid.
+Use slight rotations, offset shadows, pasted cutouts, scribbles, uneven rules, and wonky decorative shapes as controlled accents. Controls, spacing, and reading order remain deliberate; most elements align to a clear grid.
 
 Imperfection should feel authored, not randomized. Do not rotate every card or apply noise to every surface.
 
 ### 3. One loud gesture
 
-Give each composition one dominant declaration: a result, character name, call to action, status, or event. Supporting information is smaller and quieter.
+Give each graphic composition one dominant declaration: a result, character name, call to action, status, or event. Supporting information is smaller and quieter. In gameplay, the relevant state or event takes priority; a decorative headline must not compete with the fight.
 
 Avoid a screen where every label competes at headline size.
 
@@ -167,45 +191,51 @@ Preserve the face, pose, weapon, and gameplay silhouette. Cropping should add fo
 
 Paper grain, photocopy noise, halftone, stamps, and rough edges should stop clean areas from feeling sterile. They must never reduce gameplay readability or obscure small text.
 
+### 7. Scavenged sources, deliberate result
+
+Asset-pack collage is part of the identity, not something to disguise. Curate different low-poly kits through compatible scale, lighting, material response, palette/value hierarchy, and composition. The result should feel like an authored junkyard fight club, not a vendor demo scene.
+
+Favor chunky simplified geometry, exaggerated readable proportions, strong character colors, and big shapes over realism or hyperdetail. Cheap source assets are allowed; accidental composition is not. AI assistance is a production method, not a visual style: reject generic diffusion gloss and incoherent detail.
+
 ## Foundation
 
 ### Palette
 
-The landing page establishes the initial canonical graphic palette:
+The approved shared graphic palette retains the website's Paper/Ink/Orange foundation and replaces its chartreuse action ink with the native Home yellow:
 
 | Token | Value | Role |
 | --- | --- | --- |
 | Paper | `#DED8C9` | Primary warm background |
 | Ink | `#171814` | Text, borders, dark fields |
-| Acid | `#DFFF36` | Primary actions, live status, disruptive emphasis |
+| Action Yellow | `#FFCC22` | Primary graphic actions, selection, availability |
 | Orange | `#F05B35` | Combat energy, highlights, numbering |
 
-Supporting neutrals may be derived from Paper and Ink. Prefer warm greys and dirty off-whites over pure white or blue-grey UI chrome.
+Supporting neutrals adapt to the surface: marketing and native frontend are paper-led. Settings also uses paper outer framing and category navigation, retaining a calm dark field for dense utility controls. Match overlays, chat history/input, and HUD remain restrained ink fields. The approved authored frontend wallpaper may be warmer than solid control paper; exact `#1B1A18` ink is not warmed or inverted. Texture never reduces text or state legibility.
 
-Character signature colors and gameplay colors may extend the palette. Do not replace the shared foundation with a different theme per screen.
+Character signature colors, team colors, gameplay category colors, and semantic status colors may extend the palette. Yellow is not a recoloring mandate for characters, stages, or the blue special-ability slots. Exact local neutral and Orange values belong in the owning `DESIGN.md`; do not invent a new decorative theme per screen.
 
 #### Color discipline
 
 - Paper and Ink carry most of the composition.
-- Acid usually marks action, availability, success, or something intentionally obnoxious.
-- Orange usually marks impact, combat, numbering, and expressive emphasis.
-- Use one accent as dominant in a region; using Acid and Orange equally everywhere removes their meaning.
+- Action Yellow marks primary action, current selection, or availability; confirmation and failure also need explicit semantic information.
+- Orange marks impact, combat, and expressive interruption; it is not a second competing primary-action color.
+- Use one accent as dominant in a region; using Yellow and Orange equally everywhere removes their meaning.
 - Preserve accessible text contrast. Small text belongs on calm, high-contrast fields.
 - Do not rely on color alone for gameplay or status information.
 
 ### Typography
 
-The visual system uses two typographic voices:
+The visual system uses a common name mark and two typographic roles:
 
-1. **Display:** heavy, compressed or blocky sans-serif for declarations, fighter names, results, section titles, and calls to action. The landing page uses Archivo Black.
-2. **Utility:** monospace for instructions, metadata, status, buttons, technical labels, and small jokes. The landing page uses Space Mono.
+1. **Name mark and declarations:** Archivo Black supplies the shared SlopArena lettering and bold menu/marketing declarations. The yellow native name plate may remain as a container; its lettering is not a separate brand.
+2. **Utility:** Space Mono supplies short marketing instructions, metadata, labels, and dry annotations. Native short labels may use a mono treatment where practical; dense settings, body copy, and HUD information use a restrained readable sans.
 
-Equivalent project-safe fonts may be selected for Unity, but they should preserve these roles. Do not make every line display type.
+Baloo 2 remains in the current native implementation but is not the target display voice. Do not imply Archivo is already bundled in Unity. Do not make every label display type or force monospace where it harms scanning.
 
 #### Typographic behavior
 
 - Prefer uppercase for short display and utility labels.
-- Use extreme scale contrast: very large declarations beside genuinely small metadata.
+- Use extreme scale contrast in marketing and celebratory compositions; use a tighter, readable hierarchy in task-heavy menus and HUD.
 - Keep body copy short and give it comfortable line height.
 - Tighten display tracking; give tiny utility labels slightly wider tracking.
 - Use a rotated or shadowed word sparingly to create one focal interruption.
@@ -281,6 +311,7 @@ Maintain enough separation that all interactive states remain legible.
 - Cut characters cleanly from the background; roughness may be added at the mask edge afterward.
 - Let characters frame information rather than automatically becoming a symmetrical versus poster.
 - Avoid overfilling every surface with the full roster.
+- Splash illustration must preserve the actual model's proportions, costume, weapon, signature colors, and chunky forms. Amplify the fighter, not a glossy cinematic version of a different game.
 
 ### Gameplay media
 
@@ -291,6 +322,8 @@ Frames around gameplay may use the poster language, but the footage itself shoul
 ### Icons and marks
 
 Use simple geometric icons with strong weight. Prefer arrows, crosses, circles, underlines, and compact symbols over elaborate outlined icon sets. Icons should feel printed or constructed from the same rules as the typography.
+
+Crude symbols and an occasional deliberately bad bomb drawing are welcome when they have a specific job and remain recognizable. They are not permission for ambiguous icons, a pile of unrelated fonts, or a generic skull/hazard/graffiti decoration kit.
 
 ## Motion
 
@@ -343,7 +376,7 @@ The voice is short, direct, self-aware, and slightly stupid. It should sound con
 
 ### In-game menus
 
-Use the full palette and geometry, but keep navigation stable. Current selection, confirmation, disabled state, and controller focus must be more obvious than decoration.
+Use the shared Archivo name mark and declarations, Action Yellow, paper-led frontend framing with readable ink text, calm dark utility fields, hard-edged controls, and restrained pasted layers. Match overlays remain restrained over gameplay. Navigation/hit targets remain stable; selection, confirmation, disabled state, and focus outrank decoration. Chat is an absolute, user-resized overlay, never a reason to rebalance the page underneath.
 
 ### Character select
 
@@ -352,6 +385,8 @@ Let character color and silhouette carry identity inside the shared Paper/Ink sy
 ### HUD
 
 Gameplay clarity outranks the poster treatment. The local HUD groups orange normals `1–4` and blue specials `A/E/R/F` into two close-set diamonds at the bottom center. Four circular slots per diamond retain the existing move icons and cooldown overlays. Black-backed prompts above the circles follow effective keyboard/gamepad bindings and switch after gameplay input. Controller specials show only the face button in each slot; the actual gameplay input still requires LB. Physical number-row keys show their digits, even when an AZERTY layout displays punctuation there; other keyboard bindings follow their effective labels. A readable text prompt replaces artwork for unsupported keys or missing local assets. The supplied frame art does not encode gameplay state. Damage, stocks, cooldowns, and player identity remain stable while the camera moves.
+
+HUD inherits portraits, hard framing, clear numbers, and restrained accents, not the whole poster. Keep readouts aligned and texture-free, retain functional category/team colors and circular ability slots, and avoid decorative motion competing with combat. Menus may perform; the HUD must report.
 
 Kenney Input Prompts 1.5 (CC0) supplies the keyboard and Xbox sheet PNGs and XML maps. For a local build, copy `Keyboard & Mouse/keyboard-&-mouse_sheet_default.{png,xml}` to `client/Unity/Assets/Resources/InputPrompts/keyboard.{png,xml}` and `Xbox Series/xbox-series_sheet_default.{png,xml}` to `client/Unity/Assets/Resources/InputPrompts/xbox.{png,xml}`. The `InputPrompts` directory and its Unity metadata are gitignored; a clean checkout has text prompts until the sheets are provisioned. The supplied PNG rows are inverted relative to the XML rows; `InputPromptAtlas` accounts for this when constructing UVs. Import the sheets without NPOT scaling.
 
@@ -365,11 +400,11 @@ Use the visual identity for shell, section hierarchy, status, empty states, and 
 
 ### Website, trailers, and social images
 
-These surfaces may use the highest texture, overlap, cropping, and typographic contrast because their content is less interactive. The landing page is the current canonical example.
+These Persuade surfaces may use the highest texture, overlap, cropping, and typographic contrast. Retain the website's Archivo Black/Space Mono flyer construction, with Action Yellow replacing chartreuse in the approved direction. Real characters and gameplay distinguish it from generic brutalist grunge. Feedback forms and access instructions remain calm and usable. The live landing page is reference evidence, not authority for its inaccurate Steam claims.
 
 ### Stages and world decoration
 
-Translate the attitude rather than pasting UI onto the world. Favor bold readable geometry, purposeful asymmetry, signs, cheap materials, playful sponsorships, and specific jokes. Avoid generic graffiti, random props, or anarchy symbols as shorthand for “underground.”
+Translate the attitude rather than pasting UI onto the world. A clear fighting space sits inside one memorable, improvised premise: rooftops, industrial junk, strange pools, night cities, or a child's tabletop can all belong. Curate landmarks, scale, lighting, and background contrast around the fighters. Strong character colors need not make the world cute or cozy. Signs, cheap materials, playful sponsorships, and specific jokes may support the premise; generic graffiti, random props, grime, or anarchy symbols are not substitutes for one.
 
 ## What SlopArena is not
 
@@ -382,25 +417,28 @@ Translate the attitude rather than pasting UI onto the world. Favor bold readabl
 - grunge texture without hierarchy;
 - cartoon meme overload;
 - photorealistic military aggression;
+- generic asset-pack showcase scenes with stock UI;
+- cute/cozy styling as the default tone;
+- “AI slop” gloss, incoherent hyperdetail, or realism for its own sake;
 - a parody that is embarrassed to be a real fighting game.
 
 ## Source-of-truth hierarchy
 
 When references disagree, use this order:
 
-1. This living guide for overall graphic intent and grammar.
-2. Functional requirements and gameplay readability for the surface being designed.
-3. Existing approved product examples, with the landing page as the initial canonical reference.
-4. Exact implementation tokens in the owning project.
-5. Moodboard or external references.
+1. Functional requirements, gameplay authority, accessibility, and gameplay/interaction readability.
+2. This living guide for shared identity and graphic grammar; [Art and Asset Conventions](../contributing/conventions.md) own 3D presentation and asset practice, and [Stage Concepts](stage-concepts.md) own stage composition.
+3. The owning project's `DESIGN.md` for the surface realization and exact target tokens; Impeccable briefs and sidecars mirror it.
+4. Approved examples and actual implementation evidence. The website is the strongest existing marketing reference, not a universal layout or a release-status source.
+5. Moodboards and external references.
 
-If a successful new surface extends the language, update this document with the rule it established. Do not silently copy a one-off accident into every future screen.
+Existing code and assets establish what is implemented, not what must be preserved. Keep approved direction separate from current behavior; never describe a documentation decision as a shipped change. Update this guide when an explicitly approved direction or successful surface establishes a shared rule, rather than copying one-off accidents or adding a competing guide.
 
 ## Agent brief
 
 Use this instruction when asking an agent to create or revise a SlopArena visual surface:
 
-> Read `docs/design/visual-language.md` and inspect the canonical SlopArena landing-page implementation before designing. Preserve the visual grammar—Paper/Ink foundation, controlled Acid and Orange accents, heavy display type, monospace utility text, rigid geometry with deliberate imperfection, fight-poster layering, and dry self-aware copy. Adapt the grammar to the surface's function instead of copying the landing-page layout. Gameplay readability and interaction state take priority over decoration. Explain any intentional deviation.
+> Read `docs/design/visual-language.md`, the owning `DESIGN.md`, and art conventions for 3D work. Use the website's existing flyer construction as graphic evidence, not a layout mandate. Preserve the scavenged low-poly fight-club identity: cool first, joke second; curated asset-pack collage; readable silhouettes; shared Archivo name mark and declarations; Paper/Ink, Action Yellow `#FFCC22`, and Orange impact; hard geometry with controlled DIY imperfection; useful, dry copy. Adapt expression to the surface: 3D art is character/combat-first, menus are Operate, HUD reports state, marketing is Persuade. Gameplay readability and interaction state take priority over decoration. Distinguish approved direction from unchanged implementation and never infer Steam availability.
 
 For implementation tasks, also require the agent to inspect the existing scene/component and reuse established project tokens and controls before introducing new ones.
 
@@ -413,13 +451,17 @@ Before approving a new surface, ask:
 - Does the screen feel cool before the user reads the joke?
 - Is imperfection controlled rather than random?
 - Are Paper and Ink doing most of the work?
-- Do Acid and Orange still have distinct jobs?
+- Do Action Yellow and Orange still have distinct jobs?
 - Are display and utility typography used for different roles?
 - Can characters and gameplay still be read at the actual target size?
 - Are controller, keyboard, hover, focus, disabled, loading, and error states clear where applicable?
 - Would removing the texture leave a strong composition?
 - Does the copy give useful information before personality?
 - Does the result feel like SlopArena rather than generic brutalism or generic grunge?
+- Could this belong to a ridiculous underground fighting game made from scavenged low-poly characters, while looking cool enough to main somebody?
+- Can I immediately read what that fighter is doing?
+- Does splash art describe the actual model rather than promise another visual world?
+- Are approved direction, current implementation, and actual release availability stated separately?
 
 ## Maintaining the reference
 
@@ -432,3 +474,15 @@ Add canonical examples only after they have shipped or been explicitly approved.
 - the project version or commit.
 
 Prefer a small set of strong examples over a large undifferentiated moodboard.
+
+### Approved visual board — rough edges, clear decisions
+
+**Reference:** [Offline visual board](references/sloparena-visual-identity/visual-reference-board.html) and [rooftop composition study](references/sloparena-visual-identity/visual-reference-study.png), retained verbatim from the user's [SlopArena visual identity export](https://drive.google.com/file/d/1pxXADuEctjnT7L8FNTpxq3Hvf5uF0Peu/view). Approved as visual reference on 2026-09-30. Source version: unversioned user export `sloparena-visual-identity-export.zip`; not a project build or gameplay capture.
+
+- **Purpose:** demonstrate how the shared identity translates into graphic/world composition, palette/type specimens, and interactive UI treatment.
+- **Adopt:** rough fight-flyer framing around calm controls; chunky world geometry with one memorable landmark; Archivo declarations, mono annotations, readable sans information; scarce yellow selection; hard press shadows and a short outcome stamp.
+- **Keep illustrative:** the rooftop is not a mandatory stage template or proof of collision, recovery, or gameplay-camera readability. The tab labels, page layout, readiness example, and motion timings are specimens, not approved changes to navigation or gameplay.
+- **Palette boundary:** Action Yellow `#FFCC22` is established. The board's Dark Ink `#1B1A18`, Warm Paper `#F2E8D5`, and Impact Orange `#F46B35` are proposed starter shades, not replacements for owning-project tokens.
+- **Typography boundary:** the rooftop image's tall angular lettering illustrates headline attitude, not a second canonical wordmark. The shared name mark remains Archivo Black.
+- **Authority and scope:** the board includes the exported written direction for context; this living guide and the owning `DESIGN.md` remain authoritative. Do not import another guide or agent instructions from the export. This reference does not claim shipped changes or make visual reconciliation a Steam-release requirement.
+

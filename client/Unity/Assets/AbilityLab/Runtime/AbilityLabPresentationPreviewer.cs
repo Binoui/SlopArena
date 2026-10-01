@@ -12,9 +12,10 @@ namespace SlopArena.Client.Tools;
 public sealed class AbilityLabPresentationPreviewer
 {
     private readonly Dictionary<PresentationEventKey, GameObject> _instances = new();
+    private readonly List<Animator> _animators = new();
+    private readonly List<ParticleSystem> _particleSystems = new();
     private CharacterAssetCatalog.PresentationBinding[] _bindings = Array.Empty<CharacterAssetCatalog.PresentationBinding>();
     private CharacterStageSource _stage;
-
     public int ActiveInstanceCount => _instances.Count;
     public IReadOnlyCollection<GameObject> ActiveInstances => _instances.Values;
     public void SetBindings(CharacterAssetCatalog.PresentationBinding[] bindings)
@@ -56,16 +57,21 @@ public sealed class AbilityLabPresentationPreviewer
 
             var key = new PresentationEventKey(0, 0, 0, PresentationEventSource.Timeline, index);
             active.Add(key);
-            if (_instances.ContainsKey(key)) continue;
-            var binding = FindBinding(operation.PresentationId);
-            if (binding?.Prefab == null) continue;
-            _instances[key] = PresentationPlacementResolver.Instantiate(
-                binding,
-                operation.Placement,
-                renderer,
-                origin,
-                origin.position,
-                origin.rotation);
+            if (!_instances.TryGetValue(key, out var instance))
+            {
+                var binding = FindBinding(operation.PresentationId);
+                if (binding?.Prefab == null) continue;
+                instance = PresentationPlacementResolver.Instantiate(
+                    binding,
+                    operation.Placement,
+                    renderer,
+                    origin,
+                    origin.position,
+                    origin.rotation);
+                if (instance == null) continue;
+                _instances[key] = instance;
+            }
+            EvaluateInstance(instance, (tick - operation.Tick) / AbilityLab.TickRate);
         }
         RemoveInactive(active);
     }
@@ -89,16 +95,21 @@ public sealed class AbilityLabPresentationPreviewer
 
             PresentationEventKey key = presentationEvent.Key;
             active.Add(key);
-            if (_instances.ContainsKey(key)) continue;
-            var binding = FindBinding(presentationEvent.PresentationId);
-            if (binding?.Prefab == null) continue;
-            _instances[key] = PresentationPlacementResolver.Instantiate(
-                binding,
-                presentationEvent.Placement,
-                renderer,
-                origin,
-                new Vector3(presentationEvent.WorldX, presentationEvent.WorldY, presentationEvent.WorldZ),
-                Quaternion.Euler(0f, presentationEvent.WorldYaw * Mathf.Rad2Deg, 0f));
+            if (!_instances.TryGetValue(key, out var instance))
+            {
+                var binding = FindBinding(presentationEvent.PresentationId);
+                if (binding?.Prefab == null) continue;
+                instance = PresentationPlacementResolver.Instantiate(
+                    binding,
+                    presentationEvent.Placement,
+                    renderer,
+                    origin,
+                    new Vector3(presentationEvent.WorldX, presentationEvent.WorldY, presentationEvent.WorldZ),
+                    Quaternion.Euler(0f, presentationEvent.WorldYaw * Mathf.Rad2Deg, 0f));
+                if (instance == null) continue;
+                _instances[key] = instance;
+            }
+            EvaluateInstance(instance, (currentTick - presentationEvent.MatchTick) / (float)AbilityLab.TickRate);
         }
         RemoveInactive(active);
     }
@@ -108,6 +119,27 @@ public sealed class AbilityLabPresentationPreviewer
     {
         ClearInstances();
         _stage = null;
+    }
+
+    private void EvaluateInstance(GameObject instance, float elapsedSeconds)
+    {
+        elapsedSeconds = Mathf.Max(0f, elapsedSeconds);
+        _animators.Clear();
+        instance.GetComponentsInChildren(true, _animators);
+        foreach (Animator animator in _animators)
+        {
+            if (animator == null) continue;
+            animator.Rebind();
+            animator.Update(elapsedSeconds);
+        }
+        _animators.Clear();
+
+        _particleSystems.Clear();
+        instance.GetComponentsInChildren(true, _particleSystems);
+        foreach (ParticleSystem particleSystem in _particleSystems)
+            if (particleSystem != null)
+                particleSystem.Simulate(elapsedSeconds, false, true, false);
+        _particleSystems.Clear();
     }
 
     private void RemoveInactive(HashSet<PresentationEventKey> active)

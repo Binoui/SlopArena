@@ -157,10 +157,6 @@ namespace SlopArena.Client.UI
             bool qKey = Keyboard.current?.qKey.wasPressedThisFrame == true;
             if (!pad && !qKey)
                 return;
-            // The expanded social view owns interaction while it is open;
-            // Escape closes it before any region switch (issue #220).
-            if (ChatOverlay.IsExpandedSocialOpen)
-                return;
             UiRegion target = _region == UiRegion.Social ? UiRegion.Page : UiRegion.Social;
             SetActiveRegion(target, focusTarget: true);
             UISFX.PlayClick();
@@ -280,10 +276,8 @@ namespace SlopArena.Client.UI
 
         /// <summary>
         /// Region-local navigation: only the active region's controls are
-        /// focusable. The chat surface is a layout neighbor of the page, so
-        /// the page toggle excludes the social subtree; the top bar toggles
-        /// independently. The expanded social view occludes the page, so the
-        /// page stops being focusable while it is open.
+        /// focusable. Chat overlays the page independently; the top bar
+        /// toggles independently too.
         /// </summary>
         public void ApplyRegionFocusability()
         {
@@ -291,10 +285,9 @@ namespace SlopArena.Client.UI
             if (shell?.Root == null || !FrontendController.IsFrontendActive)
                 return;
 
-            bool expanded = ChatOverlay.IsExpandedSocialOpen;
             bool topBar = _region == UiRegion.TopBar;
-            bool social = expanded || _region == UiRegion.Social;
-            bool page = !expanded && _region == UiRegion.Page;
+            bool social = _region == UiRegion.Social;
+            bool page = _region == UiRegion.Page;
 
             SetRegionFocusable(shell.TopBar, topBar);
             SetRegionFocusable(shell.PageContentRoot, page, exclude: shell.SocialHost);
@@ -376,7 +369,7 @@ namespace SlopArena.Client.UI
 
         /// <summary>
         /// Escape/Start toggles the shell menu; controller Back resolves the
-        /// active modal, then expanded social, region focus and page Back.
+        /// active modal, then region focus and page Back.
         /// The handler on the stable shell root is the frontend entry point.
         /// </summary>
         private void OnShellNavigationCancel(NavigationCancelEvent evt)
@@ -444,14 +437,6 @@ namespace SlopArena.Client.UI
             if (UiModalState.Presented && FrontendController.CurrentContext != null)
             {
                 FrontendController.CurrentContext.InvokeModalAction();
-                return;
-            }
-            // Layer 2: the expanded social view — closing restores the page
-            // and the remembered valid focus; the page controller and its
-            // selections were never disturbed.
-            if (ChatOverlay.IsExpandedSocialOpen)
-            {
-                ChatOverlay.Instance?.CollapseSocialFromShell();
                 return;
             }
             // Layer 3: top-bar interaction — one press leaves the top bar and
@@ -553,13 +538,11 @@ namespace SlopArena.Client.UI
 
         /// <summary>
         /// Returns focus to the page region after an explicit social state
-        /// change (minimize, expanded-view collapse) or after a modal closes
+        /// change (hide) or after a modal closes
         /// from the top-bar route.
         /// </summary>
         public void RestorePageRegion()
         {
-            if (ChatOverlay.IsExpandedSocialOpen)
-                return;
             SetActiveRegion(UiRegion.Page, focusTarget: true);
         }
 
@@ -569,7 +552,7 @@ namespace SlopArena.Client.UI
         /// </summary>
         public void NotifyModalClosed()
         {
-            if (_region == UiRegion.TopBar && !ChatOverlay.IsExpandedSocialOpen)
+            if (_region == UiRegion.TopBar)
                 SetActiveRegion(FrontendController.CurrentPage == FrontendPage.Home
                     ? UiRegion.TopBar : _regionBeforeTopBar, focusTarget: true);
             ApplyRegionFocusability();
@@ -578,10 +561,6 @@ namespace SlopArena.Client.UI
 
         private void OnPresentationChanged()
         {
-            // The expanded view owns interaction while it is open: the
-            // Social region becomes active with the conversation focused.
-            if (ChatOverlay.IsExpandedSocialOpen && _region != UiRegion.Social)
-                SetActiveRegion(UiRegion.Social, focusTarget: true);
             ApplyRegionFocusability();
             UpdateHints();
         }

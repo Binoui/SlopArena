@@ -836,7 +836,7 @@ namespace SlopArena.Shared
                 if (cd > 0) s.SetCooldown(slot, (ushort)(cd - 1));
             }
 
-            // Charge-stock regen (refundable ability pools, e.g. Kistu Rising Slash).
+            // Charge-stock regen (refundable ability pools, e.g. Wibou Rising Slash).
             // Only active when a charge is spent; recovers one charge per regen period.
             if (s.ChargeStockSpent > 0)
             {
@@ -1717,7 +1717,7 @@ namespace SlopArena.Shared
                 return;
 
             // Run/Idle are the locomotion states this method manages. Aiming (mobile aim,
-            // e.g. Kistu E) also routes through here but must keep its own state.
+            // e.g. Wibou E) also routes through here but must keep its own state.
             bool isLocomotion = s.State == ActionState.Idle || s.State == ActionState.Run;
 
             bool hasInput = ((dirX * dirX) + (dirZ * dirZ)) > 1e-4f;

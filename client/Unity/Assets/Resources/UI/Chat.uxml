@@ -21,7 +21,6 @@
                 </ui:VisualElement>
 
                 <ui:VisualElement class="chat-body">
-                    <ui:ScrollView name="conversation-list" class="conversation-list" horizontal-scroller-visibility="Hidden" />
                     <ui:VisualElement class="chat-detail">
                         <ui:Button name="directory-refresh" text="REFRESH PLAYERS" class="chat-action chat-action--small" />
                         <ui:Label name="online-feedback" class="chat-feedback" />
@@ -38,19 +37,13 @@
                 </ui:VisualElement>
             </ui:VisualElement>
             <ui:VisualElement name="chat-corner-actions" class="chat-corner-actions">
-                <ui:Button name="chat-expand" tooltip="Expand chat" class="chat-icon-button">
-                    <ui:VisualElement class="chat-icon-expand" picking-mode="Ignore">
-                        <ui:VisualElement class="chat-icon-expand-corner chat-icon-expand-corner--top" picking-mode="Ignore" />
-                        <ui:VisualElement class="chat-icon-expand-corner chat-icon-expand-corner--bottom" picking-mode="Ignore" />
-                    </ui:VisualElement>
-                </ui:Button>
-                <ui:Button name="chat-close" tooltip="Minimize chat" class="chat-icon-button">
+                <ui:Button name="chat-close" tooltip="Hide chat" class="chat-icon-button">
                     <ui:VisualElement name="chat-close-icon" class="chat-icon-minimize" picking-mode="Ignore" />
                 </ui:Button>
-            </ui:VisualElement>
-            <ui:VisualElement name="chat-resize-grip" class="chat-resize-grip" tooltip="Drag to resize chat">
-                <ui:VisualElement class="chat-resize-mark" picking-mode="Ignore" />
-                <ui:VisualElement class="chat-resize-mark chat-resize-mark--second" picking-mode="Ignore" />
+                <ui:VisualElement name="chat-resize-grip" class="chat-resize-grip" tooltip="Drag to resize chat">
+                    <ui:VisualElement class="chat-resize-mark" picking-mode="Ignore" />
+                    <ui:VisualElement class="chat-resize-mark chat-resize-mark--second" picking-mode="Ignore" />
+                </ui:VisualElement>
             </ui:VisualElement>
         </ui:VisualElement>
     </ui:VisualElement>

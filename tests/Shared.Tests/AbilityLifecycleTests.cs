@@ -294,7 +294,7 @@ public class AbilityLifecycleTests
     }
     public static IEnumerable<object[]> GroundAbilityCases()
     {
-        foreach (var character in new[] { CharacterClass.Manki, CharacterClass.FightGuy, CharacterClass.Kistu, CharacterClass.Bonk })
+        foreach (var character in new[] { CharacterClass.Manki, CharacterClass.FightGuy, CharacterClass.Wibou, CharacterClass.Bonk })
         {
             var def = BuiltInContentResolver.Resolve(character).Definition;
             for (byte wireSlot = 1; wireSlot <= AbilitySlots.Count; wireSlot++)
@@ -307,7 +307,7 @@ public class AbilityLifecycleTests
 
         public static IEnumerable<object[]> GroundAndAirAimingAbilityCases()
     {
-        foreach (var character in new[] { CharacterClass.Manki, CharacterClass.FightGuy, CharacterClass.Kistu, CharacterClass.Bonk, CharacterClass.Nilus })
+        foreach (var character in new[] { CharacterClass.Manki, CharacterClass.FightGuy, CharacterClass.Wibou, CharacterClass.Bonk, CharacterClass.Nilus })
         {
             var def = character == CharacterClass.Nilus
                 ? TestHelpers.ResolveDef(character)

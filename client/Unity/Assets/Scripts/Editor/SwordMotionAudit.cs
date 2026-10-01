@@ -15,8 +15,8 @@ public static class SwordMotionAudit
 {
     private const float SampleRate = 60f;
 
-    [MenuItem("Tools/SlopArena/Sword Motion Audit/Kistu")]
-    private static void AuditKistu() => Run("kistu");
+    [MenuItem("Tools/SlopArena/Sword Motion Audit/Wibou")]
+    private static void AuditWibou() => Run("wibou");
 
     [MenuItem("Tools/SlopArena/Sword Motion Audit/Bonk")]
     private static void AuditBonk() => Run("bonk");

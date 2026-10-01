@@ -17,7 +17,7 @@ namespace SlopArena.Shared.Abilities;
 /// standard locked-ability lifecycle.
 ///
 /// ── Why the lifecycle is NOT `_ticks >= s.AnimLockTicks` ──
-/// The house idiom (KistuRisingSlash, NilusRiftwalk) compares an INCREMENTING local
+/// The house idiom (WibouRisingSlash, NilusRiftwalk) compares an INCREMENTING local
 /// counter against AnimLockTicks, which TickTimers DECREMENTS every tick
 /// (Simulation.cs:405). The two cross at half the stage duration, so an ability written
 /// that way ends at DurationTicks / 2. Those abilities get away with it because their

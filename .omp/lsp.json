@@ -2,7 +2,7 @@
   "servers": {
     "omnisharp": {
       "command": "/home/binoui/.dotnet/tools/omnisharp",
-      "args": ["-lsp"],
+      "args": ["-lsp", "-s", "/home/binoui/Documents/projects/SlopArena/.omp/SlopArena.sln"],
       "fileTypes": [".cs"],
       "languageId": "csharp",
       "rootMarkers": [".git", ".omp", "Assets"]

@@ -29,7 +29,7 @@ All gameplay timing uses 60 Hz ticks. Values are authored in package data and re
 
 While `Shielding`, Shared replaces the fighter's ordinary attack-contact hurtboxes
 with one non-shrinking sphere centered on its capsule center. The package-owned
-`shieldRadius` is authoritative: FightGuy, Kistu, and Bonk use 1.05 m, Manki
+`shieldRadius` is authoritative: FightGuy, Wibou, and Bonk use 1.05 m, Manki
 0.95 m, and legacy Nilus 1.025 m initially. Ordinary melee, projectile, and
 explosion hitboxes contact the sphere from every direction, without damage,
 reflection, shield-poking, or a meter. The first physical surface contact
@@ -67,7 +67,7 @@ before collision/landing:
 | --- | ---: | ---: | ---: | ---: |
 | FightGuy | 20 | 6.667 | 11 | 1.833 |
 | Manki | 20 | 6.000 | 11 | 1.833 |
-| Kistu | 22 | 5.867 | 12.1 | 2.017 |
+| Wibou | 22 | 5.867 | 12.1 | 2.017 |
 | Bonk | 20 | 6.667 | 11 | 1.833 |
 
 Universal airborne Dash input no longer moves the fighter. Kit-owned
@@ -95,7 +95,7 @@ Activation switches immediately to the attack pose, caps existing Slide momentum
 RunSpeed and decays it by 6× RunSpeed per second. Carry freezes during Hitstop and clears
 on completion, cancellation, hit or motion takeover. Normal attack locks remain intact.
 
-Default max-fall/fast-fall speeds: FightGuy 14/22, Manki 13.5/21, Bonk 15/24, Kistu 14/22.
+Default max-fall/fast-fall speeds: FightGuy 14/22, Manki 13.5/21, Bonk 15/24, Wibou 14/22.
 The report's historical-fall and 3× slide-friction controls do not change these defaults.
 
 ### Settled CrouchBrace
@@ -136,6 +136,18 @@ In the Editor, enable Scene or Game **Gizmos** to see the cooked forward grab bo
 while `GrabAttempt` runs: yellow startup, orange active contact, gray whiff
 recovery. `PlayerRenderer` places it using Shared position and captured facing;
 it does not add a Unity collider or change targeting.
+
+Unity plays the shared `grab.fbx` during `GrabAttempt` and switches directly to
+the shared `throw.fbx` on capture. Both clips are non-looping and are bound once
+in `Resources/AnimationConfigs/Shared_AnimConfig.asset`, independently of each
+character's package animation catalog. Playback samples the replicated remaining
+phase ticks: the 28-tick attempt or 12-tick throw. Whiffs return to locomotion,
+Hitstop freezes the pose, and rollback can rewind it; no grab-idle/hold clip or
+animation event decides capture, damage, or release. Grab uses C on keyboard
+(rebindable) or LB+RT on controller.
+The Edit Mode menu **Tools → SlopArena → Tests → Grab Animation Presentation**
+checks tick sampling, replay/Hitstop, attack cancellation cleanup, direct throw,
+release, and Hitstun interruption on an isolated rig without changing the open scene.
 
 Capture restrains both fighters for 12 ticks. The automatic forward throw deals
 6 damage and launches at 30° along the captured facing, using the ordinary

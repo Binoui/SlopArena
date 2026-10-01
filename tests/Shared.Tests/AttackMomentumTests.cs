@@ -53,7 +53,7 @@ public class AttackMomentumTests
     public void GroundedNormal_PreserveMomentumOverride_KeepsVelocity()
     {
         var sim = TestHelpers.MakeSim();
-        var def = TestHelpers.CloneDef(TestHelpers.KistuDef);
+        var def = TestHelpers.CloneDef(TestHelpers.WibouDef);
         def.Slot1 = CloneSpec(def.Slot1!, preserveMomentum: true);
         var groundPy = TestHelpers.GroundPY(def);
         var state = TestHelpers.PlayerState() with { PY = groundPy, VX = 10f, VZ = 5f };

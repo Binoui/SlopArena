@@ -23,7 +23,7 @@ namespace SlopArena.SelfPlayReport;
 /// self-contained HTML visual report + a markdown summary.
 ///
 /// Usage: dotnet run --project tools/SelfPlayReport -- [--matches N] [--seed S]
-///        [--char fightguy|kistu] [--difficulty Easy|Normal|Hard]
+///        [--char fightguy|wibou] [--difficulty Easy|Normal|Hard]
 ///        [--json report.json] [--html report.html] [--out report.md]
 /// </summary>
 internal static class Program
@@ -76,7 +76,7 @@ internal static class Program
         CharacterClass cls = charName.ToLowerInvariant() switch
         {
             "fightguy" or "fg" => CharacterClass.FightGuy,
-            "kistu" => CharacterClass.Kistu,
+            "wibou" => CharacterClass.Wibou,
             "manki" => CharacterClass.Manki,
             "nilus" => CharacterClass.Nilus,
             "bonk" => CharacterClass.Bonk,

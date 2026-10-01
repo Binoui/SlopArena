@@ -8,6 +8,13 @@
                     <ui:Button name="menu-solo" text="SOLO" class="menu-action menu-action--solo" />
                     <ui:Button name="menu-online" text="ONLINE" class="menu-action menu-action--online" />
                 </ui:VisualElement>
+                <ui:VisualElement name="menu-artwork-column" class="menu-artwork-column" picking-mode="Ignore">
+                    <ui:VisualElement name="menu-artwork" class="menu-artwork" picking-mode="Ignore">
+                        <ui:VisualElement class="menu-artwork-image" picking-mode="Ignore" />
+                        <ui:VisualElement class="menu-artwork-tape menu-artwork-tape--left" picking-mode="Ignore" />
+                        <ui:VisualElement class="menu-artwork-tape menu-artwork-tape--right" picking-mode="Ignore" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
                 <ui:VisualElement name="menu-info" class="menu-info">
                     <ui:Label text="ANNOUNCEMENTS" class="menu-info-heading" />
                     <ui:VisualElement name="menu-announcements" class="menu-announcements">

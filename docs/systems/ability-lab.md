@@ -5,6 +5,109 @@ packages. The shell owns selection, preview status, diagnostics, stage/tick cont
 SceneView guidance. Package authoring and cooking remain in `AbilityLabPackageWorkspace` and
 `CharacterPackageAuthoringService`.
 
+## Agent-facing workspace commands
+
+Typed Unity Pipeline commands expose package open, Shared two-fighter scenarios,
+recorded-frame preview, read-only inspect, and PNG capture without temporary C#.
+Use native commands first for gameplay setup and evidence; do not use `eval` to
+construct fighters or emulate gameplay.
+
+```bash
+unity command --project-path client/Unity \
+  sloparena.lab.open --target fightguy --format json
+# Normal hit: close idle opponent; outcome is determined by Shared simulation.
+unity command --project-path client/Unity \
+  sloparena.lab.run --action ground.1 --ticks 60 --distance 1.2 \
+  --opponent idle --format json
+# Shield block, then a distant miss (no contact is a successful run).
+unity command --project-path client/Unity \
+  sloparena.lab.run --action ground.1 --ticks 60 --distance 1.2 \
+  --opponent shield --format json
+unity command --project-path client/Unity \
+  sloparena.lab.run --action ground.1 --ticks 60 --distance 12 \
+  --opponent idle --format json
+# Shared grab against a nearby idle opponent.
+unity command --project-path client/Unity \
+  sloparena.lab.run --action grab --ticks 60 --distance 0.7 \
+  --opponent idle --format json
+unity command --project-path client/Unity \
+  sloparena.lab.inspect --format json
+```
+
+The UI presents both fighters and scenario controls; native `run` options are
+`--action <canonical-id|grab>`, `--ticks <last-frame>` (0–3600),
+`--distance <metres>`, `--opponent idle|shield`, `--damage 0..999`, and
+`--facing <relative-degrees>`. Defaults are 60, 2.5 m, idle, 0, and 180°.
+Run outcomes are observed, never forced: a successful command can be a hit,
+zero-damage block, miss, grab whiff, or capture/throw.
+
+`preview --action <id|grab> --tick <frame>` seeks a recorded scenario when its
+action matches the latest run. `capture` likewise consumes that same recorded
+run and options when the action matches; it does not substitute defaults.
+Without a matching run, grab preview/capture creates a default grab scenario,
+not a copy of another action's options/horizon; canonical actions retain
+ordinary authoring preview. Run explicitly first to choose opponent settings.
+Capture frames into the ignored cache:
+
+```bash
+unity command --project-path client/Unity \
+  sloparena.lab.preview --action grab --tick 7 --format json
+unity command --project-path client/Unity \
+  sloparena.lab.capture --action grab --ticks 7,19 \
+  --output .ability-lab-cache/fightguy/grab --format json
+```
+
+Scenario frame indexes are zero-based: frame 0 contains the first input at
+MatchTick 1. This is distinct from canonical authoring preview, whose requested
+cumulative duration endpoint maps to the final authored stage tick
+(`durationTicks - 1`). Scenario output contains `scenario.frames[]` with
+`frameIndex`, `matchTick`, and both fighters' position, movement velocity,
+knockback velocity, facing yaw (radians), damage, state/state ticks, grounded,
+hitstop, hitstun, block stun, and interaction phase/IDs/timing. `contacts[]`
+are accepted Shared hit/block records (including damage, blocked flag, impact
+force, knockback direction/angle, stun/hitstop, and hit position); paired grab
+capture/release appear in `interactions[]`, not fabricated hit contacts.
+`presentationEvents[]` and `deaths[]` report observed Shared events and deaths.
+
+For deeper collision diagnosis, the Shared simulation exposes the read-only
+`ServerSimulation.LastTickAttackEntities` view of exact attack-collision
+surfaces consumed on the latest pass (including active shields). It is a
+diagnostic surface, not a separate simulation or a replacement for reported
+accepted `contacts[]`.
+Use semantic `data.result.success`, inspect diagnostics, and assess these
+observations rather than treating command success as proof of a hit.
+
+All mutating commands are Edit Mode only. Invalid options, unavailable/invalid
+drafts, missing package/rig, and invalid action/frame return structured
+diagnostics (for example `scenario.options.invalid`,
+`scenario.action.unavailable`, `preview.tick.out-of-range`,
+`lab.mode.unsupported`). Capture also rejects unsafe paths, symlinks, invalid
+dimensions, duplicate ticks, and existing output files; a failed batch removes
+its partial PNGs. Capture restores the prior scenario/cursor, playback,
+visibility, camera, and render target on success or failure.
+
+The workspace prepares current source in memory through existing compiler,
+verified poses, catalog, and rig; it does not save, cook, change Undo history,
+or write source/cooked files. Persisted authoritative preview still requires
+valid cooked runtime/pose/catalog/rig content. Missing/invalid persisted
+pose/rig prerequisites block scenarios. A clean in-memory prepared source can
+report `dirty: false` while `authoritativePreview: false`; dirty describes
+workspace edits, not whether a scenario hit. Never claim online play or game
+feel from these isolated scenarios.
+
+Authoring preview/capture retains canonical slot IDs and cumulative 60 Hz
+ticks from move start, including zero and the requested duration endpoint;
+that endpoint maps to the final authored stage tick (`durationTicks - 1`).
+Capture `captures[]` reports action, requested tick, applied stage/local and
+cumulative tick for authoring, or frame and MatchTick for scenarios, plus PNG
+path. Root state is the restored workspace snapshot. Capture writes only below
+repository-relative `.ability-lab-cache/`; batches allow at most 64 distinct
+ticks and dimensions 64–4096. The compact Pipeline result is under
+`data.result`; outer transport success is not semantic success.
+
+See the [Unity CLI reference](../contributing/unity-cli.md) for command
+discovery and native-command-first routing.
+
 ## Package discovery and workflow
 
 1. Open `Tools → SlopArena → Ability Lab` with the Ability Lab scene component.

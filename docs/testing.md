@@ -119,6 +119,88 @@ For integrated Unity-facing changes and accepted package verification:
    idle over the replicated `LandingLagTicks / 60` seconds; ordinary zero-lag landings
    transition directly to locomotion, and hitstun interrupts the blend.
 
+
+#### Native Ability Lab scenario verification
+
+Use the real two-fighter UI or native commands before considering eval. The
+command runner uses Shared simulation; never infer hit success from command
+success. A focused native pass can exercise these outcomes:
+
+```bash
+unity command --project-path client/Unity \
+  sloparena.lab.open --target fightguy --format json
+unity command --project-path client/Unity \
+  sloparena.lab.run --action ground.1 --ticks 60 --distance 1.2 \
+  --opponent idle --format json
+unity command --project-path client/Unity \
+  sloparena.lab.run --action ground.1 --ticks 60 --distance 1.2 \
+  --opponent shield --format json
+unity command --project-path client/Unity \
+  sloparena.lab.run --action ground.1 --ticks 60 --distance 12 \
+  --opponent idle --format json
+unity command --project-path client/Unity \
+  sloparena.lab.run --action grab --ticks 60 --distance 0.7 \
+  --opponent idle --format json
+```
+
+Inspect semantic `data.result.success` and diagnostics, plus actual
+`scenario.frames[]`, accepted `contacts[]`, grab `interactions[]`,
+`presentationEvents[]`, and `deaths[]`. Confirm hit damage/knockback and later
+state, block as zero-damage blocked contact, miss as no contact/damage, and grab
+capture/release as interaction transitions rather than fabricated hit records.
+Frame 0 corresponds to MatchTick 1. Preview and capture with `--action`; capture
+must use the matching recorded run/options. It restores prior scenario/cursor,
+playback, visibility, camera and render target; verify restoration and cache
+outputs where capture is part of the change. Authoring timeline's duration
+endpoint remains `durationTicks - 1`, not scenario frame numbering.
+
+Scenarios prepare current source in memory through existing compiler, verified
+poses/catalog/rig without save, cook, Undo change or source/cooked writes.
+Persisted authoritative preview still depends on valid baked runtime/pose/
+catalog/rig data; missing/invalid pose/rig blocks execution. Interpret `dirty`
+as workspace edit state and `authoritativePreview` independently. These
+isolated scenarios do not prove online behavior or game feel. Use the
+[Unity CLI reference](contributing/unity-cli.md) and
+[Ability Lab guide](systems/ability-lab.md) for errors, options and output
+contracts.
+
+#### Ability Lab scenario evidence (2026-09-30; finalized 2026-10-01)
+
+- Native FightGuy ground.1 at distance 1.2 idle produced one accepted hit at
+  frame 5 / MatchTick 6 for 4 damage; distance 12 produced no hit; shield at
+  distance 1.2 produced one blocked zero-damage contact.
+- Shared grab at distance 0.7 against idle and shield captured at frame 7 /
+  MatchTick 8 and released at frame 19 / MatchTick 20 with 6 damage; distance
+  12 whiffed. Capturing grab frames 0, 7, 13 and 19 retained the 0.7 m run
+  and restored the previous frame 48. Real pair PNGs were inspected at
+  `.ability-lab-cache/scenario-verification-grab-20260930`.
+- Final Shared dependency build succeeded with 17 warnings and zero errors.
+  Focused shield/defense/grab/release tests: 67 passed. Full Shared suite:
+  1,111 passed, 43 failed, 6 skipped; no baseline comparison establishes
+  attribution, and a green full suite is not claimed.
+- Final Unity compilation reported completed, failed=false, errors=[].
+  Scenario Outcomes, Scenario Commands, and Scenario Controls menus passed;
+  all success markers were observed and current console returned zero errors.
+  Checks cover final-Hitstop pose freezing, exact shield collision surfaces,
+  guard replay, missing-binding preservation, native contact/interaction
+  verdicts, cross-action grab defaults, distinct rendered PNG frames, actual
+  UI scrubbing/outcome text, authoring exit, and complete restoration.
+  The active Frontend scene remained clean with three roots and Editor stopped.
+- The read-only Shared `ServerSimulation.LastTickAttackEntities` diagnostic
+  exposes the exact latest attack-collision surfaces, including active
+  shields; it complements accepted `contacts[]` and does not change gameplay.
+- Desktop screenshot provider did not see Unity; no Unity UI screenshot claim.
+  Full Frontend selftest was not run because it saves/cooks content. No online
+  match or game-feel claim.
+
+Manual checklist: open FightGuy and view both fighters/Scenario Controls; run
+ground.1 at close idle, close shield, and distant idle settings and check
+contacts/state; run close and distant grab and inspect paired capture/release
+versus whiff; scrub/capture a matching recorded run and confirm prior cursor,
+playback, visibility and camera/render target return; verify semantic failures
+and diagnostics for invalid action/frame and unsupported Play Mode. Do not save
+or cook for these scenarios.
+
 Local iteration uses the transient development catalog and affected runtime path; it
 does not require this persisted-catalog self-test for every numerical tuning edit.
 

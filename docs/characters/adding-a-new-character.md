@@ -25,7 +25,7 @@ with their `.meta` files. Record licensing and stop if a source asset is not red
 `character.json` uses `authoringSchemaVersion: 3`. Author a positive finite
 `movement.airDodgeSpeed` independently of the historical `dashSpeed`; it is
 the forward air dodge's horizontal speed for ten simulation ticks. The
-current admitted fighters use 11 m/s except Kistu at 12.1 m/s. Older source
+current admitted fighters use 11 m/s except Wibou at 12.1 m/s. Older source
 and cooked schema versions cannot be admitted without migration and a recook.
 
 ## 2. Validate and bind assets

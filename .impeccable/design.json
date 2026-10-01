@@ -7,8 +7,8 @@
       "ink": {
         "role": "neutral",
         "displayName": "Ink",
-        "canonical": "#17131B",
-        "tonalRamp": ["#F0EEE8", "#625C6B", "#17131B", "#0D0D14"]
+        "canonical": "#1B1A18",
+        "tonalRamp": ["#F0EEE8", "#7B7872", "#252422", "#1B1A18", "#161513"]
       },
       "paper": {
         "role": "neutral",
@@ -16,11 +16,11 @@
         "canonical": "#F0EEE8",
         "tonalRamp": ["#FFFFFF", "#F0EEE8", "#D8D3C9", "#A8A39B"]
       },
-      "acid": {
+      "action-yellow": {
         "role": "primary",
-        "displayName": "Acid",
-        "canonical": "#FFC821",
-        "tonalRamp": ["#FFF0A8", "#FFD95C", "#FFC821", "#B88600"]
+        "displayName": "Action Yellow",
+        "canonical": "#FFCC22",
+        "tonalRamp": ["#FFF0A8", "#FFD95C", "#FFCC22", "#B88600"]
       },
       "combat-orange": {
         "role": "secondary",
@@ -37,12 +37,12 @@
     },
     "typographyMeta": {
       "display": {
-        "displayName": "Playful Display",
-        "purpose": "Bundled Baloo 2 makes one dominant pre-match declaration; compact Unity UI type carries utility text."
+        "displayName": "Archivo Black",
+        "purpose": "Player-facing menu, selection, outcome, Settings, pause, and dialog declarations/actions implemented in Unity. Chat uses Archivo only for short actions; dense utility and HUD combat readouts remain readable sans or quiet utility mono."
       },
       "label": {
         "displayName": "Utility Label",
-        "purpose": "Uppercase broadcast metadata, status, roster roles, and technical annotations."
+        "purpose": "Short useful status, roster-role, binding, and technical metadata; ordinary sans remains preferred for dense Settings, chat messages, and HUD readouts."
       }
     },
     "shadows": [
@@ -71,19 +71,19 @@
     ],
     "breakpoints": [],
     "narrative": {
-      "northStar": "The Questionable Fight Flyer",
-      "overview": "A handmade fight poster became a live game broadcast. Cool fighting imagery leads; dry jokes and rough print gestures support it without obscuring the player's next action.",
+      "northStar": "Low-poly underground toy-fight-club, with DIY internet-game energy",
+      "overview": "Scavenged low-poly fight-club forms and curated asset-pack collage. Cool first, joke second; slightly crappy on purpose, extremely readable. Frontend pages are paper-led using the user-authored FrontendPaperBackground.png, continuing behind the transparent top bar with readable control-local paper backing and ink borders. Separate ink foreground/dark-field roles remain. Home has left modes, a larger aspect-fitted framed poster at center, and right announcements. Chat is an absolute user-sized bottom-left overlay with paper frame/tabs and grouped Hide/Resize, no maximize; dimensions never rebalance underlying layout. Fighter/stage participants and Player/CPU controls sit bottom middle/right, leaving bottom-left clear by default. Settings uses paper outer framing/categories and calm dark utility fields. Match overlays/HUD retain restrained neutral fields and independent functional colors. No 3D arena, gameplay, transport, creator/Ability Lab, or website redesign; connected-room acceptance remains unverified.",
       "keyCharacteristics": [
-        "Underground fight-poster energy with disciplined hierarchy.",
-        "Square geometry, heavy borders, and offset physical layering.",
-        "Rounded, heavy display type paired with compact utility labels.",
-        "Characters treated as graphic cutouts.",
+        "Underground fight-club energy with DIY internet-game construction.",
+        "Chunky low-poly silhouettes and curated asset-pack collage, harmonized through scale, lighting, material response, palette/value hierarchy, and composition rather than a universal shader.",
+        "Archivo Black target name mark and display voice; readable utility typography.",
+        "Recognizable character forms and gameplay-readable silhouettes.",
         "Dry self-aware copy that never obscures status."
       ],
       "rules": [
         {
           "name": "The One Accent Rule",
-          "body": "Acid and Combat Orange may both exist on a screen, but one accent owns each region.",
+          "body": "Action Yellow (#FFCC22) and retained local orange may both exist on a screen, but one accent owns each region.",
           "section": "colors"
         },
         {
@@ -114,17 +114,17 @@
       "name": "Primary Button",
       "kind": "button",
       "refersTo": "button-primary",
-      "description": "Acid, square, bordered, and physically pressable.",
+      "description": "Action Yellow, square, bordered, and physically pressable.",
       "html": "<button class=\"ds-btn-primary\">JOIN A FIGHT</button>",
-      "css": ".ds-btn-primary { background:#FFC821; color:#17131B; border:2px solid #0D0D14; border-bottom-width:6px; padding:0 18px; min-height:56px; font-weight:700; letter-spacing:1px; text-transform:uppercase; } .ds-btn-primary:hover,.ds-btn-primary:focus-visible { background:#FFD95C; border-color:#F0EEE8; transform:translateY(-2px); } .ds-btn-primary:active { transform:translateY(3px); }"
+      "css": ".ds-btn-primary { background:#FFCC22; color:#17131B; border:2px solid #0D0D14; border-bottom-width:6px; padding:0 18px; min-height:56px; font-weight:700; letter-spacing:1px; text-transform:uppercase; } .ds-btn-primary:hover,.ds-btn-primary:focus-visible { background:#FFD95C; border-color:#F0EEE8; transform:translateY(-2px); } .ds-btn-primary:active { transform:translateY(3px); }"
     },
     {
       "name": "Hot Button",
       "kind": "button",
       "refersTo": "button-hot",
-      "description": "Combat-orange action for host, join, or other high-energy paths.",
+      "description": "Action Yellow primary field with a restrained Combat Orange impact edge for high-energy paths.",
       "html": "<button class=\"ds-btn-hot\">HOST A MATCH</button>",
-      "css": ".ds-btn-hot { background:#E05C2A; color:#17131B; border:2px solid #0D0D14; border-bottom-width:6px; padding:0 18px; min-height:56px; font-weight:700; letter-spacing:1px; text-transform:uppercase; } .ds-btn-hot:hover,.ds-btn-hot:focus-visible { background:#FF7650; border-color:#FFC821; transform:translateY(-2px); } .ds-btn-hot:active { transform:translateY(3px); }"
+      "css": ".ds-btn-hot { background:#FFCC22; color:#17131B; border:2px solid #0D0D14; border-bottom:6px solid #E05C2A; padding:0 18px; min-height:56px; font-weight:700; letter-spacing:1px; text-transform:uppercase; } .ds-btn-hot:hover,.ds-btn-hot:focus-visible { background:#FFD95C; border-color:#F0EEE8; transform:translateY(-2px); } .ds-btn-hot:active { transform:translateY(3px); }"
     },
     {
       "name": "Broadcast Status Pill",
@@ -132,7 +132,7 @@
       "refersTo": "status-pill",
       "description": "Compact ink strip for live status, roster metadata, and technical labels.",
       "html": "<span class=\"ds-status-pill\">LIVE ROSTER // 4 CHARACTERS</span>",
-      "css": ".ds-status-pill { display:inline-block; background:#17131B; color:#F0EEE8; padding:8px 12px; font-size:12px; font-weight:700; letter-spacing:2px; text-transform:uppercase; border-left:8px solid #FFC821; }"
+      "css": ".ds-status-pill { display:inline-block; background:#17131B; color:#F0EEE8; padding:8px 12px; font-size:12px; font-weight:700; letter-spacing:2px; text-transform:uppercase; border-left:8px solid #FFCC22; }"
     }
   ]
 }

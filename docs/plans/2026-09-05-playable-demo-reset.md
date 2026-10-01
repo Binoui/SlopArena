@@ -5,7 +5,7 @@
 
 ## Product target
 
-The admitted roster is **Manki, FightGuy, Kistu, Bonk** (`content-cooked/roster/manifest.json`). Nilus remains legacy compatibility, not a fifth demo requirement. Package admission does not prove kit completeness or player acceptance.
+The admitted roster is **Manki, FightGuy, Wibou, Bonk** (`content-cooked/roster/manifest.json`). Nilus remains legacy compatibility, not a fifth demo requirement. Package admission does not prove kit completeness or player acceptance.
 
 Use one existing stage and the existing dedicated-server Join flow for the first remote session. Keep all four characters as the demo milestone, but run a rough match with one friend before polishing all four. Host-and-play remains a technical fallback, not a second workflow to redesign.
 
@@ -34,7 +34,7 @@ scripts derive required package IDs from the roster manifest and verify all four
 payloads for every admitted package.
 
 **Fresh-publish evidence:** `dotnet publish` now produces the roster manifest plus
-Manki, FightGuy, Kistu, and Bonk payloads in a clean output directory. The remaining
+Manki, FightGuy, Wibou, and Bonk payloads in a clean output directory. The remaining
 release gates are the Windows player build, dedicated-server deployment, and the
 packaged join-to-rematch smoke.
 

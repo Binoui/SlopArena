@@ -7,6 +7,10 @@ category: game-dev
 
 Use this skill when creating or changing a character animation clip. It owns presentation assets and catalog bindings only. It does **not** change gameplay timing, damage, hitboxes, input, server simulation, or VFX behavior.
 
+For agent-driven move preview, timeline scrubbing, captures, or diagnostics, use the
+[Ability Lab skill](../sloparena-ability-lab/SKILL.md) and
+[Unity CLI reference](../../../docs/contributing/unity-cli.md).
+
 ## Authority
 
 ```text

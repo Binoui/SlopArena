@@ -436,7 +436,7 @@ public void Knockback_DoesNotTunnelThroughThinWall()
     [Theory]
     [InlineData(CharacterClass.FightGuy)]
     [InlineData(CharacterClass.Manki)]
-    [InlineData(CharacterClass.Kistu)]
+    [InlineData(CharacterClass.Wibou)]
     [InlineData(CharacterClass.Bonk)]
     public void HeldRunIntoWall_StopsAndCanMoveAway(CharacterClass cls)
     {
@@ -497,7 +497,7 @@ public void Knockback_DoesNotTunnelThroughThinWall()
     [Theory]
     [InlineData(CharacterClass.FightGuy)]
     [InlineData(CharacterClass.Manki)]
-    [InlineData(CharacterClass.Kistu)]
+    [InlineData(CharacterClass.Wibou)]
     [InlineData(CharacterClass.Bonk)]
     public void HeldDiagonalRunAlongWall_PreservesTangentialMovement(CharacterClass cls)
     {
@@ -553,7 +553,7 @@ public void Knockback_DoesNotTunnelThroughThinWall()
     [Theory]
     [InlineData(CharacterClass.FightGuy)]
     [InlineData(CharacterClass.Manki)]
-    [InlineData(CharacterClass.Kistu)]
+    [InlineData(CharacterClass.Wibou)]
     [InlineData(CharacterClass.Bonk)]
     public void RunOffTrianglePlatform_FallsWithoutHoverOrSelfGrab(CharacterClass cls)
     {
@@ -611,8 +611,8 @@ public void Knockback_DoesNotTunnelThroughThinWall()
     [InlineData(CharacterClass.FightGuy, 0.5f)]
     [InlineData(CharacterClass.Manki, 0f)]
     [InlineData(CharacterClass.Manki, 0.5f)]
-    [InlineData(CharacterClass.Kistu, 0f)]
-    [InlineData(CharacterClass.Kistu, 0.5f)]
+    [InlineData(CharacterClass.Wibou, 0f)]
+    [InlineData(CharacterClass.Wibou, 0.5f)]
     [InlineData(CharacterClass.Bonk, 0f)]
     [InlineData(CharacterClass.Bonk, 0.5f)]
     public void HeldJumpBetweenTrianglePlatforms_LandsAndKeepsMoving(CharacterClass cls, float destinationY)

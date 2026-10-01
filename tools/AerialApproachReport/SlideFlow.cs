@@ -437,7 +437,7 @@ internal static partial class Program
             "fightguy" => (48f, 58f),
             "manki" => (45f, 54f),
             "bonk" => (48f, 58f),
-            "kistu" => (48f, 58f),
+            "wibou" => (48f, 58f),
             _ => throw new InvalidDataException($"{entry.Identity.PackageId}: no verified previous fall profile")
         };
         result.Movement = movement;

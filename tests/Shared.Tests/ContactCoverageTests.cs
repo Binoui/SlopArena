@@ -13,7 +13,7 @@ public sealed class ContactCoverageTests
 
     [Theory]
     [InlineData(CharacterClass.FightGuy)]
-    [InlineData(CharacterClass.Kistu)]
+    [InlineData(CharacterClass.Wibou)]
     public void GroundOne_ReportsRealContactAndDistantMiss(CharacterClass character)
     {
         var entry = BuiltInContentResolver.Resolve(character);

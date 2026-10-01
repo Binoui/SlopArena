@@ -86,6 +86,13 @@ public static class AbilityLabPackagePreviewLoader
             });
         }
 
+#if UNITY_EDITOR
+        // Keep an owned snapshot so asset refresh cannot invalidate the
+        // animation catalog used by an active authoring preview.
+        animationCatalog = UnityEngine.Object.Instantiate(animationCatalog);
+        animationCatalog.hideFlags = HideFlags.DontSave;
+#endif
+
         return new AbilityLabPackagePreviewResult(
             true,
             loaded.Package,

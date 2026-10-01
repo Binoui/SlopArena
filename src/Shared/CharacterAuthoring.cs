@@ -314,18 +314,18 @@ public sealed record DragonBeamCapabilityParameters(
     ushort StunTicks,
     ushort HitboxDurationTicks) : TypedCapabilityParameters;
 
-public sealed record KistuDashSlashCapabilityParameters(
+public sealed record WibouDashSlashCapabilityParameters(
     float DashDistance,
     ushort DashDurationTicks,
     ushort MaxAimTicks) : TypedCapabilityParameters;
 
-public sealed record KistuRisingSlashCapabilityParameters(
+public sealed record WibouRisingSlashCapabilityParameters(
     float RiseSpeed,
     ushort RiseTicks,
     float HomingRange,
     float HomingSpeed) : TypedCapabilityParameters;
 
-public sealed record KistuBladeFlurryCapabilityParameters(
+public sealed record WibouBladeFlurryCapabilityParameters(
     float ForwardSpeed,
     ushort MoveTicks) : TypedCapabilityParameters;
 public sealed record BonkTargetedJumpSlamCapabilityParameters(

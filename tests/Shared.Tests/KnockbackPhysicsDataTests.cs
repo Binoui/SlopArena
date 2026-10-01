@@ -29,7 +29,7 @@ public class KnockbackPhysicsDataTests
 
     private static readonly int[] Percents = { 0, 25, 50, 75, 100, 125, 150, 175, 200 };
 
-    // Profiles + a real-world custom move (Kistu charged finisher, package source).
+    // Profiles + a real-world custom move (Wibou charged finisher, package source).
     // stunTicks = 60 (engine cap) so hitstun is purely magnitude-derived:
     // hitstun = clamp(8 + magnitude*0.5, 8, 60). Real moves pass lower stun values,
     // which only shorten the constant-velocity phase, never lengthen it.
@@ -40,7 +40,7 @@ public class KnockbackPhysicsDataTests
         ("Launcher",  25,  8f, 4f),
         ("Kill",      20, 18f, 10f),
         ("Spike",    -45, 12f, 4f),
-        ("KistuFin",  45, 14f, 8f), // Custom: Kistu charged finisher
+        ("WibouFin",  45, 14f, 8f), // Custom: Wibou charged finisher
     };
 
     private sealed record Flight(

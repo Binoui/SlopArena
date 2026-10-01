@@ -35,10 +35,10 @@ public static class LocalContentResolverSelfTest
                 nilusLegacy.LegacyEntry.LegacySelector != CharacterClass.Nilus)
                 throw new InvalidOperationException("Valid rooted Nilus legacy snapshot could not be resolved: " + Format(nilusLegacy));
 
-            var kistuLegacy = resolver.ResolveLegacy(CharacterClass.Kistu);
-            if (kistuLegacy.Success || kistuLegacy.LegacyEntry != null ||
-                !kistuLegacy.Diagnostics.Any(d => d.Code == "content.legacy.selector"))
-                throw new InvalidOperationException("Kistu legacy resolution did not fail closed.");
+            var wibouLegacy = resolver.ResolveLegacy(CharacterClass.Wibou);
+            if (wibouLegacy.Success || wibouLegacy.LegacyEntry != null ||
+                !wibouLegacy.Diagnostics.Any(d => d.Code == "content.legacy.selector"))
+                throw new InvalidOperationException("Wibou legacy resolution did not fail closed.");
 
             var mankiLegacy = resolver.ResolveLegacy(CharacterClass.Manki);
             if (mankiLegacy.Success || mankiLegacy.LegacyEntry != null ||

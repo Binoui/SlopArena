@@ -9,9 +9,6 @@ Use the canonical project guidance before acting:
 - [`docs/testing.md`](docs/testing.md) owns local iteration, integrated change, and
   distributable demo verification.
 
-Preserve Shared/server authority and deterministic equivalence. Do not implement gameplay
-mechanics as client-only rules. Do not commit, push, or install anything without explicit
-user permission.
 
 ## Agent skills
 

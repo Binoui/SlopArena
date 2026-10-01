@@ -174,7 +174,7 @@ New console project (net8.0, refs Shared) — deliberately separate from `MoveDa
 (already 1700+ lines, single-purpose). CLI:
 
 ```bash
-scripts/selfplay.sh [--matches N] [--seed S] [--char fightguy|kistu] \
+scripts/selfplay.sh [--matches N] [--seed S] [--char fightguy|wibou] \
     [--json report.json] [--html report.html] [--out report.md]
 ```
 

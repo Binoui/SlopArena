@@ -4,7 +4,6 @@
         <ui:VisualElement name="settings-poster" class="sa-settings-poster">
             <ui:VisualElement class="sa-settings-header">
                 <ui:Label text="SETTINGS" class="sa-settings-title" />
-                <ui:Label text="SLOPARENA / OPTIONS" class="sa-settings-mark" />
             </ui:VisualElement>
             <ui:VisualElement class="sa-settings-tabs">
                 <ui:Button name="settings-tab-audio" text="AUDIO" class="sa-settings-tab" />

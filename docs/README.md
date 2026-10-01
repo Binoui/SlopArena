@@ -21,8 +21,7 @@ Read these in order:
 | [Release Pipeline](systems/release-pipeline.md) | Build, packaging, and release flow |
 | [Restricted local stack](../deploy/local/README.md) | Caddy/PostgreSQL/GameServer image-only integration without changing the home endpoint |
 | [Restricted VPS release](../deploy/vps/README.md) | Operator bootstrap, pinned deployment, rollback, and external ingress gates |
-| [Unity CLI](contributing/unity-cli.md) | Inspect/cook commands and live Editor verification |
-| [SlopArena Chat design](design/sloparena-chat.md) | Approved Global/Server/Direct chat contract; Master implemented and headless-verified, Unity integration pending |
+| [Unity CLI](contributing/unity-cli.md) | Inspect/cook commands, Ability Lab agent commands, and live Editor verification |
 
 ## Gameplay systems
 
@@ -33,7 +32,7 @@ Use [Project context](../CONTEXT.md) for canonical gameplay vocabulary and settl
 | [Combat Systems](systems/combat-systems.md) | Universal 8-normal/4-special model and combat mechanics |
 | [Hitbox System](systems/hitbox-system.md) | Hitbox, hurtbox, and collision geometry |
 | [Hitstun DI](systems/hitstun-di.md) | Hitstun, Hitstop, and Combo Influence design |
-| [Ability Lab](systems/ability-lab.md) | Package editing and authoritative preview |
+| [Ability Lab](systems/ability-lab.md) | Package editing, authoritative preview, and agent-facing workspace commands |
 | [NPC System](systems/npc-system.md) | Training entities and AI |
 | [Blast Zones](systems/blast-zones.md) | Void death and arena boundaries |
 | [VFX and Particles](systems/vfx-particles.md) | Presentation effects and visual contracts |
@@ -68,7 +67,7 @@ New packages live under `client/Unity/Assets/CharacterPackages/<package>/`. Cook
 | FightGuy | Cooked package; reference vertical slice | [FightGuy](characters/fightguy.md) |
 | Bonk | Cooked package; rostered | [Bonk](characters/bonk.md) |
 | Manki | Cooked package; rostered | [Manki](characters/manki.md) |
-| Kistu | Cooked package; rostered | [Kistu](characters/kistu.md) |
+| Wibou | Cooked package; rostered | [Wibou](characters/wibou.md) |
 | Nilus | Legacy compatibility implementation | [Nilus](characters/nilus.md) |
 
 The Nilus page is a modification-only legacy implementation record. Its legacy details
@@ -79,7 +78,7 @@ must not be copied into new package work.
 | Document | Use it for |
 | --- | --- |
 | [Art and asset conventions](contributing/conventions.md) | Visual direction, naming, licensing, and asset hygiene |
-| [Unity CLI](contributing/unity-cli.md) | Package inspection/cooking and Editor checks |
+| [Unity CLI](contributing/unity-cli.md) | Package inspection/cooking, Ability Lab commands, and Editor checks |
 | [Repository contributing guide](../CONTRIBUTING.md) | Setup, rules, verification, and pull requests |
 | [Code of Conduct](../CODE_OF_CONDUCT.md) | Community standards |
 

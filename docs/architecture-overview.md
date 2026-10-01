@@ -45,7 +45,7 @@ content-cooked/<package>/
 
 FightGuy is the first cooked vertical slice. Its editable source is under `client/Unity/Assets/CharacterPackages/fightguy/`; its canonical runtime package is under `content-cooked/fightguy/`. The generated client catalog is a regenerable presentation cache.
 
-Manki, Kistu, and Bonk are package-native cooked roster characters. Nilus remains behind `LegacyCharacterCatalogAdapter` until migrated. Nilus's C# definition, legacy registry, source path, and baked data are modification-only compatibility. It is not a template for new packages. Do not widen legacy instructions into the cooked workflow or infer that a legacy file is current authority.
+Manki, Wibou, and Bonk are package-native cooked roster characters. Nilus remains behind `LegacyCharacterCatalogAdapter` until migrated. Nilus's C# definition, legacy registry, source path, and baked data are modification-only compatibility. It is not a template for new packages. Do not widen legacy instructions into the cooked workflow or infer that a legacy file is current authority.
 
 ## Runtime flow
 

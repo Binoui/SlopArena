@@ -1,0 +1,32 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 06b0ddd57a57a2001a3df31c73956e2c, type: 3}
+  m_Name: Shared_AnimConfig
+  m_EditorClassIdentifier: 
+  Idle: {fileID: 0}
+  Run: {fileID: 0}
+  JumpUp: {fileID: 0}
+  JumpDown: {fileID: 0}
+  Tumble: {fileID: 0}
+  Fall: {fileID: 0}
+  Dash: {fileID: 0}
+  HitSmall: {fileID: 0}
+  HitMedium: {fileID: 0}
+  HitHard: {fileID: 0}
+  Death: {fileID: 0}
+  AbilityClips:
+  - Name: grab
+    Clip: {fileID: -1072464929596767778, guid: de48d0787130153ebbe12d2123eed3f3, type: 3}
+    Extrapolation: 0
+  - Name: throw
+    Clip: {fileID: 6992682855264344001, guid: 98bf89b97d2599a708023fd9af4bf3ae, type: 3}
+    Extrapolation: 0

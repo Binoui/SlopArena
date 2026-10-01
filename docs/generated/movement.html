@@ -15,7 +15,7 @@ Run: hold right &middot; Dash: one press &middot; Jump: full jump &middot; Short
 Double jump: edge at first apex &middot; Fall: 50 m drop (natural / fast fall) &middot; Reversal: cruise → opposite input &middot; Stop: release.<br>
 Stage-relative rows: real baked <b>colosseum</b> (30.6 m wide). Measured <em>effective</em> behavior — not authored constants; authored in <span class="note">orange</span>.</div>
 <h2>Comparison</h2><table><tr><th>metric</th>
-<th>Manki</th><th>FightGuy</th><th>Kistu</th><th>Nilus</th></tr>
+<th>Manki</th><th>FightGuy</th><th>Wibou</th><th>Nilus</th></tr>
 <tr><td>Run max speed (m/s)</td><td>12.0 <span class="note">(12)</span></td><td>14.0 <span class="note">(14)</span></td><td>15.0 <span class="note">(15)</span></td><td>13.0 <span class="note">(13)</span></td></tr>
 <tr><td>Run time-to-max</td><td>instant <span class="note">(rush kick-off)</span></td><td>instant <span class="note">(rush kick-off)</span></td><td>instant <span class="note">(rush kick-off)</span></td><td>instant <span class="note">(rush kick-off)</span></td></tr>
 <tr><td>Run cross-stage time (s)</td><td>2.55</td><td>2.19</td><td>2.04</td><td>2.35</td></tr>
@@ -49,15 +49,15 @@ Stage-relative rows: real baked <b>colosseum</b> (30.6 m wide). Measured <em>eff
 <h2>Roster read</h2><div class="verdict">
 <p>**Manki**: run 12 m/s, dash 4.7 m (15% of stage), jump 1.35 m, air/run 54%, stop 1.7 m. Best at: safest stop. Weakest at: longest dash, highest jump, fastest run, longest airtime, largest air drift, largest stage share per dash.</p>
 <p>**FightGuy**: run 14 m/s, dash 6.3 m (21% of stage), jump 1.90 m, air/run 54%, stop 2.4 m. Best at: longest dash, largest stage share per dash. Weakest at: most ground-dominant (lowest air/run).</p>
-<p>**Kistu**: run 15 m/s, dash 6.0 m (20% of stage), jump 2.24 m, air/run 57%, stop 2.8 m. Best at: highest jump, fastest run, longest airtime, largest air drift. Weakest at: safest stop.</p>
+<p><b>Wibou</b>: run 15 m/s, dash 6.0 m (20% of stage), jump 2.24 m, air/run 57%, stop 2.8 m. Best at: highest jump, fastest run, longest airtime, largest air drift. Weakest at: safest stop.</p>
 <p>**Nilus**: run 13 m/s, dash 4.9 m (16% of stage), jump 2.02 m, air/run 54%, stop 2.0 m.</p>
-<p><b>Too fast?</b> Run crosses 31 m in Manki 2.55 s / FightGuy 2.19 s / Kistu 2.04 s / Nilus 2.35 s. Full-hop airtime 0.53 s / 0.63 s / 0.68 s / 0.67 s vs ~0.25 s reaction — reactable but tight. Fast-fall from jump apex 0.05 s / 0.05 s / 0.07 s / 0.07 s — under reaction: a fast-fall landing cannot be reacted to; reads come from the jump start, not the landing.</p>
+<p><b>Too fast?</b> Run crosses 31 m in Manki 2.55 s / FightGuy 2.19 s / Wibou 2.04 s / Nilus 2.35 s. Full-hop airtime 0.53 s / 0.63 s / 0.68 s / 0.67 s vs ~0.25 s reaction — reactable but tight. Fast-fall from jump apex 0.05 s / 0.05 s / 0.07 s / 0.07 s — under reaction: a fast-fall landing cannot be reacted to; reads come from the jump start, not the landing.</p>
 </div>
 <h2>Melee comparison</h2>
 <div class="meta">Melee values: docs/research/melee-movement-audit.md (SSBWiki [community]; derived frame counts transfer 1:1 — 60 f/s = 60 ticks/s). Absolute speeds don't transfer (u/f vs m/s), timings and ratios do.</div>
 <table><tr><th>metric</th><th>SlopArena (measured)</th><th>Melee reference</th><th>read</th></tr>
 <tr><td>Jump squat</td><td>6 t–4 t–4 t–5 t</td><td style="text-align:left">3–8 f (Fox 3, Marth 4, Puff 5, Bowser 8)</td><td style="text-align:left">in Melee range</td></tr>
-<tr><td>Full-hop airtime</td><td>0.53 s–0.63 s–0.68 s–0.67 s</td><td style="text-align:left">Fox ~33 f, Marth 57–59 f</td><td style="text-align:left">FG/Kistu ≈ Fox-fast, Manki ≈ Marth</td></tr>
+<tr><td>Full-hop airtime</td><td>0.53 s–0.63 s–0.68 s–0.67 s</td><td style="text-align:left">Fox ~33 f, Marth 57–59 f</td><td style="text-align:left">FG/Wibou ≈ Fox-fast, Manki ≈ Marth</td></tr>
 <tr><td>Short-hop airtime</td><td>0.00 s–0.37 s–0.40 s–0.38 s</td><td style="text-align:left">Fox ~19 f, Marth 36–38 f</td><td style="text-align:left">short hop in the fast band</td></tr>
 <tr><td>Short/full jump force</td><td>0.60–0.60–0.60–0.60</td><td style="text-align:left">≈ 0.58 (derived)</td><td style="text-align:left">Melee-shaped (0.7 was the pre-audit value)</td></tr>
 <tr><td>Fast fall / fall</td><td>1.20–1.21–1.21–1.20</td><td style="text-align:left">1.14–1.26 (Fox 3.4/2.8 … Puff 1.6/1.3)</td><td style="text-align:left">Melee-shaped, adopted (audit §3.4)</td></tr>
@@ -173,7 +173,7 @@ Stage-relative rows: real baked <b>colosseum</b> (30.6 m wide). Measured <em>eff
 <text x="290" y="127" text-anchor="end">89 ticks</text>
 <path d="M8.0 10.0 L11.2 10.0 L14.4 10.0 L17.6 10.0 L20.8 10.0 L24.0 10.0 L27.1 10.0 L30.3 10.0 L33.5 10.0 L36.7 10.0 L39.9 10.0 L43.1 10.0 L46.3 10.0 L49.5 10.0 L52.7 10.0 L55.9 10.0 L59.1 10.0 L62.2 10.0 L65.4 10.0 L68.6 10.0 L71.8 10.0 L75.0 10.0 L78.2 10.0 L81.4 10.0 L84.6 10.0 L87.8 10.0 L91.0 10.0 L94.2 10.0 L97.3 10.0 L100.5 10.0 L103.7 14.5 L106.9 19.1 L110.1 23.6 L113.3 28.2 L116.5 32.7 L119.7 37.3 L122.9 41.8 L126.1 46.3 L129.3 50.9 L132.4 55.4 L135.6 60.0 L138.8 64.5 L142.0 69.1 L145.2 73.6 L148.4 78.1 L151.6 82.7 L154.8 87.2 L158.0 91.8 L161.2 96.3 L164.4 100.9 L167.6 105.4 L170.7 109.9 L173.9 114.5 L177.1 116.0 L180.3 116.0 L183.5 116.0 L186.7 116.0 L189.9 116.0 L193.1 116.0 L196.3 116.0 L199.5 116.0 L202.7 116.0 L205.8 116.0 L209.0 116.0 L212.2 116.0 L215.4 116.0 L218.6 116.0 L221.8 116.0 L225.0 116.0 L228.2 116.0 L231.4 116.0 L234.6 116.0 L237.8 116.0 L240.9 116.0 L244.1 116.0 L247.3 116.0 L250.5 116.0 L253.7 116.0 L256.9 116.0 L260.1 116.0 L263.3 116.0 L266.5 116.0 L269.7 116.0 L272.9 116.0 L276.0 116.0 L279.2 116.0 L282.4 116.0 L285.6 116.0 L288.8 116.0 L292.0 116.0" fill="none" stroke="#58a6ff" stroke-width="1.5"/></svg></div>
 </div>
-<h2>Kistu</h2>
+<h2>Wibou</h2>
 <table><tr><th>metric</th><th>value</th></tr>
 <tr><td>Run max speed</td><td>15.0 m/s <span class="note">(authored 15)</span></td></tr><tr><td>Run time-to-max</td><td>instant — tick 1 <span class="note">(rush kick-off, no ramp)</span></td></tr><tr><td>Dash</td><td>16 ticks &middot; 6.00 m = 20% of stage &middot; actionable tick 16 <span class="note">(authored 24 m/s &times; 16 ticks)</span></td></tr><tr><td>Dash + stop commit</td><td>8.76 m = 29% of stage (whiff-punish range)</td></tr><tr><td>Jump</td><td>apex 2.24 m at 20 ticks &middot; airtime 0.68 s &middot; full-hop drift 4.34 m = 14% of stage</td></tr><tr><td>Short hop</td><td>apex 0.78 m &middot; airtime 0.40 s &middot; drift 1.93 m <span class="note">(force 7.8 vs jump 13.0)</span></td></tr><tr><td>Running jump</td><td>full hop from cruise: 6.63 m, apex 2.24 m</td></tr><tr><td>Double jump</td><td>second apex 3.65 m &middot; total airtime 1.05 s</td></tr><tr><td>Air drift cap</td><td>8.5 m/s <span class="note">(authored 8.5)</span> = 57% of run</td></tr><tr><td>Fall (50 m drop)</td><td>max 48 m/s <span class="note">(authored 48)</span> &middot; time-to-max 1.32 s &middot; descent 1.67 s</td></tr><tr><td>Fast fall</td><td>58 m/s <span class="note">(authored 58)</span> &middot; from jump apex 0.07 s (natural full-hop fall ~0.35 s)</td></tr><tr><td>Reversal</td><td>0.67 s &middot; 2.36 m covered (pivot skid + re-accel; no rush flip on 180°)</td></tr><tr><td>Stop</td><td>0.40 s &middot; 2.76 m</td></tr></table>
 <div class="curves">

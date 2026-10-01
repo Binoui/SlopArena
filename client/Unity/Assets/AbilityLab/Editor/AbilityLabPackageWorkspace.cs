@@ -9,6 +9,7 @@ using UnityEngine;
 using SlopArena.Client.Animation;
 using SlopArena.Client.Tools;
 using SlopArena.Shared;
+using SlopArena.Client.Entities;
 
 namespace SlopArena.EditorTools;
 
@@ -57,18 +58,22 @@ public sealed class AbilityLabPackageWorkspace
     }
     public bool OpenPackage(string packageRoot)
     {
-        LiveDraftPackage = null;
-        LiveDraftInvalid = false;
         var inspection = new CharacterPackageAuthoringService(UnityCharacterAssetCooker.ProjectRoot()).Inspect(packageRoot);
         if (!inspection.Success || inspection.Source == null || inspection.Catalog == null)
         {
             SetDiagnostics(inspection.RawDiagnostics, "Failed");
-            Preview = new AbilityLabPackagePreviewResult(
-                false, null, null, null, null, null, Array.Empty<SlotAddress>(), inspection.RawDiagnostics);
-            AbilityLab.Instance?.ApplyPreviewUnavailable(Preview.Diagnostics);
             return false;
         }
+        return OpenPackage(inspection);
+    }
 
+    internal bool OpenPackage(CharacterPackageInspectionResult inspection)
+    {
+        if (inspection == null || !inspection.Success || inspection.Source == null || inspection.Catalog == null)
+            return false;
+
+        LiveDraftPackage = null;
+        LiveDraftInvalid = false;
         PackageRoot = inspection.SourcePath;
         Manifest = inspection.Source.Manifest;
         Draft = inspection.Source.Character;
@@ -206,6 +211,51 @@ public sealed class AbilityLabPackageWorkspace
             SetDiagnosticsWithoutNotify(new[] { new CharacterDiagnostic(CharacterDiagnosticSeverity.Error, "rename.failed", "catalog", ex.Message) }, "Failed");
             return false;
         }
+    }
+
+    public bool ReplaceTrailBladeWidth(int entryIndex, float width)
+    {
+        var config = Catalog?.WeaponConfig;
+        if (!HasPackage || config?.Entries == null || entryIndex < 0
+            || entryIndex >= config.Entries.Length || config.Entries[entryIndex]?.TrailStylePrefab == null)
+            return false;
+        width = Mathf.Clamp(width, 0.01f, 1f);
+        var entry = config.Entries[entryIndex];
+        if (entry.TrailBladeWidth == width) return false;
+        var prior = CaptureSnapshot(entryIndex);
+        UnityEditor.Undo.RecordObject(config, "Change blade trail width");
+        entry.TrailBladeWidth = width;
+        EditorUtility.SetDirty(config);
+        AssetDatabase.SaveAssetIfDirty(config);
+        PushUndo(prior);
+        IsDirty = true;
+        Status = "Stale";
+        return true;
+    }
+
+    public bool ReplaceTrailStyle(int entryIndex, GameObject style)
+    {
+        var config = Catalog?.WeaponConfig;
+        if (!HasPackage || config?.Entries == null || entryIndex < 0
+            || entryIndex >= config.Entries.Length || config.Entries[entryIndex] == null)
+            return false;
+        if (style != null)
+        {
+            var system = style.GetComponentInChildren<ParticleSystem>(true);
+            if (system == null || system.GetComponent<ParticleSystemRenderer>()?.sharedMaterial == null)
+                return false;
+        }
+        var entry = config.Entries[entryIndex];
+        if (entry.TrailStylePrefab == style) return false;
+        var prior = CaptureSnapshot(entryIndex);
+        UnityEditor.Undo.RecordObject(config, "Change blade trail style");
+        entry.TrailStylePrefab = style;
+        EditorUtility.SetDirty(config);
+        AssetDatabase.SaveAssetIfDirty(config);
+        PushUndo(prior);
+        IsDirty = true;
+        Status = "Stale";
+        return true;
     }
 
     public bool ReplaceCatalogRig(GameObject rig)
@@ -515,6 +565,15 @@ public sealed class AbilityLabPackageWorkspace
         return true;
     }
 
+    /// <summary>Prepare the current workspace for testing without saving, cooking, or adding Undo entries.</summary>
+    public bool PrepareScenarioPreview()
+    {
+        if (!HasPackage || Preview?.IsAvailable != true) return false;
+        if (LiveDraftPackage == null && !LiveDraftInvalid)
+            RefreshLiveDraft(new CharacterPackageSource(Manifest, Draft), Array.Empty<CharacterDiagnostic>());
+        return !LiveDraftInvalid && LiveDraftPackage != null;
+    }
+
     private void RefreshLiveDraft(CharacterPackageSource source, IReadOnlyList<CharacterDiagnostic> sourceDiagnostics)
     {
         AbilityLab.Instance?.SetSourceDocument(source);
@@ -542,14 +601,16 @@ public sealed class AbilityLabPackageWorkspace
     public void Undo()
     {
         if (_undo.Count == 0) return;
-        _redo.Push(CaptureSnapshot());
-        RestoreSnapshot(_undo.Pop(), true);
+        var snapshot = _undo.Pop();
+        _redo.Push(CaptureSnapshot(snapshot.TrailEntryIndex));
+        RestoreSnapshot(snapshot, true);
     }
     public void Redo()
     {
         if (_redo.Count == 0) return;
-        _undo.Push(CaptureSnapshot());
-        RestoreSnapshot(_redo.Pop(), true);
+        var snapshot = _redo.Pop();
+        _undo.Push(CaptureSnapshot(snapshot.TrailEntryIndex));
+        RestoreSnapshot(snapshot, true);
     }
 
     public void SetDraft(CharacterAuthoringDocument draft)
@@ -571,6 +632,20 @@ public sealed class AbilityLabPackageWorkspace
 
     private void RestoreSnapshot(WorkspaceSnapshot snapshot, bool recordUnityUndo)
     {
+        if (snapshot.WeaponConfig?.Entries != null && snapshot.TrailEntryIndex >= 0
+            && snapshot.TrailEntryIndex < snapshot.WeaponConfig.Entries.Length)
+        {
+            var config = snapshot.WeaponConfig;
+            if (recordUnityUndo) UnityEditor.Undo.RecordObject(config, "Ability Lab weapon trail undo");
+            config.Entries[snapshot.TrailEntryIndex].TrailBladeWidth = snapshot.TrailWidth;
+            config.Entries[snapshot.TrailEntryIndex].TrailStylePrefab = snapshot.TrailStyle;
+            EditorUtility.SetDirty(config);
+            AssetDatabase.SaveAssetIfDirty(config);
+            IsDirty = true;
+            Status = "Stale";
+            SceneView.RepaintAll();
+            return;
+        }
         if (recordUnityUndo && Catalog != null)
             UnityEditor.Undo.RecordObject(Catalog, "Ability Lab workspace undo");
         Manifest = snapshot.Source.Manifest;
@@ -590,10 +665,15 @@ public sealed class AbilityLabPackageWorkspace
         SceneView.RepaintAll();
     }
 
-    private WorkspaceSnapshot CaptureSnapshot()
-        => new(new CharacterPackageSource(Manifest, Draft), Catalog == null
+    private WorkspaceSnapshot CaptureSnapshot(int trailEntryIndex = -1)
+    {
+        var config = trailEntryIndex >= 0 ? Catalog?.WeaponConfig : null;
+        return new WorkspaceSnapshot(new CharacterPackageSource(Manifest, Draft), Catalog == null
             ? null
-            : new CatalogSnapshot(Catalog.Rig, CloneBindings(Catalog.Bindings), ClonePresentations(Catalog.Presentations)));
+            : new CatalogSnapshot(Catalog.Rig, CloneBindings(Catalog.Bindings), ClonePresentations(Catalog.Presentations)),
+            config, trailEntryIndex, config != null ? config.Entries[trailEntryIndex].TrailBladeWidth : 0f,
+            config != null ? config.Entries[trailEntryIndex].TrailStylePrefab : null);
+    }
 
     private void PushUndo() => PushUndo(CaptureSnapshot());
 
@@ -624,14 +704,23 @@ public sealed class AbilityLabPackageWorkspace
 
     private sealed class WorkspaceSnapshot
     {
-        public WorkspaceSnapshot(CharacterPackageSource source, CatalogSnapshot catalog)
+        public WorkspaceSnapshot(CharacterPackageSource source, CatalogSnapshot catalog,
+            WeaponAttachConfig weaponConfig, int trailEntryIndex, float trailWidth, GameObject trailStyle)
         {
             Source = source;
             Catalog = catalog;
+            WeaponConfig = weaponConfig;
+            TrailEntryIndex = trailEntryIndex;
+            TrailWidth = trailWidth;
+            TrailStyle = trailStyle;
         }
 
         public CharacterPackageSource Source { get; }
         public CatalogSnapshot Catalog { get; }
+        public WeaponAttachConfig WeaponConfig { get; }
+        public int TrailEntryIndex { get; }
+        public float TrailWidth { get; }
+        public GameObject TrailStyle { get; }
     }
 
     private sealed class CatalogSnapshot

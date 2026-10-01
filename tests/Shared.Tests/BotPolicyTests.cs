@@ -618,7 +618,7 @@ public class BotPolicyTests
     [Fact]
     public void DirectionalPlan_ExecutesMovementThroughSimulationAcrossSeeds()
     {
-        var def = TestHelpers.KistuDef;
+        var def = TestHelpers.WibouDef;
         for (int seed = 0; seed < 8; seed++)
         {
             var sim = TestHelpers.MakeSim();
@@ -661,7 +661,7 @@ public class BotPolicyTests
     [Theory]
     [InlineData(CharacterClass.FightGuy)]
     [InlineData(CharacterClass.Manki)]
-    [InlineData(CharacterClass.Kistu)]
+    [InlineData(CharacterClass.Wibou)]
     [InlineData(CharacterClass.Bonk)]
     public void StageRecovery_ReturnsToAStageSurface(CharacterClass character)
     {
@@ -712,7 +712,7 @@ public class BotPolicyTests
     [Theory]
     [InlineData(CharacterClass.FightGuy)]
     [InlineData(CharacterClass.Manki)]
-    [InlineData(CharacterClass.Kistu)]
+    [InlineData(CharacterClass.Wibou)]
     [InlineData(CharacterClass.Bonk)]
     public void RecoveryMove_IsReservedWhenOffstage(CharacterClass character)
     {
@@ -749,7 +749,7 @@ public class BotPolicyTests
         var memory = new BotMemory { Difficulty = CpuDifficulty.Hard };
         Prime(memory, target);
 
-        var input = Policy.Decide(self, target, TestHelpers.KistuDef,
+        var input = Policy.Decide(self, target, TestHelpers.WibouDef,
             new Random(0), memory, RecoveryArena());
 
         Assert.Equal(0, input.ActiveSlot);

@@ -8,6 +8,10 @@ category: game-dev
 
 Use this skill when designing or implementing a playable character. The canonical authoring guide is [`docs/characters/adding-a-new-character.md`](../../../docs/characters/adding-a-new-character.md). New characters are packages, not registry factories.
 
+For agent-driven package move inspection, preview, scrubbing, capture, or diagnostics,
+use the [Ability Lab skill](../sloparena-ability-lab/SKILL.md) and
+[Unity CLI reference](../../../docs/contributing/unity-cli.md).
+
 ## Authority and boundaries
 
 A Character Package contains exactly one playable character:

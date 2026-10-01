@@ -1,15 +1,26 @@
 /* FrontendShell (issues #218/#219): the permanent frontend frame. One stable
-   document: top bar, page header/body hosts, lower row with social and
-   page summary/actions cells, plus expanded-social and modal hosts. Home
-   overlays its social cell instead of reserving layout space. Density classes
+   document: top bar, page header/body hosts, lower-row summary/actions,
+   an absolute social host and modal host. Chat is
+   an absolute user-sized overlay on every page, never a reserved layout cell. Density classes
    live on the stable shell root; PanelSettings use ConstantPhysicalSize
    (96 dpi), so USS px ≈ physical pixels. */
 
 .frontend-shell {
+    --shell-canvas: rgb(27, 26, 24);
+    --shell-surface: rgb(37, 36, 34);
+    --shell-recess: rgb(22, 21, 19);
+    --shell-rule: rgb(123, 120, 114);
+    --shell-paper: rgb(240, 238, 232);
+    --shell-action: rgb(255, 204, 34);
+    --shell-page: var(--shell-paper);
+    --shell-page-ink: var(--shell-canvas);
+    --shell-page-muted: rgb(78, 76, 72);
+    --shell-page-warning: rgb(167, 54, 26);
+    --shell-page-error: rgb(169, 46, 30);
     flex-grow: 1;
-    color: rgb(240, 238, 232);
+    color: var(--shell-page-ink);
     font-size: 18px;
-    background-color: rgb(23, 19, 27);
+    background-color: var(--shell-page);
 }
 
 .shell-backdrop {
@@ -18,20 +29,28 @@
     right: 0;
     top: 0;
     bottom: 0;
-    background-color: rgb(23, 19, 27);
-    border-right-width: 14px;
-    border-right-color: rgb(224, 92, 42);
-    -unity-text-align: middle-left;
+    background-color: var(--shell-page);
+    background-image: url("FrontendPaperBackground.png");
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
 }
 
-.frontend-shell--home,
-.frontend-shell--home .shell-backdrop {
-    background-color: rgb(21, 18, 25);
-    color: rgb(241, 235, 221);
+.frontend-shell--fighters .char-marker--local {
+    background-color: var(--shell-canvas);
 }
-
-.frontend-shell--home .shell-backdrop {
-    border-right-color: rgb(255, 204, 34);
+.frontend-shell .chat-panel {
+    --chat-surface: var(--shell-surface);
+    --chat-deep-ink: var(--shell-recess);
+    --chat-border: var(--shell-rule);
+    background-color: var(--shell-surface);
+}
+.frontend-shell .chat-history,
+.frontend-shell .chat-draft .unity-base-text-field__input {
+    background-color: var(--shell-recess);
+}
+.frontend-shell .online-list {
+    background-color: var(--shell-surface);
 }
 
 .shell-hidden {
@@ -62,23 +81,25 @@
     bottom: 0;
     align-items: center;
     justify-content: center;
-    background-color: rgba(13, 13, 20, 0.55);
+    background-color: rgba(22, 21, 19, 0.8);
 }
 
 .shell-modal-box {
     min-width: 420px;
     max-width: 560px;
     padding: 20px 24px;
-    background-color: rgb(23, 19, 27);
-    border-width: 2px;
-    border-color: rgb(255, 200, 33);
+    background-color: var(--shell-paper);
+    border-width: 3px;
+    border-color: var(--shell-recess);
+    border-bottom-width: 8px;
 }
 
 .shell-modal-title {
-    color: rgb(255, 200, 33);
-    font-size: 16px;
-    letter-spacing: 2px;
-    -unity-font-style: bold;
+    color: var(--shell-canvas);
+    font-size: 24px;
+    letter-spacing: 0;
+    -unity-font-definition: url("../Fonts/ArchivoBlack.asset");
+    -unity-font-style: normal;
 }
 
 .shell-modal-help {
@@ -87,6 +108,19 @@
     color: rgb(196, 189, 197);
     font-size: 13px;
     white-space: normal;
+}
+
+#steam-room-join-notice {
+    background-color: rgba(22, 21, 19, 0.96);
+    color: var(--shell-paper);
+    border-width: 1px;
+    border-color: var(--shell-rule);
+    font-size: 15px;
+}
+
+.shell-modal-box .shell-modal-help {
+    color: var(--shell-surface);
+    font-size: 15px;
 }
 
 .shell-modal-row {
@@ -101,14 +135,24 @@
     padding-left: 8px;
     padding-right: 8px;
     border-width: 1px;
-    border-color: rgb(98, 92, 107);
-    background-color: rgb(240, 238, 232);
-    color: rgb(23, 19, 27);
+    border-color: var(--shell-rule);
+    background-color: var(--shell-recess);
+    color: var(--shell-paper);
     font-size: 13px;
 }
 
+.shell-modal-field .unity-base-text-field__input {
+    background-color: var(--shell-recess);
+    color: var(--shell-paper);
+}
+
+.shell-modal-field .unity-base-text-field__input:focus {
+    border-width: 2px;
+    border-color: var(--shell-action);
+}
+
 .shell-modal-field:focus {
-    border-color: rgb(255, 200, 33);
+    border-color: var(--shell-action);
 }
 
 .shell-modal-submit {
@@ -116,20 +160,41 @@
     min-height: 36px;
     margin-left: 8px;
     border-width: 2px;
-    border-color: rgb(13, 13, 20);
+    border-color: var(--shell-recess);
     border-bottom-width: 4px;
-    background-color: rgb(255, 200, 33);
-    color: rgb(23, 19, 27);
-    font-size: 11px;
-    letter-spacing: 1px;
-    -unity-font-style: bold;
+    background-color: var(--shell-action);
+    color: var(--shell-canvas);
+    font-size: 12px;
+    letter-spacing: 0;
+    -unity-font-definition: url("../Fonts/ArchivoBlack.asset");
+    -unity-font-style: normal;
     -unity-text-align: middle-center;
+}
+
+.shell-modal-submit--secondary {
+    background-color: var(--shell-paper);
+}
+
+.shell-modal-submit:hover,
+.shell-modal-submit:focus {
+    background-color: var(--shell-canvas);
+    color: var(--shell-paper);
+    border-color: var(--shell-action);
+}
+
+.shell-modal-submit:active { translate: 0 3px; }
+
+.shell-modal-submit:disabled {
+    background-color: var(--shell-surface);
+    color: var(--shell-paper);
+    border-color: var(--shell-rule);
+    translate: 0 0;
 }
 
 .shell-modal-feedback {
     min-height: 18px;
     margin-top: 8px;
-    color: rgb(175, 168, 178);
+    color: var(--shell-surface);
     font-size: 12px;
     white-space: normal;
 }
@@ -155,27 +220,55 @@
     width: 360px;
     max-width: 90%;
     padding: 24px;
-    background-color: rgb(23, 19, 27);
-    border-width: 2px;
-    border-color: rgb(255, 200, 33);
-    border-bottom-width: 7px;
+    background-color: var(--shell-paper);
+    border-width: 3px;
+    border-color: rgb(13, 13, 20);
+    border-bottom-width: 8px;
+    border-right-width: 6px;
 }
 
 .shell-escape-title {
     margin-bottom: 18px;
-    color: rgb(255, 200, 33);
+    color: var(--shell-canvas);
     font-size: 36px;
-    -unity-font-definition: url("../Fonts/Baloo2.asset");
-    -unity-font-style: bold;
 }
 
-.shell-escape-action {
+.frontend-shell .shell-escape-action {
     width: 100%;
     margin-bottom: 10px;
+    background-color: var(--shell-surface);
+    color: var(--shell-paper);
+    border-width: 3px;
+    border-bottom-width: 6px;
+    border-right-width: 5px;
+    border-color: rgb(13, 13, 20);
+}
+
+.frontend-shell .shell-escape-action.btn-primary {
+    background-color: var(--shell-action);
+    color: var(--shell-canvas);
+}
+.frontend-shell .shell-escape-action:hover,
+.frontend-shell .shell-escape-action:focus {
+    background-color: var(--shell-action);
+    color: var(--shell-canvas);
+    border-color: rgb(255, 255, 255);
+}
+.frontend-shell .shell-escape-action.btn-primary:hover,
+.frontend-shell .shell-escape-action.btn-primary:focus {
+    background-color: var(--shell-canvas);
+    color: var(--shell-paper);
+    border-color: var(--shell-action);
+}
+.frontend-shell .shell-escape-action:disabled {
+    background-color: var(--shell-surface);
+    color: var(--shell-paper);
+    border-color: var(--shell-rule);
+    opacity: 0.65;
 }
 
 
-.shell-escape-action.btn-back {
+.frontend-shell .shell-escape-action.btn-back {
     width: 100%;
     font-size: 18px;
 }
@@ -186,10 +279,12 @@
     margin-left: 12px;
     padding-left: 32px;
     padding-right: 10px;
-    background-color: rgb(36, 32, 43);
-    border-width: 1px;
-    border-color: rgb(66, 59, 73);
-    color: rgb(241, 235, 221);
+    background-color: var(--shell-paper);
+    border-width: 2px;
+    border-bottom-width: 4px;
+    border-right-width: 3px;
+    border-color: var(--shell-canvas);
+    color: var(--shell-canvas);
     font-size: 13px;
     letter-spacing: 1px;
     -unity-font-style: bold;
@@ -197,8 +292,25 @@
 
 .shell-menu-trigger:hover,
 .shell-menu-trigger:focus {
-    border-color: rgb(255, 204, 34);
-    color: rgb(255, 204, 34);
+    background-color: var(--shell-canvas);
+    border-color: var(--shell-action);
+    color: var(--shell-paper);
+}
+
+.shell-menu-trigger:active,
+.shell-settings:active,
+.shell-nav-tab:active,
+.shell-wordmark:active,
+.menu-action:active,
+.frontend-shell .shell-escape-action:active { translate: 0 3px; }
+
+.shell-menu-trigger,
+.shell-settings,
+.shell-nav-tab,
+.shell-wordmark,
+.menu-action {
+    transition-duration: 0.12s;
+    transition-property: translate, background-color, border-color;
 }
 
 .shell-menu-gear {
@@ -209,6 +321,12 @@
     height: 20px;
     background-image: url("MenuGear.png");
     -unity-background-scale-mode: scale-to-fit;
+    -unity-background-image-tint-color: var(--shell-canvas);
+}
+
+.shell-menu-trigger:hover .shell-menu-gear,
+.shell-menu-trigger:focus .shell-menu-gear {
+    -unity-background-image-tint-color: var(--shell-paper);
 }
 
 /* Keep the bottom action visible in shorter desktop windows. */
@@ -231,28 +349,31 @@
     flex-direction: row;
     align-items: center;
     border-bottom-width: 2px;
-    border-bottom-color: rgb(66, 59, 73);
+    border-bottom-color: var(--shell-canvas);
+    background-color: rgba(0, 0, 0, 0);
 }
 
 .shell-wordmark {
     min-height: 40px;
     padding-left: 12px;
     padding-right: 12px;
-    border-width: 1px;
-    border-color: rgb(255, 204, 34);
-    background-color: rgb(255, 204, 34);
-    color: rgb(21, 18, 25);
+    border-width: 2px;
+    border-bottom-width: 6px;
+    border-right-width: 5px;
+    border-color: rgb(13, 13, 20);
+    background-color: var(--shell-action);
+    color: var(--shell-canvas);
     font-size: 22px;
-    letter-spacing: 1px;
-    -unity-font-definition: url("../Fonts/Baloo2.asset");
-    -unity-font-style: bold;
+    letter-spacing: 0;
+    -unity-font-definition: url("../Fonts/ArchivoBlack.asset");
+    -unity-font-style: normal;
     -unity-text-align: middle-center;
 }
 
 .shell-wordmark:hover,
 .shell-wordmark:focus {
     background-color: rgb(255, 218, 74);
-    border-color: rgb(241, 235, 221);
+    border-color: var(--shell-canvas);
 }
 
 .shell-nav {
@@ -270,9 +391,9 @@
     padding-left: 14px;
     padding-right: 14px;
     border-width: 1px;
-    border-color: transparent;
-    background-color: transparent;
-    color: rgb(241, 235, 221);
+    border-color: var(--shell-canvas);
+    background-color: var(--shell-paper);
+    color: var(--shell-page-ink);
     font-size: 14px;
     letter-spacing: 1px;
     -unity-font-style: bold;
@@ -290,45 +411,49 @@
 }
 
 .shell-nav-tab--selected {
-    color: rgb(255, 204, 34);
+    color: var(--shell-page-ink);
+    background-color: var(--shell-action);
 }
 
 .shell-nav-tab--selected .shell-nav-underline {
-    background-color: rgb(255, 204, 34);
+    background-color: var(--shell-canvas);
 }
 
 .shell-nav-tab:hover,
 .shell-nav-tab:focus {
-    color: rgb(255, 204, 34);
-    border-color: rgb(66, 59, 73);
-    background-color: rgb(36, 32, 43);
+    color: var(--shell-page-ink);
+    border-color: var(--shell-canvas);
+    background-color: var(--shell-action);
 }
 
-.shell-nav-tab:focus { border-color: rgb(255, 204, 34); }
-.shell-nav-tab:disabled { opacity: 0.68; }
+.shell-nav-tab:focus { border-color: var(--shell-canvas); }
+.shell-nav-tab:disabled { color: var(--shell-page-muted); opacity: 1; }
 
 .shell-settings {
     min-height: 36px;
     margin-left: 8px;
     padding-left: 12px;
     padding-right: 12px;
-    background-color: rgb(36, 32, 43);
-    color: rgb(241, 235, 221);
-    border-width: 1px;
-    border-color: rgb(66, 59, 73);
+    background-color: var(--shell-paper);
+    color: var(--shell-canvas);
+    border-width: 2px;
+    border-bottom-width: 4px;
+    border-right-width: 3px;
+    border-color: var(--shell-canvas);
     font-size: 12px;
     -unity-font-style: bold;
 }
 
 .shell-settings:hover,
 .shell-settings:focus {
-    border-color: rgb(255, 204, 34);
-    color: rgb(255, 204, 34);
+    background-color: var(--shell-canvas);
+    border-color: var(--shell-action);
+    color: var(--shell-paper);
 }
 
 .shell-page-context {
     margin-left: 20px;
-    color: rgb(196, 189, 197);
+    color: var(--shell-page-muted);
     font-size: 13px;
     letter-spacing: 2px;
 }
@@ -343,21 +468,22 @@
     padding-right: 10px;
     min-height: 30px;
     border-width: 1px;
-    border-color: rgb(66, 59, 73);
-    background-color: rgb(36, 32, 43);
-    color: rgb(171, 163, 178);
+    border-color: var(--shell-canvas);
+    background-color: var(--shell-paper);
+    color: var(--shell-page-ink);
     font-size: 13px;
     letter-spacing: 1px;
     -unity-font-style: bold;
     white-space: nowrap;
 }
 
-.shell-identity--connected { color: rgb(76, 221, 136); }
-.shell-identity--warning { color: rgb(255, 204, 34); }
+.shell-identity--connected { color: rgb(23, 105, 57); }
+.shell-identity--warning { color: var(--shell-page-warning); }
 
 .shell-identity:hover,
 .shell-identity:focus {
-    border-color: rgb(255, 204, 34);
+    border-color: var(--shell-canvas);
+    background-color: var(--shell-action);
 }
 
 /* The visible top-bar route (issue #220): text is set by the focus router
@@ -365,7 +491,7 @@
    presented. */
 .shell-topbar-hint {
     margin-right: 12px;
-    color: rgb(196, 189, 197);
+    color: var(--shell-page-muted);
     font-size: 10px;
     letter-spacing: 2px;
     -unity-font-style: bold;
@@ -382,19 +508,10 @@
     padding-right: 24px;
     padding-top: 16px;
     flex-direction: column;
-    /* Positioned so the expanded social surface can resolve its absolute
-       geometry against the workspace below the top bar (issue #220). */
+    /* Absolute chat geometry resolves against the workspace below the top bar. */
     position: relative;
 }
 
-/* Home art keeps its native 1438×810 size, centered without enlarging. */
-.frontend-shell--home .shell-workspace {
-    background-color: rgb(21, 18, 25);
-    background-image: url("MainMenuBackground.png");
-    background-size: 1438px 810px;
-    background-position: center;
-    background-repeat: no-repeat;
-}
 
 .shell-host {
     min-width: 0;
@@ -403,6 +520,7 @@
 
 .shell-header-host {
     flex-shrink: 0;
+    background-color: rgba(240, 238, 232, 0.97);
 }
 
 .shell-body-host {
@@ -418,13 +536,13 @@
     align-items: flex-end;
 }
 
-/* Other pages reserve a bottom-left conversation cell in the lower row;
-   Home positions that row over the page. The row has no painted surface. */
+/* Chat floats over the workspace; resizing never moves page content. */
 .shell-social-host {
     width: 480px;
     height: 230px;
-    margin-right: 20px;
-    position: relative;
+    position: absolute;
+    left: 24px;
+    bottom: 24px;
 }
 
 .shell-page-lower-host {
@@ -447,6 +565,17 @@
     flex-direction: row;
     align-items: flex-end;
     justify-content: flex-end;
+}
+
+/* Selection essentials live in the middle/right, not under bottom-left chat.
+   This is page geometry, independent of the user's overlay dimensions. */
+.frontend-shell--fighters .shell-page-lower-host,
+.frontend-shell--stage .shell-page-lower-host {
+    margin-left: 40%;
+}
+.frontend-shell--compact.frontend-shell--fighters .shell-page-lower-host,
+.frontend-shell--compact.frontend-shell--stage .shell-page-lower-host {
+    margin-left: 55%;
 }
 
 /* ── Compact density (1280×720/800-class windows) ────────────────────── */
@@ -504,7 +633,8 @@
 .frontend-shell--compact .shell-social-host {
     width: 380px;
     height: 190px;
-    margin-right: 16px;
+    left: 16px;
+    bottom: 16px;
 }
 
 .frontend-shell--compact .shell-lower-row {
@@ -512,47 +642,30 @@
     padding-bottom: 16px;
 }
 
-/* Home overlays chat; other pages keep their reserved lower-row layout. */
-.frontend-shell--home .shell-lower-row {
-    position: absolute;
-    left: 24px;
-    bottom: 24px;
-    margin-top: 0;
-    padding-bottom: 0;
-}
+/* Home has no page summary/action footer; chat is not part of this row. */
+.frontend-shell--home .shell-lower-row { display: none; }
 .frontend-shell--home .shell-page-lower-host { display: none; }
-.frontend-shell--home.frontend-shell--compact .shell-lower-row {
-    left: 16px;
-    bottom: 16px;
-}
-/* Expanded chat still fills the workspace below the unchanged top bar. */
-.frontend-shell--home.frontend-shell--social-expanded .shell-lower-row {
-    top: 0;
-    right: 0;
-    bottom: 0;
-    left: 0;
-}
 
-/* ── Presenter sizing inside the reserved cell ─────────────────────────
+/* ── Presenter sizing inside the absolute overlay ──────────────────────
    The chat presenter keeps its own stylesheet. The shell cell's size, the
    top bar height and the outer spacing are applied from
    `FrontendShellView` in panel coordinates derived from the physical size
    targets (PanelSettings use ConstantPhysicalSize, and the runtime scale
    factor is read from `panel.scaledPixelsPerPoint`, so USS px cannot express
    physical pixels). Shell chat history may shrink and scroll when its header
-   grows, so the composer remains inside the reserved cell. */
+   grows, so the composer remains inside the user-sized overlay. */
 
 .frontend-shell .chat-panel {
-    padding: 8px;
+    padding: 4px;
 }
 
 .frontend-shell .chat-tabs {
-    height: 24px;
-    margin-top: 4px;
+    height: 28px;
+    margin-top: 0;
 }
 
 .frontend-shell .chat-tab {
-    min-height: 20px;
+    min-height: 26px;
 }
 
 .frontend-shell .chat-body {
@@ -578,7 +691,6 @@
 }
 
 
-.frontend-shell--compact .chat-corner-actions { right: 24px; }
 
 
 .frontend-shell--compact .chat-tab {
@@ -586,11 +698,6 @@
 }
 
 
-.frontend-shell--compact .conversation-list {
-    width: 104px;
-    min-width: 104px;
-    margin-right: 6px;
-}
 
 .frontend-shell--compact .chat-message {
     min-height: 0;
@@ -656,17 +763,64 @@
 }
 
 .menu-layout {
+    flex-grow: 1;
+    min-height: 0;
     flex-direction: row;
-    flex-wrap: wrap;
-    align-items: flex-start;
+    flex-wrap: nowrap;
+    align-items: stretch;
     justify-content: space-between;
 }
 
 .menu-actions {
     width: 330px;
     flex-shrink: 0;
-    margin-top: 84px;
+    margin-right: 24px;
 }
+
+.menu-artwork-column {
+    flex-grow: 1;
+    flex-basis: 0;
+    min-width: 0;
+    align-self: stretch;
+    min-height: 0;
+    align-items: center;
+}
+
+.menu-artwork {
+    width: 100%;
+    height: 100%;
+    max-width: 1464px;
+    max-height: 841px;
+    min-height: 0;
+    padding: 10px;
+    background-color: var(--shell-paper);
+    border-width: 3px;
+    border-color: var(--shell-canvas);
+    border-bottom-width: 8px;
+    position: relative;
+}
+
+.menu-artwork-image {
+    flex-grow: 1;
+    min-height: 0;
+    background-image: url("MainMenuBackground.png");
+    background-size: contain;
+    background-position: center;
+    background-repeat: no-repeat;
+}
+
+.menu-artwork-tape {
+    position: absolute;
+    top: -10px;
+    width: 76px;
+    height: 19px;
+    background-color: var(--shell-action);
+    border-width: 1px;
+    border-color: var(--shell-canvas);
+}
+
+.menu-artwork-tape--left { left: 38px; rotate: -7deg; }
+.menu-artwork-tape--right { right: 38px; rotate: 5deg; }
 
 .menu-action {
     width: 100%;
@@ -675,44 +829,43 @@
     padding-left: 28px;
     padding-right: 28px;
     border-radius: 0;
-    border-width: 2px;
-    border-bottom-width: 6px;
-    border-color: rgb(66, 59, 73);
-    color: rgb(241, 235, 221);
+    border-width: 3px;
+    border-bottom-width: 8px;
+    border-right-width: 6px;
+    border-color: rgb(13, 13, 20);
+    color: var(--shell-canvas);
     font-size: 27px;
-    -unity-font-definition: url("../Fonts/Baloo2.asset");
-    -unity-font-style: bold;
     -unity-text-align: middle-left;
 }
 
 .menu-action--online {
-    background-color: rgb(255, 204, 34);
-    color: rgb(21, 18, 25);
+    background-color: var(--shell-action);
+    color: var(--shell-canvas);
 }
 
 .menu-action--solo,
-.menu-action--training { background-color: rgb(36, 32, 43); }
+.menu-action--training { background-color: var(--shell-paper); }
 
 .menu-action--online:hover,
 .menu-action--online:focus {
-    background-color: rgb(255, 218, 74);
-    border-color: rgb(241, 235, 221);
+    background-color: var(--shell-paper);
+    border-color: var(--shell-canvas);
 }
 
 .menu-action--solo:hover,
 .menu-action--solo:focus,
 .menu-action--training:hover,
 .menu-action--training:focus {
-    background-color: rgb(55, 49, 62);
-    border-color: rgb(255, 204, 34);
+    background-color: var(--shell-action);
+    border-color: var(--shell-canvas);
 }
 
 .menu-action:disabled,
 .menu-action:disabled:hover,
 .menu-action:disabled:focus {
-    background-color: rgb(36, 32, 43);
-    border-color: rgb(66, 59, 73);
-    color: rgb(171, 163, 178);
+    background-color: var(--shell-surface);
+    border-color: var(--shell-rule);
+    color: var(--shell-paper);
     opacity: 0.65;
 }
 
@@ -720,15 +873,20 @@
     width: 348px;
     height: 300px;
     flex-shrink: 0;
-    padding: 22px 24px;
-    background-color: rgb(36, 32, 43);
-    border-width: 2px;
-    border-color: rgb(66, 59, 73);
-    border-bottom-width: 5px;
+    margin-left: 24px;
+    background-color: var(--shell-paper);
+    border-width: 3px;
+    border-color: rgb(13, 13, 20);
+    border-bottom-width: 8px;
+    border-right-width: 6px;
 }
 
 .menu-info-heading {
-    color: rgb(255, 204, 34);
+    color: var(--shell-canvas);
+    padding: 16px 21px;
+    background-color: var(--shell-action);
+    border-bottom-width: 2px;
+    border-bottom-color: var(--shell-canvas);
     font-size: 15px;
     letter-spacing: 2px;
     -unity-font-style: bold;
@@ -738,26 +896,25 @@
     flex-grow: 1;
     min-height: 0;
     margin-top: 18px;
+    padding: 0 22px;
 }
 
 .menu-info-declaration {
-    color: rgb(241, 235, 221);
+    color: var(--shell-canvas);
     font-size: 28px;
-    -unity-font-style: bold;
-    -unity-font-definition: url("../Fonts/Baloo2.asset");
     white-space: normal;
 }
 
 .menu-info-copy {
     margin-top: 12px;
-    color: rgb(241, 235, 221);
+    color: var(--shell-canvas);
     font-size: 16px;
     white-space: normal;
 }
 
 .frontend-shell--compact .menu-actions {
     width: 270px;
-    margin-top: 18px;
+    margin-right: 16px;
 }
 .frontend-shell--compact .menu-action {
     min-height: 70px;
@@ -767,10 +924,16 @@
 .frontend-shell--compact .menu-info {
     width: 270px;
     height: 260px;
-    padding: 18px 22px;
+    margin-left: 16px;
 }
 .frontend-shell--compact .menu-info-declaration { font-size: 22px; }
 .frontend-shell--compact .menu-info-copy { font-size: 14px; }
+
+.frontend-shell--compact .menu-info-heading {
+    padding: 14px 18px;
+    font-size: 12px;
+}
+.frontend-shell--compact .menu-announcements { padding: 0 18px; }
 
 
 /* Fighter Select */
@@ -797,11 +960,105 @@
 }
 .frontend-shell--compact .char-header--local .flow-title { font-size: 32px; }
 
+.shell-nav-tab,
+.shell-menu-trigger,
+.shell-settings,
+.shell-escape-title,
+.frontend-shell .shell-escape-action,
+.menu-action,
+.menu-info-heading,
+.menu-info-declaration,
+.char-header--local .flow-title,
+.char-header--local .btn-back,
+.char-summary-section .selection-target,
+.char-summary-section .selection-target-button,
+.char-summary-section .solo-difficulty-button,
+.char-summary-section .btn-primary,
+.char-summary-section .player-card__number,
+.char-summary-section .player-card__name,
+.char-summary-section .player-card__character,
+.char-actions-section .btn-primary,
+.char-actions-section .btn-secondary,
+.stage-header-section .flow-title,
+.stage-header-section .btn-back,
+.stage-card .stage-name,
+.stage-actions-section .stage-confirm,
+.stage-player-cards .player-card__number,
+.stage-player-cards .player-card__name,
+.stage-player-cards .player-card__character {
+    -unity-font-definition: url("../Fonts/ArchivoBlack.asset");
+    -unity-font-style: normal;
+    letter-spacing: 0;
+}
+
+
+.char-header--local .btn-back {
+    background-color: rgb(240, 238, 232);
+    color: rgb(23, 19, 27);
+    border-width: 3px;
+    border-bottom-width: 6px;
+    border-right-width: 5px;
+    border-color: rgb(13, 13, 20);
+}
+.char-header--local .btn-back:hover,
+.char-header--local .btn-back:focus {
+    background-color: rgb(255, 204, 34);
+    border-color: rgb(255, 255, 255);
+}
+.char-header--local .btn-back:active { translate: 0 3px; }
+
+.char-summary-section .btn-primary,
+.char-actions-section .btn-primary {
+    background-color: rgb(255, 204, 34);
+    color: rgb(23, 19, 27);
+    border-width: 3px;
+    border-bottom-width: 8px;
+    border-right-width: 6px;
+    border-color: rgb(13, 13, 20);
+    font-size: 20px;
+}
+.char-summary-section .btn-primary:hover,
+.char-summary-section .btn-primary:focus,
+.char-actions-section .btn-primary:hover,
+.char-actions-section .btn-primary:focus {
+    background-color: rgb(240, 238, 232);
+    border-color: rgb(255, 255, 255);
+}
+.char-summary-section .btn-primary:disabled,
+.char-actions-section .btn-primary:disabled {
+    background-color: rgb(83, 77, 91);
+    border-color: rgb(83, 77, 91);
+    color: rgb(240, 238, 232);
+}
+
+.char-summary-section .flow-progress,
+.char-summary-section .player-card__host,
+.char-summary-section .player-card__status {
+    -unity-font-definition: url("../Fonts/SpaceMono.asset");
+    -unity-font-style: normal;
+    letter-spacing: 0;
+}
+
+.char-summary-section .player-card__identity {
+    padding-bottom: 6px;
+    border-bottom-width: 2px;
+    border-bottom-color: rgb(240, 238, 232);
+    margin-bottom: 7px;
+}
+.char-summary-section .player-card__number { font-size: 24px; }
+.char-summary-section .player-card__host { font-size: 11px; }
+.char-summary-section .player-card__name { font-size: 19px; }
+.char-summary-section .player-card__character { font-size: 16px; }
+.char-summary-section .player-card__status { font-size: 11px; }
+.char-summary-section .player-card__portrait {
+    border-width: 2px;
+    border-color: rgb(13, 13, 20);
+}
+
 .char-body-section {
     flex-grow: 1;
     margin-top: 10px;
     flex-direction: column;
-    overflow: auto;
 }
 
 /* Portrait cards shrink to the frame's grid area instead of the legacy
@@ -833,6 +1090,8 @@
     flex-shrink: 0;
     flex-direction: row;
     align-items: flex-end;
+    justify-content: flex-end;
+    flex-wrap: wrap;
 }
 
 .char-summary-section .roster-panel {
@@ -849,30 +1108,39 @@
 .char-summary-section--solo .player-card {
     flex-direction: column;
     align-items: stretch;
-    background-color: rgb(36, 32, 43);
-    border-color: rgb(66, 59, 73);
-    border-bottom-color: rgb(66, 59, 73);
+    background-color: var(--shell-surface);
+    border-width: 3px;
+    border-color: var(--shell-rule);
+    border-bottom-width: 7px;
+    border-bottom-color: rgb(13, 13, 20);
 }
 .char-summary-section--solo .player-card__number {
-    color: rgb(171, 163, 178);
+    color: rgb(240, 238, 232);
 }
 .char-summary-section--solo .player-card:hover,
 .char-summary-section--solo .player-card:focus {
     border-color: rgb(241, 235, 221);
 }
 .char-summary-section--solo .player-card--editing {
-    background-color: rgb(48, 42, 52);
+    background-color: rgb(240, 238, 232);
     border-width: 3px;
-    border-bottom-width: 6px;
-    border-color: rgb(255, 204, 34);
+    border-bottom-width: 7px;
+    border-color: rgb(240, 238, 232);
     border-bottom-color: rgb(255, 204, 34);
 }
-.char-summary-section--solo .player-card--editing .player-card__number {
-    color: rgb(255, 204, 34);
+.char-summary-section--solo .player-card--editing .player-card__number,
+.char-summary-section--solo .player-card--editing .player-card__host,
+.char-summary-section--solo .player-card--editing .player-card__name,
+.char-summary-section--solo .player-card--editing .player-card__character,
+.char-summary-section--solo .player-card--editing .player-card__status {
+    color: rgb(23, 19, 27);
+}
+.char-summary-section--solo .player-card--editing .player-card__identity {
+    border-bottom-color: rgb(23, 19, 27);
 }
 .char-summary-section--solo .player-card--editing:hover,
 .char-summary-section--solo .player-card--editing:focus {
-    border-color: rgb(255, 218, 74);
+    border-color: rgb(255, 255, 255);
     border-bottom-color: rgb(255, 204, 34);
 }
 .char-summary-section--local .solo-next-action {
@@ -932,9 +1200,180 @@
     min-height: 40px;
 }
 
+.stage-host-status {
+    margin-top: 14px;
+    padding: 8px 11px;
+    background-color: var(--shell-surface);
+    color: var(--shell-paper);
+    font-size: 13px;
+}
+
+.stage-host-status,
+.stage-selected-label,
+.stage-waiting,
+.stage-player-cards .player-card__host,
+.stage-player-cards .player-card__status {
+    -unity-font-definition: url("../Fonts/SpaceMono.asset");
+    -unity-font-style: normal;
+    letter-spacing: 0;
+}
+
+.stage-grid {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-content: flex-start;
+    justify-content: center;
+    padding: 4px;
+}
+
+.stage-card {
+    width: 17.6%;
+    min-width: 0;
+    height: 144px;
+    margin: 6px;
+    flex-shrink: 0;
+    background-color: var(--shell-surface);
+    border-width: 2px;
+    border-color: var(--shell-rule);
+    border-bottom-width: 5px;
+    border-right-width: 4px;
+    border-bottom-color: rgb(13, 13, 20);
+    border-right-color: rgb(13, 13, 20);
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-end;
+    overflow: hidden;
+    transition-duration: 0.12s;
+    transition-property: translate, border-color, background-color;
+}
+
+.stage-card:hover,
+.stage-card:focus {
+    translate: 0 -4px;
+    border-color: var(--shell-paper);
+}
+
+.stage-card:focus .stage-name {
+    background-color: var(--shell-paper);
+    color: var(--shell-canvas);
+}
+
+.stage-card--selected {
+    translate: 0 -6px;
+    border-width: 3px;
+    border-color: var(--shell-action);
+}
+
+.stage-card--selected:focus {
+    border-top-color: var(--shell-paper);
+    border-right-color: var(--shell-paper);
+}
+
+.stage-swatch {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    opacity: 1;
+    -unity-background-scale-mode: scale-and-crop;
+}
+
+.stage-card .stage-name {
+    min-height: 34px;
+    padding: 8px 8px 6px;
+    background-color: var(--shell-paper);
+    color: var(--shell-canvas);
+    font-size: 14px;
+    -unity-text-align: middle-center;
+}
+
+.stage-card--selected .stage-name,
+.stage-card--selected:focus .stage-name {
+    background-color: var(--shell-action);
+    color: var(--shell-canvas);
+}
+
+.stage-player-cards {
+    flex-grow: 1;
+    min-width: 0;
+    flex-direction: row;
+    align-items: stretch;
+}
+
+.stage-player-cards .player-card {
+    width: 176px;
+    min-height: 174px;
+    background-color: var(--shell-surface);
+    border-color: var(--shell-rule);
+    border-bottom-color: rgb(13, 13, 20);
+}
+
+.stage-player-cards .player-card--local {
+    background-color: var(--shell-paper);
+    border-color: var(--shell-canvas);
+    border-bottom-color: var(--shell-action);
+}
+
+.stage-player-cards .player-card--local .player-card__number,
+.stage-player-cards .player-card--local .player-card__host,
+.stage-player-cards .player-card--local .player-card__name,
+.stage-player-cards .player-card--local .player-card__character {
+    color: var(--shell-canvas);
+}
+
+.stage-player-cards .player-card--local .player-card__identity {
+    border-bottom-color: var(--shell-canvas);
+}
+
+.stage-player-cards .player-card--local .player-card__status--locked {
+    color: rgb(23, 105, 57);
+}
+
+.stage-player-cards .player-card--local .player-card__status--picking {
+    color: rgb(112, 75, 0);
+}
+
+.stage-selected-label,
+.stage-waiting {
+    margin-bottom: 9px;
+    color: var(--shell-paper);
+    font-size: 17px;
+    white-space: normal;
+}
+
+.stage-waiting {
+    color: var(--shell-action);
+}
+
+.stage-actions-section .stage-confirm {
+    width: 100%;
+    min-height: 52px;
+    background-color: var(--shell-action);
+    color: var(--shell-canvas);
+    border-width: 3px;
+    border-bottom-width: 8px;
+    border-right-width: 6px;
+    border-color: rgb(13, 13, 20);
+    font-size: 17px;
+}
+
+.stage-actions-section .stage-confirm:hover,
+.stage-actions-section .stage-confirm:focus {
+    background-color: var(--shell-paper);
+    border-color: rgb(255, 255, 255);
+}
+
+.stage-actions-section .stage-confirm:disabled {
+    background-color: var(--shell-surface);
+    color: rgb(183, 180, 173);
+    border-color: var(--shell-rule);
+    opacity: 1;
+}
+
 /* ── Stage Select fragment (issue #221) ────────────────────────────────
    Stage cards lead; participants and the primary action share the
-   lower-right row beside the persistent social cell. */
+   middle/right footer; the bottom-left stays clear for default chat. */
 .frontend-shell--stage .shell-page-lower-host {
     flex-direction: row;
     align-items: flex-end;
@@ -992,7 +1431,7 @@
 }
 
 .stage-body-section .stage-card {
-    height: 170px;
+    height: 136px;
 }
 
 
@@ -1007,6 +1446,8 @@
 .stage-summary-section .stage-player-cards {
     flex-direction: row;
     align-items: stretch;
+    flex-wrap: wrap;
+    justify-content: flex-end;
     margin-right: 12px;
 }
 
@@ -1018,12 +1459,33 @@
     flex-direction: column;
     justify-content: flex-end;
     align-items: stretch;
-    background-color: rgb(13, 13, 20);
+    background-color: var(--shell-paper);
     border-width: 2px;
-    border-color: rgb(240, 238, 232);
+    border-color: var(--shell-canvas);
     border-bottom-width: 6px;
-    border-bottom-color: rgb(255, 200, 33);
+    border-bottom-color: var(--shell-action);
 }
+
+.stage-header-section .btn-back {
+    background-color: var(--shell-paper);
+    color: var(--shell-canvas);
+    border-width: 3px;
+    border-bottom-width: 6px;
+    border-right-width: 5px;
+    border-color: rgb(13, 13, 20);
+}
+
+.stage-header-section .btn-back:hover,
+.stage-header-section .btn-back:focus {
+    background-color: var(--shell-action);
+    border-color: rgb(255, 255, 255);
+}
+
+.stage-header-section .btn-back:active,
+.stage-actions-section .stage-confirm:active {
+    translate: 0 3px;
+}
+
 
 .frontend-shell--compact .stage-header-section {
     min-height: 56px;
@@ -1033,14 +1495,13 @@
     font-size: 26px;
 }
 
-.frontend-shell--compact .stage-header-section .flow-eyebrow,
 .frontend-shell--compact .stage-header-section .flow-subtitle {
     display: none;
 }
 
 .frontend-shell--compact .stage-body-section .stage-card {
-    width: 18%;
-    height: 124px;
+    width: 14.4%;
+    height: 99px;
 }
 
 
@@ -1076,11 +1537,14 @@
 .browser-header-section .flow-title {
     font-size: 34px;
     margin-top: 2px;
+    -unity-font-definition: url("../Fonts/ArchivoBlack.asset");
+    -unity-font-style: normal;
 }
 
 .browser-header-section .flow-subtitle {
     margin-top: 4px;
     font-size: 15px;
+    color: rgb(196, 193, 186);
 }
 
 .browser-body-section {
@@ -1096,6 +1560,68 @@
 .browser-body-section .browser-tools {
     width: 420px;
 }
+
+.browser-tools .unity-scroll-view__content-container {
+    flex-grow: 1;
+}
+
+.browser-tools .browser-tool {
+    flex-shrink: 0;
+}
+
+.browser-body-section .room-row {
+    border-left-width: 0;
+    border-width: 1px;
+    border-color: var(--shell-rule);
+    border-bottom-width: 4px;
+    border-bottom-color: var(--shell-canvas);
+}
+
+.room-row #room-name {
+    flex-grow: 1;
+    flex-shrink: 1;
+    min-width: 0;
+    padding: 5px 8px;
+    background-color: var(--shell-paper);
+    color: var(--shell-canvas);
+    -unity-font-definition: url("../Fonts/ArchivoBlack.asset");
+    -unity-font-style: normal;
+    font-size: 20px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.room-row #room-info {
+    width: 190px;
+    flex-shrink: 0;
+    margin-left: 14px;
+    color: var(--shell-paper);
+    font-size: 14px;
+    white-space: normal;
+}
+
+.room-row #room-id {
+    width: 290px;
+    flex-shrink: 0;
+    margin-right: 12px;
+    color: rgb(196, 193, 186);
+    -unity-font-definition: url("../Fonts/SpaceMono.asset");
+    font-size: 11px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.room-row .server-join {
+    width: 160px;
+    font-size: 14px;
+    letter-spacing: 0;
+}
+
+.frontend-shell--compact .room-row #room-info { width: 160px; }
+.frontend-shell--compact .room-row #room-id { width: 230px; font-size: 10px; }
+.frontend-shell--compact .room-row .server-join { width: 150px; }
 
 
 .browser-summary-section {
@@ -1119,6 +1645,8 @@
 .browser-actions-section .btn-secondary {
     width: 210px;
     min-height: 48px;
+    font-size: 14px;
+    letter-spacing: 0;
 }
 
 .browser-actions-section .btn-secondary {
@@ -1177,23 +1705,43 @@
 }
 
 .lobby-header-section .flow-header-copy {
+    min-width: 0;
     margin-left: 16px;
     align-items: flex-start;
 }
 
 .lobby-header-section .flow-title {
-    font-size: 34px;
     margin-top: 2px;
+    color: var(--shell-paper);
+    font-size: 38px;
+    -unity-font-definition: url("../Fonts/ArchivoBlack.asset");
+    -unity-font-style: normal;
+    letter-spacing: 0;
 }
 
 .lobby-header-section .flow-subtitle {
     margin-top: 4px;
+    color: var(--shell-paper);
     font-size: 15px;
 }
 
 .lobby-header-section .flow-context {
+    max-width: 320px;
+    min-width: 0;
     margin-left: auto;
-    align-self: flex-start;
+    padding: 8px 12px;
+    background-color: var(--shell-paper);
+    color: var(--shell-canvas);
+    font-size: 15px;
+    -unity-font-definition: url("../Fonts/SpaceMono.asset");
+    -unity-font-style: normal;
+    letter-spacing: 0;
+    white-space: normal;
+    overflow: hidden;
+    border-left-width: 0;
+    border-width: 2px;
+    border-color: var(--shell-recess);
+    border-bottom-width: 5px;
 }
 
 .lobby-body-section {
@@ -1204,7 +1752,38 @@
 
 .lobby-body-section .lobby-panel {
     flex-grow: 1;
+    min-width: 0;
     flex-direction: column;
+    padding: 16px;
+    background-color: var(--shell-surface);
+    border-width: 2px;
+    border-color: var(--shell-rule);
+    border-bottom-width: 5px;
+    border-bottom-color: rgb(13, 13, 20);
+}
+
+.lobby-body-section .lobby-panel__header {
+    flex-shrink: 0;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.lobby-body-section .panel-title {
+    color: var(--shell-paper);
+    font-size: 23px;
+    -unity-font-definition: url("../Fonts/ArchivoBlack.asset");
+    -unity-font-style: normal;
+    letter-spacing: 0;
+}
+
+.lobby-body-section .panel-note,
+.lobby-body-section .lobby-panel__capacity {
+    color: var(--shell-paper);
+    font-size: 12px;
+    -unity-font-definition: url("../Fonts/SpaceMono.asset");
+    -unity-font-style: normal;
+    letter-spacing: 0;
 }
 
 .lobby-body-section .player-list-scroll {
@@ -1213,19 +1792,124 @@
     margin-top: 12px;
 }
 
+.lobby-body-section .lobby-list {
+    min-width: 0;
+}
+
+.lobby-body-section .lobby-list .player-slot {
+    min-width: 0;
+    background-color: var(--shell-recess);
+    border-color: var(--shell-rule);
+    border-left-width: 0;
+    border-width: 1px;
+    border-bottom-width: 3px;
+    color: var(--shell-paper);
+}
+
+.lobby-body-section .lobby-list .slot-index,
+.lobby-body-section .lobby-list #slot-index,
+.lobby-body-section .lobby-list #leader-badge,
+.lobby-body-section .lobby-list #room-member-status {
+    min-width: 0;
+    color: var(--shell-paper);
+}
+
+.lobby-body-section .lobby-list .slot-name,
+.lobby-body-section .lobby-list #slot-name {
+    min-width: 0;
+    flex-grow: 1;
+    flex-shrink: 1;
+    font-size: 20px;
+    max-width: 100%;
+    padding: 4px 7px;
+    background-color: var(--shell-paper);
+    color: var(--shell-canvas);
+    -unity-font-definition: url("../Fonts/ArchivoBlack.asset");
+    -unity-font-style: normal;
+    letter-spacing: 0;
+    white-space: normal;
+    overflow: hidden;
+}
+
+.lobby-body-section .lobby-list .slot-character,
+.lobby-body-section .lobby-list #room-character {
+    min-width: 0;
+    max-width: 100%;
+    color: var(--shell-paper);
+    white-space: normal;
+    overflow: hidden;
+}
+
+.lobby-body-section .lobby-list #slot-index {
+    width: 52px;
+    flex-shrink: 0;
+    -unity-font-definition: url("../Fonts/SpaceMono.asset");
+}
+
+.lobby-body-section .lobby-list #leader-badge {
+    margin-left: 10px;
+    padding: 5px 8px;
+    background-color: var(--shell-action);
+    color: var(--shell-canvas);
+    font-size: 12px;
+    flex-shrink: 0;
+}
+
+.lobby-body-section .lobby-list #room-character {
+    max-width: 150px;
+    margin-left: 12px;
+    font-size: 14px;
+}
+
+.lobby-body-section .lobby-list #room-member-status {
+    width: 80px;
+    margin-left: 12px;
+    font-size: 13px;
+    flex-shrink: 0;
+}
+
 .lobby-summary-section {
     flex-grow: 1;
     min-width: 0;
     flex-direction: column;
     justify-content: flex-end;
 }
+
+.lobby-summary-section .lobby-status,
 .lobby-invite-hint {
-    margin-top: 6px;
-    color: rgb(240, 238, 232);
-    font-size: 13px;
+    min-width: 0;
+    color: var(--shell-paper);
+    font-size: 14px;
     white-space: normal;
 }
 
+.lobby-summary-section .lobby-status.error { color: rgb(255, 145, 128); }
+
+.lobby-invite-hint { margin-top: 6px; }
+
+.lobby-summary-section .lobby-retry {
+    width: 210px;
+    min-width: 0;
+    min-height: 44px;
+    margin-top: 8px;
+    background-color: var(--shell-paper);
+    color: var(--shell-canvas);
+    border-width: 3px;
+    border-bottom-width: 7px;
+    border-right-width: 5px;
+    border-color: rgb(13, 13, 20);
+    -unity-font-definition: url("../Fonts/ArchivoBlack.asset");
+    -unity-font-style: normal;
+    letter-spacing: 0;
+}
+
+.lobby-summary-section .lobby-retry:hover,
+.lobby-summary-section .lobby-retry:focus {
+    background-color: var(--shell-action);
+    border-color: var(--shell-paper);
+}
+
+.lobby-summary-section .lobby-retry:active { translate: 0 3px; }
 
 .lobby-actions-section {
     flex-shrink: 0;
@@ -1235,45 +1919,154 @@
     justify-content: flex-end;
 }
 
-.lobby-actions-section .lobby-action--leave {
-    margin-left: 0;
-}
-.lobby-action--invite:disabled {
-    background-color: rgb(83, 77, 91);
-    border-color: rgb(83, 77, 91);
-    color: rgb(222, 216, 224);
+.lobby-actions-section .lobby-action {
+    min-width: 0;
+    min-height: 48px;
+    margin-left: 10px;
+    padding-left: 12px;
+    padding-right: 12px;
+    border-width: 3px;
+    border-bottom-width: 8px;
+    border-right-width: 6px;
+    border-color: rgb(13, 13, 20);
+    font-size: 16px;
+    -unity-font-definition: url("../Fonts/ArchivoBlack.asset");
+    -unity-font-style: normal;
+    letter-spacing: 0;
 }
 
+.lobby-actions-section .lobby-action--leave,
+.lobby-actions-section .lobby-action--invite {
+    background-color: var(--shell-paper);
+    color: var(--shell-canvas);
+}
+
+.lobby-actions-section .lobby-action--start {
+    min-width: 190px;
+    background-color: var(--shell-action);
+    color: var(--shell-canvas);
+}
+
+.lobby-actions-section .lobby-action:hover,
+.lobby-actions-section .lobby-action:focus {
+    background-color: var(--shell-surface);
+    color: var(--shell-paper);
+    border-color: var(--shell-paper);
+}
+
+.lobby-actions-section .lobby-action--start:hover,
+.lobby-actions-section .lobby-action--start:focus {
+    background-color: var(--shell-canvas);
+    color: var(--shell-paper);
+    border-color: var(--shell-action);
+}
+
+.lobby-actions-section .lobby-action:active { translate: 0 3px; }
+
+.lobby-actions-section .lobby-action:disabled {
+    background-color: var(--shell-surface);
+    border-color: var(--shell-rule);
+    color: var(--shell-paper);
+    opacity: 0.72;
+    translate: 0 0;
+}
+
+.lobby-header-section .btn-back {
+    background-color: var(--shell-paper);
+    color: var(--shell-canvas);
+    border-width: 3px;
+    border-bottom-width: 6px;
+    border-right-width: 5px;
+    border-color: rgb(13, 13, 20);
+    -unity-font-definition: url("../Fonts/ArchivoBlack.asset");
+    -unity-font-style: normal;
+    letter-spacing: 0;
+}
+
+.lobby-header-section .btn-back:hover,
+.lobby-header-section .btn-back:focus {
+    background-color: var(--shell-action);
+    border-color: var(--shell-paper);
+}
+
+.lobby-header-section .btn-back:active { translate: 0 3px; }
+
+.frontend-shell--compact .lobby-header-section { min-height: 56px; }
+.frontend-shell--compact .lobby-header-section .flow-title { font-size: 29px; }
+.frontend-shell--compact .lobby-header-section .flow-subtitle { font-size: 13px; }
+.frontend-shell--compact .lobby-body-section .lobby-panel { padding: 10px; }
+.frontend-shell--compact .lobby-body-section .player-slot { min-height: 54px; }
 .frontend-shell--compact .lobby-actions-section .lobby-action {
     width: 150px;
     min-height: 44px;
-    font-size: 15px;
+    font-size: 14px;
+}
+.frontend-shell--compact .lobby-actions-section .lobby-action--start { width: 190px; }
+
+
+/* Paper-page copy: retain paper text only inside the existing dark controls. */
+.char-summary-section--local .flow-progress,
+.char-summary-section--local .char-select-meta,
+.char-body-section .selection-copy .char-name,
+.char-body-section .selection-copy .char-role,
+.char-actions-section .pvp-status,
+.stage-header-section .flow-title,
+.stage-header-section .flow-subtitle,
+.stage-selected-label,
+.browser-header-section .flow-title,
+.browser-header-section .flow-subtitle,
+.browser-summary-section .host-status,
+.lobby-header-section .flow-title,
+.lobby-header-section .flow-subtitle,
+.lobby-invite-hint {
+    color: var(--shell-page-ink);
 }
 
-.frontend-shell--compact .lobby-actions-section .lobby-action--start {
-    width: 190px;
+.char-summary-section--local .char-select-meta,
+.browser-header-section .flow-subtitle,
+.stage-header-section .flow-subtitle,
+.lobby-invite-hint {
+    color: var(--shell-page-muted);
 }
 
-
-.frontend-shell--compact .lobby-header-section {
-    min-height: 56px;
+.stage-waiting,
+.lobby-summary-section .lobby-status.error {
+    color: var(--shell-page-error);
 }
 
-.frontend-shell--compact .lobby-header-section .flow-title {
-    font-size: 26px;
+.stage-host-status {
+    color: var(--shell-paper);
 }
 
-.frontend-shell--compact .lobby-header-section .flow-subtitle {
-    font-size: 13px;
+.char-header--local .btn-back:hover,
+.char-header--local .btn-back:focus,
+.stage-header-section .btn-back:hover,
+.stage-header-section .btn-back:focus,
+.stage-actions-section .stage-confirm:hover,
+.stage-actions-section .stage-confirm:focus,
+.lobby-header-section .btn-back:hover,
+.lobby-header-section .btn-back:focus,
+.lobby-summary-section .lobby-retry:hover,
+.lobby-summary-section .lobby-retry:focus {
+    border-color: var(--shell-canvas);
 }
 
-.frontend-shell--compact .lobby-body-section .player-slot {
-    min-height: 54px;
+.char-summary-section--solo .player-card--editing:hover,
+.char-summary-section--solo .player-card--editing:focus {
+    border-color: var(--shell-canvas);
 }
 
+.stage-card:hover,
+.stage-card:focus {
+    border-color: var(--shell-action);
+}
+
+.stage-card--selected:focus {
+    border-top-color: var(--shell-action);
+    border-right-color: var(--shell-action);
+}
 /* ── Results fragment (issue #221) ─────────────────────────────────────
-   The distinctive winner/standings broadcast composition fills the body;
-   the decorative art stays inside it; the existing result context and the
+   The winner and standings fill the body; result context and the actual
    return action sit in the lower-right cells. */
 
 .results-header-section {
@@ -1282,7 +2075,6 @@
     flex-direction: row;
     justify-content: space-between;
     align-items: flex-start;
-    z-index: 2;
 }
 
 .results-header-section .results-headline {
@@ -1316,9 +2108,6 @@
     font-size: 30px;
 }
 
-.frontend-shell--compact .results-body-section {
-    overflow: auto;
-}
 
 .frontend-shell--compact .results-winner-card {
     min-height: 190px;

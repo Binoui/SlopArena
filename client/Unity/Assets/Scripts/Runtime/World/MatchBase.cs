@@ -43,6 +43,10 @@ namespace SlopArena.Client.World
         protected CharacterDefinition _playerDef = null!;
         protected UnityEngine.Camera _mainCamera;
         private readonly TimelinePresentationDispatcher _timelinePresentations = new();
+        private readonly Dictionary<ulong, WeaponAttach> _weapons = new();
+        private readonly HashSet<ulong> _activeSwordOwners = new();
+        private uint _lastSwordTrailTick;
+        private bool _hasSwordTrailTick;
         protected MatchPauseMenu _pauseMenu;
         private Mesh _cameraCollisionMesh;
 
@@ -67,6 +71,9 @@ namespace SlopArena.Client.World
         {
             _aimHandler?.ResetPresentation();
             _timelinePresentations.Clear();
+            foreach (var weapon in _weapons.Values)
+                if (weapon != null) weapon.SetHitboxTrailActive(false);
+            _weapons.Clear();
             if (_cameraCollisionMesh != null)
                 Destroy(_cameraCollisionMesh);
         }
@@ -132,11 +139,48 @@ namespace SlopArena.Client.World
                 : local && _playerWeaponConfig != null
                     ? _playerWeaponConfig
                     : Resources.Load<WeaponAttachConfig>($"WeaponConfigs/{def.Class}");
-            renderer.GetComponent<WeaponAttach>()?.Init(renderer, weaponConfig);
+            var weapon = renderer.GetComponent<WeaponAttach>();
+            weapon?.Init(renderer, weaponConfig);
+            if (weapon != null) _weapons[entityId] = weapon;
             return true;
         }
         protected void PresentTimelineEvents()
             => _timelinePresentations.Tick(Bridge.LastTickPresentationEvents);
+
+        /// <summary>Training: use active Shared melee hitboxes, including early removal.</summary>
+        protected void UpdateSwordTrailsFromResolver(SpellResolver resolver)
+        {
+            _activeSwordOwners.Clear();
+            if (resolver != null)
+                foreach (var hitbox in resolver.GetActiveHitboxes())
+                    if (IsSwordHitbox(in hitbox))
+                        _activeSwordOwners.Add(hitbox.OwnerId);
+            ApplySwordTrailOwners();
+        }
+
+        /// <summary>PvP: use the latest authoritative owner set, including empty removals.</summary>
+        protected void ApplySwordTrailSnapshot(SwordTrailSnapshotPacket snapshot)
+        {
+            if (_hasSwordTrailTick && snapshot.Tick <= _lastSwordTrailTick) return;
+            _hasSwordTrailTick = true;
+            _lastSwordTrailTick = snapshot.Tick;
+            _activeSwordOwners.Clear();
+            foreach (ulong owner in snapshot.ActiveOwnerIds)
+                _activeSwordOwners.Add(owner);
+            ApplySwordTrailOwners();
+        }
+
+        private void ApplySwordTrailOwners()
+        {
+            foreach (var entry in _weapons)
+                if (entry.Value != null)
+                    entry.Value.SetHitboxTrailActive(_activeSwordOwners.Contains(entry.Key));
+        }
+
+        internal static bool IsSwordHitbox(in Hitbox hitbox)
+            => hitbox.Active && hitbox.TracksBone
+                && hitbox.SourceEvent.BoneName == "_weapon_hilt"
+                && hitbox.SourceEvent.EndBoneName == "_weapon_tip";
 
         protected void SetupCamera()
         {

@@ -69,7 +69,7 @@ namespace SlopArena.Client.UI
             _host = host;
             _accept = accept;
             _cancel = cancel;
-            _surface = BuildSurface(title, message, training);
+            _surface = BuildSurface(title, message);
             _cancelHandler = OnNavigationCancel;
             _surface.RegisterCallback(_cancelHandler, TrickleDown.TrickleDown);
             host.Add(_surface);
@@ -110,7 +110,6 @@ namespace SlopArena.Client.UI
             notice.style.paddingRight = 12;
             notice.style.paddingTop = 8;
             notice.style.paddingBottom = 8;
-            notice.style.backgroundColor = new Color(0.09f, 0.09f, 0.11f, 0.94f);
             notice.pickingMode = PickingMode.Ignore;
             _surface = notice;
             _host.Add(notice);
@@ -140,77 +139,32 @@ namespace SlopArena.Client.UI
             Notice(message, gameplay);
         }
 
-        private VisualElement BuildSurface(string title, string message, bool training)
+        private VisualElement BuildSurface(string title, string message)
         {
             var surface = new VisualElement { name = "steam-room-join-confirmation" };
             surface.AddToClassList("shell-modal");
             surface.pickingMode = PickingMode.Position;
-            if (training)
-            {
-                surface.style.position = Position.Absolute;
-                surface.style.left = 0;
-                surface.style.right = 0;
-                surface.style.top = 0;
-                surface.style.bottom = 0;
-                surface.style.alignItems = Align.Center;
-                surface.style.justifyContent = Justify.Center;
-                surface.style.backgroundColor = new Color(0.05f, 0.05f, 0.08f, 0.72f);
-            }
 
             var box = new VisualElement { name = "steam-room-join-box" };
             box.AddToClassList("shell-modal-box");
             box.pickingMode = PickingMode.Position;
-            if (training)
-            {
-                box.style.minWidth = 320;
-                box.style.maxWidth = 560;
-                box.style.paddingLeft = 24;
-                box.style.paddingRight = 24;
-                box.style.paddingTop = 20;
-                box.style.paddingBottom = 20;
-                box.style.backgroundColor = new Color(0.09f, 0.09f, 0.11f, 1f);
-                box.style.borderTopWidth = box.style.borderBottomWidth = box.style.borderLeftWidth = box.style.borderRightWidth = 2;
-                box.style.borderTopColor = box.style.borderBottomColor = box.style.borderLeftColor = box.style.borderRightColor = new Color(1f, 0.78f, 0.13f);
-            }
             surface.Add(box);
 
             var heading = new Label(title) { name = "steam-room-join-title" };
             heading.AddToClassList("shell-modal-title");
             var help = new Label(message) { name = "steam-room-join-help" };
             help.AddToClassList("shell-modal-help");
-            if (training)
-            {
-                heading.style.color = new Color(1f, 0.78f, 0.13f);
-                heading.style.fontSize = 16;
-                heading.style.unityFontStyleAndWeight = FontStyle.Bold;
-                help.style.marginTop = 8;
-                help.style.marginBottom = 14;
-                help.style.color = new Color(0.77f, 0.74f, 0.77f);
-                help.style.whiteSpace = WhiteSpace.Normal;
-            }
             box.Add(heading);
             box.Add(help);
 
             var row = new VisualElement { name = "steam-room-join-row" };
             row.AddToClassList("shell-modal-row");
             box.Add(row);
-            if (training)
-            {
-                row.style.flexDirection = FlexDirection.Row;
-                row.style.alignItems = Align.Stretch;
-            }
             _acceptButton = new Button(() => Close(invokeAccept: true)) { text = "JOIN" };
             _cancelButton = new Button(() => Close(invokeCancel: true)) { text = "CANCEL" };
             _acceptButton.AddToClassList("shell-modal-submit");
             _cancelButton.AddToClassList("shell-modal-submit");
-            _cancelButton.style.backgroundColor = new Color(0.14f, 0.12f, 0.17f);
-            _cancelButton.style.color = new Color(0.94f, 0.93f, 0.91f);
-            if (training)
-            {
-                _acceptButton.style.minHeight = _cancelButton.style.minHeight = 40;
-                _acceptButton.style.flexGrow = _cancelButton.style.flexGrow = 1;
-                _acceptButton.style.marginRight = 6;
-            }
+            _cancelButton.AddToClassList("shell-modal-submit--secondary");
             row.Add(_acceptButton);
             row.Add(_cancelButton);
             return surface;

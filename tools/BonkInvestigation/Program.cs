@@ -9,14 +9,14 @@ var outputDirectory = Path.GetFullPath(args.Length == 1 ? args[0] : Path.Combine
 Directory.CreateDirectory(outputDirectory);
 var summary = new List<string>();
 void Log(string message) { summary.Add(message); Console.WriteLine(message); }
-var identities = new[] { CharacterClass.Bonk, CharacterClass.FightGuy, CharacterClass.Kistu }
+var identities = new[] { CharacterClass.Bonk, CharacterClass.FightGuy, CharacterClass.Wibou }
     .Select(character => { var entry = BuiltInContentResolver.Resolve(character); return new { character = character.ToString(), entry.Identity }; }).ToArray();
 File.WriteAllText(Path.Combine(outputDirectory, "content-identities.json"), JsonSerializer.Serialize(identities, new JsonSerializerOptions { WriteIndented = true }));
 var arena = new ArenaDefinition { Name = "probe", KillHeight = -1000, SpawnPoints = new[] { new SpawnPoint() }, Heightmap = new ArenaHeightmap { Data = new float[200 * 200], Width = 200, Height = 200, CellSize = 1 } };
 var victim = BuiltInContentResolver.Resolve(CharacterClass.FightGuy);
 var rows = new List<object>();
 // Real contact trace: target one metre ahead, neutral inputs after the attack.
-foreach (var who in new[] { CharacterClass.Bonk, CharacterClass.Kistu })
+foreach (var who in new[] { CharacterClass.Bonk, CharacterClass.Wibou })
     foreach (int slot in new[] { 1, 2, 3, 4 })
     {
         var entry = BuiltInContentResolver.Resolve(who); var def = entry.Definition;

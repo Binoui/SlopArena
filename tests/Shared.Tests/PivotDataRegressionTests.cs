@@ -18,12 +18,12 @@ public class PivotDataRegressionTests
 {
     private static readonly CharacterClass[] Kits =
     {
-        CharacterClass.FightGuy, CharacterClass.Kistu, CharacterClass.Manki, CharacterClass.Nilus,
+        CharacterClass.FightGuy, CharacterClass.Wibou, CharacterClass.Manki, CharacterClass.Nilus,
     };
 
     private static readonly CharacterClass[] WarpKits =
     {
-        CharacterClass.FightGuy, CharacterClass.Kistu, CharacterClass.Manki, CharacterClass.Bonk, CharacterClass.Nilus,
+        CharacterClass.FightGuy, CharacterClass.Wibou, CharacterClass.Manki, CharacterClass.Bonk, CharacterClass.Nilus,
     };
 
     private static IEnumerable<AttackStage> AllStages(CharacterDefinition def)

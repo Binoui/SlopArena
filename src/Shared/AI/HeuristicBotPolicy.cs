@@ -1171,9 +1171,9 @@ public sealed class HeuristicBotPolicy
             or CookedRisingDragonCapabilityParameters
             or CookedCycloneKickCapabilityParameters
             or CookedDragonBeamCapabilityParameters
-            or CookedKistuDashSlashCapabilityParameters
-            or CookedKistuRisingSlashCapabilityParameters
-            or CookedKistuBladeFlurryCapabilityParameters
+            or CookedWibouDashSlashCapabilityParameters
+            or CookedWibouRisingSlashCapabilityParameters
+            or CookedWibouBladeFlurryCapabilityParameters
             or CookedBonkTargetedJumpSlamCapabilityParameters
             or CookedMankiRoundBombCapabilityParameters
             or CookedMankiJetpackBoostCapabilityParameters
@@ -1199,9 +1199,9 @@ public sealed class HeuristicBotPolicy
             case CookedDragonBeamCapabilityParameters x:
                 hitReach = MathF.Max(hitReach, x.BeamRange + x.BeamRadius);
                 damage += x.Damage; hasDamage |= x.Damage > 0f; break;
-            case CookedKistuDashSlashCapabilityParameters x:
+            case CookedWibouDashSlashCapabilityParameters x:
                 hitReach = MathF.Max(hitReach, x.DashDistance); hasMovement = true; hasDamage = true; break;
-            case CookedKistuRisingSlashCapabilityParameters x:
+            case CookedWibouRisingSlashCapabilityParameters x:
                 hitReach = MathF.Max(hitReach, x.HomingRange);
                 recoveryHorizontal = MathF.Max(recoveryHorizontal,
                     x.HomingSpeed * x.RiseTicks / 60f);
@@ -1209,7 +1209,7 @@ public sealed class HeuristicBotPolicy
                     x.RiseSpeed * x.RiseTicks / 60f);
                 recoveryRequiresDelayedOpponent = true;
                 hasMovement = true; hasDamage = true; break;
-            case CookedKistuBladeFlurryCapabilityParameters x:
+            case CookedWibouBladeFlurryCapabilityParameters x:
                 hitReach = MathF.Max(hitReach, x.ForwardSpeed * x.MoveTicks / 60f);
                 hasMovement = true; hasDamage = true; break;
             case CookedBonkTargetedJumpSlamCapabilityParameters x:
@@ -1235,8 +1235,8 @@ public sealed class HeuristicBotPolicy
             CookedRisingDragonCapabilityParameters x => x.RiseDelay,
             CookedCycloneKickCapabilityParameters x => x.WindupTicks,
             CookedDragonBeamCapabilityParameters x => x.FireTick,
-            CookedKistuDashSlashCapabilityParameters x => x.MaxAimTicks,
-            CookedKistuRisingSlashCapabilityParameters _ => 0,
+            CookedWibouDashSlashCapabilityParameters x => x.MaxAimTicks,
+            CookedWibouRisingSlashCapabilityParameters _ => 0,
             CookedBonkTargetedJumpSlamCapabilityParameters x => x.MaxAimTicks,
             CookedMankiRoundBombCapabilityParameters x => x.ThrowTriggerTick,
             CookedMankiJetpackBoostCapabilityParameters x => x.StartupTicks,

@@ -45,6 +45,7 @@ namespace SlopArena.Client.Combat
         private float _lastAimYawRad;
         private float _lastAimPitchRad;
         private ushort _lastAimDistanceCm;
+        private float _groundVectorDistance = 5f;
         private byte _lastAimingSlot;
         /// <summary>
         /// GroundVector aim: screen-space offset of a hidden cursor anchored at the character's
@@ -58,7 +59,7 @@ namespace SlopArena.Client.Combat
         private const float AimScreenDeadZone = 20f;
         /// <summary>Max cursor offset (px) — clamps runaway spin while keeping the angle.</summary>
         private const float AimScreenMaxOffset = 600f;
-        /// <summary>True when a CameraForward3D ability is active — caller draws the crosshair.</summary>
+        /// <summary>Whether the current aimed move needs the HUD crosshair.</summary>
         public bool ShowCrosshair { get; private set; }
 
         // Last computed ground-cursor destination, kept for UpdateTargetPresentation-free
@@ -217,6 +218,23 @@ namespace SlopArena.Client.Combat
                     _lastAimPitchRad = 0f;
                     // Hidden cursor starts above the character's screen position → aim = camera forward.
                     _aimScreenOffset = Vector2.up * AimScreenDeadZone;
+                    _groundVectorDistance = spec?.Params != null
+                        && spec.Params.TryGetValue("dash_distance", out float distance) ? distance : 5f;
+                    // Wibou's dash velocity is authored as consecutive timeline windows.
+                    // Derive the endpoint once on aim entry so the marker follows Ability Lab edits.
+                    if (charDef.Class == CharacterClass.Wibou)
+                    {
+                        var slot = charDef.GetCookedSlotAbility((byte)(_aimingSlot + 1), !playerState.IsGrounded);
+                        if (slot?.Timeline.Stages.Count > 0)
+                        {
+                            float authoredDistance = 0f;
+                            foreach (var operation in slot.Timeline.Stages[0].Operations)
+                                if (operation is CookedForwardLungeOperation lunge)
+                                    authoredDistance += lunge.Speed * lunge.DurationTicks * SlopArena.Shared.Simulation.TickDt;
+                            if (authoredDistance > 0f)
+                                _groundVectorDistance = authoredDistance;
+                        }
+                    }
                 }
 
                 // Entering Aiming — activate aim camera, inherit current yaw + zoom distance
@@ -286,16 +304,11 @@ namespace SlopArena.Client.Combat
                 }
                 _lastAimingSlot = _aimingSlot;
 
-                // Dash distance + indicator width come from the spec (matches the server sim).
-                float dashDistance = 5f;
+                // Use the authored dash travel for the endpoint; width follows the hitbox.
+                float dashDistance = _groundVectorDistance;
                 float dashWidth = 1.1f;
-                if (spec != null)
-                {
-                    if (spec.Params != null && spec.Params.TryGetValue("dash_distance", out var dd))
-                        dashDistance = dd;
-                    if (spec.Stages is { Length: > 0 } && spec.Stages[0].HitboxEvents is { Length: > 0 })
-                        dashWidth = spec.Stages[0].HitboxEvents[0].Radius * 2f;
-                }
+                if (spec?.Stages is { Length: > 0 } && spec.Stages[0].HitboxEvents is { Length: > 0 })
+                    dashWidth = spec.Stages[0].HitboxEvents[0].Radius * 2f;
 
                 float yaw = _lastAimYawRad;
                 ushort distCm = (ushort)Mathf.Clamp(dashDistance * 100f, 0f, 6500f);
@@ -364,7 +377,8 @@ namespace SlopArena.Client.Combat
                 }
             }
 
-            ShowCrosshair = aimMode is AimMode.GroundCursor or AimMode.CameraForward3D;
+            ShowCrosshair = (aimMode is AimMode.GroundCursor or AimMode.CameraForward3D)
+                && !(charDef.Class == CharacterClass.Wibou && (byte)(_aimingSlot + 1) == AbilitySlots.A);
             return ctx;
         }
 

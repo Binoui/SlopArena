@@ -119,7 +119,7 @@ scripts/move-data.sh fightguy --example --pcts 0,60,120 \
   --json docs/generated/fightguy-move-data.example.json
 ```
 
-- `<char>`: `fightguy` (default) | `kistu`. `manki`/`nilus` resolve but produce empty reports until their
+- `<char>`: `fightguy` (default) | `wibou`. `manki`/`nilus` resolve but produce empty reports until their
   kits are Melee-converted to Custom-knockback normals.
 - Default markdown output: `docs/generated/<char>-move-data.md`.
 - `--example` limits JSON/HTML collection to the representative grounded g2 first hit. Use it only for a
@@ -142,8 +142,8 @@ committing; the `.html` and `.md` renderings of the same data are small enough t
 `docs/generated/`.
 
 ```bash
-scripts/move-data.sh kistu --json /tmp/kistu-move-data.json
-scripts/move-data.sh kistu --html docs/generated/kistu-move-data.html
+scripts/move-data.sh wibou --json /tmp/wibou-move-data.json
+scripts/move-data.sh wibou --html docs/generated/wibou-move-data.html
 ```
 
 - **`--json`** — structured report: per-move frame data, per-tick trajectory arcs, adv per move×%, kill% +
@@ -249,7 +249,7 @@ uncovered height bands.
   markdown section on the default path. Flags compose with `--json`/`--html`.
 
 ```bash
-scripts/move-data.sh kistu --reach --html docs/generated/kistu-move-data.html
+scripts/move-data.sh wibou --reach --html docs/generated/wibou-move-data.html
 ```
 
 **Reading the ladder**: reach sorts the kit's normals by how far forward they extend — the answer to

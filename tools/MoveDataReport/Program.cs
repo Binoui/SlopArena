@@ -24,7 +24,7 @@ namespace SlopArena.MoveDataReport;
 ///
 /// Usage: dotnet run --project tools/MoveDataReport -- [character] [--pcts 0,30,60] [--out path]
 ///        [--json report.json] [--html report.html] [--combos] [--example]
-/// Character: fightguy (default) | manki | kistu | bonk | nilus.
+/// Character: fightguy (default) | manki | wibou | bonk | nilus.
 /// Default markdown output: docs/generated/{character}-move-data.md.
 /// Kill % / blast clearance: on a Crossroads-style 60x60 proxy (top +20, sides ±40, bottom -10).
 /// </summary>
@@ -126,11 +126,11 @@ internal static class Program
         {
             "fightguy" => BuiltInContentResolver.Resolve(CharacterClass.FightGuy),
             "manki"    => BuiltInContentResolver.Resolve(CharacterClass.Manki),
-            "kistu"    => BuiltInContentResolver.Resolve(CharacterClass.Kistu),
+            "wibou"    => BuiltInContentResolver.Resolve(CharacterClass.Wibou),
             "bonk"     => BuiltInContentResolver.Resolve(CharacterClass.Bonk),
             "nilus"    => BuiltInContentResolver.Resolve(CharacterClass.Nilus),
             var c => throw new ArgumentException(
-                $"unknown character: {c} (expected one of: fightguy, manki, kistu, bonk, nilus)"),
+                $"unknown character: {c} (expected one of: fightguy, manki, wibou, bonk, nilus)"),
         };
     }
 

@@ -91,9 +91,9 @@ internal static class Program
         {
             "fightguy" => CharacterClass.FightGuy,
             "manki" => CharacterClass.Manki,
-            "kistu" => CharacterClass.Kistu,
+            "wibou" => CharacterClass.Wibou,
             "nilus" => CharacterClass.Nilus,
-            _ => throw new ArgumentException($"unknown character: {which} (expected one of: fightguy, manki, kistu, nilus, all)"),
+            _ => throw new ArgumentException($"unknown character: {which} (expected one of: fightguy, manki, wibou, nilus, all)"),
         };
         return BuiltInContentResolver.Resolve(cls).Definition;
     }
@@ -288,7 +288,7 @@ internal static class Program
         return new List<MeleeRow>
         {
             new("Jump squat", Rng("{0:F0} t", sq), "3–8 f (Fox 3, Marth 4, Puff 5, Bowser 8)", "in Melee range"),
-            new("Full-hop airtime", Rng("{0:F2} s", fh), "Fox ~33 f, Marth 57–59 f", "FG/Kistu ≈ Fox-fast, Manki ≈ Marth"),
+            new("Full-hop airtime", Rng("{0:F2} s", fh), "Fox ~33 f, Marth 57–59 f", "FG/Wibou ≈ Fox-fast, Manki ≈ Marth"),
             new("Short-hop airtime", Rng("{0:F2} s", sh), "Fox ~19 f, Marth 36–38 f", "short hop in the fast band"),
             new("Short/full jump force", Rng("{0:F2}", ratio), "≈ 0.58 (derived)", "Melee-shaped (0.7 was the pre-audit value)"),
             new("Fast fall / fall", Rng("{0:F2}", ff), "1.14–1.26 (Fox 3.4/2.8 … Puff 1.6/1.3)", "Melee-shaped, adopted (audit §3.4)"),

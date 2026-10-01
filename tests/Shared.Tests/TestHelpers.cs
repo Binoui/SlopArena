@@ -11,7 +11,7 @@ public static class TestHelpers
 
     public static CharacterDefinition FightGuyDef => BuiltInContentResolver.Resolve(CharacterClass.FightGuy).Definition;
 
-    public static CharacterDefinition KistuDef => BuiltInContentResolver.Resolve(CharacterClass.Kistu).Definition;
+    public static CharacterDefinition WibouDef => BuiltInContentResolver.Resolve(CharacterClass.Wibou).Definition;
 
     public static CharacterDefinition NilusDef => ResolveDef(CharacterClass.Nilus);
 

@@ -12,7 +12,7 @@ Primary users are friends playing SlopArena online. They need to join a match, u
 
 ## Product Purpose
 
-SlopArena is an open-source 3D platform fighter built around expressive movement, knockback, compact hero-style kits, and room for unexpected play. The immediate product goal is a playable friends demo that gets real remote feedback on four admitted cooked characters: FightGuy, Manki, Kistu, and Bonk.
+SlopArena is an open-source 3D platform fighter built around expressive movement, knockback, compact hero-style kits, and room for unexpected play. The immediate product goal is a playable friends demo that gets real remote feedback on four admitted cooked characters: FightGuy, Manki, Wibou, and Bonk.
 
 Success means friends can enter a match, understand what happened, and have enough readable, expressive interaction to want another round. Package admission is not treated as proof of kit completeness or player acceptance.
 
@@ -39,15 +39,19 @@ Gameplay runs at 60 Hz. The client renders authoritative state and semantic pres
 - Raw authoring JSON is cook input, not the runtime contract.
 - Server-side simulation is authoritative. Unity physics, animation callbacks, VFX, and audio are presentation or authoring aids only.
 - Shared simulation code remains free of Unity types and engine physics queries.
-- Current admitted demo roster: FightGuy, Manki, Kistu, and Bonk. Nilus is legacy compatibility content and is not part of the four-character demo roster.
+- Current admitted demo roster: FightGuy, Manki, Wibou, and Bonk. Nilus is legacy compatibility content and is not part of the four-character demo roster.
 - The longer-term Workshop direction permits approved deterministic primitives and package-owned assets, not arbitrary simulation code, native plugins, or direct Unity-path dependencies.
 - The current implementation targets Unity 6 desktop. SlopArena also has a separate web presentation surface; the Impeccable platform value `adaptive` records that the product spans these first-party surfaces rather than asserting a mobile-native target.
 
 ## Brand Commitments
 
-The product name is SlopArena. Existing project guidance commits to an underground fight-poster energy filtered through a playful, self-aware prototype: cool fighting imagery, dry jokes, rigid geometry with controlled imperfection, strong information hierarchy, bold character silhouettes, and a welcoming game made for friends.
+The shared identity is **low-poly underground toy-fight-club, with DIY internet-game energy**: scavenged construction, chunky silhouettes, curated asset-pack collage, and cool fighting imagery with jokes second. “Toy” is a construction metaphor, not a requirement for literal plastic or cute styling. The website is the strongest existing graphic reference, not a fully approved implementation.
 
-The canonical visual-language guide is `docs/design/visual-language.md`. It applies across menus, results, trailers, web pages, Workshop documentation, and future creator tools while adapting composition to each screen's job. The separate `../sloparena-web` reference mentioned during init was not present in the available workspace; the repository's visual-language guide identifies the web surface as the canonical graphic reference.
+Target graphic primary actions and selection use Action Yellow (`#FFCC22`). Archivo Black is the target shared name-mark and display voice; marketing pairs it with Space Mono. Native short utility labels may use mono where practical, while dense settings and HUD text should remain readable sans. Paper, Ink, and orange values remain local to each surface; existing native orange `#E05C2A` and marketing orange `#F05B35` are retained.
+
+The canonical visual-language guide is `docs/design/visual-language.md`; art conventions remain authoritative for 3D and assets. The sibling repository `../SlopArena-web` is the web graphic reference.
+
+**Status:** SlopArena is unreleased, developed by a solo developer, and is not on Steam. The player-facing identity rollout is implemented. Frontend pages use the user's authored paper background; Home has separate mode/poster/announcement columns. Chat is an absolute user-sized overlay in menus and gameplay and does not influence underlying composition. Settings, match overlays, and HUD retain readable neutral fields; HUD geometry/function colors and 3D arenas remain unchanged. Existing navigation, data, authority, and networking are preserved. Connected-room, distributable-player, creator/Ability Lab, website, and release-copy migration are not claimed; the website still has the misleading Steam CTA.
 
 ## Evidence on Hand
 

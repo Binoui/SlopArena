@@ -16,7 +16,7 @@ public class AuthoringPolicyTests
     private static readonly (string Name, CharacterDefinition Def)[] Kits =
     {
         ("FightGuy", TestHelpers.FightGuyDef),
-        ("Kistu", TestHelpers.KistuDef),
+        ("Wibou", TestHelpers.WibouDef),
         ("Manki", TestHelpers.MankiDef),
         ("Nilus", TestHelpers.NilusDef),
     };

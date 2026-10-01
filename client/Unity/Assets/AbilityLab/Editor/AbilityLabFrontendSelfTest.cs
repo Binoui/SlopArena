@@ -14,6 +14,53 @@ namespace SlopArena.EditorTools;
 
 public static class AbilityLabFrontendSelfTest
 {
+    public static void RunCommandInvariants()
+    {
+        var stages = new[]
+        {
+            new CharacterStageSource(4, 0, 0, 0, 0, Array.Empty<string>(), Array.Empty<CharacterTimelineOperationSource>()),
+            new CharacterStageSource(5, 0, 0, 0, 0, Array.Empty<string>(), Array.Empty<CharacterTimelineOperationSource>()),
+        };
+        var projection = AbilityLabTimelineProjection.Build(new CharacterSlotSource(
+            "ground.1", "Test", "", "", AuthoringAbilityBehavior.MeleeCombo, AuthoringAimMode.None,
+            0, false, false, new CharacterTimelineSource(stages)));
+
+        AssertApplied(3, 0, 3, 3);
+        AssertApplied(4, 1, 0, 4);
+        AssertApplied(9, 1, 4, 8);
+        if (!AbilityLabWindow.CanCommandOpenPackage(true, "wibou", true, "wibou") ||
+            AbilityLabWindow.CanCommandOpenPackage(true, "wibou", true, "manki") ||
+            !AbilityLabWindow.CanCommandOpenPackage(true, "wibou", false, "manki"))
+            throw new InvalidOperationException("Dirty same-target retention or dirty package switch guard regressed.");
+        if (!SlopArenaAbilityLabCommands.TryParseTicks(
+                string.Join(",", Enumerable.Range(0, 64)), out var batch, out _) || batch.Count != 64 ||
+            SlopArenaAbilityLabCommands.TryParseTicks("19,19", out _, out _) ||
+            SlopArenaAbilityLabCommands.TryParseTicks(
+                string.Join(",", Enumerable.Range(0, 65)), out _, out _))
+            throw new InvalidOperationException("Capture batch parsing did not enforce distinct ticks and the 64-sample limit.");
+        if (SlopArenaAbilityLabCommands.TryResolveCaptureDirectory(".ability-lab-cache/../escape", out _, out _) ||
+            SlopArenaAbilityLabCommands.TryResolveCaptureDirectory(
+                System.IO.Path.Combine(System.IO.Path.GetTempPath(), "ability-lab"), out _, out _))
+            throw new InvalidOperationException("Capture output validation accepted traversal or an absolute path.");
+        string repositoryRoot = System.IO.Path.GetFullPath(
+            System.IO.Path.Combine(UnityCharacterAssetCooker.ProjectRoot(), "..", ".."));
+        if (!SlopArenaAbilityLabCommands.TryResolveCaptureDirectory(
+                ".ability-lab-cache/command-invariants", out string captureDirectory, out _) ||
+            System.IO.Path.GetRelativePath(repositoryRoot, captureDirectory).Replace('\\', '/') !=
+                ".ability-lab-cache/command-invariants")
+            throw new InvalidOperationException("Capture paths are not rooted in the repository artifact cache.");
+
+
+        void AssertApplied(int requested, int expectedStage, ushort expectedLocal, int expectedCumulative)
+        {
+            if (!AbilityLabWindow.TryResolveCumulativeTick(
+                    projection, requested, out var stage, out ushort local, out int cumulative) ||
+                stage.SourceStageIndex != expectedStage || local != expectedLocal || cumulative != expectedCumulative)
+                throw new InvalidOperationException(
+                    $"Cumulative tick {requested} resolved to stage {stage?.SourceStageIndex}, local {local}, cumulative {cumulative}.");
+        }
+    }
+
     [MenuItem("Tools/SlopArena/Tests/Ability Lab Frontend")]
     public static void Run()
     {
@@ -37,12 +84,29 @@ public static class AbilityLabFrontendSelfTest
             var moveList = root.Q<VisualElement>("move-list");
             var groundAirSelector = root.Q<VisualElement>("ground-air-selector");
             var diagnosticsPanel = root.Q<ScrollView>("diagnostics-panel");
+            var scenarioDistance = root.Q<FloatField>("scenario-distance");
+            var scenarioFacing = root.Q<FloatField>("scenario-facing");
+            var scenarioDamage = root.Q<IntegerField>("scenario-damage");
+            var scenarioOpponent = root.Q<DropdownField>("scenario-opponent");
+            var scenarioHorizon = root.Q<IntegerField>("scenario-horizon");
+            var scenarioRun = root.Q<Button>("scenario-run");
+            var scenarioExit = root.Q<Button>("scenario-exit");
+            var scenarioOutcomes = root.Q<Label>("scenario-outcomes");
+            var scenarioAction = root.Q<Label>("scenario-action");
             var rowLabels = timeline?.Query<Label>().ToList()
                 .Where(label => label.ClassListContains("timeline-row-label"))
                 .Select(label => label.text)
                 .ToList() ?? new List<string>();
             if (packageSelector == null || groundOne == null || timeline == null ||
-                moveSelector == null || moveList == null || groundAirSelector == null || diagnosticsPanel == null ||
+                scenarioDistance == null || scenarioFacing == null || scenarioDamage == null ||
+                scenarioOpponent == null || scenarioHorizon == null || scenarioRun == null ||
+                scenarioExit == null || scenarioOutcomes == null || scenarioAction == null ||
+                !scenarioRun.enabledSelf ||
+                scenarioDistance.label != "Opponent distance (m)" ||
+                scenarioFacing.label != "Opponent relative facing (°)" ||
+                scenarioDamage.label != "Opponent starting damage (%)" ||
+                scenarioOpponent.label != "Opponent behavior" || scenarioHorizon.label != "Last frame" ||
+                scenarioRun.text != "Run scenario" || scenarioExit.text != "Exit to authoring" ||
                 !ReferenceEquals(groundAirSelector.parent, moveSelector) ||
                 !ReferenceEquals(moveList.parent, moveSelector) ||
                 moveList.childCount != 9 ||
@@ -313,17 +377,31 @@ public static class AbilityLabFrontendSelfTest
                 throw new InvalidOperationException("Ground move selector does not offer Grab.");
             float originalReach = windowWorkspace.Draft.CaptureGeometry.Reach;
             InvokeButton(grabButton);
+            var scenarioSlider = root.Q<SliderInt>("timeline-slider");
+            var selectedScenario = lab.Scenario;
+            if (selectedScenario == null || selectedScenario.Options.Action != "grab" ||
+                selectedScenario.Options.LastFrame != 60 || !lab.IsScenarioPreview ||
+                scenarioSlider == null || !scenarioSlider.enabledSelf ||
+                scenarioOutcomes.text.Contains("No scenario run", StringComparison.Ordinal) ||
+                scenarioAction.text != "Action: grab")
+                throw new InvalidOperationException("Ground Grab did not produce an observable default Shared scenario.");
+            scenarioSlider.value = 3;
+            if (lab.ScenarioFrame != 3)
+                throw new InvalidOperationException("Scenario timeline scrubbing did not seek the recorded Shared frame.");
+            scenarioSlider.value = 0;
             var grabReach = root.Q<VisualElement>("inspector").Query<FloatField>().ToList()
                 .FirstOrDefault(field => field.label == "Reach");
             if (grabReach == null || lab.ShowHitboxes ||
-                root.Q<VisualElement>("move-timeline").style.display != DisplayStyle.None)
-                throw new InvalidOperationException("Grab did not open its numeric geometry inspector without move hitboxes.");
+                root.Q<VisualElement>("move-timeline").style.display == DisplayStyle.None)
+                throw new InvalidOperationException("Grab did not retain its numeric geometry inspector and recorded scenario timeline.");
             float editedReach = originalReach + 0.05f;
             grabReach.value = editedReach;
             if (Mathf.Abs(windowWorkspace.Draft.CaptureGeometry.Reach - editedReach) > 0.0001f ||
                 windowWorkspace.LiveDraftPackage == null ||
                 Mathf.Abs(windowWorkspace.LiveDraftPackage.Definition.CaptureGeometry.Reach - editedReach) > 0.0001f)
                 throw new InvalidOperationException("Grab reach edit did not update the authoritative draft preview.");
+            if (lab.Scenario != null)
+                throw new InvalidOperationException("Editing Grab geometry left an obsolete recorded scenario available.");
             windowWorkspace.Undo();
             Refresh(window);
             if (Mathf.Abs(windowWorkspace.Draft.CaptureGeometry.Reach - originalReach) > 0.0001f)
@@ -332,6 +410,21 @@ public static class AbilityLabFrontendSelfTest
             if (!lab.ShowHitboxes ||
                 root.Q<VisualElement>("move-timeline").style.display == DisplayStyle.None)
                 throw new InvalidOperationException("Returning to a move did not restore its hitboxes and timeline.");
+            scenarioDistance.value = 2.5f;
+            scenarioFacing.value = 90f;
+            scenarioDamage.value = 7;
+            scenarioOpponent.value = "Shield";
+            scenarioHorizon.value = 12;
+            InvokeButton(scenarioRun);
+            if (lab.Scenario == null || lab.Scenario.Options.Action != "ground.1" ||
+                lab.Scenario.Options.Distance != 2.5f || lab.Scenario.Options.RelativeFacingDegrees != 90f ||
+                lab.Scenario.Options.OpponentDamage != 7 ||
+                lab.Scenario.Options.OpponentBehavior != AbilityLabOpponentBehavior.Shield ||
+                lab.Scenario.Options.LastFrame != 12)
+                throw new InvalidOperationException("Scenario controls did not record the selected action and configured opponent inputs.");
+            InvokeButton(scenarioExit);
+            if (lab.IsScenarioPreview || windowWorkspace.IsDirty == false)
+                throw new InvalidOperationException("Exit to authoring did not restore the draft workspace after scenario playback.");
 
             Refresh(window);
 

@@ -88,11 +88,11 @@ public class LandingAerialDriftTests
         Assert.Equal(0f, vz[landing]);
     }
 
-    /// <summary>All four Kistu air normals (keys 1-4): none may drift after landing.</summary>
+    /// <summary>All four Wibou air normals (keys 1-4): none may drift after landing.</summary>
     [Fact]
-    public void Kistu_AllAirNormals_Land_NoDrift()
+    public void Wibou_AllAirNormals_Land_NoDrift()
     {
-        var def = TestHelpers.KistuDef;
+        var def = TestHelpers.WibouDef;
         foreach (byte slot in new[] { AbilitySlots.Slot1, AbilitySlots.Slot2, AbilitySlots.Slot3, AbilitySlots.Slot4 })
         {
             var sim = TestHelpers.MakeSim();
@@ -128,14 +128,14 @@ public class LandingAerialDriftTests
     }
 
     /// <summary>
-    /// Faithful reproduction of the user report: Kistu runs toward the enemy, jumps, whiffs
+    /// Faithful reproduction of the user report: Wibou runs toward the enemy, jumps, whiffs
     /// an air normal past them, crosses up (turn around), lands, and must NOT keep drifting
     /// — with the stick RELEASED after the cross-up, friction must stop it.
     /// </summary>
     [Fact]
-    public void Kistu_CrossUpWhiffAirNormal_NoPersistentDrift()
+    public void Wibou_CrossUpWhiffAirNormal_NoPersistentDrift()
     {
-        var def = TestHelpers.KistuDef;
+        var def = TestHelpers.WibouDef;
         var sim = TestHelpers.MakeSim();
         var p = TestHelpers.PlayerState() with { PY = TestHelpers.GroundPY(def), PZ = 0f };
         TestHelpers.RegisterPlayer(sim, def, p);
