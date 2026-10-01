@@ -137,7 +137,7 @@ Tick():
   6. SendState() — broadcast to all connected clients
      → For each client:
        → For each entity (all rostered players):
-      → Packet: entityId(8) + tick(4) + CharacterStatePacket(109) + hasInput(1) + InputState(20) = up to 142B
+      → Packet: entityId(8) + tick(4) + CharacterStatePacket(164) + hasInput(1) + InputState(22) = up to 199B
          → tick = _serverTick (echoed back)
          → hasInput/InputState = the input the server consumed for that entity
            that tick, or the no-input marker (issue #80 — input relay)
@@ -151,14 +151,14 @@ Tick():
 ### 4a. Client → Server
 
 ```
-Send packet: entityId(8) + tick(4) + InputState(21) = 33 bytes
+Send packet: entityId(8) + tick(4) + InputState(22) = 34 bytes
 
 [0..7]   entityId        (ulong)
 [8..11]  tick            (uint)       ← local client frame counter
-[12..32] InputState (21 bytes)
+[12..33] InputState (22 bytes)
 ```
 
-**InputState layout (21 bytes):**
+**InputState layout (22 bytes):**
 | Offset | Type    | Field           | Notes                              |
 |--------|---------|-----------------|------------------------------------|
 | 0-3    | float   | MoveX           | Horizontal analog input            |
@@ -170,45 +170,46 @@ Send packet: entityId(8) + tick(4) + InputState(21) = 33 bytes
 | 14-15  | short   | AimPitch        | Degrees × 100 (camera vertical aim) |
 | 16-17  | ushort  | AimDistance     | cm (0-6500 = 0-65m)                |
 | 18     | byte    | TargetEntityId  | Client-selected target (0 = none)  |
-| 19     | byte    | flags2          | bit0: JumpHeld, bit1: FaceToCamera, bit2: ToggleLock, bit3: DownPressed, bit4: ShieldHeld, bit5: ShieldPressed, bit6: GrabPressed |
-| 20     | byte    | protocolVersion | `SimulationProtocol.Version = 3` |
+| 19     | byte    | flags2          | bit0: JumpHeld, bit1: FaceToCamera, bit2: ToggleLock, bit3: DownPressed, bit4: ShieldHeld, bit5: ShieldPressed, bit6: GrabPressed, bit7: RetargetPressed |
+| 20     | byte    | LockMode        | `0=Never`, `1=Always`, `2=OnHit` |
+| 21     | byte    | protocolVersion | `SimulationProtocol.Version = 4` |
 
 `ShieldHeld` is the per-tick physical hold used for grounded shield. `ShieldPressed` is a
 fresh logical edge and the sole airborne dodge input; the simulation accepts it only while
 airborne. `GrabPressed` is also a one-tick edge. A completed controller grab chord consumes
 the competing defense edge without clearing the physical hold.
 
-Total: 33 bytes (8 + 4 + 21). Validate the exact envelope and supported version before
+Total: 34 bytes (8 + 4 + 22). Validate the exact envelope and supported version before
 endpoint registration or reconnect/countdown side effects. This is a coordinated cutover,
 not backward-compatible partial decoding.
 
 ### 4b. Server → Client (per entity)
 
 ```
-Receive packet per entity: entityId(8) + tick(4) + CharacterStatePacket(156) + hasInput(1) + InputState(21) = up to 190 bytes
+Receive packet per entity: entityId(8) + tick(4) + CharacterStatePacket(164) + hasInput(1) + InputState(22) = up to 199 bytes
 
 [0..7]      entityId          (ulong)
 [8..11]     tick              (uint)       ← echoes client's tick number
-[12..167]   CharacterStatePacket (156 bytes) — fixed state payload; see §4b table below
-[168]       hasInput          (byte)       ← exactly 0 or 1
-[169..189]  InputState       (21 bytes)   ← present iff hasInput == 1
+[12..175]   CharacterStatePacket (164 bytes) — fixed state payload; see §4b table below
+[176]       hasInput          (byte)       ← exactly 0 or 1
+[177..198]  InputState       (22 bytes)   ← present iff hasInput == 1
 
 
 **The relay section** carries the exact input consumed for that entity/tick. A missing
 exact server input may extend prior held input but clears one-shot `DownPressed`,
 `ShieldPressed`, and `GrabPressed`; `ShieldHeld` remains latched. `hasInput = 0` denotes
-no consumed input and is not a truncated relay. The envelope must be exactly 169 bytes
-for marker 0 or 190 bytes for marker 1; mismatches are rejected. The client discards
+no consumed input and is not a truncated relay. The envelope must be exactly 177 bytes
+for marker 0 or 199 bytes for marker 1; mismatches are rejected. The client discards
 malformed/incompatible state datagrams without ending its receive loop. Codec owner:
 `src/Shared/ServerEntityPacket.cs`.
 
-InputState remains 21 bytes. `Flags2` (byte 19) assigns bits `0x10=ShieldHeld`,
-`0x20=ShieldPressed`, and `0x40=GrabPressed`; `Flags2` bit `0x80` remains reserved.
+InputState is 22 bytes. `Flags2` (byte 19) assigns bits `0x10=ShieldHeld`,
+`0x20=ShieldPressed`, `0x40=GrabPressed`, and `0x80=RetargetPressed`.
 `ShieldPressed` and `GrabPressed` are one-tick edges. The sim chooses grounded shield
 versus airborne dodge from authoritative state; client-side chord binding emits
 `GrabPressed` and removes a competing defense edge without clearing the physical hold.
 
-**CharacterStatePacket layout (156 bytes):**
+**CharacterStatePacket layout (164 bytes):**
 | Offset | Type    | Field                       | Notes                              |
 |--------|---------|-----------------------------|------------------------------------|
 | 0-3    | uint    | TickNumber                  | Echoed client tick (for matching)  |
@@ -244,14 +245,14 @@ versus airborne dodge from authoritative state; client-side chord binding emits
 | 94-97  | float   | LastDirZ                    | Last input direction Z (D10)       |
 | 98     | byte    | WasAirborneDuringKnockback   | Landing/tech context flag (D10)    |
 | 99-100 | ushort  | HitstopTicks                 | Remaining hitstop freeze ticks (ADR-0012) |
-| 101-102| ushort  | BurstCooldownTicks           | Burst cooldown (ADR-0014)          |
-| 103-104| ushort  | BurstRecoveryTicks           | Burst recovery lock (ADR-0014)     |
+| 101-102| ushort  | BurstCooldownTicks           | Reserved retired Burst field; no gameplay meaning |
+| 103-104| ushort  | BurstRecoveryTicks           | Reserved retired Burst field; never locks actions |
 | 105    | byte    | JumpHeldTicks                | Consecutive jump-held ticks — short-hop replay (ADR-0016) |
 | 106    | byte    | LockOn                      | Persistent target-lock flag (ADR-0018) |
-| 107-108| ushort  | LedgeRegrabLockTicks         | Walk-off self-grab suppression — on-wire so rollback reproduces a walk-off |
+| 107-108| ushort  | LedgeRegrabLockTicks         | Reserved field while automatic ledge grabs are disabled |
 | 109    | byte    | AttackSequence              | Changes for each ability activation |
 | 110-111| ushort  | LandingLagTicks             | Authoritative landing lock for reconciliation and presentation |
-| 112    | byte    | MovementFlags                | bit0: IsFastFalling; bit1: JumpFromSlide; bit2: SlideAttackCarryActive; bit3: CrouchSettled; bit4: QueuedCrouchBrace; bit5: InPostHitstunFlight |
+| 112    | byte    | MovementFlags                | bit0: IsFastFalling; bit1: JumpFromSlide; bit2: SlideAttackCarryActive; bit3: CrouchSettled; bit4: QueuedCrouchBrace; bit5: InPostHitstunFlight; bit6: AutoLockSuppressed |
 | 113-114| ushort  | ShieldDropTicks              | Remaining vulnerable shield-drop recovery |
 | 115-116| ushort  | BlockStunTicks               | Remaining block stun |
 | 117    | byte    | BlockHitstopKind             | `0=none`, `1=shield contact` |
@@ -263,12 +264,13 @@ versus airborne dodge from authoritative state; client-side chord binding emits
 | 147-150| uint    | InteractionTerminalTick      | Authoritative terminal outcome tick |
 | 151-152| short   | CapturedYaw                  | Grab facing snapshot, signed degrees × 100 |
 | 153-154| ushort  | AirDodgeRecoveryTicks         | Grounded commitment left after an air-dodge landing |
-| 155    | byte    | ProtocolVersion              | `SimulationProtocol.Version = 3` |
+| 155-162| ulong   | TargetEntityId               | Sticky selected target for deterministic lock reconstruction |
+| 163    | byte    | ProtocolVersion              | `SimulationProtocol.Version = 4` |
 
-**Packet sizes:** `CharacterStatePacket` is 156 bytes. `ServerEntityPacket` is 168 bytes
-before its mandatory relay marker, 169 bytes without input and 190 bytes with input.
-Input remains 21 bytes. Pre-v3 state/input payloads are rejected. Steam admission also
-uses protocol version 3; coordinate the Master server's `protocolVersion` with GameServer
+**Packet sizes:** `CharacterStatePacket` is 164 bytes. `ServerEntityPacket` is 176 bytes
+before its mandatory relay marker, 177 bytes without input and 199 bytes with input.
+Input is 22 bytes. Non-v4 state/input payloads are rejected. Steam admission also
+uses protocol version 4; coordinate the Master server's `protocolVersion` with GameServer
 and clients for this cutover.
 
 **The server sends ALL states to every client.** Clients ignore the ones that don't concern them. No routing overhead.
@@ -298,6 +300,11 @@ Snapshots serialize the fields needed to rebuild predictable movement state. Abi
 instance fields such as active hitbox/projectile lists and private lifecycle state are
 not fully reconstructible; complex action states therefore use received state rather than
 client re-simulation.
+
+`ShieldDropTicks` is serialized with the other defense timers. `ApplyTo` overwrites
+carried state including `AirTimeTicks`; it preserves local-only fields such as attack
+elapsed ticks and queued knockback. Both full decode and reconciliation must retain
+these authoritative timers rather than clearing them or retaining stale local values.
 
 ---
 

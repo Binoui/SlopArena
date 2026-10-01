@@ -63,17 +63,23 @@ public class FightGuyAbilityTests
     public void FightGuyKiShot_HitDoesNotMarkTarget()
     {
         var sim = TestHelpers.MakeSim();
+        var def = TestHelpers.FightGuyDef;
+        var baked = TestHelpers.LoadBakedData(def);
         var player = TestHelpers.PlayerState();
         player.PY = GroundPY;
-        sim.RegisterEntity(1, TestHelpers.FightGuyDef, player);
+        sim.RegisterEntity(1, def, player);
 
         var npc = TestHelpers.NpcState(0f, 2f);
-        npc.PY = GroundPY + 1.2f;
-        npc.IsGrounded = false;
-        npc.AirTimeTicks = 100;
-        sim.RegisterEntity(100, TestHelpers.FightGuyDef, npc);
+        npc.PY = GroundPY;
+        sim.RegisterEntity(100, def, npc, baked);
 
-        sim.Tick(new() { { 1, new InputState { ActiveSlot = 11 } }, { 100, default } });
+        var aim = new InputState { ActiveSlot = 11, AimYaw = 0, IsAiming = true };
+        sim.Tick(new() { { 1, aim }, { 100, default } });
+        aim.ActiveSlot = 0;
+        for (int i = 0; i < 10; i++)
+            sim.Tick(new() { { 1, aim }, { 100, default } });
+        aim.IsAiming = false;
+        sim.Tick(new() { { 1, aim }, { 100, default } });
         for (int i = 0; i < 40; i++)
             sim.Tick(new() { { 1, default }, { 100, default } });
 
@@ -101,15 +107,17 @@ public class FightGuyAbilityTests
     [Fact]
     public void FightGuyCycloneKick_HitsEachTargetOnceWithModerateKnockback()
     {
+        var def = TestHelpers.FightGuyDef;
+        var baked = TestHelpers.LoadBakedData(def);
         var sim = TestHelpers.MakeSim();
         var player = TestHelpers.PlayerState();
         player.PY = GroundPY;
         player.FacingYaw = 0f;
-        sim.RegisterEntity(1, TestHelpers.FightGuyDef, player);
+        sim.RegisterEntity(1, def, player);
 
         var npc = TestHelpers.NpcState(0f, 3f);
         npc.PY = GroundPY;
-        sim.RegisterEntity(100, TestHelpers.FightGuyDef, npc);
+        sim.RegisterEntity(100, def, npc, baked);
 
         float maxHorizontalVelocity = 0f;
         ushort maxStun = 0;
@@ -134,19 +142,21 @@ public class FightGuyAbilityTests
     [Fact]
     public void FightGuyCycloneKick_HitsMultipleEnemiesAlongPath()
     {
+        var def = TestHelpers.FightGuyDef;
+        var baked = TestHelpers.LoadBakedData(def);
         var sim = TestHelpers.MakeSim();
         var player = TestHelpers.PlayerState();
         player.PY = GroundPY;
         player.FacingYaw = 0f;
-        sim.RegisterEntity(1, TestHelpers.FightGuyDef, player);
+        sim.RegisterEntity(1, def, player);
 
         var npc1 = TestHelpers.NpcState(0f, 2f);
         npc1.PY = GroundPY;
-        sim.RegisterEntity(100, TestHelpers.FightGuyDef, npc1);
+        sim.RegisterEntity(100, def, npc1, baked);
 
         var npc2 = TestHelpers.NpcState(0f, 3.5f);
         npc2.PY = GroundPY;
-        sim.RegisterEntity(101, TestHelpers.FightGuyDef, npc2);
+        sim.RegisterEntity(101, def, npc2, baked);
 
         for (int i = 0; i < 150; i++)
         {
@@ -167,17 +177,21 @@ public class FightGuyAbilityTests
     [Fact]
     public void FightGuyFistOfFury_PunchesPullAndRehit()
     {
+        var def = TestHelpers.FightGuyDef;
+        var baked = TestHelpers.LoadBakedData(def);
         var sim = TestHelpers.MakeSim();
         var player = TestHelpers.PlayerState();
         player.PY = GroundPY;
         player.FacingYaw = 0f;
-        sim.RegisterEntity(1, TestHelpers.FightGuyDef, player, TestHelpers.LoadBakedData(TestHelpers.FightGuyDef));
+        sim.RegisterEntity(1, def, player, baked);
 
         var npc = TestHelpers.NpcState(0f, 0.9f);
         npc.PY = GroundPY;
-        sim.RegisterEntity(100, TestHelpers.FightGuyDef, npc);
+        sim.RegisterEntity(100, def, npc, baked);
 
         ushort maxHitstun = 0;
+        float positionAfterPunches = 0f;
+        ushort damageAfterPunches = 0;
         for (int i = 0; i < 100; i++)
         {
             sim.Tick(new()
@@ -186,26 +200,37 @@ public class FightGuyAbilityTests
                 { 100, default },
             });
             maxHitstun = Math.Max(maxHitstun, sim.GetState(100).HitstunTicks);
+            if (i == 55)
+            {
+                var afterPunches = sim.GetState(100);
+                positionAfterPunches = afterPunches.PZ;
+                damageAfterPunches = afterPunches.DamagePercent;
+            }
         }
 
         var target = sim.GetState(100);
         Assert.Equal((ushort)13, target.DamagePercent);
-        Assert.True(target.PZ < 0.9f, $"punches must pull inward, got PZ={target.PZ:F3}");
+        Assert.True(damageAfterPunches > 0,
+            "the six inward punches must hit before the authored push-away hitboxes");
+        Assert.True(positionAfterPunches < 0.9f,
+            $"the six punches should pull inward before the authored push-away hitboxes, got PZ={positionAfterPunches:F3}");
         Assert.True(maxHitstun > 0, "punches must apply hitstun");
     }
 
     [Fact]
     public void FightGuyFistOfFury_RightFootFinisherLaunchesAway()
     {
+        var def = TestHelpers.FightGuyDef;
+        var baked = TestHelpers.LoadBakedData(def);
         var sim = TestHelpers.MakeSim();
         var player = TestHelpers.PlayerState();
         player.PY = GroundPY;
         player.FacingYaw = 0f;
-        sim.RegisterEntity(1, TestHelpers.FightGuyDef, player, TestHelpers.LoadBakedData(TestHelpers.FightGuyDef));
+        sim.RegisterEntity(1, def, player, baked);
 
         var npc = TestHelpers.NpcState(0f, 0.9f);
         npc.PY = GroundPY;
-        sim.RegisterEntity(100, TestHelpers.FightGuyDef, npc);
+        sim.RegisterEntity(100, def, npc, baked);
 
         float beforeKickZ = 0f;
         for (int i = 0; i < 140; i++)
@@ -376,6 +401,8 @@ public class FightGuyAbilityTests
         def.BakedDataPath = ""; // no baked data — entity offset must not need it
 
         var sim = TestHelpers.MakeSim();
+        var targetDef = TestHelpers.FightGuyDef;
+        var targetBaked = TestHelpers.LoadBakedData(targetDef);
         var player = TestHelpers.PlayerState();
         player.PY = TestHelpers.GroundPY(TestHelpers.MankiDef);
         player.FacingYaw = 0f;
@@ -385,7 +412,7 @@ public class FightGuyAbilityTests
         var npc = TestHelpers.NpcState(0f, 1.2f);
         npc.PY = TestHelpers.GroundPY(TestHelpers.MankiDef);
         npc.DamagePercent = 0;
-        sim.RegisterEntity(100, TestHelpers.FightGuyDef, npc);
+        sim.RegisterEntity(100, targetDef, npc, targetBaked);
 
         sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 1) }, { 100, default } });
         for (int i = 0; i < 10; i++)

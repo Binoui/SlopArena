@@ -19,4 +19,4 @@ jobs:
           docker run --rm --user "$(id -u):$(id -g)"
           -v "${GITHUB_WORKSPACE}:/repo"
           ghcr.io/gitleaks/gitleaks:v8.30.1
-          git --redact --verbose --log-opts="--all" /repo
+          git --redact --verbose --gitleaks-ignore-path=/repo/.gitleaksignore --log-opts="--all" /repo

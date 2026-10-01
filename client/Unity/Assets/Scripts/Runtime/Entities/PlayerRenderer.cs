@@ -2021,7 +2021,17 @@ namespace SlopArena.Client.Entities
         public Transform ResolvePresentationBone(string name)
         {
             if (string.IsNullOrEmpty(name)) return null;
-            return FindBone(name);
+            string rigName = name switch
+            {
+                "bone.head" => "mixamorig:Head",
+                "bone.hips" => "mixamorig:Hips",
+                "bone.right-hand" => "mixamorig:RightHand",
+                "bone.left-hand" => "mixamorig:LeftHand",
+                "bone.right-foot" => "mixamorig:RightFoot",
+                "bone.left-foot" => "mixamorig:LeftFoot",
+                _ => name,
+            };
+            return FindBone(rigName);
         }
 
         private Transform FindBone(string name)

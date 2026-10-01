@@ -216,6 +216,10 @@ The client may provide camera-derived aim and target intent. The Shared simulati
 
 The Gameplay target-lock setting has three modes: **Always auto-lock** (default) acquires an enemy automatically; **Never auto-lock** requires manual activation; **Auto-lock on hit** activates when the fighter deals or receives a damaging hit. An active lock keeps its target while valid within 20 m rather than switching as the camera moves. Retarget selects the nearest valid enemy within 20 m; the lock toggle explicitly disables or reenables automatic locking. If a target leaves range, automatic modes may reacquire when one returns, but explicit lock-off remains off until reenabling. Manual camera-facing snap does not disable lock.
 
+A fresh lock toggle or retarget resolves its new candidate before invalidating the
+previous target. If no eligible candidate exists, lock remains off. Shield freezes
+combat facing without stopping authoritative target selection or lock acquisition.
+
 Aim indicators and camera movement are visual input aids. They do not bypass server validation or replace Shared simulation.
 
 ## Design rules

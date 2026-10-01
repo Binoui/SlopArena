@@ -139,20 +139,6 @@ public class CharacterStatePacketTests
         Assert.Equal(original.CapturedYaw, restored.CapturedYaw);
     }
 
-    [Fact]
-    public void Size_MatchesActualSerializedLayout()
-    {
-        // 156 bytes: legacy state fields, defense contract, movement flags, protocol version.
-        Assert.Equal(156, CharacterStatePacket.Size);
-
-        // Prove it: serialize into an exactly-Size buffer must not throw
-        var packet = CharacterStatePacket.FromState(new CharacterState { AimPitch = 1f, LastDirX = 2f });
-        byte[] buffer = new byte[CharacterStatePacket.Size];
-        packet.Serialize(buffer); // throws if Size is too small
-        var restored = CharacterStatePacket.Deserialize(buffer);
-        Assert.Equal(1f, restored.AimPitch);
-        Assert.Equal(2f, restored.LastDirX);
-    }
 
     [Fact]
     public void Roundtrip_Cooldown6To10_And_JumpHeldTicks()

@@ -212,6 +212,8 @@ client/Unity/Assets/Plugins/**/NuGet/.nuget-installed.json
 !client/Unity/Assets/CharacterPackages/bonk/Animations/bonk_crouch.anim
 !client/Unity/Assets/CharacterPackages/wibou/Animations/wibou_crouch.anim
 *.png
+# Approved project documentation reference, not imported game art.
+!docs/design/references/sloparena-visual-identity/visual-reference-study.png
 !client/Unity/Assets/UI/SplashArt/*.png
 !client/Unity/Assets/UI/MenuGear.png
 !client/Unity/Assets/UI/SelectionCheck.png

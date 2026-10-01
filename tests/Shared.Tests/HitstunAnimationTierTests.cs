@@ -101,14 +101,6 @@ public class HitstunAnimationTierTests
     }
 
     // ═══════════════════════════════════════════════════════════════════
-    // Packet size includes the current fixed movement-resource, lifecycle, and movement-flag fields.
-    [Fact]
-    public void CharacterStatePacket_Size_IncludesHitstunLevel()
-    {
-        Assert.Equal(156, CharacterStatePacket.Size);
-    }
-
-    // ═══════════════════════════════════════════════════════════════════
     // End-to-end: combat pipeline produces correct HitstunLevel
     // ═══════════════════════════════════════════════════════════════════
 

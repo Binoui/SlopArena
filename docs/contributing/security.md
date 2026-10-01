@@ -39,3 +39,13 @@ When reporting, please include:
 4. Suggested fix (if any)
 
 We appreciate your help keeping SlopArena safe for everyone!
+
+## Secret scanning
+
+CI scans the full Git history with redacted Gitleaks output. The root
+`.gitleaksignore` exempts only two exact historical fingerprints for the same
+explicit, deterministic JWT test-secret example in the local-test walkthrough.
+These examples are not deployment credentials and must never be used on a live
+service. New findings remain blocking; never exempt a file or credential pattern
+to hide a real leak. Rotate any exposed live credential through the private
+operator configuration before treating removal from the current tree as a fix.

@@ -405,9 +405,13 @@ foreach (var cap in def.HurtboxCapsules)
 }
 ```
 
-> The fallback is used when no `BakedDataPath` is set in `CharacterDefinition`.
-> You can switch per-character: set `BakedDataPath = null` to use capsules for a character,
-> or set `BakedDataPath = "res://data/your_skeleton.bin"` to use baked bones.
+> Fixed-capsule fallback requires authored `HurtboxCapsules` whenever the simulation
+> cannot resolve baked bone hurtboxes. A `BakedDataPath` string
+> alone does not supply poses to a directly registered entity; callers must pass
+> its resolved `BakedAnimationData`. Cooked combat fixtures therefore register
+> baked data explicitly. Legacy character JSON serialization and loading preserve
+> the capsule array through catalog snapshot cloning; dropping it removes collision
+> rather than substituting a generic hurtbox.
 
 ---
 

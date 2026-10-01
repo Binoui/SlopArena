@@ -13,7 +13,8 @@ public sealed class SteamMatchRoutingWireTests
     [Fact]
     public void JoinFrame_BindsMatchVersionAndContent_AndAckBindsEntity()
     {
-        var descriptor = new SteamMatchDescriptor(Match, 90293421017699331UL, 0, 3, Digest,
+        var descriptor = new SteamMatchDescriptor(Match, 90293421017699331UL, 0,
+            SteamMatchDescriptor.CurrentProtocolVersion, Digest,
             DateTimeOffset.UtcNow.AddSeconds(60));
         var join = SteamGameplayWire.CreateJoin(descriptor);
         Assert.True(SteamGameplayWire.TryParseJoin(join, out var parsedMatch, out var parsedDigest));
@@ -21,7 +22,7 @@ public sealed class SteamMatchRoutingWireTests
         Assert.Equal(Digest, parsedDigest);
         join[37] = 2; // Previous protocol version.
         Assert.False(SteamGameplayWire.TryParseJoin(join, out _, out _));
-        join[37] = 3;
+        join[37] = (byte)SteamMatchDescriptor.CurrentProtocolVersion;
         join[39] = (byte)'z'; // Noncanonical content hash.
         Assert.False(SteamGameplayWire.TryParseJoin(join, out _, out _));
         Assert.False(SteamGameplayWire.TryParseJoin(join.AsSpan(0, join.Length - 1), out _, out _));
@@ -94,7 +95,12 @@ public sealed class SteamMatchRoutingWireTests
             content = contentDocument.RootElement,
             descriptor = new
             {
-                protocolVersion = 4, contentHash,
+                transport = "steam-p2p",
+                matchId = Match,
+                serverSteamId = "90293421017699331",
+                virtualPort = 0,
+                protocolVersion = SteamMatchDescriptor.CurrentProtocolVersion,
+                contentHash,
                 admissionExpiresAtUtc = DateTimeOffset.Parse("2026-09-26T12:00:00Z")
             }
         };

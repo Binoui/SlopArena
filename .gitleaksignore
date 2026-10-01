@@ -1,0 +1,5 @@
+# Public, deterministic JWT test-secret examples in the historical local-test
+# walkthrough. Both findings contain the same explicit test/length mnemonic;
+# these fingerprints do not exempt actual credentials or future assignments.
+f419717975820fe54db3c5d5cef2f32b15d2f05f:docs/superpowers/plans/2026-06-10-server-mvp-phase1.md:generic-api-key:2594
+f9eeb18792a5eaefaf97e71c6d4999e1e0d42fa4:docs/superpowers/plans/2026-06-10-server-mvp-phase1.md:generic-api-key:2594

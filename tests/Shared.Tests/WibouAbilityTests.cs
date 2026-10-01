@@ -141,9 +141,11 @@ public class WibouAbilityTests
     [Fact]
     public void F_FlurryDamagesEnemy()
     {
+        var targetDef = Def;
+        var targetBaked = TestHelpers.LoadBakedData(targetDef);
         var sim = SimWithPlayer(out _);
         var npc = TestHelpers.NpcState(0f, 1.3f); npc.PY = GroundPY;
-        TestHelpers.RegisterNpc(sim, Def, npc);
+        sim.RegisterEntity(100, targetDef, npc, targetBaked);
         sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 6) }, { 100, default } });
         for (int i = 0; i < 64; i++) sim.Tick(new() { { 1, default }, { 100, default } });
         Assert.True(sim.GetState(100).DamagePercent > 0);

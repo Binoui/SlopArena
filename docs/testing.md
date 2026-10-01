@@ -361,3 +361,30 @@ Record:
 - any unexercised runtime surface.
 
 Do not claim a live runtime result from a build or static inspection alone.
+
+### Steam Playtest release repair evidence — 2026-10-01
+
+- Full Shared suite after the integrated repairs: **1,165 passed, 6 existing skips,
+  zero failures**. Server suite: **26 passed**. MasterServer suite: **158 passed**;
+  its registration/launcher suites also passed all **40** cases after independent
+  protocol-4 fixtures were finalized.
+- The isolated backend smoke exercised actual Master HTTP registration with EF
+  InMemory storage: protocol 2 returned 400 without creating a host; protocol 4
+  returned 200 and persisted the approved host. It does not prove PostgreSQL or
+  live VPS behavior.
+- Snapshot smoke retained shield-drop timer 6 through wire decode, corrected air
+  timer 999 to 37, and preserved local-only attack timer 500. Legacy snapshot
+  collision and lock acquisition are covered by the passing Shared suite.
+- Unity reported ready/stopped with zero current console errors. The initial repaired
+  Windows `0.2.0-playtest.4` candidate built successfully with **1,309 warnings and
+  zero errors**, with its four cooked packages matching the checkpoint roster.
+  The operator subsequently approved the coherent Manki renderer/weapon/binding
+  update for the final source-pinned rebuild. The packaged VPS endpoint and matching
+  Steam native library were checked; developer bootstrap/private config files were
+  absent. Final build/source/content identities belong in the release receipt.
+- Existing project credits, MIT license, and both font OFL licenses accompany the
+  candidate. Release evidence is retained under ignored `build/playtest/0.2.0-playtest.4/`.
+- The attempted Proton player smoke was cancelled at the operator's request; no
+  subsequent player launch, Steam install, two-account match/rematch, VPS deploy,
+  or default-branch activation was exercised. Source publication, redacted history
+  scan, Steam upload, and live deployment remain separate gated operations.

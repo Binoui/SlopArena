@@ -104,7 +104,7 @@ public sealed class TelemetryProvenanceTests
         var target = TestHelpers.NpcState(z: 3f);
         target.PY = TestHelpers.GroundPY(Def);
         sim.RegisterEntity(1, Def, attacker, TestHelpers.LoadBakedData(Def));
-        TestHelpers.RegisterNpc(sim, Def, target);
+        sim.RegisterEntity(100, Def, target, TestHelpers.LoadBakedData(Def));
 
         var recorder = new SlopArena.Shared.AI.MatchRecorder();
         var inputs = new Dictionary<ulong, InputState>
@@ -184,7 +184,7 @@ public sealed class TelemetryProvenanceTests
         var victim = TestHelpers.NpcState(z: 1f);
         victim.PY = TestHelpers.GroundPY(Def);
         TestHelpers.RegisterPlayer(sim, Def, attacker);
-        TestHelpers.RegisterNpc(sim, Def, victim);
+        sim.RegisterEntity(100, Def, victim, TestHelpers.LoadBakedData(Def));
 
         sim.Resolver.Spawn(new Hitbox
         {
@@ -201,6 +201,8 @@ public sealed class TelemetryProvenanceTests
         sim.ActivateAbility(100, new CancelMutatorAbility(), slot: 2, def: Def);
         var falling = sim.GetState(100);
         falling.PY = -30f;
+        falling.IsGrounded = false;
+        falling.PZ = -1f; // Outside the heightmap so below-floor death isn't snapped onto it.
         falling.PX = 4.5f;
         sim.SetState(100, falling);
         sim.Tick(new Dictionary<ulong, InputState> { [1] = default, [100] = default });
@@ -226,7 +228,7 @@ public sealed class TelemetryProvenanceTests
         var victim = TestHelpers.NpcState(z: 1f);
         victim.PY = TestHelpers.GroundPY(Def);
         TestHelpers.RegisterPlayer(sim, Def, attacker);
-        TestHelpers.RegisterNpc(sim, Def, victim);
+        sim.RegisterEntity(100, Def, victim, TestHelpers.LoadBakedData(Def));
 
         sim.Resolver.Spawn(new Hitbox
         {
@@ -243,6 +245,8 @@ public sealed class TelemetryProvenanceTests
 
         var falling = sim.GetState(100);
         falling.PY = -30f;
+        falling.IsGrounded = false;
+        falling.PZ = -1f; // Outside the heightmap so below-floor death isn't snapped onto it.
         sim.SetState(100, falling);
         sim.Tick(new Dictionary<ulong, InputState> { [1] = default, [100] = default });
 
@@ -262,7 +266,7 @@ public sealed class TelemetryProvenanceTests
         var victim = TestHelpers.NpcState(z: 1f);
         victim.PY = TestHelpers.GroundPY(Def);
         TestHelpers.RegisterPlayer(sim, Def, attacker);
-        TestHelpers.RegisterNpc(sim, Def, victim);
+        sim.RegisterEntity(100, Def, victim, TestHelpers.LoadBakedData(Def));
 
         sim.Resolver.Spawn(new Hitbox
         {
@@ -280,6 +284,7 @@ public sealed class TelemetryProvenanceTests
         reset.PX = 0f;
         reset.PY = TestHelpers.GroundPY(Def);
         reset.PZ = 5f;
+        reset.IsGrounded = true;
         reset.State = ActionState.Idle;
         reset.HitstopTicks = 0;
         reset.HitstunTicks = 0;
@@ -299,6 +304,7 @@ public sealed class TelemetryProvenanceTests
 
         var falling = sim.GetState(100);
         falling.PX = 500f;
+        falling.IsGrounded = false;
         sim.SetState(100, falling);
         sim.Tick(new Dictionary<ulong, InputState> { [1] = default, [100] = default });
 
@@ -314,7 +320,7 @@ public sealed class TelemetryProvenanceTests
         var sim = TestHelpers.MakeSim();
         var victim = TestHelpers.PlayerState();
         victim.PY = TestHelpers.GroundPY(Def);
-        TestHelpers.RegisterPlayer(sim, Def, victim);
+        sim.RegisterEntity(1, Def, victim, TestHelpers.LoadBakedData(Def));
 
         sim.Resolver.Spawn(new Hitbox
         {
@@ -331,6 +337,8 @@ public sealed class TelemetryProvenanceTests
 
         var falling = sim.GetState(1);
         falling.PY = -30f;
+        falling.IsGrounded = false;
+        falling.PZ = -1f; // Outside the heightmap so below-floor death isn't snapped onto it.
         sim.SetState(1, falling);
         sim.Tick(new Dictionary<ulong, InputState> { [1] = default });
 

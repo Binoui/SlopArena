@@ -318,6 +318,7 @@ namespace SlopArena.Shared
             if (InPostHitstunFlight) movementFlags |= 0x20;
             if (AutoLockSuppressed) movementFlags |= 0x40;
             buffer[112] = movementFlags;
+            BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(113, 2), ShieldDropTicks);
             BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(115, 2), BlockStunTicks);
             buffer[117] = BlockHitstopKind;
             buffer[118] = InteractionPhase;
@@ -444,6 +445,7 @@ namespace SlopArena.Shared
             s.JumpHeldTicks = JumpHeldTicks;
             s.LockOn = LockOn;
             s.AutoLockSuppressed = AutoLockSuppressed;
+            s.AirTimeTicks = AirTimeTicks;
             s.DashDurationTicks = DashDurationTicks;
             s.DashDirX = DashDirX; s.DashDirZ = DashDirZ;
             s.DashCooldownTicks = DashCooldownTicks;

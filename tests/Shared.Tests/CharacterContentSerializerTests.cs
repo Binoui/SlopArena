@@ -78,6 +78,27 @@ public sealed class CharacterContentSerializerTests
         => Assert.Contains("missing stages", Assert.Throws<InvalidDataException>(() => LoadText(
             "{\"schemaVersion\":1,\"id\":\"fightguy\",\"class\":\"FightGuy\",\"abilities\":{\"slot1\":{\"name\":\"No stages\"}}}" )).Message);
 
+
+    [Fact]
+    public void LegacySnapshot_PreservesCapsuleCollisionForResolvedCharacter()
+    {
+        var targetDef = new LegacyCharacterCatalogAdapter()
+            .Snapshot(CharacterClass.Nilus).Definition;
+        var sim = TestHelpers.MakeSim();
+        var player = TestHelpers.PlayerState();
+        player.PY = TestHelpers.GroundPY(targetDef);
+        sim.RegisterEntity(1, targetDef, player);
+
+        var target = TestHelpers.NpcState(0f, 6f);
+        target.PY = TestHelpers.GroundPY(targetDef);
+        sim.RegisterEntity(100, targetDef, target);
+
+        TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 4), 10);
+
+        Assert.True(sim.GetState(100).DamagePercent > 0,
+            "the resolved legacy hurtbox must receive Riftwalk's arrival burst");
+    }
+
     private static CharacterDefinition LoadText(string json) => CharacterContentSerializer.Load(json);
 
 

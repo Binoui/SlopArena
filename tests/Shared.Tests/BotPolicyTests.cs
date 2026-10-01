@@ -576,6 +576,7 @@ public class BotPolicyTests
         var def = TestHelpers.MankiDef;
         for (int seed = 0; seed < 8; seed++)
         {
+            var baked = TestHelpers.LoadBakedData(def);
             var sim = TestHelpers.MakeSim();
             var self = Self();
             self.PY = TestHelpers.GroundPY(def);
@@ -588,8 +589,8 @@ public class BotPolicyTests
 
             var target = Opponent(z: 2f);
             target.PY = TestHelpers.GroundPY(def);
-            TestHelpers.RegisterPlayer(sim, def, self);
-            TestHelpers.RegisterNpc(sim, def, target);
+            sim.RegisterEntity(1, def, self, baked);
+            sim.RegisterEntity(100, def, target, baked);
 
             var memory = new BotMemory { Difficulty = CpuDifficulty.Hard };
             var rng = new Random(seed);

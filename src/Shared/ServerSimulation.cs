@@ -1697,7 +1697,8 @@ namespace SlopArena.Shared
 				ulong targetId = state.TargetEntityId;
 				bool previousTargetValid = targetId != 0
 					&& IsEligibleEnemy(id, targetId, state.PX, state.PZ, LockRangeMeters, out _);
-				if (state.LockOn && !previousTargetValid)
+				// Let a new toggle/retarget resolve before validating the previous target.
+				if (state.LockOn && !previousTargetValid && !acquiring)
 				{
 					state.LockOn = false;
 					state.TargetEntityId = 0;
