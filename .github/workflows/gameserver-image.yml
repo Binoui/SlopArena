@@ -68,7 +68,7 @@ jobs:
           printf 'release_id=%s\ngameserver_image=%s\ngameserver_revision=%s\ngameserver_runtime=8.0.31\ngameserver_sdk=8.0.425\n' \
             "$RELEASE_ID" "$digest" "$GITHUB_SHA" > gameserver-image.txt
           cat gameserver-image.txt >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: gameserver-image-${{ github.sha }}
           path: gameserver-image.txt
