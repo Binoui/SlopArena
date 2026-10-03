@@ -48,7 +48,7 @@ unity command
 unity command --project-path /path/to/your/unity/project
 ```
 
-Click [here](Documentation~/connectivity.md) for more details on Connectivity troubleshooting.
+See the project's [Unity CLI guide](../../../../docs/contributing/unity-cli.md) for the maintained connection and ownership workflow.
 
 ## Connect to a running Player (Runtime)
 
@@ -76,11 +76,11 @@ unity command --runtime-path <path> runtime_status
   unity command --runtime-path "/Users/me/Builds/MyGame.app" runtime_status
   ```
 
-Click [here](Documentation~/connectivity.md) for more details on Connectivity troubleshooting.
+See the project's [Unity CLI guide](../../../../docs/contributing/unity-cli.md) for connectivity requirements.
 
 ## Documentation
 
-For the full command reference, connectivity details, runtime setup, and hot-reload guides, see the [Pipeline documentation](Documentation~/index.md).
+For the command reference, runtime setup, and hot-reload guides, see the [Pipeline documentation](https://docs.unity.com/en-us/unity-production-pipeline/local-tools-cli/unity-pipeline-package).
 
 ## License
 

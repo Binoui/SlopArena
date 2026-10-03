@@ -39,9 +39,9 @@ The project-local ownership gateway uses Unity CLI `1.0.0-beta.6` and embedded
 `com.unity.pipeline` `0.5.0-exp.1`. On 2026-10-03, the canonical Editor passed
 31 gateway regressions, five native ownership tests, real caller contention and
 automatic release/restoration, retained-lease domain reload, and actual process
-restart/stale-token rejection. The [cutover receipt](../../../sloparena-workspace/_bmad-output/editor-coordination/gateway-cutover-verification.json)
+restart/stale-token rejection. The [cutover receipt](file:///home/binoui/Documents/projects/sloparena-workspace/_bmad-output/editor-coordination/gateway-cutover-verification.json)
 records commands, lifecycle evidence and preservation limits. The planning workspace's
-[coordination protocol](../../../sloparena-workspace/docs/unity-editor-coordination.md)
+[coordination protocol](file:///home/binoui/Documents/projects/sloparena-workspace/docs/unity-editor-coordination.md)
 now uses Pipeline runtime status, not Markdown assignments, as ownership authority.
 Ordinary agents wait for their own lease; no previous owner's response is required.
 
@@ -69,7 +69,7 @@ markers and live coordination plans are not disposable output.
 
 ## Pipeline connection and shared Editor leases
 
-Read the canonical [shared Editor protocol](../../../sloparena-workspace/docs/unity-editor-coordination.md)
+Read the canonical [shared Editor protocol](file:///home/binoui/Documents/projects/sloparena-workspace/docs/unity-editor-coordination.md)
 before operating the main Editor. Each agent runs its own bounded gateway batch.
 The gateway waits for a busy Editor, atomically claims its own lease, executes,
 restores declared state, and releases only after actual work settles. Do not send
