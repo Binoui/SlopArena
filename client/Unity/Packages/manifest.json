@@ -29,6 +29,7 @@
     "com.unity.modules.uielements": "1.0.0"
   },
   "testables": [
-    "com.besty.unity-skills"
+    "com.besty.unity-skills",
+    "com.unity.pipeline"
   ]
 }

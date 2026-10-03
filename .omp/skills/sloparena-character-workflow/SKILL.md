@@ -4,6 +4,8 @@ description: "Package-native workflow for designing, authoring, cooking, validat
 category: game-dev
 ---
 
+Before gateway examples, set `ORCA_TERMINAL_HANDLE` to your own runtime-issued terminal handle; the gateway verifies its incarnation and fails closed if it is missing or mismatched. Use the canonical gateway in [`docs/contributing/unity-cli.md`](../../../docs/contributing/unity-cli.md) and the [shared Editor coordination protocol](file:///home/binoui/Documents/projects/sloparena-workspace/docs/unity-editor-coordination.md). Wait for an independent lease; never inject work into an owner's batch. Runtime ownership status replaces historical Markdown ownership; `blocked` or unknown is not free.
+
 # SlopArena Character Workflow
 
 Use this skill when designing or implementing a playable character. The canonical authoring guide is [`docs/characters/adding-a-new-character.md`](../../../docs/characters/adding-a-new-character.md). New characters are packages, not registry factories.
@@ -99,10 +101,8 @@ and repair structured diagnostics without replacing persisted cooked output. For
 accepted package, use the typed Unity CLI commands:
 
 ```bash
-unity command --project-path client/Unity \
-  sloparena.character.inspect --target <package> --format json
-unity command --project-path client/Unity \
-  sloparena.character.cook --target <package> --format json
+bun /home/binoui/Documents/projects/sloparena-workspace/scripts/unity-editor-gateway.ts --project-path /home/binoui/Documents/projects/SlopArena/client/Unity -- sloparena.character.inspect --target <package>
+bun /home/binoui/Documents/projects/sloparena-workspace/scripts/unity-editor-gateway.ts --project-path /home/binoui/Documents/projects/SlopArena/client/Unity -- sloparena.character.cook --target <package>
 ```
 
 `inspect` reports the canonical 16-slot projection, source/cooked hashes, status,
@@ -131,11 +131,10 @@ For online content, verify server admission and exact client/server hash agreeme
 Presentation resolves semantic IDs to generated package bindings and plays through
 Animancer; presentation never feeds back into simulation.
 
-## Legacy compatibility
+## Cooked-only content
 
-Nilus is the remaining legacy implementation case behind `LegacyCharacterCatalogAdapter` until its package migration. The legacy path is **modification-only compatibility**, not a template for new work.
-
-For legacy maintenance, preserve its existing registry and baked-data contracts unless the migration task explicitly changes them. For new work, do not:
+Nilus compatibility, registry factories, and character/slot dispatch have been removed.
+Character execution and Ability Lab preview use packages only. Do not:
 
 - add `Build<Name>`, `BuildRegistry`, `CharacterRegistry`, or `(CharacterClass, slot)` dispatch;
 - copy `MankiData` or another legacy character definition;

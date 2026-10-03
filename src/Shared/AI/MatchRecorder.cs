@@ -285,7 +285,7 @@ public sealed class MatchRecorder
             CookedWibouDashSlashCapabilityParameters x => x.MaxAimTicks + x.DashDurationTicks,
             CookedWibouRisingSlashCapabilityParameters x => x.RiseTicks,
             CookedWibouBladeFlurryCapabilityParameters x => x.MoveTicks,
-            CookedBonkTargetedJumpSlamCapabilityParameters x => x.MaxAimTicks + x.MaxFlightTicks + x.SlamDurationTicks,
+            CookedTargetedLeapCapabilityParameters x => x.MaxAimTicks + x.MaxFlightTicks + x.RecoveryTicks,
             CookedMankiRoundBombCapabilityParameters x => x.ThrowTriggerTick + x.MaxFlightTicks + x.ExplosionDurationTicks,
             CookedMankiJetpackBoostCapabilityParameters x => x.StartupTicks + x.ExplosionDurationTicks,
             CookedMankiBazookaCapabilityParameters x => x.FireTriggerTick + x.MaxFlightTicks + x.RecoveryDuration,

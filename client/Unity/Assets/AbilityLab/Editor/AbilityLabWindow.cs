@@ -15,7 +15,7 @@ using SlopArena.Client.World;
 
 namespace SlopArena.EditorTools;
 
-public sealed class AbilityLabWindow : EditorWindow
+public sealed partial class AbilityLabWindow : EditorWindow
 {
     private sealed class PackageOption
     {
@@ -51,23 +51,6 @@ public sealed class AbilityLabWindow : EditorWindow
     private readonly Dictionary<string, PackageOption> _packagesByDisplay = new(StringComparer.Ordinal);
     private VisualElement _root = null!;
     private DropdownField _packageSelector = null!;
-    private Label _compatibilityAuthority = null!;
-    private DropdownField _legacySelector = null!;
-    private Button _legacyLoad = null!;
-    private Toggle _compatibilityAirborne = null!;
-    private DropdownField _compatibilitySlotSelector = null!;
-    private DropdownField _compatibilityStageSelector = null!;
-    private Button _compatibilityPlay = null!;
-    private Button _compatibilityStepBack = null!;
-    private Button _compatibilityStepForward = null!;
-    private SliderInt _compatibilitySlider = null!;
-    private Label _compatibilityTick = null!;
-    private Label _compatibilityDuration = null!;
-    private Toggle _compatibilityShowHurtboxes = null!;
-    private Toggle _compatibilityShowHitboxes = null!;
-    private Toggle _compatibilityShowBakedBones = null!;
-    private Toggle _compatibilityShowDummy = null!;
-    private readonly List<CharacterClass> _compatibilityCharacters = new();
     private string _activePage = "moves-page";
     private Button _packageStatusToggle = null!;
     private ScrollView _diagnosticsPanel = null!;
@@ -249,7 +232,7 @@ public sealed class AbilityLabWindow : EditorWindow
         _grabSelected = false;
         _selectedOperation = null;
         _airborneSelector = address.IsAirborne;
-        if (_activePage == "compatibility-page") SelectTab("moves-page");
+        UpdateMoveModeButtons();
         UpdateMoveModeButtons();
         BuildMoveButtons(_airborneSelector);
         UpdateTimelineControls();
@@ -272,6 +255,7 @@ public sealed class AbilityLabWindow : EditorWindow
     private void OnDisable()
     {
         SceneView.duringSceneGui -= OnSceneGUI;
+        DisposeAttachmentPreview();
         if (_grabSelected && _lab != null) _lab.ShowHitboxes = _grabPriorShowHitboxes;
         DestroyOwnedLab();
     }
@@ -299,6 +283,7 @@ public sealed class AbilityLabWindow : EditorWindow
         BindMovesPage();
         BindCharacterPage();
         BindAssetsPage();
+        BindPhaseAuthoring();
         BindAdvancedPage();
         if (!_workspace.HasPackage && !_suppressInitialPackage && _packages.Any(option => option.PackageId == "fightguy"))
             OpenPackage("fightguy");
@@ -311,8 +296,6 @@ public sealed class AbilityLabWindow : EditorWindow
 
     private void Update()
     {
-        if (_activePage == "compatibility-page")
-            RefreshCompatibilityControls();
         if (_lab != null && _lab.Playing)
         {
             UpdateTimelineControls();
@@ -333,29 +316,15 @@ public sealed class AbilityLabWindow : EditorWindow
         _createLabRig = Required<Button>("create-lab-rig");
         _inspector = Required<VisualElement>("inspector");
         _moveTimeline = Required<VisualElement>("move-timeline");
+        _phaseSelector = Required<DropdownField>("authoring-phase");
+        _phaseClipLabel = Required<Label>("authoring-phase-clip");
         _timelineTick = Required<Label>("timeline-tick");
         _timelinePlay = Required<Button>("timeline-play");
         _timelineSlider = Required<SliderInt>("timeline-slider");
         _timelineDuration = Required<Label>("timeline-duration");
         _stageSelector = Required<DropdownField>("stage-selector");
-        _compatibilityAuthority = Required<Label>("compatibility-authority");
         _timelineZoom = Required<Slider>("timeline-zoom");
         _timelineScroll = Required<ScrollView>("timeline-scroll");
-        _legacySelector = Required<DropdownField>("legacy-selector");
-        _legacyLoad = Required<Button>("legacy-load");
-        _compatibilityAirborne = Required<Toggle>("compatibility-airborne");
-        _compatibilitySlotSelector = Required<DropdownField>("compatibility-slot-selector");
-        _compatibilityStageSelector = Required<DropdownField>("compatibility-stage-selector");
-        _compatibilityPlay = Required<Button>("compatibility-play");
-        _compatibilityStepBack = Required<Button>("compatibility-step-back");
-        _compatibilityStepForward = Required<Button>("compatibility-step-forward");
-        _compatibilitySlider = Required<SliderInt>("compatibility-slider");
-        _compatibilityTick = Required<Label>("compatibility-tick");
-        _compatibilityDuration = Required<Label>("compatibility-duration");
-        _compatibilityShowHurtboxes = Required<Toggle>("compatibility-show-hurtboxes");
-        _compatibilityShowHitboxes = Required<Toggle>("compatibility-show-hitboxes");
-        _compatibilityShowBakedBones = Required<Toggle>("compatibility-show-baked-bones");
-        _compatibilityShowDummy = Required<Toggle>("compatibility-show-dummy");
         _scenarioAction = Required<Label>("scenario-action");
         _scenarioDistance = Required<FloatField>("scenario-distance");
         _scenarioFacing = Required<FloatField>("scenario-facing");
@@ -376,7 +345,7 @@ public sealed class AbilityLabWindow : EditorWindow
         _timelineTrack.TickScrubbed += ApplyCumulativeTick;
         _root.focusable = true;
         _root.RegisterCallback<KeyDownEvent>(OnRootKeyDown, TrickleDown.TrickleDown);
-        foreach (string page in new[] { "moves-page", "character-page", "assets-page", "compatibility-page", "advanced-page" })
+        foreach (string page in new[] { "moves-page", "character-page", "assets-page", "advanced-page" })
             _pages[page] = Required<VisualElement>(page);
         _characterGeneral = Required<VisualElement>("character-general");
         _characterMovement = Required<VisualElement>("character-movement");
@@ -428,7 +397,6 @@ public sealed class AbilityLabWindow : EditorWindow
         BindTab("tab-moves", "moves-page");
         BindTab("tab-character", "character-page");
         BindTab("tab-assets", "assets-page");
-        BindTab("tab-compatibility", "compatibility-page");
         BindTab("tab-advanced", "advanced-page");
         SelectTab("moves-page");
     }
@@ -438,30 +406,11 @@ public sealed class AbilityLabWindow : EditorWindow
 
     private void SelectTab(string pageName)
     {
-        bool compatibility = pageName == "compatibility-page";
-        bool leavingCompatibility = _activePage == "compatibility-page" && !compatibility;
         _activePage = pageName;
         foreach (var page in _pages)
             page.Value.style.display = page.Key == pageName ? DisplayStyle.Flex : DisplayStyle.None;
-        _root.Q<Label>("compatibility-banner")!.style.display = compatibility ? DisplayStyle.Flex : DisplayStyle.None;
-        SetPackageControlsVisible(!compatibility);
-        if (leavingCompatibility)
-            RefreshPreview();
-        RefreshCompatibilityControls();
     }
 
-    private void SetPackageControlsVisible(bool visible)
-    {
-        DisplayStyle display = visible ? DisplayStyle.Flex : DisplayStyle.None;
-        Required<Label>("package-label").style.display = display;
-        _packageSelector.style.display = display;
-        _packageStatusToggle.style.display = display;
-        Required<Button>("toolbar-undo").style.display = display;
-        Required<Button>("toolbar-redo").style.display = display;
-        Required<Button>("toolbar-save").style.display =
-            visible && _workspace.HasPackage ? DisplayStyle.Flex : DisplayStyle.None;
-        _diagnosticsPanel.style.display = visible ? DisplayStyle.Flex : DisplayStyle.None;
-    }
 
     private void BindToolbar()
     {
@@ -479,91 +428,6 @@ public sealed class AbilityLabWindow : EditorWindow
         Required<Button>("toolbar-redo").clicked += () => { _workspace.Redo(); RefreshAll(); };
         Required<Button>("toolbar-save").clicked += () => { _workspace.SavePackage(); RefreshAll(); };
         _createLabRig.clicked += CreateOrSelectLabRig;
-        DiscoverCompatibilityCharacters();
-        _legacyLoad.clicked += () =>
-        {
-            if (!Application.isPlaying)
-            {
-                EditorUtility.DisplayDialog("Play Mode required", "Legacy compatibility preview is read-only and Play Mode-only.", "OK");
-                return;
-            }
-            if (_lab != null && _compatibilityCharacters.Count > 0 &&
-                Enum.TryParse(_legacySelector.value, out CharacterClass selector))
-            {
-                _lab.LoadCharacter(selector);
-                RefreshCompatibilityControls();
-                SceneView.RepaintAll();
-            }
-        };
-        _compatibilityAirborne.RegisterValueChangedCallback(evt =>
-        {
-            if (!_updatingControls && _lab != null && IsLoadedLegacy())
-            {
-                _lab.SetAirborne(evt.newValue);
-                RefreshCompatibilityControls();
-                SceneView.RepaintAll();
-            }
-        });
-        _compatibilitySlotSelector.RegisterValueChangedCallback(evt =>
-        {
-            if (!_updatingControls && _lab != null && IsLoadedLegacy())
-            {
-                int labelIndex = Array.IndexOf(AbilityLab.SlotNames, evt.newValue);
-                if (labelIndex >= 0 && labelIndex < AbilityLab.SlotIndices.Length)
-                {
-                    _lab.SetSlot(AbilityLab.SlotIndices[labelIndex]);
-                    RefreshCompatibilityControls();
-                    SceneView.RepaintAll();
-                }
-            }
-        });
-        _compatibilityStageSelector.RegisterValueChangedCallback(evt =>
-        {
-            if (!_updatingControls && _lab != null && IsLoadedLegacy() &&
-                int.TryParse(evt.newValue.Replace("Stage ", ""), out int stage))
-            {
-                _lab.SetStage(stage - 1);
-                RefreshCompatibilityControls();
-                SceneView.RepaintAll();
-            }
-        });
-        _compatibilityPlay.clicked += () =>
-        {
-            if (_lab == null || !IsLoadedLegacy()) return;
-            _lab.Playing = !_lab.Playing;
-            RefreshCompatibilityControls();
-        };
-        _compatibilityStepBack.clicked += () => SetCompatibilityTickDelta(-1);
-        _compatibilityStepForward.clicked += () => SetCompatibilityTickDelta(1);
-        _compatibilitySlider.RegisterValueChangedCallback(evt =>
-        {
-            if (!_updatingControls && _lab != null && IsLoadedLegacy())
-            {
-                _lab.SetTick((ushort)Mathf.Clamp(evt.newValue, 0, ushort.MaxValue));
-                RefreshCompatibilityControls();
-                SceneView.RepaintAll();
-            }
-        });
-        _compatibilityShowHurtboxes.RegisterValueChangedCallback(evt =>
-        {
-            if (_lab != null) _lab.ShowHurtboxes = evt.newValue;
-            SceneView.RepaintAll();
-        });
-        _compatibilityShowHitboxes.RegisterValueChangedCallback(evt =>
-        {
-            if (_lab != null) _lab.ShowHitboxes = evt.newValue;
-            SceneView.RepaintAll();
-        });
-        _compatibilityShowBakedBones.RegisterValueChangedCallback(evt =>
-        {
-            if (_lab != null) _lab.ShowBakedBones = evt.newValue;
-            SceneView.RepaintAll();
-        });
-        _compatibilityShowDummy.RegisterValueChangedCallback(evt =>
-        {
-            if (_lab != null) _lab.ShowDummy = evt.newValue;
-            SceneView.RepaintAll();
-        });
     }
 
     private void BindMovesPage()
@@ -1212,19 +1076,6 @@ public sealed class AbilityLabWindow : EditorWindow
         }
         _packageSelector.choices = _packages.Select(Display).ToList();
     }
-    private void DiscoverCompatibilityCharacters()
-    {
-        _compatibilityCharacters.Clear();
-        var resolution = SlopArena.Client.LocalContentResolver.CreateDefault().ResolveRoster();
-        if (resolution.Success && resolution.Roster != null)
-        {
-            _compatibilityCharacters.Add(CharacterClass.Nilus);
-        }
-
-        _legacySelector.choices = _compatibilityCharacters.Select(selector => selector.ToString()).ToList();
-        if (_legacySelector.choices.Count > 0)
-            _legacySelector.SetValueWithoutNotify(_legacySelector.choices[0]);
-    }
 
     private static string Display(PackageOption option) => string.IsNullOrEmpty(option.PackageId)
         ? option.DisplayName
@@ -1233,6 +1084,7 @@ public sealed class AbilityLabWindow : EditorWindow
     private void OpenPackage(string packageId)
     {
         if (string.IsNullOrEmpty(packageId)) return;
+        if (!CanLeaveAttachmentDraft()) { BindPackageSelection(); return; }
         if (!_workspace.OpenPackage($"Assets/CharacterPackages/{packageId}"))
         {
             RefreshAll();
@@ -1275,6 +1127,7 @@ public sealed class AbilityLabWindow : EditorWindow
         BindPackageSelection();
         RefreshWorkspaceControls();
         RefreshPreview();
+        ApplyAttachmentPreview();
         RefreshCharacterPage();
         RefreshAssets();
         RefreshAdvanced();
@@ -1282,8 +1135,7 @@ public sealed class AbilityLabWindow : EditorWindow
         RefreshRigState();
         UpdateTimelineControls();
         RefreshScenarioControls();
-        RefreshCompatibilityControls();
-        if (_grabSelected) RefreshInspector();
+        RefreshInspector();
         RestoreFocus(focusedName);
     }
 
@@ -1316,7 +1168,7 @@ public sealed class AbilityLabWindow : EditorWindow
         _packageStatusToggle.text = PackageStatus();
         Required<Button>("toolbar-undo").SetEnabled(_workspace.CanUndo);
         Required<Button>("toolbar-redo").SetEnabled(_workspace.CanRedo);
-        SetPackageControlsVisible(_activePage != "compatibility-page");
+        Required<Button>("toolbar-save").SetEnabled(_workspace.HasPackage);
     }
 
     private string PackageStatus()
@@ -1332,8 +1184,7 @@ public sealed class AbilityLabWindow : EditorWindow
     private void RefreshPreview()
     {
         _preview = _workspace.Preview;
-        if (_activePage == "compatibility-page")
-            return;
+        
         if (_workspace.HasPackage && _workspace.Preview?.IsAvailable == true)
             _workspace.PrepareScenarioPreview();
         if (_workspace.LiveDraftPackage != null && _preview?.IsAvailable == true)
@@ -1375,91 +1226,6 @@ public sealed class AbilityLabWindow : EditorWindow
             _lab.Playing = false;
         }
         RefreshRigState();
-    }
-    private bool IsLoadedLegacy()
-        => _lab != null && !_lab.IsPackagePreview && _lab.Character == CharacterClass.Nilus;
-
-    private void RefreshCompatibilityControls()
-    {
-        if (_compatibilityAuthority == null) return;
-        bool loaded = IsLoadedLegacy();
-        _compatibilityAuthority.text = loaded
-            ? _lab!.PreviewStatus
-            : "Compatibility Preview · Legacy authority · Read-only";
-        _legacySelector.SetEnabled(_compatibilityCharacters.Count > 0);
-        _legacyLoad.SetEnabled(_compatibilityCharacters.Count > 0);
-
-        _updatingControls = true;
-        if (loaded)
-        {
-            _legacySelector.SetValueWithoutNotify(_lab!.Character.ToString());
-            _compatibilityAirborne.SetValueWithoutNotify(_lab.Airborne);
-            _compatibilitySlotSelector.choices = AbilityLab.SlotNames.ToList();
-            int slotLabelIndex = Array.IndexOf(AbilityLab.SlotIndices, _lab.SlotIndex);
-            if (slotLabelIndex >= 0)
-                _compatibilitySlotSelector.SetValueWithoutNotify(AbilityLab.SlotNames[slotLabelIndex]);
-
-            int stageCount = _lab.CurrentSpec()?.Stages?.Length ?? 0;
-            var stageChoices = Enumerable.Range(0, stageCount).Select(index => $"Stage {index + 1}").ToList();
-            _compatibilityStageSelector.choices = stageChoices;
-            if (stageChoices.Count > 0)
-                _compatibilityStageSelector.SetValueWithoutNotify(stageChoices[Mathf.Clamp(_lab.StageIndex, 0, stageChoices.Count - 1)]);
-
-            int duration = _lab.TryGetStage(out var stage) ? stage.DurationTicks : 0;
-            int maxTick = Mathf.Max(0, duration - 1);
-            int tick = Mathf.Clamp(_lab.Tick, 0, maxTick);
-            _compatibilitySlider.lowValue = 0;
-            _compatibilitySlider.highValue = maxTick;
-            _compatibilitySlider.SetValueWithoutNotify(tick);
-            _compatibilityTick.text = $"Tick {tick}";
-            _compatibilityDuration.text = $"Duration {duration} ticks · {duration / AbilityLab.TickRate:0.00}s";
-            _compatibilityPlay.text = _lab.Playing ? "Pause" : "Play";
-            _compatibilityPlay.SetEnabled(stageCount > 0);
-            _compatibilityStageSelector.SetEnabled(stageCount > 0);
-            _compatibilitySlider.SetEnabled(stageCount > 0);
-            _compatibilityStepBack.SetEnabled(stageCount > 0);
-            _compatibilityStepForward.SetEnabled(stageCount > 0);
-        }
-        else
-        {
-            _compatibilitySlotSelector.choices = AbilityLab.SlotNames.ToList();
-            _compatibilityStageSelector.choices = new List<string>();
-            _compatibilitySlider.SetValueWithoutNotify(0);
-            _compatibilitySlider.lowValue = 0;
-            _compatibilitySlider.highValue = 0;
-            _compatibilityTick.text = "Tick 0";
-            _compatibilityDuration.text = "Duration —";
-            _compatibilityPlay.text = "Play";
-            _compatibilityPlay.SetEnabled(false);
-            _compatibilityAirborne.SetValueWithoutNotify(false);
-            _compatibilitySlotSelector.SetValueWithoutNotify(AbilityLab.SlotNames[0]);
-            _compatibilityStageSelector.SetValueWithoutNotify("");
-            _compatibilityStageSelector.SetEnabled(false);
-            _compatibilitySlider.SetEnabled(false);
-            _compatibilityStepBack.SetEnabled(false);
-            _compatibilityStepForward.SetEnabled(false);
-        }
-        _compatibilityAirborne.SetEnabled(loaded);
-        _compatibilitySlotSelector.SetEnabled(loaded);
-        _compatibilityShowHurtboxes.SetValueWithoutNotify(_lab?.ShowHurtboxes ?? true);
-        _compatibilityShowHitboxes.SetValueWithoutNotify(_lab?.ShowHitboxes ?? true);
-        _compatibilityShowBakedBones.SetValueWithoutNotify(_lab?.ShowBakedBones ?? false);
-        _compatibilityShowDummy.SetValueWithoutNotify(_lab?.ShowDummy ?? false);
-        _compatibilityShowHurtboxes.SetEnabled(loaded);
-        _compatibilityShowHitboxes.SetEnabled(loaded);
-        _compatibilityShowBakedBones.SetEnabled(loaded);
-        _compatibilityShowDummy.SetEnabled(loaded);
-        _updatingControls = false;
-    }
-
-    private void SetCompatibilityTickDelta(int delta)
-    {
-        if (_lab == null || !IsLoadedLegacy() || !_lab.TryGetStage(out var stage)) return;
-        int maxTick = Mathf.Max(0, stage.DurationTicks - 1);
-        int next = Mathf.Clamp(_lab.Tick + delta, 0, maxTick);
-        _lab.SetTick((ushort)next);
-        RefreshCompatibilityControls();
-        SceneView.RepaintAll();
     }
 
     private void BuildMoveButtons(bool airborne)
@@ -1841,7 +1607,7 @@ public sealed class AbilityLabWindow : EditorWindow
             .ToList();
         foreach (var diagnostic in unique)
             _diagnosticsPanel.Add(new Label($"{diagnostic.Code} · {diagnostic.Path}\n{diagnostic.Message}"));
-        _diagnosticsPanel.style.display = unique.Count > 0 && _activePage != "compatibility-page"
+        _diagnosticsPanel.style.display = unique.Count > 0
             ? DisplayStyle.Flex
             : DisplayStyle.None;
     }
@@ -1849,11 +1615,13 @@ public sealed class AbilityLabWindow : EditorWindow
     private void RefreshRigState()
     {
         _lab = FindLab();
-        bool showCreateRig = _activePage != "compatibility-page" && _lab == null;
+        bool showCreateRig = _lab == null;
         _createLabRig.style.display = showCreateRig ? DisplayStyle.Flex : DisplayStyle.None;
     }
     private void UpdateTimelineControls()
     {
+        RefreshPhaseControls();
+        if (UpdatePhaseTimeline()) return;
         if (_lab?.IsScenarioPreview == true && _lab.Scenario != null)
         {
             var result = _lab.Scenario;
@@ -1987,6 +1755,13 @@ public sealed class AbilityLabWindow : EditorWindow
     private void ApplyCumulativeTick(int cumulativeTick)
     {
         if (_updatingControls || _lab == null) return;
+        if (_lab.PhasePreviewActive && !_lab.IsScenarioPreview)
+        {
+            _lab.SetPhaseTick(cumulativeTick);
+            UpdateTimelineControls();
+            SceneView.RepaintAll();
+            return;
+        }
         if (_lab.IsScenarioPreview && _lab.Scenario != null)
         {
             _lab.SeekScenario(Mathf.Clamp(cumulativeTick, 0, _lab.Scenario.Options.LastFrame));
@@ -2023,6 +1798,11 @@ public sealed class AbilityLabWindow : EditorWindow
     private void SetTickDelta(int delta)
     {
         if (_lab == null) return;
+        if (_lab.PhasePreviewActive && !_lab.IsScenarioPreview)
+        {
+            ApplyCumulativeTick(_lab.PhaseTick + delta);
+            return;
+        }
         if (_lab.IsScenarioPreview && _lab.Scenario != null)
         {
             ApplyCumulativeTick(_lab.ScenarioFrame + delta);
@@ -2035,7 +1815,7 @@ public sealed class AbilityLabWindow : EditorWindow
     private void OnRootKeyDown(KeyDownEvent evt)
     {
         if (IsTextInput(evt.target as VisualElement)) return;
-        bool packageMode = _activePage != "compatibility-page" && _workspace.HasPackage;
+        bool packageMode = _workspace.HasPackage;
         if (evt.keyCode == KeyCode.Escape)
         {
             _timelineTrack.CancelDrag();
@@ -2156,12 +1936,18 @@ public sealed class AbilityLabWindow : EditorWindow
     private void RefreshInspector()
     {
         _inspector.Clear();
+        AddAttachmentAuthoring();
         _moveTimeline.style.display = _grabSelected && _lab?.IsScenarioPreview != true
             ? DisplayStyle.None
             : DisplayStyle.Flex;
         if (_lab?.IsScenarioPreview == true && !_grabSelected)
         {
             _inspector.Add(new Label("Recorded Shared scenario preview · timeline and outcomes are read-only. Exit to authoring to edit move stages."));
+            return;
+        }
+        if (_lab?.PhasePreviewActive == true && !_grabSelected)
+        {
+            _inspector.Add(new Label("Presentation-only phase preview. Choose Timeline to edit gameplay operations."));
             return;
         }
         if (_grabSelected)
@@ -2314,6 +2100,25 @@ public sealed class AbilityLabWindow : EditorWindow
         };
         addGravityWindow.tooltip = "Temporarily scales airborne gravity over a fixed timeline window.";
         moveGroup.Add(addGravityWindow);
+        var addTargetedLeap = new Button(() =>
+        {
+            if (_lab == null || !_workspace.AddTargetedLeap(_lab.SelectedSlotId, _lab.StageIndex)) return;
+            UpdateTimelineControls();
+            _selectedOperation = _timelineProjection?.Stages[_lab.StageIndex].Operations.LastOrDefault();
+            _timelineTrack.SelectedOperation = _selectedOperation;
+            RefreshInspector();
+            SceneView.RepaintAll();
+        })
+        {
+            text = "Add targeted leap"
+        };
+        addTargetedLeap.tooltip = "Hold to aim, leap toward the target, then trigger a landing hitbox and recovery.";
+        addTargetedLeap.SetEnabled(!slot.Timeline.Stages
+            .SelectMany(phase => phase.Operations)
+            .OfType<StartCapabilityOperationSource>()
+            .Any(op => op.CapabilityId == CharacterPackageCompiler.TargetedLeapCapabilityId));
+        moveGroup.Add(addTargetedLeap);
+
 
         var presentationIds = _workspace.Draft.PresentationIds ?? Array.Empty<string>();
         var addPresentation = new Button(() =>
@@ -2403,6 +2208,27 @@ public sealed class AbilityLabWindow : EditorWindow
                     GravityScale = Mathf.Clamp01(value)
                 }));
         }
+        else if (operation.Source is ArmorWindowOperationSource armor)
+        {
+            group.Add(new Label("Takes damage without ordinary knockback or hitstun; grabs still work."));
+            AddDelayedInteger(group, "Start tick", armor.Tick,
+                value => CommitArmorWindow(current => current with
+                {
+                    Tick = (ushort)Mathf.Clamp(value, 0,
+                        Mathf.Max(0, CurrentStage().DurationTicks - current.DurationTicks))
+                }));
+            AddDelayedInteger(group, "Duration ticks", armor.DurationTicks,
+                value => CommitArmorWindow(current => current with
+                {
+                    DurationTicks = (ushort)Mathf.Clamp(value, 1,
+                        Mathf.Max(1, CurrentStage().DurationTicks - current.Tick))
+                }));
+        }
+        else if (operation.Source is StartCapabilityOperationSource targeted &&
+            targeted.Parameters is TargetedLeapCapabilityParameters leap)
+        {
+            AddTargetedLeapInspector(group, operation, leap);
+        }
         else if (operation.Source is StartCapabilityOperationSource capability)
         {
             AddCapabilityPresentationSelector(group, operation, capability);
@@ -2481,6 +2307,71 @@ public sealed class AbilityLabWindow : EditorWindow
                     Mathf.Max(1, CurrentStage().DurationTicks - operation.Source.Tick)),
             }));
         group.Add(placementGroup);
+    }
+
+    private void AddTargetedLeapInspector(
+        Foldout group, AbilityLabOperationProjection operation, TargetedLeapCapabilityParameters leap)
+    {
+        group.Add(new Label("Hold to aim; release launches toward the selected distance. The impact occurs on landing, not at a fixed timeline tick."));
+        AddDelayedInteger(group, "Start tick", operation.Source.Tick,
+            value => CommitCapabilityStart(operation, value));
+        AddDelayedInteger(group, "Aim limit ticks (0 = unlimited)", leap.MaxAimTicks,
+            value => CommitTargetedLeap(p => p with { MaxAimTicks = (ushort)Mathf.Clamp(value, 0, ushort.MaxValue) }));
+        AddDelayedInteger(group, "Flight limit ticks", leap.MaxFlightTicks,
+            value => CommitTargetedLeap(p => p with { MaxFlightTicks = (ushort)Mathf.Clamp(value, 1, ushort.MaxValue) }));
+        AddDelayedFloat(group, "Minimum target range (m)", leap.MinRange,
+            value => CommitTargetedLeap(p => p with { MinRange = Mathf.Max(0f, value) }));
+        AddDelayedFloat(group, "Maximum target range (m)", leap.MaxRange,
+            value => CommitTargetedLeap(p => p with { MaxRange = Mathf.Max(0f, value) }));
+        AddDelayedFloat(group, "Vertical launch speed (m/s)", leap.LaunchVerticalSpeed,
+            value => CommitTargetedLeap(p => p with { LaunchVerticalSpeed = Mathf.Max(0.01f, value) }));
+        AddDelayedInteger(group, "Landing animation seek tick", leap.LandingSeekTick,
+            value => CommitTargetedLeap(p => p with { LandingSeekTick = (ushort)Mathf.Clamp(value, 0, ushort.MaxValue) }));
+        AddDelayedInteger(group, "Landing recovery ticks", leap.RecoveryTicks,
+            value => CommitTargetedLeap(p => p with { RecoveryTicks = (ushort)Mathf.Clamp(value, 1, ushort.MaxValue) }));
+
+        var landing = new Foldout { text = "On landing · hitbox", value = false };
+        AddDelayedInteger(landing, "Hitstun gate (0 = off)", leap.Hitbox.StunTicks,
+            value => CommitHitbox(h => h with { StunTicks = (ushort)Mathf.Clamp(value, 0, ushort.MaxValue) }));
+        AddDelayedInteger(landing, "Active duration ticks", leap.Hitbox.DurationTicks,
+            value => CommitHitbox(h => h with { DurationTicks = (ushort)Mathf.Clamp(value, 1, ushort.MaxValue) }));
+        AddToggle(landing, "Interruptible", leap.Hitbox.Interruptible,
+            value => CommitHitbox(h => h with { Interruptible = value }));
+        AddDelayedInteger(landing, "Hit group", leap.Hitbox.HitGroup,
+            value => CommitHitbox(h => h with { HitGroup = (byte)Mathf.Clamp(value, 0, byte.MaxValue) }));
+        var direction = new EnumField("Knockback direction", leap.Hitbox.KnockbackDirection);
+        direction.RegisterValueChangedCallback(evt =>
+            CommitHitbox(h => h with { KnockbackDirection = (AuthoringKnockbackDirection)evt.newValue }));
+        landing.Add(direction);
+        AddHitboxCombat(landing, leap.Hitbox);
+        AddHitboxShape(landing, leap.Hitbox);
+        AddHitboxAttachment(landing, leap.Hitbox);
+        group.Add(landing);
+    }
+
+    private void CommitTargetedLeap(Func<TargetedLeapCapabilityParameters, TargetedLeapCapabilityParameters> edit)
+    {
+        if (_updatingControls || _lab == null ||
+            _selectedOperation?.Source is not StartCapabilityOperationSource operation ||
+            operation.Parameters is not TargetedLeapCapabilityParameters parameters ||
+            !_workspace.TryResolveCanonicalSlot(_lab.SelectedSlotId, out int slotIndex, out _))
+            return;
+        int stageIndex = _selectedOperation.SourceStageIndex;
+        int operationIndex = _selectedOperation.SourceOperationIndex;
+        _updatingControls = true;
+        bool accepted;
+        try
+        {
+            accepted = _workspace.ReplaceOperation(slotIndex, stageIndex, operationIndex,
+                operation with { Parameters = edit(parameters) });
+        }
+        finally { _updatingControls = false; }
+        if (!accepted) return;
+        UpdateTimelineControls();
+        _selectedOperation = FindProjectedOperation(stageIndex, operationIndex);
+        _timelineTrack.SelectedOperation = _selectedOperation;
+        RefreshInspector();
+        SceneView.RepaintAll();
     }
 
     private void AddCapabilityPresentationSelector(
@@ -2731,8 +2622,39 @@ public sealed class AbilityLabWindow : EditorWindow
         SceneView.RepaintAll();
     }
 
+    private void CommitArmorWindow(Func<ArmorWindowOperationSource, ArmorWindowOperationSource> edit)
+    {
+        if (_updatingControls || _lab == null ||
+            _selectedOperation?.Source is not ArmorWindowOperationSource original ||
+            !_workspace.TryResolveCanonicalSlot(_lab.SelectedSlotId, out int slotIndex, out _))
+            return;
+        int stageIndex = _selectedOperation.SourceStageIndex;
+        int operationIndex = _selectedOperation.SourceOperationIndex;
+        _updatingControls = true;
+        bool accepted;
+        try
+        {
+            accepted = _workspace.ReplaceOperation(
+                slotIndex, stageIndex, operationIndex, edit(original));
+        }
+        finally { _updatingControls = false; }
+        if (!accepted) return;
+        UpdateTimelineControls();
+        _selectedOperation = FindProjectedOperation(stageIndex, operationIndex);
+        _timelineTrack.SelectedOperation = _selectedOperation;
+        RefreshInspector();
+        SceneView.RepaintAll();
+    }
+
+
     private void CommitHitbox(Func<HitboxSource, HitboxSource> edit)
     {
+        if (_selectedOperation?.Source is StartCapabilityOperationSource capability &&
+            capability.Parameters is TargetedLeapCapabilityParameters)
+        {
+            CommitTargetedLeap(p => p with { Hitbox = edit(p.Hitbox) });
+            return;
+        }
         if (_updatingControls || _lab == null || _selectedOperation?.Source is not SpawnHitboxOperationSource original) return;
         int stageIndex = _selectedOperation.SourceStageIndex;
         int operationIndex = _selectedOperation.SourceOperationIndex;
@@ -2776,7 +2698,7 @@ public sealed class AbilityLabWindow : EditorWindow
     {
         var timing = new Foldout { text = "Timing", value = true };
         AddDelayedInteger(timing, "Start tick", startTick, CommitHitboxStart);
-        AddDelayedInteger(timing, "Stun ticks", value.StunTicks, v => CommitHitbox(h => h with { StunTicks = (ushort)Mathf.Clamp(v, 0, ushort.MaxValue) }));
+        AddDelayedInteger(timing, "Hitstun gate (0 = off)", value.StunTicks, v => CommitHitbox(h => h with { StunTicks = (ushort)Mathf.Clamp(v, 0, ushort.MaxValue) }));
         AddDelayedInteger(timing, "Active duration ticks", value.DurationTicks, v => CommitHitbox(h => h with { DurationTicks = (ushort)Mathf.Clamp(v, 0, ushort.MaxValue) }));
         AddToggle(timing, "Interruptible", value.Interruptible, v => CommitHitbox(h => h with { Interruptible = v }));
         AddDelayedInteger(timing, "Hit group", value.HitGroup, v => CommitHitbox(h => h with { HitGroup = (byte)Mathf.Clamp(v, 0, byte.MaxValue) }));
@@ -2790,6 +2712,8 @@ public sealed class AbilityLabWindow : EditorWindow
         AddDelayedFloat(combat, "Angle", value.Angle, v => CommitHitbox(h => h with { Angle = v }));
         AddDelayedFloat(combat, "Base knockback", value.BaseKnockback, v => CommitHitbox(h => h with { BaseKnockback = v }));
         AddDelayedFloat(combat, "Knockback growth", value.KnockbackGrowth, v => CommitHitbox(h => h with { KnockbackGrowth = v }));
+        AddDelayedInteger(combat, "Fixed hitstun ticks (0 = automatic)", value.FixedHitstunTicks,
+            v => CommitHitbox(h => h with { FixedHitstunTicks = (ushort)Mathf.Clamp(v, 0, 240) }));
         group.Add(combat);
     }
 

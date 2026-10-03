@@ -10,19 +10,14 @@ using UnityEngine.UIElements;
 namespace SlopArena.Client.UI
 {
     /// <summary>
-    /// Combat HUD (spec §1-§3), rebuilt on UI Toolkit.
+    /// Combat HUD, rebuilt on UI Toolkit.
     ///
-    /// Two layers:
-    ///  • Overhead — one screen-space-tracked panel per player (badge, damage %,
-    ///    stocks), clamped to each player's simulation position via
-    ///    Camera.WorldToScreenPoint → RuntimePanelUtils.ScreenToPanel. Panels are
-    ///    built at runtime from the roster, so 1v1, 2/3/4-player PvP all adapt
-    ///    with no per-count UXML variants.
-    ///  • Kit diamonds — local normals 1–4 and specials A/E/R/F.
-    ///    Labels use effective Input System bindings; cooldown data remains read-only.
+    /// Player cards are built from the roster, so 1v1 and 2/3/4-player matches
+    /// adapt without per-count UXML variants. Kit diamonds use effective Input
+    /// System bindings; cooldown data remains read-only.
     ///
     /// Juice: cooldown-ready pulse (1.15x / 0.15s) + white flash,
-    /// and a damage-taken hit-flash on the overhead percent.
+    /// and a damage-taken hit-flash on the card percent.
     /// </summary>
     public class HUDManager : MonoBehaviour
     {
@@ -32,7 +27,7 @@ namespace SlopArena.Client.UI
         /// <summary>The HUD's UI document — the explicit host for match-surface
         /// overlays (pause menu) so nothing searches for a first document.</summary>
         public UIDocument? Document => _uiDocument;
-        /// <summary>Identity required by both the tracked readout and broadcast card.</summary>
+        /// <summary>Identity required by the tracked damage readout and broadcast card.</summary>
         public readonly struct HudPlayer
         {
             public readonly ulong EntityId;
@@ -53,16 +48,13 @@ namespace SlopArena.Client.UI
         {
             public VisualElement Root = null!;
             public Label Damage = null!;
-            public Label DamageOutline = null!;
             public VisualElement[] StockIcons = Array.Empty<VisualElement>();
             public Label StockCountLabel = null!;
             public Label StockToast = null!;
             public float StockToastTimer;
-            public Color IdentityColor = Color.white;
-            public bool UseIdentityColor;
             public Color TierColor = Color.white;
-            public Vector2 SmoothPos;
             public ushort PrevDamage;
+            public int PrevStocks = -1;
             public float HitFlashTimer;
         }
 
@@ -74,6 +66,10 @@ namespace SlopArena.Client.UI
             public readonly Label Key;
             public readonly Image Button;
             public readonly VisualElement Flash;
+            public readonly VisualElement Icon;
+            public Texture2D GroundIcon;
+            public Texture2D AirIcon;
+            public Texture2D DisplayedIcon;
             public ushort MaxCooldown;
             public ushort PrevCooldown;
             public float PulseTimer;
@@ -90,6 +86,8 @@ namespace SlopArena.Client.UI
                 Button = root.Q<Image>(root.name + "-button");
                 Button.scaleMode = ScaleMode.ScaleToFit;
                 Flash = root.Q<VisualElement>(flashName);
+                Icon = root.Q<VisualElement>(root.name + "-icon");
+                Icon.style.backgroundImage = StyleKeyword.None;
             }
         }
 
@@ -125,13 +123,9 @@ namespace SlopArena.Client.UI
             new("ab-f", 5, "SlotF"),
         };
 
-        // Stock icons beyond this many become a "×N" count label instead (MaxStocks ≤ 99).
+        // More than eight lives use the explicit count without overflowing the card.
         private const int MaxStockIcons = 8;
 
-        /// <summary>Fixed screen-space gap (px) above the character's projected center the
-        /// overhead panel hangs at — camera-pitch independent (spec §3.1).</summary>
-        private const float OverheadScreenOffsetPx = 45f;
-        private const float TrackLerpSpeed = 25f;
         private const float JuiceDuration = 0.15f;
 
         private static readonly Color[] BadgeColors;
@@ -156,8 +150,6 @@ namespace SlopArena.Client.UI
         private ulong _localEntityId;
         private int _maxStocks;
         private CharacterDefinition _charDef;
-        private UnityEngine.Camera _camera;
-        private VisualElement _overheadLayer;
         private VisualElement _billboardLayer;
         private VisualElement _kitDiamonds;
         public VisualElement TargetingRoot
@@ -167,7 +159,6 @@ namespace SlopArena.Client.UI
         private Label _networkStatsLabel;
         private NetworkClient _networkClient;
 
-        private readonly Dictionary<ulong, OverheadPanel> _panels = new();
         private readonly Dictionary<ulong, OverheadPanel> _billboardPanels = new();
 
         private ActionSlot[] _abilitySlots = Array.Empty<ActionSlot>();
@@ -213,30 +204,17 @@ namespace SlopArena.Client.UI
             _networkStatsLabel.style.color = Color.white;
             _networkStatsLabel.style.unityTextAlign = TextAnchor.UpperRight;
             root.Add(_networkStatsLabel);
-            _overheadLayer = root.Q<VisualElement>("overhead-layer");
             _billboardLayer = root.Q<VisualElement>("player-billboard");
             _kitDiamonds = root.Q<VisualElement>("kit-diamonds");
 
             // Rebuild player panels from the roster (badge color by roster position).
-            _overheadLayer?.Clear();
-            _panels.Clear();
             _billboardLayer?.Clear();
             _billboardPanels.Clear();
             for (int i = 0; i < players.Count; i++)
             {
                 var p = players[i];
-
-                if (!p.IsLocal)
-                {
-                    // TargetLockIndicator owns the only in-world opponent damage readout.
-                    // Keep the scoreboard/billboard percent; do not create a duplicate
-                    // floating VFX percent here.
-                }
-                else
-                {
+                if (p.IsLocal)
                     _localEntityId = p.EntityId;
-                }
-
                 var billboard = BuildBillboardPanel(p, i);
                 _billboardPanels[p.EntityId] = billboard;
                 _billboardLayer?.Add(billboard.Root);
@@ -263,7 +241,6 @@ namespace SlopArena.Client.UI
                     $"{d.Name}-cooldown", $"{d.Name}-timer", $"{d.Name}-key", $"{d.Name}-flash");
             }
 
-            _promptAtlas ??= new InputPromptAtlas();
             UpdateBindingPrompts();
         }
 
@@ -278,19 +255,20 @@ namespace SlopArena.Client.UI
                 var slot = _abilitySlots[i];
                 string action = _showGamepadPrompts && i >= 4
                     ? AbilitySlotDefs[i - 4].Action : AbilitySlotDefs[i].Action;
-                string label = HumanInputActions.BindingLabel(action, group);
                 string path = BindingPath(action, group);
-                if (!_showGamepadPrompts)
-                    label = InputPromptAtlas.KeyboardDisplayLabel(path, label);
-                bool hasButton = _showGamepadPrompts
-                    ? _promptAtlas.TryXbox(path, out var buttonGlyph)
-                    : _promptAtlas.TryKeyboard(path, label, out buttonGlyph);
+                var buttonGlyph = default(InputPromptAtlas.Glyph);
+                bool hasButton = _showGamepadPrompts &&
+                    (_promptAtlas ??= new InputPromptAtlas()).TryXbox(path, out buttonGlyph);
                 slot.Button.style.display = hasButton ? DisplayStyle.Flex : DisplayStyle.None;
                 slot.Key.style.display = hasButton ? DisplayStyle.None : DisplayStyle.Flex;
                 if (hasButton)
                     SetPromptImage(slot.Button, buttonGlyph);
                 else
-                    slot.Key.text = label;
+                {
+                    string label = HumanInputActions.BindingLabel(action, group);
+                    slot.Key.text = _showGamepadPrompts
+                        ? label : InputPromptAtlas.KeyboardDisplayLabel(path, label);
+                }
             }
         }
 
@@ -306,30 +284,6 @@ namespace SlopArena.Client.UI
             image.uv = glyph.Uv;
         }
 
-        private OverheadPanel BuildOverheadPanel(HudPlayer p, int colorIndex)
-        {
-            var root = new VisualElement { name = $"overhead-{p.EntityId}" };
-            root.AddToClassList("overhead-panel");
-
-            var identityColor = BadgeColors[colorIndex % BadgeColors.Length];
-            var damageOutline = new Label("0%");
-            damageOutline.AddToClassList("overhead-damage-outline");
-            root.Add(damageOutline);
-
-            var damage = new Label("0%");
-            damage.AddToClassList("overhead-damage");
-            damage.style.color = identityColor;
-            root.Add(damage);
-
-            return new OverheadPanel
-            {
-                Root = root,
-                DamageOutline = damageOutline,
-                Damage = damage,
-                IdentityColor = identityColor,
-                UseIdentityColor = true,
-            };
-        }
 
         private OverheadPanel BuildBillboardPanel(HudPlayer p, int colorIndex)
         {
@@ -370,13 +324,14 @@ namespace SlopArena.Client.UI
             var fighterName = new Label(p.Class.ToString().ToUpperInvariant());
             fighterName.AddToClassList("fighter-name");
             details.Add(fighterName);
+            copy.Add(details);
 
             var damage = new Label("0%");
             damage.AddToClassList("overhead-damage");
-            var panel = new OverheadPanel { Root = root, Damage = damage, IdentityColor = identityColor };
-            AddStocks(panel, details);
-            copy.Add(details);
             copy.Add(damage);
+
+            var panel = new OverheadPanel { Root = root, Damage = damage };
+            AddStocks(panel, copy);
             root.Add(copy);
 
             var stockToast = new Label();
@@ -394,27 +349,37 @@ namespace SlopArena.Client.UI
 
             var stockRow = new VisualElement();
             stockRow.AddToClassList("stock-row");
-            parent.Add(stockRow);
+            var label = new Label("LIVES");
+            label.AddToClassList("stock-label");
+            stockRow.Add(label);
+
+            var count = new Label($"×{_maxStocks}") { name = "stock-count" };
+            count.AddToClassList("stock-count");
+            stockRow.Add(count);
+            panel.StockCountLabel = count;
 
             if (_maxStocks <= MaxStockIcons)
             {
+                var tickets = new VisualElement { name = "stock-tickets" };
+                tickets.AddToClassList("stock-tickets");
+                tickets.EnableInClassList("many-stocks", _maxStocks > 4);
                 panel.StockIcons = new VisualElement[_maxStocks];
                 for (int i = 0; i < _maxStocks; i++)
                 {
                     var icon = new VisualElement();
                     icon.AddToClassList("stock-icon");
-                    stockRow.Add(icon);
+                    var strike = new VisualElement { name = "stock-strike" };
+                    strike.AddToClassList("stock-strike");
+                    icon.Add(strike);
+                    tickets.Add(icon);
                     panel.StockIcons[i] = icon;
                 }
+                stockRow.Add(tickets);
             }
-            else
-            {
-                var count = new Label($"×{_maxStocks}");
-                count.AddToClassList("stock-count");
-                stockRow.Add(count);
-                panel.StockCountLabel = count;
-            }
+
+            parent.Add(stockRow);
         }
+
 
         /// <summary>
         /// Provide the character definition: resolves ability icons, per-slot max
@@ -423,6 +388,7 @@ namespace SlopArena.Client.UI
         public void SetCharacterDefinition(CharacterDefinition def)
         {
             _charDef = def;
+            bool isGrounded = _getState == null || _localEntityId == 0 || _getState(_localEntityId).IsGrounded;
 
             if (_abilitySlots == null || _abilitySlots.Length == 0) return;
             for (int i = 0; i < _abilitySlots.Length; i++)
@@ -439,46 +405,56 @@ namespace SlopArena.Client.UI
                 slot.Locked = grounded == null && airborne == null;
                 slot.Root.EnableInClassList("locked", slot.Locked);
 
-                LoadSlotIcon(slot.Root.Q<VisualElement>($"{d.Name}-icon"), grounded ?? airborne);
+                slot.GroundIcon = LoadSlotIcon(grounded ?? airborne, airborne: false);
+                slot.AirIcon = LoadSlotIcon(airborne, airborne: true);
+                SetSlotIcon(slot, isGrounded ? slot.GroundIcon : slot.AirIcon);
             }
 
         }
 
-        private void LoadSlotIcon(VisualElement icon, AbilitySpec spec)
+        private Texture2D LoadSlotIcon(AbilitySpec spec, bool airborne)
         {
-            if (icon == null || _charDef == null) return;
-            if (spec == null || string.IsNullOrEmpty(spec.IconName)) return;
-
-            string path = $"Icons/{_charDef.Class}/{spec.IconName}";
-            var tex = Resources.Load<Texture2D>(path);
-            if (tex != null)
-                icon.style.backgroundImage = new StyleBackground(tex);
-            // No icon art yet — the USS .slot-icon-inner placeholder remains. Silent on purpose.
+            if (spec == null || string.IsNullOrEmpty(spec.IconName)) return null;
+            string path = $"Icons/{_charDef.Class}/";
+            if (airborne)
+            {
+                var variant = Resources.Load<Texture2D>($"{path}Air/{spec.IconName}");
+                if (variant != null) return variant;
+            }
+            return Resources.Load<Texture2D>(path + spec.IconName);
         }
 
-        /// <summary>Apply damage % + stocks to one panel (overhead or scoreboard).</summary>
+        private static void SetSlotIcon(ActionSlot slot, Texture2D texture)
+        {
+            if (slot.DisplayedIcon == texture) return;
+            slot.DisplayedIcon = texture;
+            slot.Icon.style.backgroundImage = texture != null
+                ? new StyleBackground(texture)
+                : new StyleBackground(StyleKeyword.None);
+        }
+
+        /// <summary>Apply damage % + stocks to one scoreboard card.</summary>
         private void UpdatePanel(OverheadPanel panel, CharacterState state)
         {
             int dmg = (int)state.DamagePercent;
-            panel.TierColor = panel.UseIdentityColor ? panel.IdentityColor : DamageColor(dmg);
-            panel.Damage.text = $"{dmg}%";
-            if (panel.DamageOutline != null) panel.DamageOutline.text = panel.Damage.text;
-            if (dmg > panel.PrevDamage) panel.HitFlashTimer = JuiceDuration;
+            panel.TierColor = DamageColor(dmg);
+            if (dmg != panel.PrevDamage)
+                panel.Damage.text = $"{dmg}%";
+            if (dmg > panel.PrevDamage && !ClientSettingsService.Instance.ReducedFlashing)
+                panel.HitFlashTimer = JuiceDuration;
             panel.PrevDamage = (ushort)dmg;
 
             if (_maxStocks > 0)
             {
-                int left = Mathf.Max(0, _maxStocks - state.Deaths);
-                if (panel.StockIcons.Length > 0)
-                {
-                    for (int i = 0; i < panel.StockIcons.Length; i++)
-                        panel.StockIcons[i].EnableInClassList("lost", i >= left);
-                }
-                else if (panel.StockCountLabel != null)
+                int left = Mathf.Clamp(_maxStocks - state.Deaths, 0, _maxStocks);
+                if (left != panel.PrevStocks)
                 {
                     panel.StockCountLabel.text = $"×{left}";
+                    for (int i = 0; i < panel.StockIcons.Length; i++)
+                        panel.StockIcons[i].EnableInClassList("lost", i >= left);
+                    panel.Root.EnableInClassList("eliminated", left == 0);
+                    panel.PrevStocks = left;
                 }
-                panel.Root.EnableInClassList("eliminated", left <= 0);
             }
         }
 
@@ -519,18 +495,14 @@ namespace SlopArena.Client.UI
 
         /// <summary>
         /// Refresh all HUD data from the simulation. Called by the owning MatchBase
-        /// each fixed tick. Overhead panel screen positions are smoothed in LateUpdate.
+        /// each fixed tick. The player cards are updated from simulation state.
         /// </summary>
         public void Refresh()
         {
             if (_getState == null || _uiDocument == null) return;
 
-            // Floating overhead panels (opponents) + bottom scoreboard (everyone).
-            foreach (var kv in _panels)
-                UpdatePanel(kv.Value, _getState(kv.Key));
             foreach (var kv in _billboardPanels)
                 UpdatePanel(kv.Value, _getState(kv.Key));
-
             // Kit diamonds — local player only.
             if (_localEntityId != 0)
             {
@@ -540,6 +512,7 @@ namespace SlopArena.Client.UI
                 for (int i = 0; i < _abilitySlots.Length; i++)
                 {
                     var slot = _abilitySlots[i];
+                    SetSlotIcon(slot, state.IsGrounded ? slot.GroundIcon : slot.AirIcon);
                     if (slot.Locked) continue;
                     UpdateCooldownSlot(slot, state.GetCooldown((byte)(AbilitySlotDefs[i].SlotIndex + 1)));
                 }
@@ -616,11 +589,10 @@ namespace SlopArena.Client.UI
 
             for (int i = 0; i < _abilitySlots.Length; i++) TickSlotJuice(_abilitySlots[i], dt);
 
-            foreach (var panel in _panels.Values)
-                TickPanelJuice(panel, dt);
             foreach (var panel in _billboardPanels.Values)
                 TickPanelJuice(panel, dt);
         }
+
         private void UpdateNetworkStats()
         {
             if (_networkStatsLabel == null) return;
@@ -647,8 +619,8 @@ namespace SlopArena.Client.UI
 
         private static void TickPanelJuice(OverheadPanel panel, float dt)
         {
-            bool flashing = panel.HitFlashTimer > 0f;
-            if (flashing) panel.HitFlashTimer -= dt;
+            bool flashing = panel.HitFlashTimer > 0f && !ClientSettingsService.Instance.ReducedFlashing;
+            if (panel.HitFlashTimer > 0f) panel.HitFlashTimer -= dt;
             panel.Damage.style.color = flashing ? Color.white : panel.TierColor;
 
             if (panel.StockToastTimer > 0f)
@@ -681,66 +653,12 @@ namespace SlopArena.Client.UI
             }
         }
 
-        /// <summary>Track overhead panels to player sim positions (after the camera moves).</summary>
-        /// <summary>
-        /// Resolve the render camera for screen→panel projection. Camera.main only works when
-        /// the match camera is tagged MainCamera; the Cinemachine-driven CameraMount camera is
-        /// not, so fall back to any enabled, active camera (the one real Unity camera in a match).
-        /// </summary>
-        private static UnityEngine.Camera FindRenderCamera()
-        {
-            var main = UnityEngine.Camera.main;
-            if (main != null) return main;
-            foreach (var c in UnityEngine.Camera.allCameras)
-                if (c != null && c.enabled && c.gameObject.activeInHierarchy)
-                    return c;
-            return null;
-        }
-
-        private void LateUpdate()
-        {
-            if (_panels.Count == 0 || _uiDocument == null) return;
-            _camera ??= FindRenderCamera();
-            if (_camera == null) return;
-
-            if (_uiDocument.rootVisualElement.panel is not UnityEngine.UIElements.IPanel runtimePanel) return;
-
-            float dt = Time.deltaTime;
-            foreach (var kv in _panels)
-            {
-                var state = _getState(kv.Key);
-                var panel = kv.Value;
-
-                // Project the character CENTER, then hang the panel at a fixed screen-space
-                // gap above it — camera-pitch independent, so it stays over the head.
-                Vector3 world = new UnityEngine.Vector3(state.PX, state.PY, state.PZ);
-                Vector3 screenPoint = _camera.WorldToScreenPoint(world);
-                bool visible = screenPoint.z > 0;
-
-                if (visible)
-                {
-                    Vector2 target = RuntimePanelUtils.ScreenToPanel(runtimePanel, new Vector2(screenPoint.x, screenPoint.y));
-                    // ScreenToPanel passes the screen Y through (bottom-left origin), but
-                    // style.top is measured from the top: flip, then lift above the head.
-                    target.y = runtimePanel.visualTree.layout.height - target.y - OverheadScreenOffsetPx;
-                    panel.SmoothPos = Vector2.Lerp(panel.SmoothPos, target, dt * TrackLerpSpeed);
-                    panel.Root.style.left = panel.SmoothPos.x;
-                    panel.Root.style.top = panel.SmoothPos.y;
-                    // Center the panel horizontally, its bottom edge at the tracked point.
-                    panel.Root.style.translate = new Translate(
-                        new Length(-50, LengthUnit.Percent),
-                        new Length(-100, LengthUnit.Percent));
-                }
-
-                panel.Root.style.display = visible ? DisplayStyle.Flex : DisplayStyle.None;
-            }
-        }
 
         // ── Small helpers ───────────────────────────────────────────────────
 
 
         /// <summary>Damage-percent tier colors (spec §3.1): white &lt;40, orange 40-89, crimson 90+.</summary>
-        private static Color DamageColor(int percent)
+        internal static Color DamageColor(int percent)
             => percent < 40 ? Color.white : percent < 90 ? OrangeDamage : CrimsonDamage;
     }
 }

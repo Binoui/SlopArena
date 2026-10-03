@@ -1,5 +1,6 @@
+using System;
+using System.Linq;
 using Xunit;
-using SlopArena.Shared.Abilities;
 
 namespace SlopArena.Shared.Tests;
 
@@ -255,7 +256,7 @@ public class FightGuyAbilityTests
     {
         var s = new CharacterState { EntityId = 1, PX = 0, PY = 5f, PZ = 0, IsGrounded = false, State = ActionState.Idle, JumpsLeft = 2, AirDodgesLeft = 1, StatusFlags = (1 << 2), StatusRemainingTicks = 10 };
         var sim = TestHelpers.MakeSim();
-        sim.RegisterEntity(1, TestHelpers.FightGuyDef, s);
+        sim.RegisterEntity(1, TestHelpers.EngineDef, s);
         for (int i = 0; i < 10; i++) TestHelpers.TickDefault(sim, 1);
         var a = sim.GetState(1);
         Assert.Equal(0u, a.StatusRemainingTicks);
@@ -267,7 +268,7 @@ public class FightGuyAbilityTests
     {
         var s = new CharacterState { EntityId = 1, PX = 0, PY = 5f, PZ = 0, IsGrounded = false, State = ActionState.Idle, JumpsLeft = 2, AirDodgesLeft = 1, StatusFlags = (1 << 2), StatusRemainingTicks = 10 };
         var sim = TestHelpers.MakeSim();
-        sim.RegisterEntity(1, TestHelpers.FightGuyDef, s);
+        sim.RegisterEntity(1, TestHelpers.EngineDef, s);
         for (int i = 0; i < 5; i++) TestHelpers.TickDefault(sim, 1);
         var a = sim.GetState(1);
         Assert.Equal(5u, a.StatusRemainingTicks);
@@ -277,80 +278,33 @@ public class FightGuyAbilityTests
     // ── Bone-attached hitbox ──
 
     [Fact]
-    public void BoneHitbox_FromData_BoneHitboxDisabledWithoutBakedData()
+    public void CookedBoneHitbox_IsSkippedWithoutBakedData()
     {
-        // Custom LMB with a bone-attached hitbox
-        var boneLMB = new AbilitySpec
+        var def = WithGroundSlot(new CookedTimeline(new[]
         {
-            Name = "BoneLMB",
-            CooldownTicks = 0,
-            Stages = new AttackStage[]
+            new CookedStage(20, 0, 0, 0, 0, Array.Empty<string>(), new CookedTimelineOperation[]
             {
-                new()
-                {
-                    DurationTicks = 20,
-                    HitboxEvents = new[]
-                    {
-                        new HitboxEvent
-                        {
-                            TriggerTick = 5,
-                            DurationTicks = 5,
-                            Radius = 0.8f,
-                            BoneName = "mixamorig:RightFoot",
-                            OffY = 0.1f,
-                            Damage = 10f,
-                            Knockback = new() { Profile = KnockbackProfile.Medium },
-                            StunTicks = 10,
-                            Interruptible = true,
-                        },
-                    },
-                    LungeForce = 0f,
-                },
-            },
-            AnimationNames = new[] { "melee" },
-        };
-
-        // Def based on BoneHitboxTestDef but with the custom bone LMB
-        var src = TestHelpers.BoneHitboxTestDef;
-        var def = new CharacterDefinition
-        {
-            Class = src.Class,
-            DisplayName = src.DisplayName,
-            CapsuleRadius = src.CapsuleRadius,
-            CapsuleHeight = src.CapsuleHeight,
-            HurtboxRadius = src.HurtboxRadius,
-            Movement = src.Movement,
-            LMB = boneLMB,
-            HurtboxBoneDefs = src.HurtboxBoneDefs,
-            BakedDataPath = "", // No baked data — bone hitbox skips
-            HurtboxCapsules = src.HurtboxCapsules!,
-            IdleAnim = src.IdleAnim,
-            RunAnim = src.RunAnim,
-            DashAnim = src.DashAnim,
-            JumpAnim = src.JumpAnim,
-            FallAnim = src.FallAnim,
-            HitSmallAnim = src.HitSmallAnim,
-            HitMediumAnim = src.HitMediumAnim,
-            HitHardAnim = src.HitHardAnim,
-            VisualScale = src.VisualScale,
-            ModelYOffset = src.ModelYOffset,
-            ModelSoleOffset = src.ModelSoleOffset,
-        };
+                new CookedSpawnHitboxOperation(5, AuthoringUnit.Meters,
+                    new CookedHitbox(AuthoringHitboxShape.Sphere, 0.8f, 0f, 0.1f, 0f,
+                        0f, 0f, 0f, "mixamorig:RightFoot", null, 10f, 45f, 20f, 2f, 10, 5, true, 0)),
+            }),
+        }));
 
         var sim = TestHelpers.MakeSim();
+        var targetDef = TestHelpers.EngineDef;
         var player = TestHelpers.PlayerState();
-        player.PY = TestHelpers.GroundPY(TestHelpers.MankiDef); // 0.75
+        player.PY = TestHelpers.GroundPY(def);
         player.FacingYaw = 0f;
         sim.RegisterEntity(1, def, player);
 
-        // NPC in front-right where right foot bone would be (without baked data, shouldn't matter)
+        // NPC is a synthetic target; no baked poses are needed for the synthetic hitbox.
         var npc = TestHelpers.NpcState(0.5f, 1.5f);
-        npc.PY = TestHelpers.GroundPY(TestHelpers.MankiDef);
+        npc.PY = TestHelpers.GroundPY(targetDef);
         npc.DamagePercent = 0;
-        sim.RegisterEntity(100, TestHelpers.FightGuyDef, npc);
+        sim.RegisterEntity(100, targetDef, npc);
 
         // Tick through hitbox trigger (tick 5)
-        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 1) }, { 100, default } });
+        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: AbilitySlots.Slot1) }, { 100, default } });
         for (int i = 0; i < 10; i++)
             sim.Tick(new() { { 1, default }, { 100, default } });
 
@@ -361,60 +315,34 @@ public class FightGuyAbilityTests
     }
 
     [Fact]
-    public void BoneHitbox_EntityOffsetHitboxStillWorks()
+    public void CookedEntityOffsetHitbox_StillWorks()
     {
         // Entity-relative offset (no BoneName) still hits via the standard path now that
         // bone-attached hitboxes exist — Off* is anchor-relative (bone or entity origin).
-        var entityLMB = new AbilitySpec
+        var def = WithGroundSlot(new CookedTimeline(new[]
         {
-            Name = "EntityLMB",
-            CooldownTicks = 0,
-            Stages = new AttackStage[]
+            new CookedStage(20, 0, 0, 0, 0, Array.Empty<string>(), new CookedTimelineOperation[]
             {
-                new()
-                {
-                    DurationTicks = 20,
-                    HitboxEvents = new[]
-                    {
-                        new HitboxEvent
-                        {
-                            TriggerTick = 5,
-                            DurationTicks = 5,
-                            Radius = 0.8f,
-                            OffY = 0.8f,
-                            OffZ = 1.2f,
-                            Damage = 10f,
-                            Knockback = new() { Profile = KnockbackProfile.Medium },
-                            StunTicks = 10,
-                            Interruptible = true,
-                        },
-                    },
-                    LungeForce = 0f,
-                },
-            },
-            AnimationNames = new[] { "melee" },
-        };
-
-        var def = TestHelpers.CloneDef(TestHelpers.BoneHitboxTestDef);
-        def.Class = CharacterClass.Nilus; // use the generic legacy spec path for this isolated geometry test
-        def.LMB = entityLMB;
-        def.BakedDataPath = ""; // no baked data — entity offset must not need it
+                new CookedSpawnHitboxOperation(5, AuthoringUnit.Meters,
+                    new CookedHitbox(AuthoringHitboxShape.Sphere, 0.8f, 0f, 0.8f, 1.2f,
+                        0f, 0f, 0f, null, null, 10f, 45f, 20f, 2f, 10, 5, true, 0)),
+            }),
+        }));
 
         var sim = TestHelpers.MakeSim();
-        var targetDef = TestHelpers.FightGuyDef;
-        var targetBaked = TestHelpers.LoadBakedData(targetDef);
+        var targetDef = TestHelpers.EngineDef;
         var player = TestHelpers.PlayerState();
-        player.PY = TestHelpers.GroundPY(TestHelpers.MankiDef);
+        player.PY = TestHelpers.GroundPY(def);
         player.FacingYaw = 0f;
         sim.RegisterEntity(1, def, player);
 
         // NPC directly in front at the entity-offset hitbox position (OffZ = 1.2).
         var npc = TestHelpers.NpcState(0f, 1.2f);
-        npc.PY = TestHelpers.GroundPY(TestHelpers.MankiDef);
+        npc.PY = TestHelpers.GroundPY(targetDef);
         npc.DamagePercent = 0;
-        sim.RegisterEntity(100, targetDef, npc, targetBaked);
+        sim.RegisterEntity(100, targetDef, npc);
 
-        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 1) }, { 100, default } });
+        sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: AbilitySlots.Slot1) }, { 100, default } });
         for (int i = 0; i < 10; i++)
             sim.Tick(new() { { 1, default }, { 100, default } });
 
@@ -423,18 +351,15 @@ public class FightGuyAbilityTests
             $"NPC should take damage from entity-offset hitbox, got {npcAfter.DamagePercent}");
     }
 
-    // ── RETIRED LMB (activeSlot=1) — no longer an attack input for FightGuy ──
-    // LMB/AirLMB data specs were dropped; the normal tier (keys 1-4) carries the
-    // melee kit. Pins the contract so retired LMB golden tests don't resurrect.
+    // Reserved wire selector 1 must not start a move.
 
     [Fact]
-    public void LMB_AttackSlot_IsRetired_NeverDispatches()
+    public void ReservedFirstWireSelector_DoesNotStartAttack()
     {
         var sim = TestHelpers.MakeSim();
         var state = TestHelpers.PlayerState();
-        state.PY = GroundPY;
-        TestHelpers.RegisterPlayer(sim, TestHelpers.FightGuyDef, state);
-
+        state.PY = TestHelpers.GroundPY(TestHelpers.EngineDef);
+        TestHelpers.RegisterPlayer(sim, TestHelpers.EngineDef, state);
         sim.Tick(new() { { 1, new InputState { ActiveSlot = 1 } } });
         for (int i = 0; i < 10; i++)
             sim.Tick(new() { { 1, default } });
@@ -443,5 +368,15 @@ public class FightGuyAbilityTests
         Assert.Equal(ActionState.Idle, s.State); // never entered an attack
         Assert.Equal((byte)0, s.AttackSlot);
         Assert.Equal((ushort)0, s.DamagePercent);
+    }
+    private static CharacterDefinition WithGroundSlot(CookedTimeline timeline)
+    {
+        var def = TestHelpers.EngineDef;
+        var slots = def.CookedSlots!.ToArray();
+        slots[0] = new CookedSlotDefinition(
+            0, "ground.1", false, "Test hitbox", "", "",
+            AuthoringAbilityBehavior.MeleeCombo, AuthoringAimMode.None, 0, false, false, timeline);
+        def.CookedSlots = slots;
+        return def;
     }
 }

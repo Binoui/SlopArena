@@ -24,7 +24,7 @@ public class SteamGameServerAdmissionTests
         var manifest = BuiltInRosterManifestCodec.Load(Path.Combine(cooked, "roster/manifest.json"));
         var packages = manifest.Entries.ToDictionary(x => x.PackageId,
             x => CookedCharacterPackageLoader.LoadDirectory(Path.Combine(cooked, x.PackageId), x.Requirement));
-        var catalog = new MatchContentCatalogBuilder().Build(manifest, packages, new LegacyCharacterCatalogAdapter());
+        var catalog = new MatchContentCatalogBuilder().Build(manifest, packages);
         Assert.True(catalog.IsValid, string.Join("; ", catalog.Diagnostics));
         return catalog.Catalog!;
     }

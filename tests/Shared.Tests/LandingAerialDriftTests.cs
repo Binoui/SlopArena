@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Xunit;
 
 namespace SlopArena.Shared.Tests;
@@ -11,7 +12,6 @@ namespace SlopArena.Shared.Tests;
 public class LandingAerialDriftTests
 {
     private static readonly CharacterDefinition Def = TestHelpers.FightGuyDef;
-    private static readonly float GroundPy = TestHelpers.GroundPY(Def);
 
     private static InputState Fwd(float moveY = 1f, bool jump = false, byte slot = 0) => new()
     {
@@ -25,11 +25,11 @@ public class LandingAerialDriftTests
     /// Returns (pz, vz, states, grounded) sampled each tick.
     /// </summary>
     private static (List<float> pz, List<float> vz, List<ActionState> states, List<bool> grounded)
-        LandMidAerial(byte slot, int aerialStartTick, int releaseTick, int totalTicks)
+        LandMidAerial(CharacterDefinition def, byte slot, int aerialStartTick, int releaseTick, int totalTicks)
     {
         var sim = TestHelpers.MakeSim();
-        var p = TestHelpers.PlayerState() with { PY = GroundPy, PZ = 0f };
-        TestHelpers.RegisterPlayer(sim, Def, p);
+        var p = TestHelpers.PlayerState() with { PY = TestHelpers.GroundPY(def), PZ = 0f };
+        TestHelpers.RegisterPlayer(sim, def, p);
 
         var inputs = new Dictionary<ulong, InputState>();
         var pz = new List<float>();
@@ -41,7 +41,7 @@ public class LandingAerialDriftTests
             if (t < 20) inputs[1] = Fwd();
             else if (t == 20) inputs[1] = Fwd(jump: true);               // short hop
             else if (t < aerialStartTick) inputs[1] = Fwd();
-            else if (t < releaseTick) inputs[1] = Fwd(slot: slot);       // whiff aerial
+            else if (t < releaseTick) inputs[1] = Fwd(slot: t == aerialStartTick ? slot : (byte)0);
             else inputs[1] = default;                                    // release all
             sim.Tick(inputs);
             var s = sim.GetState(1);
@@ -65,7 +65,7 @@ public class LandingAerialDriftTests
     [Fact]
     public void Cyclone_LandMidMove_ContinuesUntilNaturalEnd()
     {
-        var (_, _, states, grounded) = LandMidAerial(AbilitySlots.R, aerialStartTick: 28, releaseTick: 48, totalTicks: 120);
+        var (_, _, states, grounded) = LandMidAerial(Def, AbilitySlots.R, aerialStartTick: 28, releaseTick: 48, totalTicks: 120);
 
         int takeoff = FirstTakeoff(grounded);
         int landing = FirstLanding(grounded, takeoff);
@@ -79,13 +79,33 @@ public class LandingAerialDriftTests
     [Fact]
     public void AirNormal_LandMidMove_StillEndsOnLanding()
     {
-        var (_, vz, states, grounded) = LandMidAerial(AbilitySlots.Slot1, aerialStartTick: 40, releaseTick: 60, totalTicks: 100);
+        var def = TestHelpers.EngineDef;
+        var slots = def.CookedSlots!.ToArray();
+        var hitbox = new CookedHitbox(
+            AuthoringHitboxShape.Sphere, 0.5f, 0f, 0f, 0f, 0f, 0f, 0f,
+            null, null, 5f, 0f, 2f, 1f, 5, 3, true, 0);
+        slots[8] = new CookedSlotDefinition(8, "air.1", true, "Aerial landing fixture", "", "",
+            AuthoringAbilityBehavior.MeleeCombo, AuthoringAimMode.None, 0, false, false,
+            new CookedTimeline(new[]
+            {
+                new CookedStage(30, 0, 0, 0, 0, Array.Empty<string>(),
+                    new CookedTimelineOperation[]
+                    {
+                        new CookedSpawnHitboxOperation(0, AuthoringUnit.Meters, hitbox),
+                    }),
+            }));
+        def.CookedSlots = slots;
+        var (_, vz, states, grounded) = LandMidAerial(def, AbilitySlots.Slot1, aerialStartTick: 40, releaseTick: 60, totalTicks: 100);
 
         int takeoff = FirstTakeoff(grounded);
         int landing = FirstLanding(grounded, takeoff);
         Assert.True(landing > 0, "should land");
+        bool attackedBeforeLanding = false;
+        for (int tick = takeoff; tick < landing; tick++)
+            attackedBeforeLanding |= states[tick] == ActionState.Attacking;
+        Assert.True(attackedBeforeLanding, "synthetic air normal should be active before landing");
         Assert.Equal(ActionState.Idle, states[landing]);
-        Assert.Equal(0f, vz[landing]);
+        Assert.Equal(0f, vz[^1]); // After input release, ordinary ground braking stops drift.
     }
 
     /// <summary>All four Wibou air normals (keys 1-4): none may drift after landing.</summary>
@@ -128,9 +148,8 @@ public class LandingAerialDriftTests
     }
 
     /// <summary>
-    /// Faithful reproduction of the user report: Wibou runs toward the enemy, jumps, whiffs
-    /// an air normal past them, crosses up (turn around), lands, and must NOT keep drifting
-    /// — with the stick RELEASED after the cross-up, friction must stop it.
+    /// Wibou runs beside an enemy, full-jumps, whiffs an air normal, passes them,
+    /// then releases the stick. Landing friction must stop actual carried momentum.
     /// </summary>
     [Fact]
     public void Wibou_CrossUpWhiffAirNormal_NoPersistentDrift()
@@ -139,31 +158,39 @@ public class LandingAerialDriftTests
         var sim = TestHelpers.MakeSim();
         var p = TestHelpers.PlayerState() with { PY = TestHelpers.GroundPY(def), PZ = 0f };
         TestHelpers.RegisterPlayer(sim, def, p);
-        TestHelpers.RegisterNpc(sim, def, TestHelpers.NpcState(0, 4f) with { PY = TestHelpers.GroundPY(def) });
+        // Offset the enemy from the run line so pushboxes cannot stop the approach.
+        TestHelpers.RegisterNpc(sim, def, TestHelpers.NpcState(2f, 7f) with { PY = TestHelpers.GroundPY(def) });
 
         var inputs = new Dictionary<ulong, InputState>();
         var pz = new List<float>();
         var vz = new List<float>();
         var grounded = new List<bool>();
+        bool attackedAirborne = false;
         for (int t = 0; t < 200; t++)
         {
             if (t < 20) inputs[1] = Fwd();                             // run toward enemy
-            else if (t == 20) inputs[1] = Fwd(jump: true);             // jump
-            else if (t < 30) inputs[1] = Fwd();
-            else if (t < 34) inputs[1] = Fwd(slot: AbilitySlots.Slot1); // tap air normal (whiff)
-            else if (t < 60) inputs[1] = Fwd();                        // keep flying past, cross up
-            else inputs[1] = default;                                  // release — must stop
+            else if (t < 30) inputs[1] = new InputState { MoveY = 1f, Jump = t == 20, JumpHeld = true };
+            else if (t == 30) inputs[1] = Fwd(slot: AbilitySlots.Slot1); // one airborne whiff
+            else if (t < 60) inputs[1] = Fwd();                        // fly past, cross up
+            else inputs[1] = default;                                 // release — must stop
             sim.Tick(inputs);
             var s = sim.GetState(1);
             pz.Add(s.PZ); vz.Add(s.VZ); grounded.Add(s.IsGrounded);
+            attackedAirborne |= !s.IsGrounded && s.AttackSlot == AbilitySlots.Slot1;
         }
 
         int takeoff = -1;
         for (int t = 21; t < grounded.Count; t++) if (!grounded[t]) { takeoff = t; break; }
+        Assert.True(takeoff > 0, "full jump should take off");
         int landing = -1;
         for (int t = takeoff; t < grounded.Count; t++) if (grounded[t]) { landing = t; break; }
         Assert.True(landing > 0, "should land");
-        Assert.True(pz[landing] > 4f, $"should land PAST the enemy (cross-up): pz={pz[landing]:F2}");
+        Assert.True(attackedAirborne, "cross-up must include an airborne normal");
+        Assert.Equal((ushort)0, sim.GetState(100).DamagePercent); // Deliberate whiff, not hitstop drift.
+        Assert.True(pz[takeoff] < sim.GetState(100).PZ, "takeoff must precede the cross-up");
+        Assert.True(pz[landing] > sim.GetState(100).PZ,
+            $"should land PAST the enemy (cross-up): pz={pz[landing]:F2}");
+        Assert.True(vz[59] > 0f, "runout must carry momentum before stick release");
 
         // 40 ticks after landing, fully stopped — no persistent drift.
         int check = Math.Min(landing + 40, vz.Count - 1);

@@ -126,8 +126,8 @@ public class CookedAimHoldTests
     {
         // The cooked adapters surface the authored aim-loop id so the renderer can
         // play it during the hold (and the timeline anim on release).
-        Assert.Equal("anim.ki-shot-loop", FightGuyDef.GetSlotAbility(10, airborne: false)!.AimAnimationId);
-        Assert.Equal("anim.manki.ga-loop", MankiDef.GetSlotAbility(10, airborne: false)!.AimAnimationId);
+        Assert.Equal("anim.ki-shot-loop", FightGuyDef.GetCookedSlotAbility(AbilitySlots.A, airborne: false)!.AimAnimationId);
+        Assert.Equal("anim.manki.ga-loop", MankiDef.GetCookedSlotAbility(AbilitySlots.A, airborne: false)!.AimAnimationId);
     }
 
     [Fact]

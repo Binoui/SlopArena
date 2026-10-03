@@ -1,11 +1,10 @@
+using System.Linq;
 using Xunit;
 
 namespace SlopArena.Shared.Tests;
 
 /// <summary>
-/// Regression coverage for the FightGuy normal-role pass. The golden scenarios use baked
-/// attacker poses and a plain capsule dummy, so timing, hitbox attachment, damage, and launch
-/// stay pinned together.
+/// Real baked-pose normal contacts and attack completion, independent of tuning snapshots.
 /// </summary>
 public class FightGuyNormalTuningTests : KitScenarioTests
 {
@@ -37,37 +36,35 @@ public class FightGuyNormalTuningTests : KitScenarioTests
 
 
     [Fact]
-    public void G2_ForwardPunch_HitConfirm_IsGolden()
+    public void G2_ForwardPunch_DealsAuthoredDamage()
     {
-        AssertGoldenScenario(new KitScenario
+        AssertScenario(new KitScenario
         {
             Name = "FightGuy G2 Forward Punch Hit Confirm",
             Def = Def,
             Setup = GroundedPlayer,
             Inputs = new InputSequence().Press(0, 7),
-            Assert = _ => { },
+            Assert = player => Assert.Equal((byte)0, player.AttackSlot),
             NpcSetup = () => TestHelpers.NpcState(0f, 1f) with { PY = GroundPy },
             NpcDef = Def,
-            NpcAssert = npc => Assert.Equal((ushort)7, npc.DamagePercent),
-            SnapshotTick = 7, // t5–9 active window; pins the fully extended punch.
+            NpcAssert = npc => Assert.Equal(NormalDamage(AbilitySlots.Slot2, false), (float)npc.DamagePercent),
             TotalTicks = 80,
         });
     }
 
     [Fact]
-    public void G4_DoubleKick_HitConfirm_IsGolden()
+    public void G4_DoubleKick_DealsAuthoredDamage()
     {
-        AssertGoldenScenario(new KitScenario
+        AssertScenario(new KitScenario
         {
             Name = "FightGuy G4 Double Kick Hit Confirm",
             Def = Def,
             Setup = GroundedPlayer,
             Inputs = new InputSequence().Press(0, 9),
-            Assert = _ => { },
+            Assert = player => Assert.Equal((byte)0, player.AttackSlot),
             NpcSetup = () => TestHelpers.NpcState(0f, 0.8f) with { PY = GroundPy },
             NpcDef = Def,
-            NpcAssert = npc => Assert.Equal((ushort)14, npc.DamagePercent),
-            SnapshotTick = 12, // t10–16 capsule active across both feet.
+            NpcAssert = npc => Assert.Equal(NormalDamage(AbilitySlots.Slot4, false), (float)npc.DamagePercent),
             TotalTicks = 100,
         });
     }
@@ -93,38 +90,44 @@ public class FightGuyNormalTuningTests : KitScenarioTests
     }
 
     [Fact]
-    public void A3_HighKick_HitConfirm_IsGolden()
+    public void A3_HighKick_DealsAuthoredDamage()
     {
-        AssertGoldenScenario(new KitScenario
+        AssertScenario(new KitScenario
         {
             Name = "FightGuy A3 High Kick Hit Confirm",
             Def = Def,
             Setup = AirbornePlayer,
             Inputs = new InputSequence().Press(0, 8),
-            Assert = _ => { },
+            Assert = player => Assert.Equal((byte)0, player.AttackSlot),
             NpcSetup = () => AirborneNpc(0.8f),
             NpcDef = Def,
-            NpcAssert = npc => Assert.Equal((ushort)8, npc.DamagePercent),
-            SnapshotTick = 16, // t14–19 high-kick window.
+            NpcAssert = npc => Assert.Equal(NormalDamage(AbilitySlots.Slot3, true), (float)npc.DamagePercent),
             TotalTicks = 90,
         });
     }
 
     [Fact]
-    public void A4_AirSmash_HitConfirm_IsGolden()
+    public void A4_AirSmash_DealsAuthoredDamage()
     {
-        AssertGoldenScenario(new KitScenario
+        AssertScenario(new KitScenario
         {
             Name = "FightGuy A4 Air Smash Hit Confirm",
             Def = Def,
             Setup = AirbornePlayer,
             Inputs = new InputSequence().Press(0, 9),
-            Assert = _ => { },
+            Assert = player => Assert.Equal((byte)0, player.AttackSlot),
             NpcSetup = () => AirborneNpc(0.8f),
             NpcDef = Def,
-            NpcAssert = npc => Assert.Equal((ushort)13, npc.DamagePercent),
-            SnapshotTick = 22, // t20–26 late forward-air strike window.
+            NpcAssert = npc => Assert.Equal(NormalDamage(AbilitySlots.Slot4, true), (float)npc.DamagePercent),
             TotalTicks = 100,
         });
+    }
+    private static float NormalDamage(byte slot, bool airborne)
+    {
+        var damage = Def.GetCookedSlotAbility(slot, airborne)!.Timeline.Stages
+            .SelectMany(stage => stage.Operations).OfType<CookedSpawnHitboxOperation>()
+            .Sum(operation => operation.Hitbox.Damage);
+        Assert.True(damage > 0f, "Hit-confirm scenarios require a damaging authored normal.");
+        return damage;
     }
 }

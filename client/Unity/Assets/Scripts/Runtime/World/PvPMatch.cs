@@ -315,8 +315,6 @@ namespace SlopArena.Client.World
                 { PlayerEntityId, input }
             });
             var projectileSnapshot = _networkClient.ReceiveProjectileVisuals();
-            if (projectileSnapshot.HasValue)
-                _projectileVFX.OnSnapshot(projectileSnapshot.Value);
             var swordTrailSnapshot = _networkClient.ReceiveSwordTrailSnapshot();
             _combatFeedback?.OnTick();
 
@@ -329,6 +327,8 @@ namespace SlopArena.Client.World
             _playerRenderer.ApplyServerState(_bridge.GetState(PlayerEntityId));
             foreach (var kv in _opponentRenderers)
                 kv.Value.ApplyServerState(_bridge.GetState(kv.Key));
+            if (projectileSnapshot.HasValue)
+                _projectileVFX.OnSnapshot(projectileSnapshot.Value);
             if (swordTrailSnapshot.HasValue)
                 ApplySwordTrailSnapshot(swordTrailSnapshot.Value);
             PresentTimelineEvents();

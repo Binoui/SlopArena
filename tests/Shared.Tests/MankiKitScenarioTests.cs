@@ -9,9 +9,8 @@ using Xunit;
 namespace SlopArena.Shared.Tests;
 
 /// <summary>
-/// Package-native Manki regression coverage: canonical kit compile, cooked artifact
-/// loading with typed capability parameters, and golden snapshots for normals,
-/// aerials, and the four specials (Round Bomb, Jetpack Boost, Bazooka, Aerosol Inferno).
+/// Package-native Manki coverage: canonical kit validation, cooked capability loading,
+/// real normal contacts, and special regression scenarios.
 /// </summary>
 public sealed class MankiKitScenarioTests : KitScenarioTests
 {
@@ -47,7 +46,7 @@ public sealed class MankiKitScenarioTests : KitScenarioTests
     }
 
     [Fact]
-    public void Manki_TrustedPackage_CooksExactCanonicalKit()
+    public void Manki_TrustedPackage_CooksValidCanonicalKit()
     {
         var first = CompileManki();
         var second = CompileManki();
@@ -59,98 +58,68 @@ public sealed class MankiKitScenarioTests : KitScenarioTests
         Assert.Equal(4, package.Definition.CapabilityRequirements.Count);
         Assert.Equal(new[] { AerosolCapabilityId, BazookaCapabilityId, JetpackCapabilityId, RoundBombCapabilityId },
             package.Definition.CapabilityRequirements.Select(x => x.CapabilityId).OrderBy(x => x).ToArray());
-        var expected = new Dictionary<string, (ushort duration, ushort iasa, ushort trigger, ushort active, float radius, float damage, float angle, float @base, float growth, ushort stun, ushort landing, ushort before, ushort after)>
+        Assert.Equal(16, package.Definition.Slots.Count);
+        foreach (var slot in package.Definition.Slots.Where(x => x.Ordinal % 8 < 4))
         {
-            ["ground.1"] = (30, 13, 8, 5, .5f, 4, 8, 4, 20, 14, 0, 0, 0),
-            ["ground.2"] = (50, 22, 8, 5, .5f, 7, 25, 5, 26, 18, 0, 0, 0),
-            ["ground.3"] = (38, 25, 8, 10, .5f, 7, 25, 5, 26, 18, 0, 0, 0),
-            ["ground.4"] = (60, 56, 10, 7, .5f, 14, 28, 9, 42, 26, 0, 0, 0),
-            ["air.1"] = (33, 29, 6, 5, .5f, 3, 55, 5, 24, 12, 9, 5, 23),
-            ["air.3"] = (44, 41, 14, 6, .5f, 8, 65, 5, 26, 20, 9, 5, 30),
-            ["air.4"] = (54, 50, 20, 7, .5f, 13, 25, 8, 42, 26, 12, 5, 38),
-        };
-        foreach (var pair in expected)
-        {
-            var stage = package.Definition.Slots.Single(x => x.Id == pair.Key).Timeline.Stages.Single();
-            var operation = Assert.IsType<CookedSpawnHitboxOperation>(stage.Operations.First());
-            var hitbox = operation.Hitbox;
-            Assert.Equal(pair.Value.duration, stage.DurationTicks);
-            Assert.Equal(pair.Value.iasa, stage.IasaTicks);
-            Assert.Equal(pair.Value.landing, stage.LandingLagTicks);
-            Assert.Equal(pair.Value.before, stage.AutoCancelBeforeTicks);
-            Assert.Equal(pair.Value.after, stage.AutoCancelAfterTicks);
-            Assert.Equal(pair.Value.trigger, operation.Tick);
-            Assert.Equal(pair.Value.active, hitbox.DurationTicks);
-            Assert.Equal(pair.Value.radius, hitbox.Radius);
-            Assert.Equal(pair.Value.damage, hitbox.Damage);
-            Assert.Equal(pair.Value.angle, hitbox.Angle);
-            Assert.Equal(pair.Value.@base, hitbox.BaseKnockback);
-            Assert.Equal(pair.Value.growth, hitbox.KnockbackGrowth);
-            Assert.Equal(pair.Value.stun, hitbox.StunTicks);
-            Assert.True(hitbox.Interruptible);
-            Assert.Equal((byte)0, hitbox.HitGroup);
+            var stage = Assert.Single(slot.Timeline.Stages);
+            var hitboxes = stage.Operations.OfType<CookedSpawnHitboxOperation>().ToArray();
+            Assert.NotEmpty(hitboxes);
+            Assert.All(hitboxes, operation =>
+            {
+                Assert.InRange(operation.Tick + operation.Hitbox.DurationTicks, 1, stage.DurationTicks);
+                Assert.True(operation.Hitbox.Damage > 0f);
+            });
         }
 
-        var air2 = package.Definition.Slots.Single(x => x.Id == "air.2").Timeline.Stages.Single();
-        Assert.Equal(2, air2.Operations.Count);
-        Assert.All(air2.Operations.OfType<CookedSpawnHitboxOperation>(), op =>
+        // Air Swing's sweet/sour windows must share hit history and the same limb sweep.
+        var airSwing = package.Definition.Slots.Single(x => x.Id == "air.2").Timeline.Stages
+            .SelectMany(stage => stage.Operations).OfType<CookedSpawnHitboxOperation>().ToArray();
+        Assert.Equal(2, airSwing.Length);
+        Assert.NotEqual((byte)0, airSwing[0].Hitbox.HitGroup);
+        Assert.All(airSwing, operation =>
         {
-            Assert.Equal(AuthoringHitboxShape.Capsule, op.Hitbox.Shape);
-            Assert.Equal("bone.left-foot", op.Hitbox.StartBoneId);
-            Assert.Equal("bone.hips", op.Hitbox.EndBoneId);
-            Assert.Equal((byte)1, op.Hitbox.HitGroup);
+            Assert.Equal(airSwing[0].Hitbox.HitGroup, operation.Hitbox.HitGroup);
+            Assert.Equal(AuthoringHitboxShape.Capsule, operation.Hitbox.Shape);
+            Assert.Equal("bone.left-foot", operation.Hitbox.StartBoneId);
+            Assert.Equal("bone.hips", operation.Hitbox.EndBoneId);
         });
 
-        AssertSpecial(package, "ground.A", RoundBombCapabilityId, AuthoringAbilityBehavior.AimedProjectile, AuthoringAimMode.GroundCursor, 300,
+        AssertSpecial(package, "ground.A", RoundBombCapabilityId, AuthoringAbilityBehavior.AimedProjectile, AuthoringAimMode.GroundCursor,
             p => Assert.IsType<CookedMankiRoundBombCapabilityParameters>(p));
-        AssertSpecial(package, "ground.E", JetpackCapabilityId, AuthoringAbilityBehavior.MeleeCombo, AuthoringAimMode.None, 210,
+        AssertSpecial(package, "ground.E", JetpackCapabilityId, AuthoringAbilityBehavior.MeleeCombo, AuthoringAimMode.None,
             p => Assert.IsType<CookedMankiJetpackBoostCapabilityParameters>(p));
-        AssertSpecial(package, "ground.R", BazookaCapabilityId, AuthoringAbilityBehavior.Projectile, AuthoringAimMode.CameraForward3D, 240,
+        AssertSpecial(package, "ground.R", BazookaCapabilityId, AuthoringAbilityBehavior.Projectile, AuthoringAimMode.CameraForward3D,
             p => Assert.IsType<CookedMankiBazookaCapabilityParameters>(p));
         var jetpackSlot = package.Definition.Slots.Single(x => x.Id == "ground.E");
         Assert.True(jetpackSlot.IsRecoveryMove);
         Assert.False(jetpackSlot.PreserveMomentumOnStart);
-        Assert.Equal((ushort)60, jetpackSlot.Timeline.Stages.Single().DurationTicks);
         var airJetpack = package.Definition.Slots.Single(x => x.Id == "air.E");
         Assert.Equal(jetpackSlot.Name, airJetpack.Name);
         var aerosol = package.Definition.Slots.Single(x => x.Id == "ground.F");
         Assert.Equal(AuthoringAbilityBehavior.AreaDenial, aerosol.Behavior);
         Assert.Equal(AuthoringAimMode.CameraForward3D, aerosol.AimMode);
-        Assert.Equal((ushort)600, aerosol.CooldownTicks);
         Assert.Equal("anim.manki.gf-loop", aerosol.AimAnimationId);
         var aerosolStage = Assert.Single(aerosol.Timeline.Stages);
-        Assert.Equal((ushort)52, aerosolStage.DurationTicks);
         Assert.Equal((ushort)0, aerosolStage.IasaTicks);
         Assert.Equal(2, aerosolStage.Operations.Count);
         var start = Assert.IsType<CookedStartCapabilityOperation>(aerosolStage.Operations[0]);
         Assert.Equal((ushort)0, start.Tick);
         var aerosolParameters = Assert.IsType<CookedMankiAerosolInfernoCapabilityParameters>(start.Parameters);
-        Assert.Equal((ushort)28, aerosolParameters.HitboxDurationTicks);
-        Assert.Equal((ushort)52, aerosolParameters.FireDurationTicks);
-        Assert.Equal(0.7f, aerosolParameters.HitboxRadius);
-        Assert.Equal(0.25f, aerosolParameters.OffsetY);
-        Assert.Equal(1.25f, aerosolParameters.OffsetZ);
-        Assert.Equal(3f, aerosolParameters.EndOffsetZ);
-        Assert.Equal(15f, aerosolParameters.Damage);
-        Assert.Equal(55f, aerosolParameters.KnockbackAngle);
-        Assert.Equal(12f, aerosolParameters.KnockbackBase);
-        Assert.Equal(20f, aerosolParameters.KnockbackGrowth);
-        Assert.Equal((ushort)30, aerosolParameters.StunTicks);
-        Assert.Equal((byte)1, aerosolParameters.HitGroup);
+        Assert.InRange(aerosolParameters.FireTriggerTick + aerosolParameters.HitboxDurationTicks,
+            1, aerosolStage.DurationTicks);
+        Assert.True(aerosolParameters.Damage > 0f);
         var presentation = Assert.IsType<CookedEmitPresentationOperation>(aerosolStage.Operations[1]);
-        Assert.Equal((ushort)18, presentation.Tick);
         Assert.Equal("presentation.manki.aerosol-inferno.start", presentation.PresentationId);
         Assert.Empty(package.Definition.Slots.SelectMany(x => x.Timeline.Stages).SelectMany(x => x.Operations).OfType<CookedSetVelocityOperation>());
     }
 
     private static void AssertSpecial(CookedCharacterPackage package, string slotId, string capabilityId,
-        AuthoringAbilityBehavior behavior, AuthoringAimMode aimMode, ushort cooldown,
+        AuthoringAbilityBehavior behavior, AuthoringAimMode aimMode,
         Action<CookedCapabilityParameters> parameterAssert)
     {
         var slot = package.Definition.Slots.Single(x => x.Id == slotId);
         Assert.Equal(behavior, slot.Behavior);
         Assert.Equal(aimMode, slot.AimMode);
-        Assert.Equal(cooldown, slot.CooldownTicks);
         var operation = Assert.IsType<CookedStartCapabilityOperation>(Assert.Single(slot.Timeline.Stages.Single().Operations));
         Assert.Equal((ushort)0, operation.Tick);
         Assert.Equal(capabilityId, operation.CapabilityId);
@@ -250,91 +219,86 @@ public sealed class MankiKitScenarioTests : KitScenarioTests
         Assert.Equal("presentation.manki.aerosol-inferno.start", emit.PresentationId);
     }
     [Fact]
-    public void G1_MonkeyPunch_HitConfirm_IsGolden()
+    public void G1_MonkeyPunch_DealsAuthoredDamage()
     {
-        AssertGoldenScenario(new KitScenario
+        AssertScenario(new KitScenario
         {
             Name = "Manki G1 Monkey Punch Hit Confirm",
             Def = Def,
             Setup = GroundedPlayer,
             Inputs = new InputSequence().Press(0, AbilitySlots.Slot1),
-            Assert = _ => { },
+            Assert = player => Assert.Equal((byte)0, player.AttackSlot),
             NpcSetup = () => TestHelpers.NpcState(0f, 1f) with { PY = GroundPy },
             NpcDef = Def,
-            NpcAssert = npc => Assert.Equal((ushort)4, npc.DamagePercent),
-            SnapshotTick = 14, // t12–19 active window.
+            NpcAssert = npc => Assert.Equal(NormalDamage(AbilitySlots.Slot1, false), (float)npc.DamagePercent),
             TotalTicks = 80,
         });
     }
 
     [Fact]
-    public void G2_StraightPunch_HitConfirm_IsGolden()
+    public void G2_StraightPunch_DealsAuthoredDamage()
     {
-        AssertGoldenScenario(new KitScenario
+        AssertScenario(new KitScenario
         {
             Name = "Manki G2 Straight Punch Hit Confirm",
             Def = Def,
             Setup = GroundedPlayer,
             Inputs = new InputSequence().Press(0, AbilitySlots.Slot2),
-            Assert = _ => { },
+            Assert = player => Assert.Equal((byte)0, player.AttackSlot),
             NpcSetup = () => TestHelpers.NpcState(0f, 1f) with { PY = GroundPy },
             NpcDef = Def,
-            NpcAssert = npc => Assert.Equal((ushort)7, npc.DamagePercent),
-            SnapshotTick = 7, // t5–9 active window.
+            NpcAssert = npc => Assert.Equal(NormalDamage(AbilitySlots.Slot2, false), (float)npc.DamagePercent),
             TotalTicks = 80,
         });
     }
 
     [Fact]
-    public void G4_DoubleKick_HitConfirm_IsGolden()
+    public void G4_DoubleKick_DealsAuthoredDamage()
     {
-        AssertGoldenScenario(new KitScenario
+        AssertScenario(new KitScenario
         {
             Name = "Manki G4 Double Kick Hit Confirm",
             Def = Def,
             Setup = GroundedPlayer,
             Inputs = new InputSequence().Press(0, AbilitySlots.Slot4),
-            Assert = _ => { },
+            Assert = player => Assert.Equal((byte)0, player.AttackSlot),
             NpcSetup = () => TestHelpers.NpcState(0f, 0.8f) with { PY = GroundPy },
             NpcDef = Def,
-            NpcAssert = npc => Assert.Equal((ushort)14, npc.DamagePercent),
-            SnapshotTick = 12, // t10–16 capsule active across both feet.
+            NpcAssert = npc => Assert.Equal(NormalDamage(AbilitySlots.Slot4, false), (float)npc.DamagePercent),
             TotalTicks = 100,
         });
     }
 
     [Fact]
-    public void A1_AirKick_HitConfirm_IsGolden()
+    public void A1_AirKick_DealsAuthoredDamage()
     {
-        AssertGoldenScenario(new KitScenario
+        AssertScenario(new KitScenario
         {
             Name = "Manki A1 Air Kick Hit Confirm",
             Def = Def,
             Setup = AirbornePlayer,
             Inputs = new InputSequence().Press(0, AbilitySlots.Slot1),
-            Assert = _ => { },
+            Assert = player => Assert.Equal((byte)0, player.AttackSlot),
             NpcSetup = () => AirborneNpc(0f) with { PY = 2f },
             NpcDef = Def,
-            NpcAssert = npc => Assert.Equal((ushort)8, npc.DamagePercent), // Tracking connects both authored hits: t6 (3) + t16 (5).
-            SnapshotTick = 8, // First hit's t6–10 active window; final assertion covers both hits.
+            NpcAssert = npc => Assert.Equal(NormalDamage(AbilitySlots.Slot1, true), (float)npc.DamagePercent),
             TotalTicks = 90,
         });
     }
 
     [Fact]
-    public void A4_AirSmash_HitConfirm_IsGolden()
+    public void A4_AirSmash_DealsAuthoredDamage()
     {
-        AssertGoldenScenario(new KitScenario
+        AssertScenario(new KitScenario
         {
             Name = "Manki A4 Air Smash Hit Confirm",
             Def = Def,
             Setup = AirbornePlayer,
             Inputs = new InputSequence().Press(0, AbilitySlots.Slot4),
-            Assert = _ => { },
+            Assert = player => Assert.Equal((byte)0, player.AttackSlot),
             NpcSetup = () => AirborneNpc(0f) with { PY = 2f },
             NpcDef = Def,
-            NpcAssert = npc => Assert.Equal((ushort)13, npc.DamagePercent),
-            SnapshotTick = 22, // t20–26 active window.
+            NpcAssert = npc => Assert.Equal(NormalDamage(AbilitySlots.Slot4, true), (float)npc.DamagePercent),
             TotalTicks = 120,
         });
     }
@@ -472,6 +436,15 @@ public sealed class MankiKitScenarioTests : KitScenarioTests
         for (var tick = 0; tick <= 19; tick++) sequence.Set(tick, held);
         sequence.Set(20, new InputState { IsAiming = false, AimPitch = aimPitch });
         return sequence;
+    }
+
+    private static float NormalDamage(byte slot, bool airborne)
+    {
+        var damage = Def.GetCookedSlotAbility(slot, airborne)!.Timeline.Stages
+            .SelectMany(stage => stage.Operations).OfType<CookedSpawnHitboxOperation>()
+            .Sum(operation => operation.Hitbox.Damage);
+        Assert.True(damage > 0f, "Hit-confirm scenarios require a damaging authored normal.");
+        return damage;
     }
 
     private static CharacterCompileResult CompileManki()

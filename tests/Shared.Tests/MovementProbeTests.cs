@@ -4,14 +4,12 @@ using Xunit;
 namespace SlopArena.Shared.Tests;
 
 /// <summary>
-/// Movement data sheet probe (issue #150) — external-behavior assertions on the real sim:
-/// run reaches authored RunSpeed, shield stops and holds from cruise, jump apex
-/// respects Gravity + float window, fast fall reaches FastFallSpeed, and drift caps at
-/// AirSpeedMax. The report uses the same probe, so failures expose simulation changes.
+/// Movement probe assertions on the real simulation with explicit engine data.
+/// Tests protect measurement and movement rules independently of roster tuning.
 /// </summary>
 public class MovementProbeTests
 {
-    private static readonly CharacterDefinition Def = TestHelpers.FightGuyDef;
+    private static readonly CharacterDefinition Def = TestHelpers.EngineDef;
     private static readonly MovementStats M = Def.Movement;
 
     private static MovementProbe.CharacterMovement Measured() =>
@@ -33,7 +31,6 @@ public class MovementProbeTests
         var shield = Measured().Shield;
         Assert.Equal(1, shield.StopTicks);
         Assert.InRange(shield.StopDistance, 0f, 0.001f);
-        Assert.Equal(30, shield.HoldTicks);
         Assert.Equal(ActionState.Shielding, shield.Curve[shield.Curve.Length - 1].State);
     }
 

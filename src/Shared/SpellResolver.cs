@@ -83,6 +83,10 @@ namespace SlopArena.Shared
             public float BaseKnockback;
             public float KnockbackGrowth;
             public ushort StunTicks;
+            /// <summary>Optional fixed hitstun override; zero uses the launch formula.</summary>
+            public ushort FixedHitstunTicks;
+            /// <summary>Snapshot of target armor at collision resolution.</summary>
+            public bool ArmorProtected;
             /// <summary>If true, the hit freezes the owner too (melee contact, ADR-0012).</summary>
             public bool FreezesOwner;
             /// <summary>World-space contact point resolved from the colliding shapes.</summary>
@@ -415,6 +419,7 @@ namespace SlopArena.Shared
                                 DirX = dirXNorm,
                                 KnockbackAngle = launchAngle,
                                 KnockbackDirection = hb.KnockbackDirection,
+                                FixedHitstunTicks = hb.FixedHitstunTicks,
                                 DirZ = dirZNorm,
                                 BaseKnockback = hb.BaseKnockback,
                                 KnockbackGrowth = hb.KnockbackGrowth,

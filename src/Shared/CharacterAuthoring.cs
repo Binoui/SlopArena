@@ -132,7 +132,8 @@ public sealed record CharacterSlotSource(
     ChargePoolSource? ChargePool = null,
     AuthoringAimMovementMode AimMovement = AuthoringAimMovementMode.Fixed,
     string? AimAnimationId = null,
-    bool AllowSlideCarry = false);
+    bool AllowSlideCarry = false,
+    string? HitPresentationId = null);
 
 public sealed record ChargePoolSource(int MaxCharges, ushort RegenTicks);
 public sealed record CharacterAliasSource(string From, string To);
@@ -171,6 +172,11 @@ public sealed record GravityWindowOperationSource(
     ushort Tick,
     AuthoringUnit Unit,
     float GravityScale,
+    ushort DurationTicks) : CharacterTimelineOperationSource(Tick, Unit);
+
+public sealed record ArmorWindowOperationSource(
+    ushort Tick,
+    AuthoringUnit Unit,
     ushort DurationTicks) : CharacterTimelineOperationSource(Tick, Unit);
 
 
@@ -248,7 +254,8 @@ public sealed record HitboxSource(
     ushort DurationTicks,
     bool Interruptible,
     byte HitGroup,
-    AuthoringKnockbackDirection KnockbackDirection = AuthoringKnockbackDirection.AwayFromOwner);
+    AuthoringKnockbackDirection KnockbackDirection = AuthoringKnockbackDirection.AwayFromOwner,
+    ushort FixedHitstunTicks = 0);
 public sealed record ProjectileSource(
     float LaunchOffsetX,
     float LaunchOffsetY,
@@ -328,19 +335,15 @@ public sealed record WibouRisingSlashCapabilityParameters(
 public sealed record WibouBladeFlurryCapabilityParameters(
     float ForwardSpeed,
     ushort MoveTicks) : TypedCapabilityParameters;
-public sealed record BonkTargetedJumpSlamCapabilityParameters(
+public sealed record TargetedLeapCapabilityParameters(
     ushort MaxAimTicks,
     ushort MaxFlightTicks,
     float MinRange,
     float MaxRange,
     float LaunchVerticalSpeed,
-    float SlamRadius,
-    float SlamDamage,
-    float SlamAngle,
-    float SlamBaseKnockback,
-    float SlamKnockbackGrowth,
-    ushort SlamStunTicks,
-    ushort SlamDurationTicks) : TypedCapabilityParameters;
+    ushort LandingSeekTick,
+    ushort RecoveryTicks,
+    HitboxSource Hitbox) : TypedCapabilityParameters;
 public sealed record MankiRoundBombCapabilityParameters(
     ushort ThrowTriggerTick,
     float MaxRange,

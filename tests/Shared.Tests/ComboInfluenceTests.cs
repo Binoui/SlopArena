@@ -65,7 +65,7 @@ public class ComboInfluenceTests
         state.QueuedKBStun = 0;
 
         var sim = TestHelpers.MakeSim(TestHelpers.TestArena());
-        sim.RegisterEntity(1, TestHelpers.CombatDef, state);
+        sim.RegisterEntity(1, TestHelpers.EngineDef, state);
         sim.Tick(new() { { 1, default } });
 
         var launched = sim.GetState(1);
@@ -92,7 +92,7 @@ public class ComboInfluenceTests
         queued.QueuedKBDamage = 12f;
         queued.QueuedKBStun = 20;
         var sim = TestHelpers.MakeSim(TestHelpers.TestArena());
-        sim.RegisterEntity(1, TestHelpers.CombatDef, queued);
+        sim.RegisterEntity(1, TestHelpers.EngineDef, queued);
         sim.Tick(new() { { 1, default } });
         queued = sim.GetState(1);
 
@@ -131,7 +131,7 @@ public class ComboInfluenceTests
         state.QueuedKBAngle = 30;
 
         var sim = TestHelpers.MakeSim(TestHelpers.TestArena());
-        sim.RegisterEntity(1, TestHelpers.CombatDef, state);
+        sim.RegisterEntity(1, TestHelpers.EngineDef, state);
         sim.Tick(new() { { 1, new InputState { MoveX = 1f } } });
         var first = sim.GetState(1);
         sim.Tick(new() { { 1, new InputState { MoveY = 1f } } });
@@ -154,7 +154,7 @@ public class ComboInfluenceTests
         state.State = ActionState.Idle;
 
         var sim = TestHelpers.MakeSim(TestHelpers.TestArena());
-        sim.RegisterEntity(1, TestHelpers.CombatDef, state);
+        sim.RegisterEntity(1, TestHelpers.EngineDef, state);
 
         sim.Tick(new() { { 1, default } });
         var first = sim.GetState(1);

@@ -5,7 +5,7 @@ using System.Linq;
 
 namespace SlopArena.Shared;
 
-/// <summary>Resolves a built-in selector through the same cooked/legacy catalog boundary used by matches.</summary>
+/// <summary>Resolves a built-in selector through the cooked catalog boundary used by matches.</summary>
 public static class BuiltInContentResolver
 {
     public static MatchContentEntry Resolve(CharacterClass selector, string cookedRoot = "content-cooked")
@@ -16,14 +16,13 @@ public static class BuiltInContentResolver
         var packages = new Dictionary<string, CookedCharacterPackageLoadResult>(StringComparer.Ordinal);
         foreach (var rosterEntry in manifest.Entries)
         {
-            if (rosterEntry.Requirement.Version == "legacy-1") continue;
             var loaded = CookedCharacterPackageLoader.LoadDirectory(
                 Path.Combine(cookedRoot, rosterEntry.PackageId), rosterEntry.Requirement);
             if (!loaded.IsValid)
                 throw new InvalidDataException(string.Join("; ", loaded.Diagnostics.Select(x => $"{x.Code}:{x.Message}")));
             packages[rosterEntry.PackageId] = loaded;
         }
-        var result = new MatchContentCatalogBuilder().Build(manifest, packages, new LegacyCharacterCatalogAdapter());
+        var result = new MatchContentCatalogBuilder().Build(manifest, packages);
         if (!result.IsValid || result.Catalog == null) throw new InvalidDataException(string.Join("; ", result.Diagnostics.Select(x => $"{x.Code}:{x.Message}")));
         return result.Catalog.Resolve(selector) ?? throw new InvalidDataException($"Catalog selector '{selector}' is unavailable.");
     }
@@ -38,8 +37,7 @@ public static class BuiltInContentResolver
             {
                 var manifest = BuiltInRosterManifestCodec.Load(manifestPath);
                 foreach (var entry in manifest.Entries)
-                    if (entry.Requirement.Version != "legacy-1" &&
-                        !File.Exists(Path.Combine(basePath, root, entry.PackageId, "manifest.json")))
+                    if (!File.Exists(Path.Combine(basePath, root, entry.PackageId, "manifest.json")))
                         return false;
                 return true;
             }

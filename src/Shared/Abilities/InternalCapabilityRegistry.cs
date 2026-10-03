@@ -37,8 +37,8 @@ public static class InternalCapabilityRegistry
             case "slop.internal.wibou.blade-flurry.v1" when parameters is CookedWibouBladeFlurryCapabilityParameters flurry:
                 capability = new WibouUltFlurry(flurry);
                 return true;
-            case "slop.internal.bonk.targeted-jump-slam.v1" when parameters is CookedBonkTargetedJumpSlamCapabilityParameters bonk:
-                capability = new BonkTargetedJumpSlam(bonk);
+            case CharacterPackageCompiler.TargetedLeapCapabilityId when parameters is CookedTargetedLeapCapabilityParameters leap:
+                capability = new TargetedLeapAbility(leap);
                 return true;
             case "slop.internal.manki.round-bomb.v1" when parameters is CookedMankiRoundBombCapabilityParameters bomb:
                 capability = new MankiRoundBomb(bomb);

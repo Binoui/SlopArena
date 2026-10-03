@@ -130,7 +130,15 @@ client/Unity/Assets/Shared/*.meta
 client/Unity/Assets/Generated/CharacterPackages/
 client/Unity/Assets/Resources/Generated/CharacterPackages/
 /.ability-lab-cache/
+/client/Unity/Assets/Temp/pipeline-screenshots/
+/client/Unity/Assets/Temp/pipeline-screenshots.meta
 client/Unity/Assets/Shared/*.runtimeconfig.json
+
+# Embedded Pipeline is versioned source; omit only upstream repository metadata.
+/client/Unity/Packages/com.unity.pipeline/CLAUDE.md
+/client/Unity/Packages/com.unity.pipeline/CLAUDE.md.meta
+/client/Unity/Packages/com.unity.pipeline/CODEOWNERS
+/client/Unity/Packages/com.unity.pipeline/CODEOWNERS.meta
 
 # Root Unity artifacts (orphaned)
 /Library/
@@ -138,6 +146,7 @@ client/Unity/Assets/Shared/*.runtimeconfig.json
 /UserSettings/
 /Temp/
 /artifacts/
+/tmp/
 
 # Third-party animation/model packs (non-redistributable)
 client/Unity/Assets/~AnimationPacks/
@@ -170,6 +179,12 @@ client/Unity/Assets/Shield Shader FREE.meta
 # Locally generated Cartoon FX variants (Asset Store source dependency)
 client/Unity/Assets/Resources/VFX/SlopArena/
 client/Unity/Assets/Resources/VFX/SlopArena.meta
+
+# Local FightGuy Cartoon FX copies (Asset Store source, not redistributable).
+client/Unity/Assets/CharacterPackages/fightguy/Presentation/FightGuyKiShot.prefab
+client/Unity/Assets/CharacterPackages/fightguy/Presentation/FightGuyKiShot.prefab.meta
+client/Unity/Assets/CharacterPackages/fightguy/Presentation/FightGuyKiShotHit.prefab
+client/Unity/Assets/CharacterPackages/fightguy/Presentation/FightGuyKiShotHit.prefab.meta
 
 # Character art (models, textures, materials — non-redistributable)
 # Solo-dev local audio; keep licensed/downloaded source assets out of Git.

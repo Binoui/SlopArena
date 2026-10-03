@@ -7,13 +7,11 @@ namespace SlopArena.Shared.Tests;
 /// </summary>
 public class PhysicsTests
 {
-    // Classic definition with FloatWindowTicks=0 for backward-compatible gravity tests
+    // Classic definition with FloatWindowTicks=0 for full-gravity mechanics tests.
     private static readonly CharacterDefinition Def = CreateClassicDef();
     private static readonly MovementStats Move = Def.Movement;
-    private static readonly float GroundPx = TestHelpers.MankiGroundPY;
+    private static readonly float GroundPx = Def.CapsuleHeight * 0.5f;
     private static readonly float GravPerTick = Move.Gravity * Simulation.TickDt;
-    // Number of held ticks needed after the loop reaches StateTicks=1. Manki's
-    // four-tick squat expires before the five-tick short-hop decision window.
     private static int FullJumpDecisionTicksAfterSquatRemainder =>
         Simulation.ShortHopWindowTicks > Move.JumpSquatTicks
             ? Simulation.ShortHopWindowTicks - Move.JumpSquatTicks + 1
@@ -21,9 +19,9 @@ public class PhysicsTests
 
     private static CharacterDefinition CreateClassicDef()
     {
-        var mov = TestHelpers.MankiDef.Movement;
-        mov.FloatWindowTicks = 0;
-        return TestHelpers.CloneDef(TestHelpers.MankiDef, mov);
+        var def = TestHelpers.EngineDef;
+        def.Movement = def.Movement with { FloatWindowTicks = 0 };
+        return def;
     }
     // ── Jump ──
 
@@ -389,17 +387,15 @@ public class PhysicsTests
         Assert.Equal(ActionState.Idle, after.State);
     }
     // ── Float-window gravity ──
-    // FallRampChar: Manki definition with FloatWindowTicks=10 for float-window gravity tests
     private static readonly CharacterDefinition FallRampDef = CreateFallRampDef();
     private static readonly float FallRampFloatPerTick = FallRampDef.Movement.AirFloatGravity * Simulation.TickDt;
-    private static readonly float FallRampFullPerTick = 35f * Simulation.TickDt;   // Gravity=35
-    
+    private static readonly float FallRampFullPerTick = FallRampDef.Movement.Gravity * Simulation.TickDt;
+
     private static CharacterDefinition CreateFallRampDef()
     {
-        var mov = TestHelpers.MankiDef.Movement;
-        mov.AirFloatGravity = 6f;
-        mov.FloatWindowTicks = 10;
-        return TestHelpers.CloneDef(TestHelpers.MankiDef, mov);
+        var def = TestHelpers.EngineDef;
+        def.Movement = def.Movement with { AirFloatGravity = 6f, FloatWindowTicks = 10 };
+        return def;
     }
 
     [Fact]
@@ -533,72 +529,21 @@ public class PhysicsTests
         // ── Jump arc timing ──
 
     [Fact]
-    public void FightGuy_JumpArcTiming()
+    public void JumpArcTiming_UsesSyntheticMovement()
     {
-        var def = TestHelpers.FightGuyDef;
-        var mov = def.Movement;
-        float groundPy = TestHelpers.GroundPY(def, 0f);
-        var arena = TestHelpers.TestArena();
-        var sim = TestHelpers.MakeSim(arena);
-        var state = TestHelpers.PlayerState();
-        state.PY = groundPy;
-        TestHelpers.RegisterPlayer(sim, def, state);
+        var mov = Def.Movement;
+        var sim = TestHelpers.MakeSim(TestHelpers.TestArena());
+        var state = TestHelpers.PlayerState() with { PY = GroundPx };
+        TestHelpers.RegisterPlayer(sim, Def, state);
 
-        // Step 1: JumpSquat duration
-        var t0 = TestHelpers.TickN(sim, TestHelpers.Input(jump: true), 1);
-        Assert.Equal(ActionState.JumpSquat, t0.State);
-        Assert.Equal(mov.JumpSquatTicks, (int)t0.StateTicks);
-        int squatTicks = mov.JumpSquatTicks;
-
-        // Complete squat
-        for (int i = 1; i < squatTicks; i++)
-            TestHelpers.TickDefault(sim, 1);
-        Assert.Equal(ActionState.JumpSquat, sim.GetState(1).State);
-
-        // Step 2: Jump fires (squat expires)
-        TestHelpers.TickDefault(sim, 1); // squat expiry → VY applied
-        var afterSquat = sim.GetState(1);
-        Assert.False(afterSquat.IsGrounded);
-        int ascentTicks = 0;
-
-        // Step 3: Count ascent ticks until VY ≤ 0
-        while (sim.GetState(1).VY > 0f)
-        {
-            TestHelpers.TickDefault(sim, 1);
-            ascentTicks++;
-        }
-        var atPeak = sim.GetState(1);
-
-        // Step 4: Count descent ticks until grounded
-        int descentTicks = 0;
-        while (!sim.GetState(1).IsGrounded)
-        {
-            TestHelpers.TickDefault(sim, 1);
-            descentTicks++;
-        }
-
-        // Totals
-        int totalAirTicks = ascentTicks + descentTicks;
-        int totalFromPress = squatTicks + totalAirTicks;
-        float secSquat = squatTicks / 60f;
-        float secAscent = ascentTicks / 60f;
-        float secDescent = descentTicks / 60f;
-        float secTotal = totalFromPress / 60f;
-
-        System.Console.WriteLine("=== FightGuy Jump Arc Timing ===");
-        System.Console.WriteLine($"JumpSquat: {squatTicks} ticks ({secSquat:F3}s)");
-        System.Console.WriteLine($"Ascent (VY>0): {ascentTicks} ticks ({secAscent:F3}s)");
-        System.Console.WriteLine($"Descent (to ground): {descentTicks} ticks ({secDescent:F3}s)");
-        System.Console.WriteLine($"Total (from press): {totalFromPress} ticks ({secTotal:F3}s)");
-        System.Console.WriteLine($"Air ticks only: {totalAirTicks}");
-        System.Console.WriteLine();
-        System.Console.WriteLine("Animation: 24 frames @ 30fps = 0.800s (48 ticks @ 60)");
-        System.Console.WriteLine("  Ascent: 15 frames = 0.500s (30 ticks)");
-        System.Console.WriteLine("  Descent: 9 frames = 0.300s (18 ticks)");
-        System.Console.WriteLine();
-        System.Console.WriteLine($"Game ascent vs clip ascent: {secAscent*60f:F0} vs 30 anim-ticks");
-        System.Console.WriteLine($"Game total vs clip: {totalAirTicks} vs 48 anim-ticks");
-        int clipOvershoot = totalAirTicks - 48;
-        System.Console.WriteLine($"Clip overshoot (crouch frames shown mid-air): {clipOvershoot} ticks = {clipOvershoot/2f:F1} anim frames");
+        var squat = TestHelpers.TickN(sim, TestHelpers.Input(jump: true, jumpHeld: true), 1);
+        Assert.Equal(ActionState.JumpSquat, squat.State);
+        Assert.Equal(mov.JumpSquatTicks, (int)squat.StateTicks);
+        TestHelpers.TickHold(
+            sim,
+            TestHelpers.Input(jumpHeld: true),
+            Math.Max(mov.JumpSquatTicks, Simulation.ShortHopWindowTicks));
+        Assert.False(sim.GetState(1).IsGrounded);
+        Assert.True(sim.GetState(1).VY > 0f);
     }
 }

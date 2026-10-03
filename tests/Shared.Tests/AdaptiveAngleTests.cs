@@ -92,7 +92,7 @@ public class AdaptiveAngleTests
     private static float LaunchKvy(float victimY)
     {
         var sim = TestHelpers.MakeSim(TestHelpers.TestArena());
-        var def = TestHelpers.CombatDef;
+        var def = TestHelpers.EngineDef;
 
         // Attacker so the hitstop/queued-launch path is the real one.
         sim.RegisterEntity(1, def, TestHelpers.PlayerState());

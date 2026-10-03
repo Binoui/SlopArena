@@ -2,7 +2,7 @@
 id: "nilus"
 name: "Nilus"
 title: "The Void Stalker"
-status: "Implemented (sim) — art/anim pending"
+status: "Retired — implementation removed 2026-10-02"
 archetype: "In-your-face controller. Denies the ground the opponent wants to retreat to, drags them back into it, and cashes out with ordinary knockback. Shortest reach on the roster; blinks are both its approach and its only recovery."
 source_image: "TBD"
 inspiration: "Kassadin (LoL) — Riftwalk blink as core mobility, void-blade melee-mage hybrid. Ruh Kaan (Battlerite) — clawed silhouette, the grasp that yanks a target to you. Void (Supervive) — rift-as-a-real-zone you fight around, cold violet VFX language."
@@ -44,13 +44,12 @@ kit:
     type: "ult"
     description: "1.2s telegraphed rift, drags every enemy within 6m for 60t (3 dmg per 10t pulse = 18 over the drag), then detonates for 18 dmg with Kill-class knockback (`Custom{40°, 16, 9}`). Pulses and detonation damage every target in radius. Dodgeable by dashing out."
 ---
-> **Legacy implementation record — modification only.** The canonical kit contract is the package-native 16-entry grid: grounded and aerial variants of `1 / 2 / 3 / 4 / A / E / R / F`. `LMB` and `RMB` are camera controls, not persisted move identities. This file records the current simulation implementation and is not a template for new kit design. New characters must use `client/Unity/Assets/CharacterPackages/<package>/`.
-> Legacy source, registry, and baked-data details below remain valid only while Nilus is maintained through `LegacyCharacterCatalogAdapter`.
+> **Historical record — retired 2026-10-02.** Nilus's implementation, tests, exclusive runtime assets, and legacy compatibility path have been removed. The kit and source details below describe the former implementation, not supported gameplay or an authoring template. Current characters use the package-native 16-entry grid in `client/Unity/Assets/CharacterPackages/<package>/`.
 
 
 # Nilus — The Void Stalker
 
-> Status: **Implemented in sim** with placeholder art (FightGuy prefab, capsule hurtboxes). Art, animation and tuning are separate passes; see Ship Order.
+> Status: **Retired.** The simulation implementation described below no longer exists.
 > Inspired by: **Kassadin** (Riftwalk, void melee-mage) × **Ruh Kaan** (claws, the grasp) × **Void / Supervive** (rift as a real zone).
 
 ## Concept

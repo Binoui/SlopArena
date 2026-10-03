@@ -7,9 +7,9 @@ archetype: "In-your-face spacing duelist. Wins neutral with disjointed blade rea
 source_image: "TBD"
 inspiration: "Marth (Fire Emblem / Smash) — spacing, reach, punish game, counter, exploitable recovery. Amaterasu (DKO) — fast agile sword, launcher, air-juggle payoff."
 palette:
-  # Direction: mystic fox spirit. Refine during model/concept pass.
+  # Approved presentation accent: Matrix/hacker green; model palette remains open.
   fur: "TBD (white / silver, or classic fox orange)"
-  accents: "TBD (foxfire — cyan/violet or crimson)"
+  accents: "#91FF69 (Matrix/hacker green, from the existing sword VFX base tint)"
   blade: "TBD"
 kit:
   - slot: "LMB"
@@ -51,8 +51,17 @@ kit:
 > Status: Included in the cooked roster. Legacy Shared registry definitions are retired; new changes must use the package compiler, asset catalog, cooked package, and Match Content Catalog path.
 > Current Q/A is Shuriken Toss, not the Counter in the historical concept below. It fires three camera-forward projectiles without a HUD crosshair. Ground and air use the imported `kunai.fbx` model as a cosmetic projectile, while Shared retains all flight and hit authority.
 > Current R/Dash Slash: release directional aim into a 50-tick authored dash: 6 ticks at 5 m/s, 25 ticks at 10.5 m/s, then 18 ticks at 5.1 m/s after a one-tick windup (about 6.4 m total). The authored slash hitbox starts at tick 31; the bound animation keeps its own timing.
-> Current sword-hitbox VFX: the Wibou weapon config references `CFXR4 Sword Trail TECH (360 Thin Spiral)` for its shader, mask texture, color gradient, and authored dissolve curves. Unity bends those style inputs onto a short-lived blade-sweep ribbon connecting recent `bladeHilt` and `bladeEnd` poses; it does **not** instantiate the prefab's one-shot 360° mesh. The ribbon has no area if the sword stays still, fades over 0.12 s after movement, and clears immediately when the authoritative hilt-to-tip hitbox ends or is interrupted.
+> Current sword VFX: the Wibou weapon config references `CFXR4 Sword Trail TECH (360 Thick)` for its shader, mask texture, color gradient, and authored dissolve curves. Unity bends those style inputs onto a short-lived blade-sweep ribbon connecting recent `bladeHilt` and `bladeEnd` poses; it does **not** instantiate the prefab's one-shot 360° mesh. Baked blade emission starts at the authored hilt-to-tip hitbox trigger and follows the swing through its animation duration, independently of the damage-window end. Hitstop pauses ribbon/particle aging with the pose, including the final frozen snapshot. A stationary sword produces no new area; closing or interrupting the swing stops emission and lets the existing tail fade over the configured 0.12 s, even when an attack-only weapon hides. Death, teleport, and a new attack/stage identity clear old history. Damage and hitbox lifetimes remain Shared-owned.
 > Inspired by: **Marth** (spacing, reach, punish, counter, exploitable recovery) × **Amaterasu** (DKO — fast agile sword, launcher, air-juggle payoff).
+
+## Approved presentation accent — 2026-10-02
+
+Wibou's character accent is **Matrix/hacker green**, shared by sword VFX and ability-icon blades/arcs. The current weapon config's trail GUID resolves to `CFXR4 Sword Trail TECH (360 Thick)`, inheriting `(360 Spiral)` with base RGB `(0.5673758, 1, 0.41134745)`; its flat 8-bit icon equivalent is **`#91FF69`**. The particle/material HDR boost is not reproduced as UI glow. This replaces the undecided foxfire accent in the historical concept below; it does not approve a model/costume redesign.
+
+Grounded-normal icon readings: **G1 forward-reaching downward sweep; G2 forward-reaching rising sweep; G3 vertical rising swing; G4 downward hit**. Icons simplify the dominant active portion, omitting return hooks that imply a different action. All selected poses/paths remain inside their authored hitbox windows. Full active-only blade/hitbox measurements remain separate and must not be replaced by these cropped art compositions.
+
+The four transparent 512px icon samples, 50px-interior/70px-frame previews, and source/tick/color provenance are under `.impeccable/review/wibou-grounded-blade-icons-20261002/`. Artwork is individually fitted to a 448px safe area inside each 512px export, preserving proportions: about 44px on its long edge at native HUD size, with a small margin and no slot enlargement. Measurement plots retain their common scale; icon framing is not a reach comparison. These are inspected art samples, not yet wired runtime icons. Shared gameplay, existing VFX assets, normal/special category frames, damage-tier colors, and global menu colors are unchanged.
+
 
 ## Concept
 
@@ -70,16 +79,33 @@ Fox-spirit theme gives a distinct roster silhouette (monkey / human / fox) and n
 - Mobility: agile, for **repositioning and spacing**, not stealth/escape. Not a full run-in rushdown — a pressure-at-range fighter.
 - **Designed weakness:** weak once an opponent gets *inside* the blade (classic Marth flaw) and an **honestly exploitable recovery** (see below).
 
-### Movement tuning — 2026-09-15
+### Local gamefeel tuning — 2026-10-02
 
-Wibou keeps the roster's fastest Run (15 m/s), but pays for ground spacing with
-the lowest air-speed cap (8.5 → 7 m/s) and less frequent dashes. Air acceleration
-is reduced from 18 + 3.6 to 16 + 3.2 m/s²; dash speed drops from 24 to 22 m/s,
-with its 16-tick duration retained and cooldown increased from 44 to 52 ticks.
+Wibou retains the fastest Run at 14 m/s. Air cap remains 7 m/s and air
+acceleration 16 + 3.2 m/s². Jump/short-hop impulses remain 12/7.8 m/s;
+gravity is reduced to 32 m/s², with fall/fast-fall caps unchanged at 14/22 m/s.
+Source-compiled Shared measures full hop **43 ticks / 2.151 m** and short hop
+**27 ticks / 0.887 m**.
 
-The earlier `jumpForce` reduction from 13 to 12 remains: the authoritative
-flat-arena probe measures a 1.90 m full jump with 38 airborne ticks. Double-jump
-launch speed remains 9.6 m/s. Short hop, gravity, weight, and ability data are unchanged.
+Normals use approximately 1.05× previous durations, preserving the fast end of
+the roster. Contact windows and auto-cancel thresholds follow the stretched
+animation; landing lag, geometry, rewards and specials are unchanged.
+
+| Normal | Duration | IASA | Hit trigger / active length |
+|---|---:|---:|---|
+| ground.1 | 63 | 28 | 13 / 12 |
+| ground.2 | 63 | 23 | 9 / 7 |
+| ground.3 | 63 | 26 | 14 / 7 |
+| ground.4 | 74 | 63 | 41 / 15 |
+| air.1 | 27 | 23 | 6 / 8 |
+| air.2 | 25 | 21 | 4 / 5 |
+| air.3 | 27 | 23 | 10 / 7 |
+| air.4 | 36 | 31 | 8 / 8 |
+
+All entries are authored 60-Hz ticks. Ground normals retain at least four inactive
+ticks before another ability, eight for ground.4. Shared lifetime/IASA probes
+passed; this is source-only Editor tuning, not updated cooked content.
+Live Lab/Training alignment verification awaits the retained Editor owner.
 
 ### Grounded animation correction — 2026-09-15
 
@@ -111,10 +137,10 @@ Verified through the transient Editor development catalog: all eight grounded sl
 Run → idle, and jump → landing → idle. The corrected bindings and poses are now
 included in the cooked Wibou package and its refreshed roster requirement.
 
-### Grounded IASA tuning — 2026-09-15
+### Historical grounded IASA tuning — 2026-09-15
 
-Grounded normal cancellation now follows the same IASA boundary used by attacks when
-grounded movement input is held. The package source values are:
+This earlier pass introduced the movement/attack IASA boundary. Its values
+remain a historical record; the local source candidate above supersedes them.
 
 | Slot | Previous IASA | Tuned IASA | Intent |
 |------|--------------:|-----------:|--------|

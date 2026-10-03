@@ -430,7 +430,7 @@ public sealed class TimelineRuntimeTests
     public void InterruptionAndRemovalCancelWithoutNaturalEnd()
     {
         var sim = TestHelpers.MakeSim();
-        var def = TestHelpers.FightGuyDef;
+        var def = TestHelpers.EngineDef;
         sim.RegisterEntity(1, def, TestHelpers.PlayerState() with { PY = TestHelpers.GroundPY(def) });
         var probe = new ProbeAbility();
         sim.ActivateAbility(1, probe, 0, def);
@@ -477,28 +477,11 @@ public sealed class TimelineRuntimeTests
             Assert.Equal(expectedGround[i], def.GetCookedSlotAbility(wireSlots[i], false)!.Id);
             Assert.Equal("air." + expectedGround[i].Substring(expectedGround[i].IndexOf('.') + 1), def.GetCookedSlotAbility(wireSlots[i], true)!.Id);
         }
-        Assert.Null(AbilityFactory.CreateServer(CharacterClass.FightGuy, 2, false));
         Assert.Null(def.GetCookedSlotAbility(1, false));
         Assert.Null(def.GetCookedSlotAbility(10, false));
     }
 
 
-    [Fact]
-    public void FightGuyCycloneKickEmitsSemanticPresentationEvent()
-    {
-        var def = TestHelpers.FightGuyDef;
-        var sim = TestHelpers.MakeSim();
-        sim.RegisterEntity(1, def, TestHelpers.PlayerState() with
-        {
-            PY = TestHelpers.GroundPY(def),
-        });
-
-        sim.Tick(new Dictionary<ulong, InputState> { [1] = new InputState { ActiveSlot = 5 } });
-
-        var evt = Assert.Single(sim.GetPresentationEvents());
-        Assert.Equal(new PresentationEventKey(1, 1, 1, PresentationEventSource.Timeline, 10), evt.Key);
-        Assert.Equal("presentation.cyclone-kick.start", evt.PresentationId);
-    }
 
     private static CookedSlotDefinition Slot(ushort duration, params CookedTimelineOperation[] operations)
         => new(0, "ground.1", false, "Test", "Test", "icon.test", AuthoringAbilityBehavior.MeleeCombo,
@@ -510,16 +493,8 @@ public sealed class TimelineRuntimeTests
 
     private static (ServerSimulation Sim, CharacterDefinition Def) Create(CookedSlotDefinition slot, CharacterState? state = null)
     {
-        var def = new CharacterDefinition
-        {
-            Class = CharacterClass.Manki,
-            DisplayName = "Cooked Test",
-            CapsuleHeight = 1.7f,
-            CapsuleRadius = .35f,
-            Movement = TestHelpers.FightGuyDef.Movement,
-            CookedSlots = new[] { slot },
-            HurtboxCapsules = Array.Empty<HurtboxCapsule>(),
-        };
+        var def = TestHelpers.EngineDef;
+        def.CookedSlots = new[] { slot };
         var sim = TestHelpers.MakeSim();
         sim.RegisterEntity(1, def, state ?? TestHelpers.PlayerState());
         return (sim, def);

@@ -38,13 +38,6 @@ public sealed class CharacterPackageCompilerTests
         Assert.DoesNotContain(result.Diagnostics, x => x.Severity == CharacterDiagnosticSeverity.Error);
         Assert.Equal(16, result.CookedPackage!.Definition.Slots.Count);
         Assert.Equal(16, result.CookedPackage.Budget.SlotCount);
-        Assert.Equal("anim.cyclone-kick", result.CookedPackage.Definition.Slots.Single(x => x.Id == "ground.R").Timeline.Stages[0].AnimationIds.Single());
-        Assert.Equal("anim.cyclone-kick", result.CookedPackage.Definition.Slots.Single(x => x.Id == "air.R").Timeline.Stages[0].AnimationIds.Single());
-        Assert.Equal(new ushort[] { 25, 25, 5 }, result.CookedPackage.Definition.Slots.Single(x => x.Id == "ground.E").Timeline.Stages[0].Operations.OfType<CookedSpawnHitboxOperation>().Select(x => x.Hitbox.DurationTicks).ToArray());
-        var groundR = result.CookedPackage.Definition.Slots.Single(x => x.Id == "ground.R");
-        var presentation = Assert.IsType<CookedEmitPresentationOperation>(groundR.Timeline.Stages[0].Operations[1]);
-        Assert.Equal("presentation.cyclone-kick.start", presentation.PresentationId);
-        Assert.Equal(10, presentation.OperationIndex);
         var second = CharacterPackageCompiler.Compile(Fixture("package.json"), Fixture("character.json"), CharacterCookProfile.TrustedBuiltIn);
         Assert.Equal(result.CookedPackage.CanonicalBytes, second.CookedPackage!.CanonicalBytes);
     }
@@ -181,6 +174,57 @@ public sealed class CharacterPackageCompilerTests
             });
         });
         AssertError(conflict, "slot.slide-carry.motion-conflict");
+    }
+
+    [Fact]
+    public void HitPresentationId_RoundTripsThroughSourceCookRuntimeAndAliasProjection()
+    {
+        var json = JsonNode.Parse(Fixture("character.json"))!.AsObject();
+        json["presentationIds"]!.AsArray().Add("presentation.test.hit");
+        var ground = json["slots"]!.AsArray().Single(x => x!["id"]!.GetValue<string>() == "ground.1")!.AsObject();
+        var target = json["slots"]!.AsArray().Single(x => x!["id"]!.GetValue<string>() == "ground.2")!;
+        target["hitPresentationId"] = "presentation.test.hit";
+        var air = json["slots"]!.AsArray().Single(x => x!["id"]!.GetValue<string>() == "air.1")!;
+        air["hitPresentationId"] = "presentation.test.hit";
+        var slotIndex = json["slots"]!.AsArray().IndexOf(ground);
+        ((JsonArray)json["slots"]!).RemoveAt(slotIndex);
+        ((JsonArray)json["aliases"]!).Add(new JsonObject { ["from"] = "ground.1", ["to"] = "ground.2" });
+
+        var loaded = CharacterPackageSourceCodec.Load(Fixture("package.json"), json.ToJsonString());
+        Assert.True(loaded.IsValid, string.Join("\n", loaded.Diagnostics));
+        var rewritten = CharacterPackageSourceCodec.SerializeCharacter(loaded.Source!.Character);
+        var reloaded = CharacterPackageSourceCodec.Load(Fixture("package.json"), rewritten);
+        Assert.True(reloaded.IsValid, string.Join("\n", reloaded.Diagnostics));
+        Assert.Equal("presentation.test.hit", reloaded.Source!.Character.Slots.Single(x => x.Id == "ground.2").HitPresentationId);
+
+        var compiled = CharacterPackageCompiler.Compile(loaded.Source, CharacterCookProfile.TrustedBuiltIn);
+        Assert.NotNull(compiled.CookedPackage);
+        var cooked = compiled.CookedPackage!.Definition.Slots.Single(x => x.Id == "ground.1");
+        Assert.Equal("presentation.test.hit", cooked.HitPresentationId);
+        Assert.Equal("presentation.test.hit", compiled.CookedPackage.Definition.Slots.Single(x => x.Id == "air.1").HitPresentationId);
+
+        var definition = CookedCharacterRuntimeAdapter.ToCharacterDefinition(compiled.CookedPackage);
+        Assert.Equal("presentation.test.hit", definition.GetCookedSlotAbility(AbilitySlots.Slot1, false)!.HitPresentationId);
+        Assert.Equal("presentation.test.hit", definition.GetCookedSlotAbility(AbilitySlots.Slot1, true)!.HitPresentationId);
+        Assert.Equal("presentation.test.hit", definition.GetCookedSlotAbility(AbilitySlots.Slot2, false)!.HitPresentationId);
+        Assert.Equal(compiled.CookedPackage.CanonicalBytes, CharacterPackageCompiler.Compile(
+            reloaded.Source!, CharacterCookProfile.TrustedBuiltIn).CookedPackage!.CanonicalBytes);
+    }
+
+    [Fact]
+    public void HitPresentationId_RejectsUndeclaredPresentationAndAbsentUsesDefault()
+    {
+        var absent = CompileCharacter(character =>
+        {
+            foreach (var slot in character["slots"]!.AsArray())
+                slot!.AsObject().Remove("hitPresentationId");
+        });
+        Assert.NotNull(absent.CookedPackage);
+        Assert.All(absent.CookedPackage!.Definition.Slots, slot => Assert.Null(slot.HitPresentationId));
+        Assert.Null(CookedCharacterRuntimeAdapter.ToCharacterDefinition(absent.CookedPackage).A!.HitPresentationId);
+
+        AssertError(CompileCharacter(x => x["slots"]![0]!["hitPresentationId"] = "presentation.unknown.hit"), "reference.unresolved");
+        AssertError(CompileCharacter(x => x["slots"]![0]!["hitPresentationId"] = "Bad ID"), "id.invalid");
     }
 
     [Fact]

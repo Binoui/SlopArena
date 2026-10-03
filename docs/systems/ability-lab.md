@@ -86,6 +86,31 @@ dimensions, duplicate ticks, and existing output files; a failed batch removes
 its partial PNGs. Capture restores the prior scenario/cursor, playback,
 visibility, camera, and render target on success or failure.
 
+Capture uses a temporary camera with the preview view's orientation and fits
+the complete visible Lab fighter/weapon bounds for each requested frame.
+Camera framing can change between frames; PNG scale is not a reach comparison.
+Scene camera layer masks, lens shifts, and partial viewports do not crop the
+capture. Only Lab-owned renderer hierarchies are included, including visible
+scenario opponents; unrelated scene/editor-preview renderers are temporarily
+excluded and their rendering state is restored. Weapon props follow their
+owner's hierarchy, so hiding a fighter also hides its weapons.
+Capture temporarily enables per-render skinned-mesh matrix recalculation so
+freshly evaluated bones are reflected in the PNG without waiting for an Editor
+frame. Original renderer settings are restored afterward.
+
+Authoring and recorded-frame scrubs explicitly evaluate skeletal poses even
+when the model is offscreen. The Animator's culling policy is restored after
+each seek. Edit Mode playback is driven by the editor update loop and editor
+clock, not by updates on the hidden preview rig. Play Mode authoring retains
+scaled delta-time behavior; recorded scenarios retain their realtime clock.
+
+Package authoring and recorded previews select clips from the Shared state's
+animation phase, independently of the number of timeline stages, and use the
+same playback-speed calculation as the runtime renderer. Aim/release capabilities
+can have multiple animation phases inside one timeline stage; clamping the phase
+to that stage count would display the wrong clip and pose. Live-draft refreshes
+also reattach the selected catalog's weapon props when reusing preview renderers.
+
 The workspace prepares current source in memory through existing compiler,
 verified poses, catalog, and rig; it does not save, cook, change Undo history,
 or write source/cooked files. Persisted authoritative preview still requires
@@ -138,25 +163,23 @@ The compact toolbar status has this precedence: `No package → Unsaved → Cook
 failed → Stale → Cooked`. Clicking status opens the structured diagnostics panel. Hashes and
 raw IDs are shown only in Advanced.
 
+Weapon props use the package catalog's `WeaponConfig`; timeline VFX use separate
+semantic presentation bindings. Manki F holds `manki_aerosol.prefab` on the right
+hand during aiming/attacking and emits `MankiAerosolInferno` at attack tick 18.
+Presentation attachment IDs such as `bone.right-hand` resolve to the rig's
+`mixamorig:RightHand` transform; they are not literal transform names.
+
 ## Authority boundary
 
 Canonical package slot IDs are the persisted move identity. `CanonicalSlotProjection.All`
 exposes the sixteen read-only `SlotAddress` values in ground-then-air order, with input
-labels `1`, `2`, `3`, `4`, `A`, `E`, `R`, `F`. Human labels and the legacy `CharacterClass`
-selector are adapters only; see ADR-0030.
+labels `1`, `2`, `3`, `4`, `A`, `E`, `R`, `F`. Human labels and `CharacterClass`
+roster selectors are adapters only; see ADR-0030.
 
 A stale source keeps the last verified cooked preview visible and shows stale diagnostics.
 Missing or invalid cooked content produces `Preview unavailable`. Missing generated
 catalog/rig bindings are reported at the preview seam, and the rig setup state distinguishes
 no scene rig, valid rig, and unavailable package preview.
-
-## Compatibility mode
-
-Nilus and other unmigrated content remain behind
-`LegacyCharacterCatalogAdapter`. Compatibility is a separate read-only UI shell with a
-persistent legacy-authority banner. It is the only Ability Lab path that may use legacy
-`CharacterClass` selection. Package mode has no package editing controls in Compatibility and
-never uses the legacy roster to resolve a package.
 
 ## Moves interaction
 
@@ -167,6 +190,16 @@ scrubbing, supports `0.5×..4×` zoom with horizontal scrolling, and preserves i
 control identity. Root and timeline focus support Left/Right tick stepping, `Ctrl+S`,
 `Ctrl+Z`, `Ctrl+Shift+Z`, and Escape drag cancellation; text fields keep their normal editor
 shortcuts.
+
+`Add targeted leap` creates one public `slop.ability.targeted-leap.v1` operation
+and its package capability requirement in the same Undo step. Its Moves inspector
+edits aim/flight limits, range, vertical launch, landing animation seek, recovery,
+and the nested landing hitbox; changes compile into the live draft without saving.
+The seek plus recovery must fit the authored stage, and the hitbox duration must
+fit recovery. Ordinary timeline scrubbing cannot predict the landing frame of a
+variable-length flight: use a recorded Shared scenario to inspect the actual
+landing and impact. `SAVE + COOK` persists the source/cooked package; admitted
+matches also require a roster refresh.
 
 In package Edit Mode, active resolved hitboxes expose SceneView selection buttons and a radius
 handle. Radius changes commit through the same source workspace authority. Compatibility,

@@ -110,8 +110,7 @@ public sealed class MatchContentCatalogBuildResult
 public sealed class MatchContentCatalogBuilder
 {
     public MatchContentCatalogBuildResult Build(BuiltInRosterManifest manifest,
-        IReadOnlyDictionary<string, CookedCharacterPackageLoadResult> cookedPackages,
-        LegacyCharacterCatalogAdapter legacyAdapter)
+        IReadOnlyDictionary<string, CookedCharacterPackageLoadResult> cookedPackages)
     {
         var diagnostics = new List<CharacterDiagnostic>();
         if (manifest == null) { diagnostics.Add(Error("catalog.manifest.missing", "manifest", "Roster manifest is required.")); return new(null, diagnostics); }
@@ -129,27 +128,13 @@ public sealed class MatchContentCatalogBuilder
                 continue;
             }
             if (roster.Requirement == null) continue;
-            if (roster.Requirement.Version == "legacy-1")
+            if (cookedPackages == null || !cookedPackages.TryGetValue(roster.PackageId, out var loaded) || loaded == null || !loaded.IsValid || loaded.Package == null)
             {
-                if (legacyAdapter == null) { diagnostics.Add(Error("catalog.legacy.adapter-missing", roster.PackageId, "Legacy adapter is required.")); continue; }
-                if (!legacyAdapter.TrySnapshot(roster.Selector, out var snapshot, out var snapshotDiagnostics))
-                {
-                    diagnostics.AddRange(snapshotDiagnostics);
-                    continue;
-                }
-                if (!IdentityMatches(roster.Requirement, snapshot.Identity, roster.PackageId, diagnostics)) continue;
-                byPackage[roster.PackageId] = new MatchContentEntry(new ContentHandle(1), snapshot.LegacySelector, snapshot.Identity, snapshot.DisplayName, snapshot.Definition, snapshot.BakedAnimation);
+                diagnostics.Add(Error("catalog.package.missing", roster.PackageId, "Cooked package is missing or invalid."));
+                continue;
             }
-            else
-            {
-                if (cookedPackages == null || !cookedPackages.TryGetValue(roster.PackageId, out var loaded) || loaded == null || !loaded.IsValid || loaded.Package == null)
-                {
-                    diagnostics.Add(Error("catalog.package.missing", roster.PackageId, "Cooked package is missing or invalid."));
-                    continue;
-                }
-                if (!IdentityMatches(roster.Requirement, loaded.Identity, roster.PackageId, diagnostics)) continue;
-                byPackage[roster.PackageId] = new MatchContentEntry(new ContentHandle(1), roster.Selector, loaded.Identity, loaded.Package.Definition.DisplayName, loaded.ToCharacterDefinition(roster.Selector), loaded.BakedAnimation, loaded.Package);
-            }
+            if (!IdentityMatches(roster.Requirement, loaded.Identity, roster.PackageId, diagnostics)) continue;
+            byPackage[roster.PackageId] = new MatchContentEntry(new ContentHandle(1), roster.Selector, loaded.Identity, loaded.Package.Definition.DisplayName, loaded.ToCharacterDefinition(roster.Selector), loaded.BakedAnimation, loaded.Package);
         }
         if (diagnostics.Any(x => x.Severity == CharacterDiagnosticSeverity.Error)) return new(null, diagnostics);
         var ordered = byPackage.Values.OrderBy(x => x.Identity.PackageId, StringComparer.Ordinal).ToList();
@@ -162,8 +147,6 @@ public sealed class MatchContentCatalogBuilder
         return new MatchContentCatalogBuildResult(new MatchContentCatalog(entries), diagnostics);
     }
 
-    public MatchContentCatalogBuildResult Build(BuiltInRosterManifest manifest, IReadOnlyDictionary<string, CookedCharacterPackageLoadResult> cookedPackages)
-        => Build(manifest, cookedPackages, new LegacyCharacterCatalogAdapter());
 
     private static void ValidateManifest(BuiltInRosterManifest manifest, List<CharacterDiagnostic> d)
     {
@@ -194,55 +177,6 @@ public sealed class MatchContentCatalogBuilder
     public static bool IsStablePackageId(string value) => !string.IsNullOrEmpty(value) && value.All(x => (x >= 'a' && x <= 'z') || (x >= '0' && x <= '9') || x == '.' || x == '-') && char.IsLetter(value[0]);
 }
 
-public sealed class LegacyCharacterCatalogAdapter
-{
-    private static readonly CharacterClass[] LegacySelectors = { CharacterClass.Nilus };
-
-    public MatchContentEntry Snapshot(CharacterClass selector)
-    {
-        if (!TrySnapshot(selector, out var entry, out var diagnostics))
-            throw new InvalidDataException(string.Join("; ", diagnostics.Select(x => x.Message)));
-        return entry;
-    }
-
-    public bool TrySnapshot(CharacterClass selector, out MatchContentEntry entry, out IReadOnlyList<CharacterDiagnostic> diagnostics)
-    {
-        entry = null!;
-        var d = new List<CharacterDiagnostic>();
-        if (!LegacySelectors.Contains(selector)) { d.Add(MatchContentCatalogBuilder.Error("catalog.legacy.selector", selector.ToString(), "Selector is not a legacy built-in.")); diagnostics = d; return false; }
-        CharacterDefinition source;
-        try { source = CharacterRegistry.Get(selector); }
-        catch (Exception ex) { d.Add(MatchContentCatalogBuilder.Error("catalog.legacy.lookup", selector.ToString(), ex.Message)); diagnostics = d; return false; }
-        if (source == null) { d.Add(MatchContentCatalogBuilder.Error("catalog.legacy.null", selector.ToString(), "Registry returned no definition.")); diagnostics = d; return false; }
-        try
-        {
-            string json = CharacterContentSerializer.Serialize(selector.ToString().ToLowerInvariant(), source);
-            var clone = CharacterContentSerializer.Load(json);
-            string hash = MatchContentInternals.Sha256(Encoding.UTF8.GetBytes(json));
-            var identity = new MatchContentIdentity(selector.ToString().ToLowerInvariant(), "legacy-1", hash, hash, hash);
-            entry = new MatchContentEntry(new ContentHandle(1), selector, identity, clone.DisplayName, clone, LoadBaked(clone));
-            diagnostics = d;
-            return true;
-        }
-        catch (Exception ex)
-        {
-            d.Add(MatchContentCatalogBuilder.Error("catalog.legacy.snapshot", selector.ToString(), ex.Message));
-            diagnostics = d;
-            return false;
-        }
-    }
-
-    private static BakedAnimationData? LoadBaked(CharacterDefinition definition)
-    {
-        if (string.IsNullOrWhiteSpace(definition.BakedDataPath)) return null;
-        try
-        {
-            string path = definition.BakedDataPath.Replace("res://", "", StringComparison.Ordinal);
-            return BakedAnimationData.LoadFromBin(File.ReadAllBytes(path));
-        }
-        catch { return null; }
-    }
-}
 
 public static class BuiltInRosterManifestCodec
 {
@@ -278,7 +212,7 @@ public static class BuiltInRosterManifestCodec
 
     private static CharacterClass ParseSelector(string value) => value switch
     {
-        "Manki" => CharacterClass.Manki, "FightGuy" => CharacterClass.FightGuy, "Wibou" => CharacterClass.Wibou, "Bonk" => CharacterClass.Bonk, "Nilus" => CharacterClass.Nilus,
+        "Manki" => CharacterClass.Manki, "FightGuy" => CharacterClass.FightGuy, "Wibou" => CharacterClass.Wibou, "Bonk" => CharacterClass.Bonk,
         _ => throw new InvalidDataException("Unknown roster selector.")
     };
     private static Dictionary<string, JsonElement> ParseObject(string json, string path)

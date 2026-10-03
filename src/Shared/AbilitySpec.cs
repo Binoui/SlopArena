@@ -59,6 +59,8 @@ namespace SlopArena.Shared
         /// or locomotion (mobile policy).
         /// </summary>
         public string? AimAnimationId;
+        /// <summary>Optional semantic hit VFX override. Null or empty preserves default presentation.</summary>
+        public string? HitPresentationId;
         public string Name = "";
         public string Description = "";
         /// <summary>Resource filename (without extension) under Resources/Icons/{CharacterClass}/. Null/empty = no icon.</summary>

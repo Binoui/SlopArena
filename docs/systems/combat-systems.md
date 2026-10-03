@@ -30,7 +30,7 @@ All gameplay timing uses 60 Hz ticks. Values are authored in package data and re
 While `Shielding`, Shared replaces the fighter's ordinary attack-contact hurtboxes
 with one non-shrinking sphere centered on its capsule center. The package-owned
 `shieldRadius` is authoritative: FightGuy, Wibou, and Bonk use 1.05 m, Manki
-0.95 m, and legacy Nilus 1.025 m initially. Ordinary melee, projectile, and
+0.95 m. Ordinary melee, projectile, and
 explosion hitboxes contact the sphere from every direction, without damage,
 reflection, shield-poking, or a meter. The first physical surface contact
 determines which fighter a one-hit projectile strikes. Block stun, hitstop,
@@ -177,6 +177,13 @@ SlopArena uses damage percent rather than a conventional health pool. A hit appl
 - **Block stun** locks a defender after a blocked contact for `clamp(ceil(0.6 × incoming damage) + 2, 4, 15)` ticks; overlaps retain the larger remaining duration.
 - **Shield drop** lasts 7 vulnerable ticks after release; release during block stun starts the full drop only when the stun expires.
 - **Clash** resolves simultaneous Interruptible hitboxes as mutual pushback and short stun instead of an arbitrary trade.
+- **Armor** is an authored activation window, not invulnerability: incoming
+  damage/contact feedback and Hitstop remain, but ordinary launch, Hitstun and
+  SDI do not apply. The contact snapshots protection before Hitstop; no deferred
+  launch appears when the window expires. Grabs bypass armor.
+- Ordinary Hitstun is derived from launch magnitude; `stunTicks` is a gate.
+  An opt-in hitbox `fixedHitstunTicks` gives a bounded linking duration without
+  increasing displacement. It does not bypass armor or a zero stun gate.
 
 Visual hit reactions, VFX, audio, and camera effects are presentation only. Damage and state transitions occur in Shared simulation.
 

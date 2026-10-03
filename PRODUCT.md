@@ -39,7 +39,7 @@ Gameplay runs at 60 Hz. The client renders authoritative state and semantic pres
 - Raw authoring JSON is cook input, not the runtime contract.
 - Server-side simulation is authoritative. Unity physics, animation callbacks, VFX, and audio are presentation or authoring aids only.
 - Shared simulation code remains free of Unity types and engine physics queries.
-- Current admitted demo roster: FightGuy, Manki, Wibou, and Bonk. Nilus is legacy compatibility content and is not part of the four-character demo roster.
+- Current admitted demo roster: FightGuy, Manki, Wibou, and Bonk. Nilus and its legacy character execution path are retired.
 - The longer-term Workshop direction permits approved deterministic primitives and package-owned assets, not arbitrary simulation code, native plugins, or direct Unity-path dependencies.
 - The current implementation targets Unity 6 desktop. SlopArena also has a separate web presentation surface; the Impeccable platform value `adaptive` records that the product spans these first-party surfaces rather than asserting a mobile-native target.
 
@@ -51,7 +51,7 @@ Target graphic primary actions and selection use Action Yellow (`#FFCC22`). Arch
 
 The canonical visual-language guide is `docs/design/visual-language.md`; art conventions remain authoritative for 3D and assets. The sibling repository `../SlopArena-web` is the web graphic reference.
 
-**Status:** SlopArena is unreleased, developed by a solo developer, and is not on Steam. The player-facing identity rollout is implemented. Frontend pages use the user's authored paper background; Home has separate mode/poster/announcement columns. Chat is an absolute user-sized overlay in menus and gameplay and does not influence underlying composition. Settings, match overlays, and HUD retain readable neutral fields; HUD geometry/function colors and 3D arenas remain unchanged. Existing navigation, data, authority, and networking are preserved. Connected-room, distributable-player, creator/Ability Lab, website, and release-copy migration are not claimed; the website still has the misleading Steam CTA.
+**Status:** SlopArena is unreleased, developed by a solo developer, and is not on Steam. The player-facing identity rollout is implemented. Frontend pages use the user's authored paper background; Home has separate mode/poster/announcement columns. Chat is an absolute user-sized overlay in menus and gameplay and does not influence underlying composition. Settings and match overlays retain readable neutral fields. The separately approved gameplay HUD now has fight-card player panels with clear lives, clipped-square slots in the existing diamonds, shared damage-tier colors, and a persistent target marker with an optional overhead percentage. 3D arenas, existing navigation, gameplay data/authority, and networking are preserved. Connected-room, distributable-player, creator/Ability Lab, website, and release-copy migration are not claimed; the website still has the misleading Steam CTA.
 
 ## Evidence on Hand
 

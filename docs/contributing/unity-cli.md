@@ -33,19 +33,91 @@ unity doctor
 Use `--format json` for automation. Results are written to stdout, errors to stderr, and
 command failure produces a nonzero exit code.
 
-## Pipeline connection
+### Gateway baseline and upgrades
 
-Pipeline runs a localhost HTTP server inside the running Editor. The CLI discovers it
-through `Library/Pipeline/.unity-pipeline-port`.
+The project-local ownership gateway uses Unity CLI `1.0.0-beta.6` and embedded
+`com.unity.pipeline` `0.5.0-exp.1`. On 2026-10-03, the canonical Editor passed
+31 gateway regressions, five native ownership tests, real caller contention and
+automatic release/restoration, retained-lease domain reload, and actual process
+restart/stale-token rejection. The [cutover receipt](../../../sloparena-workspace/_bmad-output/editor-coordination/gateway-cutover-verification.json)
+records commands, lifecycle evidence and preservation limits. The planning workspace's
+[coordination protocol](../../../sloparena-workspace/docs/unity-editor-coordination.md)
+now uses Pipeline runtime status, not Markdown assignments, as ownership authority.
+Ordinary agents wait for their own lease; no previous owner's response is required.
+
+The gateway lives in the planning workspace at `scripts/unity-editor-gateway.ts`
+and invokes the installed CLI without modifying it. CLI and Pipeline upgrades
+are separate:
+
+- **CLI:** compatibility depends on `command --runtime-path`, JSON output,
+  non-interactive/proxy flags, HTTP routes and native result shapes. Before
+  adopting a new version, run `node --test --test-concurrency=1
+  scripts/unity-editor-gateway.test.ts` from the planning workspace, then have
+  the owner exercise discovery, command execution, semantic failure,
+  restoration and automatic release using that actual CLI. Fixture tests alone
+  do not establish compatibility with a different installed binary.
+- **Pipeline:** `client/Unity/Packages/com.unity.pipeline/` is a maintained local
+  fork, based on upstream revision `17df0ac8d6533a8c22830c89dc85a24c01f30ade`.
+  An upstream update must preserve and verify the ownership enforcement and
+  lifecycle changes; replacing the folder with stock Pipeline loses them.
+
+Keep the embedded package's source, assembly definitions, required DLLs,
+Unity metadata, tests and license versioned with the package manifest/lock.
+Only upstream repository metadata is ignored. Connection descriptors/tokens
+under `Library/`, temporary files and logs remain local; referenced verification
+markers and live coordination plans are not disposable output.
+
+## Pipeline connection and shared Editor leases
+
+Read the canonical [shared Editor protocol](../../../sloparena-workspace/docs/unity-editor-coordination.md)
+before operating the main Editor. Each agent runs its own bounded gateway batch.
+The gateway waits for a busy Editor, atomically claims its own lease, executes,
+restores declared state, and releases only after actual work settles. Do not send
+ordinary verification requests to another owner's inbox or inject commands into
+their session. Missing, blocked or uncertain ownership never means free.
+
+The gateway uses the installed Unity CLI and the canonical project's
+`Library/Pipeline/.unity-pipeline-port`; never overwrite that descriptor or use
+raw `unity command --project-path` to bypass ownership.
+
+Use your own runtime-issued terminal handle from the injected session/task identity.
+Set `ORCA_TERMINAL_HANDLE` explicitly; the gateway confirms that exact handle and
+incarnation with Orca. Never infer your identity from an active pane or an unqualified
+`orca-ide terminal show`. Missing/mismatched/orphaned identity fails before acquisition.
+
+For the examples below, define this local shell helper once; it is not an installed
+alias and does not modify shell configuration:
 
 ```bash
-unity pipeline list --format json
-unity command --project-path client/Unity --query sloparena --detail compact --format json
+export ORCA_TERMINAL_HANDLE='<your-own-runtime-issued-terminal-handle>'
+editor() {
+  bun /home/binoui/Documents/projects/sloparena-workspace/scripts/unity-editor-gateway.ts \
+    --project-path /home/binoui/Documents/projects/SlopArena/client/Unity -- "$@"
+}
+
+# Observation only: no lease and no Editor command.
+bun /home/binoui/Documents/projects/sloparena-workspace/scripts/unity-editor-gateway.ts \
+  status --project-path /home/binoui/Documents/projects/SlopArena/client/Unity
+
+# Discovery is part of this agent's own lease.
+editor --query sloparena --detail compact
 ```
 
 The project exposes self-describing commands. Discover the relevant command family
 with `--query` or `--tag`; use `--detail full` only when its argument schema is needed.
+The gateway controls connection/output flags and forces JSON. Stdout is a JSON stream
+containing native command results followed by final ownership status; diagnostics go
+to stderr. It exits nonzero for transport, typed semantic, compile or native test failure.
+When filtering a result, enable `set -o pipefail` and select native `.data` objects,
+not the final ownership object.
 
+For dependent commands, pass `--batch <json-file>` before `--` instead of invoking
+the helper separately. Input is `{"commands":[["editor_status"],["get_console_logs",
+"--severity","error","--limit","20"]],"restore":[]}`. Put required restoration in
+`restore`; it runs before release, including after a settled command failure.
+Do not retain a lease while doing unrelated coding. Interactive `--hold` is an
+explicit exception, not the default. Ctrl-C before acquisition cancels only the wait;
+after acquisition the gateway settles owned work/restoration before release.
 
 
 ## Ability Lab agent commands
@@ -55,24 +127,18 @@ first. Do not generate temporary C# or use `eval` to create opponents or arrange
 gameplay. `eval` is reserved for novel diagnostics not covered by a typed command.
 
 ```bash
-unity command --project-path client/Unity \
-  sloparena.lab.open --target fightguy --format json
+editor sloparena.lab.open --target fightguy
 # Normal hit
-unity command --project-path client/Unity \
-  sloparena.lab.run --action ground.1 --ticks 60 --distance 1.2 \
-  --opponent idle --format json
+editor sloparena.lab.run --action ground.1 --ticks 60 --distance 1.2 \
+  --opponent idle
 # Block, miss, shared grab capture/throw
-unity command --project-path client/Unity \
-  sloparena.lab.run --action ground.1 --ticks 60 --distance 1.2 \
-  --opponent shield --format json
-unity command --project-path client/Unity \
-  sloparena.lab.run --action ground.1 --ticks 60 --distance 12 \
-  --opponent idle --format json
-unity command --project-path client/Unity \
-  sloparena.lab.run --action grab --ticks 60 --distance 0.7 \
-  --opponent idle --format json
-unity command --project-path client/Unity \
-  sloparena.lab.inspect --format json
+editor sloparena.lab.run --action ground.1 --ticks 60 --distance 1.2 \
+  --opponent shield
+editor sloparena.lab.run --action ground.1 --ticks 60 --distance 12 \
+  --opponent idle
+editor sloparena.lab.run --action grab --ticks 60 --distance 0.7 \
+  --opponent idle
+editor sloparena.lab.inspect
 ```
 
 The Ability Lab UI shows both fighters and scenario controls. The `run`
@@ -91,11 +157,9 @@ Canonical actions without a matching run retain ordinary authoring preview.
 For example, run a grab with the desired distance/opponent/horizon, then:
 
 ```bash
-unity command --project-path client/Unity \
-  sloparena.lab.preview --action grab --tick 7 --format json
-unity command --project-path client/Unity \
-  sloparena.lab.capture --action grab --ticks 7,19 \
-  --output .ability-lab-cache/fightguy/grab --format json
+editor sloparena.lab.preview --action grab --tick 7
+editor sloparena.lab.capture --action grab --ticks 7,19 \
+  --output .ability-lab-cache/fightguy/grab
 ```
 
 This scenario frame numbering differs from canonical authoring timeline
@@ -120,6 +184,23 @@ failure; it restores prior scenario/cursor/playback/visibility/camera/render
 target. Capture accepts up to 64 distinct ticks, 64–4096 pixel dimensions,
 and writes only below repository-relative `.ability-lab-cache/`; no overwrite.
 
+Capture supports repeatable actor-relative `--view front|back|left|right|top|bottom`
+(default `current`), or absolute camera angles in degrees via `--camera-yaw` [-180,180]
+and `--camera-pitch` [-90,90]. Do not combine a view preset with angles. Orientation
+is applied to the capture camera after seeking the pose, not to a camera changed
+between CLI calls. Each `captures[].camera` reports actual position/forward/quaternion
+and effective overlay/dummy flags.
+
+Both capture and preview accept `--overlays current|none|hitboxes,hurtboxes,bones,trajectory`
+and `--dummy on|off`. `none` also hides dummy hurtbox lines and the dummy;
+combining it with `--dummy on` is rejected. Preview retains the chosen visibility;
+capture restores it. Use a fresh output directory for each capture:
+
+```bash
+editor sloparena.lab.capture --action ground.F --ticks 18 --view front \
+  --overlays none --output .ability-lab-cache/manki/front-check
+```
+
 The workspace prepares current source in memory using existing compilation,
 verified poses, catalog and rig without saving, cooking, changing Undo history,
 or writing source/cooked files. Persisted authoritative preview still requires
@@ -137,20 +218,19 @@ scenario frame/MatchTick or authoring applied stage/local/cumulative tick.
 Root result is the restored workspace state. See the
 [Ability Lab guide](../systems/ability-lab.md) for the complete contract.
 
-Pipeline wraps typed results under `data.result`; outer command success is
-transport status. For automation, require semantic success explicitly:
+Pipeline wraps typed results under `data.result`; outer command success is transport
+status. The gateway propagates semantic failure. To inspect a typed result explicitly:
 
 ```bash
-unity command --project-path client/Unity \
-  sloparena.lab.run --action ground.1 --distance 1.2 --opponent idle \
-  --format json | jq -e '.data.result.success'
+set -o pipefail
+editor sloparena.lab.run --action ground.1 --distance 1.2 --opponent idle \
+  | jq -e 'select(.data != null) | .data.result.success'
 ```
 
 Discover this family narrowly:
 
 ```bash
-unity command --project-path client/Unity \
-  --query sloparena.lab --detail full --format json
+editor --query sloparena.lab --detail full
 ```
 
 Routing: use native Pipeline commands for generic Unity tasks and
@@ -158,11 +238,166 @@ Routing: use native Pipeline commands for generic Unity tasks and
 command covers the operation; never invent aliases or obsolete `--slot`
 arguments.
 
+### Evaluated presentation inspection
+
+```bash
+editor sloparena.lab.inspect --bones bone.head,bone.right-hand
+editor sloparena.presentation.inspect --target lab --bones bone.head,bone.right-hand
+```
+
+These inspect existing actor transforms, evaluated animation, named bone transforms,
+renderer bounds and weapon attachments without refreshing the pose, creating a rig
+or initializing an animation graph. Missing observations carry diagnostics, not
+idle/root substitutes. The Lab window's transient rig is a valid inspection target.
+Standalone runtime inspection uses `--target runtime --entity <decimal-string-id>`
+in Play Mode; missing or ambiguous entities fail. `lab.inspect` reports an unavailable
+presentation through `presentationError`, separately from its workspace status.
+
+The stopped-Editor Lab path is owner-verified; runtime entity inspection still needs
+a coordinated Play-Mode smoke. Compile success alone is not runtime acceptance.
+
+### Supported preferences and live Training
+
+**Verification limit:** parser regressions passed in the stopped Editor; live
+preference application and Training sequence execution remain unverified. Coordinate
+Play Mode with the retained Editor owner before exercising these commands.
+
+`sloparena.settings.inspect` reads the existing settings owner without creating it.
+`sloparena.settings.apply --patch '<JSON object>'` defaults to dry-run; it reports
+requested, proposed, before and observed after values. Supported keys are `uiScale`
+(80/90/100/110/120/130/140 percent), `targetOpacity` (20–100 percent),
+`screenShake` (0–100 percent), `showOverheadDamage` and `reducedFlashing` (booleans).
+Unknown/duplicate keys and invalid types/ranges fail before setters run.
+Actual application requires `--dry-run false --confirm true` and persists through
+the settings service. Save original values and restore them after verification.
+Check `persistenceStatus` and nullable `persisted`; a partial failure is not rollback.
+
+`sloparena.training.run --steps '[{"ticks":1,"slot":"1"},{"ticks":30}]'`
+intentionally mutates an existing, unpaused Play-Mode Training match through Shared;
+it does not restore gameplay state. Each step has positive integer `ticks`, with
+at most 600 total simulation ticks and a 30-second deadline. `slot` accepts canonical
+labels `1/2/3/4/A/E/R/F`; slot and `*Pressed` inputs apply only on the first tick of
+each step, while held values apply throughout that step. Discover all supported
+fields via `--query sloparena.training.run --detail full`. Yaw/pitch input units are
+degrees × 100; aim distance is centimeters. IDs cross JSON as decimal strings.
+Receipts report actual Shared ticks, participant states, accepted hits and presentation
+events. Paused, unsupported or capture-owned sessions reject without stepping/resuming.
+This semantic route does not verify physical key bindings or InputController routing.
+
+
+## Screenshots and visual evidence
+
+Choose the capture path by surface:
+
+| Surface | Command |
+| --- | --- |
+| Ability Lab action/scenario frames | `sloparena.lab.capture` |
+| Runtime menus, HUD, or gameplay including Screen Space - Overlay UI (Play Mode) | `sloparena.capture.game-view --source screen` |
+| Camera-only frame or Scene View | `sloparena.capture.game-view --source camera` or `--source scene` |
+
+The native Pipeline `screenshot` command is camera-only and does not capture composited
+Screen Space - Overlay UI. Its `--output` accepts an absolute path or a path relative to the
+Unity project root, defaults to `Temp/pipeline-screenshots`, and does not call
+`AssetDatabase.Refresh`:
+
+```bash
+editor screenshot --output "Temp/pipeline-screenshots/menu-camera.png"
+```
+
+Native `capture_game_view` and `capture_scene_view` instead use `--save_path`, sandboxed
+under `Assets/`; saving triggers `AssetDatabase.Refresh` and imports the PNG, which can
+interrupt a live frontend session. For repository-relative evidence paths, use the
+project-safe `sloparena.capture.game-view` command below.
+
+For repository evidence (including outside `Assets/`), prefer `sloparena.capture.game-view`.
+Its required `--output` accepts only a repository-relative PNG path below `.impeccable/`,
+`.ability-lab-cache/`, `client/Unity/Temp/`, or `tmp/`; it rejects absolute paths, existing
+files and unsafe paths, and never imports assets. There is no default output path.
+Discover the exact options and safe output syntax
+before use:
+
+```bash
+editor --query screenshot --detail full
+```
+
+`--source screen` captures the composited Game View backbuffer and requires Play Mode.
+It retains the selected main Game View and waits up to five seconds for a camera render
+inside that view's actual rendering scope, then subsequent Editor updates before reading
+the same composited target. A view/target change fails rather than certifying unrelated
+rendering. This is an observation, not an instantaneous/latest-frame guarantee.
+Its `freshness` is `observed-game-render` for this path. Results include
+`scene`, `frame`, `renderedFrame`, and `stepped`; require semantic success
+(`data.result.success`) and inspect those fields. A missing render or target is an actionable
+failure, not a fresh capture or fallback.
+
+When the Editor is paused, default capture fails immediately with instructions. `--step`
+explicitly authorizes advancing exactly one frame, after which capture observes the render.
+Use `--last-frame` only to explicitly snapshot the existing target while retaining the current
+pause/frame; the result is labeled `last-rendered-unverified`. `--step` and `--last-frame` are
+mutually exclusive, and neither applies to camera or scene sources. A matching frame or
+checksum/hash is not proof of freshness.
+
+For example, request an observed runtime render and check semantic success:
+
+```bash
+set -o pipefail
+editor sloparena.capture.game-view --source screen \
+  --output .impeccable/review/runtime-hud.png \
+  | jq -e 'select(.data != null) | .data.result.success'
+```
+
+For an explicitly paused Editor, add `--step` to authorize one frame. For an explicitly
+unverified existing target, use `--last-frame` instead. Do not combine them.
+
+Runtime UI workflows use typed commands instead of temporary `eval` code. Discover command
+schemas first; the UI commands cover currently available live controls and inspection, not
+every possible runtime probe:
+
+```bash
+editor --query sloparena.ui --detail full
+# Current page, mode, viewport, HUD card geometry, and visible buttons
+editor sloparena.ui.status
+# Page/mode navigation; --step advances exactly one frame when paused
+editor sloparena.ui.navigate --mode Solo --step
+# Submit a UI Toolkit button by UXML name (for example char-Manki, btn-select, stage-slop_pit)
+editor sloparena.ui.click --name btn-select --step
+# Set the actual Game View layout before capturing at this viewport
+editor sloparena.ui.viewport --width 1920 --height 1080 --gizmos off
+```
+
+Capture-output resizing changes the PNG dimensions only; it does not set the Game View layout
+resolution. Set the viewport first when the intended UI layout depends on it.
+
+`viewport` verifies the selected size/gizmo settings and reports `completion: settings-applied`
+plus `screenSizeMatches`; this is not proof of a newly rendered screenshot. Use capture's
+render observation for that. Navigation waits for an activated frontend context, not merely
+the default Home enum. Mode navigation submits the real shell controls, preserving identity,
+modal and online-room guards; leave a room or close a modal through its live controls first.
+Status and click share live document enumeration. A button is clickable only when enabled,
+ancestor-visible and hit-testable at its center, so clipped or modal-obscured controls are
+unavailable; scroll/reveal them before submitting.
+
+Use `sloparena.ui.status --element <exact-UXML-name> [--document <exact-UIDocument-name>]`
+for named geometry without opening, scrolling or navigating UI. The optional `element`
+result includes finite world/local bounds, effective ancestor visibility, center
+picking and enclosing ScrollView viewport/content/offset/ranges. Missing or ambiguous
+names fail explicitly; qualify duplicates with `--document`. Unavailable geometry is
+null, not a fabricated zero rectangle. `clippingCoverage: inline-and-scroll-viewports`
+is deliberately partial: stylesheet-computed clipping is not fully enumerated, and
+center picking proves only that point, not full-element visibility.
+
+Preserve Editor ownership and its current mode. A screenshot-only task does not recompile,
+stop, or restart the Editor; actual C# changes are what gate recompile. Website/browser work
+and user-provided image/mockup review do not launch Unity.
+
+Keep `eval` for genuinely novel probes (private runtime state, one-off diagnostics); do not
+write screenshot, navigation, viewport, or HUD-inspection code in `eval` while a typed command
+covers the operation.
 
 ## Skill sources
 
 - SlopArena operations use repository `.omp/skills/`, `docs/testing.md`, and this
-  document's installed Unity CLI/Pipeline commands.
+  document's gateway-owned Unity CLI/Pipeline commands.
 - Project skills require explicit `name` and nonempty `description` frontmatter.
 - `.agents/skills/unity-skills` is an ignored local installation; `.claude/skills/unity-skills`
   points to it. The operational umbrella is excluded for this project because it requires
@@ -173,15 +408,14 @@ arguments.
 ## Live Editor commands
 
 ```bash
-unity command --project-path client/Unity editor_status --format json
-unity command --project-path client/Unity list_open_scenes --format json
-unity command --project-path client/Unity get_scene_hierarchy --format json
-unity command --project-path client/Unity \
-  get_console_logs --severity error --limit 20 --format json
-unity command --project-path client/Unity recompile --format json
-unity command --project-path client/Unity recompile_status --format json
-unity command --project-path client/Unity editor_play --format json
-unity command --project-path client/Unity editor_stop --format json
+editor editor_status
+editor list_open_scenes
+editor get_scene_hierarchy
+editor get_console_logs --severity error --limit 20
+editor recompile
+editor recompile_status
+editor editor_play
+editor editor_stop
 ```
 
 ## Agent-facing character authoring
@@ -194,28 +428,20 @@ Character inspection and cooking both accept a package ID or a project-relative
 package root under `Assets/CharacterPackages`:
 
 ```bash
-unity command --project-path client/Unity \
-  sloparena.character.inspect --target fightguy --format json
-unity command --project-path client/Unity \
-  sloparena.character.cook --target fightguy --format json
+editor sloparena.character.inspect --target fightguy
+editor sloparena.character.cook --target fightguy
 ```
 
 The authoring boundary also exposes read-only planning and typed catalog operations:
 
 ```bash
-unity command --project-path client/Unity \
-  sloparena.character.cook --target bonk --dry-run --format json
-unity command --project-path client/Unity \
-  sloparena.character.verify --target bonk --format json
-unity command --project-path client/Unity \
-  sloparena.character.bind --target bonk --semantic-id anim.run \
-  --asset-path Assets/CharacterPackages/bonk/Animations/bonk_run.anim --format json
-unity command --project-path client/Unity \
-  sloparena.character.unbind --target bonk --semantic-id anim.run --format json
-unity command --project-path client/Unity \
-  sloparena.character.roster.refresh --package-id bonk --format json
-unity command --project-path client/Unity \
-  sloparena.character.assets --target bonk --semantic-id anim.run --format json
+editor sloparena.character.cook --target bonk --dry-run
+editor sloparena.character.verify --target bonk
+editor sloparena.character.bind --target bonk --semantic-id anim.run \
+  --asset-path Assets/CharacterPackages/bonk/Animations/bonk_run.anim
+editor sloparena.character.unbind --target bonk --semantic-id anim.run
+editor sloparena.character.roster.refresh --package-id bonk
+editor sloparena.character.assets --target bonk --semantic-id anim.run
 ```
 
 `cook --dry-run` returns the predicted hashes and output paths without writing
@@ -230,12 +456,12 @@ canonical 16-slot summary, source/cooked hashes, status, stale reasons, and exis
 compiler/cooker diagnostics. Cook returns source, cooked-content, and package hashes
 when successful. Semantic cook failures return `data.result.success: false` with
 structured diagnostics; the outer Pipeline transport command remains successful.
-Shell automation can propagate that semantic result explicitly:
+The gateway propagates semantic cook failure; shell consumers can also inspect it:
 
 ```bash
-unity command --project-path client/Unity \
-  sloparena.character.cook --target fightguy --format json \
-  | jq -e '.data.result.success'
+set -o pipefail
+editor sloparena.character.cook --target fightguy \
+  | jq -e 'select(.data != null) | .data.result.success'
 ```
 
 Choose the verification mode from [`docs/testing.md`](../testing.md):
@@ -253,9 +479,8 @@ replace the last valid cooked package, generated assets, or persisted cook statu
 `eval` runs C# inside the live Editor on its main thread without a project-level recompile:
 
 ```bash
-unity command --project-path client/Unity eval \
-  'return new { unity = UnityEngine.Application.unityVersion, playing = UnityEditor.EditorApplication.isPlaying };' \
-  --format json
+editor eval \
+  'return new { unity = UnityEngine.Application.unityVersion, playing = UnityEditor.EditorApplication.isPlaying };'
 ```
 
 Verified result:

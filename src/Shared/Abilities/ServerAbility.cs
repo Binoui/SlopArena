@@ -20,12 +20,51 @@ namespace SlopArena.Shared.Abilities
         // Lazily allocated only for multi-event moves that deliberately share a hit identity
         // (for example an early sweetspot handing off to a late sourspot).
         private Dictionary<byte, HashSet<ulong>>? _hitGroups;
+        private ushort _armorWindowTicks;
+        private bool _armorTickActive;
+        private bool _armorStartsOnFirstTick;
+        internal bool FrozenForSimulationTick { get; set; }
         // ── Lifecycle (implement in subclasses) ──
 
         /// <summary>Whether this activation currently owns vertical motion.</summary>
         public virtual bool OwnsVerticalMotion => false;
         /// <summary>Multiplier applied to ordinary airborne gravity while this ability is active.</summary>
         public virtual float GravityMultiplier => 1f;
+
+        /// <summary>True while this activation's authored armor window remains active.</summary>
+        public bool HasArmor => _armorWindowTicks > 0;
+
+        /// <summary>Starts or replaces this activation's armor window.</summary>
+        protected void StartArmorWindow(ushort durationTicks)
+        {
+            _armorWindowTicks = durationTicks;
+            // OnStart runs before the first collision step; do not spend that contact tick.
+            _armorStartsOnFirstTick = durationTicks > 0 && !_armorTickActive;
+        }
+
+        /// <summary>Advances armor only when the owning ability receives an active tick.</summary>
+        internal void TickArmorWindow()
+        {
+            _armorTickActive = true;
+            if (_armorStartsOnFirstTick)
+            {
+                _armorStartsOnFirstTick = false;
+                return;
+            }
+            if (_armorWindowTicks > 0)
+                _armorWindowTicks--;
+        }
+
+        internal void EndArmorTick() => _armorTickActive = false;
+        internal void AccountForCurrentContactFrame() => _armorStartsOnFirstTick = false;
+
+        internal void ClearArmorWindow()
+        {
+            _armorWindowTicks = 0;
+            _armorStartsOnFirstTick = false;
+            _armorTickActive = false;
+            FrozenForSimulationTick = false;
+        }
 
         /// <summary>Called once when the ability activates.</summary>
         public abstract void OnStart(ref CharacterState s, CharacterDefinition def);
@@ -175,6 +214,7 @@ namespace SlopArena.Shared.Abilities
                 KnockbackAngle = kbAngle,
                 KnockbackDirection = evt.KnockbackDirection,
                 StunTicks = evt.StunTicks,
+                FixedHitstunTicks = evt.FixedHitstunTicks,
                 DurationTicks = evt.DurationTicks,
                 OwnerId = s.EntityId,
                 ActivationId = ActivationId,

@@ -56,7 +56,6 @@ namespace SlopArena.Client.UI
                 CharacterClass.Manki => "There's nothing a few explosives can't fix.",
                 CharacterClass.Wibou => "He studied the blade. A lot.",
                 CharacterClass.Bonk => "Bonk do bonky bonks.",
-                CharacterClass.Nilus => "Nature control that shapes space and sets traps.",
                 _ => "Admitted fighter with a style all its own.",
             };
         }

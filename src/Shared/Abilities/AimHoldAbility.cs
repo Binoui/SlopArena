@@ -4,7 +4,7 @@ namespace SlopArena.Shared.Abilities
 {
     /// <summary>
     /// Shared base for hold-to-aim, release-to-fire abilities (AbilityBehavior.AimedProjectile
-    /// family: Manki Q/E/R, FightGuy Q, Nilus Q). Owns the whole hold lifecycle so the
+    /// family: Manki Q/E/R, FightGuy Q. Owns the whole hold lifecycle so the
     /// per-ability classes are just projectile spawners:
     ///
     ///   - OnStart: Aiming state (hold = aim stance), IsAiming, AnimLockTicks,
@@ -17,8 +17,7 @@ namespace SlopArena.Shared.Abilities
     ///   - Aim phase: 8-tick debounce, optional mid-hold anim swap, manual release
     ///     (!IsAiming) or auto-release at the positive hold cap. A cap of zero is unlimited.
     ///     The cap reads the SPEC's ChargeHoldTicks — the same field Simulation.cs clamps
-    ///     s.ChargeTicks against — so the auto-release can't drift from the clamp
-    ///     (see the original NilusVoidRift note for why a Param would).
+    ///     so the auto-release can't drift from the clamp.
     ///   - Throw phase: fire once at throw_trigger_tick (IsAiming=false) in the
     ///     Attacking state (action phase, mirroring WibouDashSlash's Aiming → Attacking
     ///     dash transition), end at throw_duration.

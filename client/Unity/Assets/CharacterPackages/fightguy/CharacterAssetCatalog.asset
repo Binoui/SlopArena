@@ -114,4 +114,6 @@ MonoBehaviour:
     _clip: {fileID: 7400000, guid: ec85ad82fa4577ab0908d4e873fdace2, type: 2}
     _extrapolation: 0
     _poseTrackId: pose.fightguy.slide
-  _presentations: []
+  _presentations:
+  - _semanticId: presentation.fightguy.ki-shot.hit
+    _prefab: {fileID: 583897833427099164, guid: 9cd63d5e221f1c53195c4af1a5c4d61a, type: 3}

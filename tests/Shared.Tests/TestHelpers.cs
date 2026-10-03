@@ -13,22 +13,57 @@ public static class TestHelpers
 
     public static CharacterDefinition WibouDef => BuiltInContentResolver.Resolve(CharacterClass.Wibou).Definition;
 
-    public static CharacterDefinition NilusDef => ResolveDef(CharacterClass.Nilus);
-
-    /// <summary>
-    /// Resolve a built-in character definition. Cooked roster characters resolve
-    /// through <see cref="BuiltInContentResolver"/>; legacy characters not admitted
-    /// to the roster (e.g. Nilus, disabled until finished) resolve through the
-    /// <see cref="LegacyCharacterCatalogAdapter"/> snapshot instead.
-    /// </summary>
     public static CharacterDefinition ResolveDef(CharacterClass selector)
+        => BuiltInContentResolver.Resolve(selector).Definition;
+
+    /// <summary>Fresh engine-only data. Roster tuning must not change mechanics fixtures.</summary>
+    public static CharacterDefinition EngineDef
     {
-        if (selector == CharacterClass.Nilus)
+        get
         {
-            var snapshot = new LegacyCharacterCatalogAdapter().Snapshot(selector);
-            return snapshot.Definition;
+            var suffixes = new[] { "1", "2", "3", "4", "A", "E", "R", "F" };
+            var slots = new CookedSlotDefinition[16];
+            for (var ordinal = 0; ordinal < slots.Length; ordinal++)
+            {
+                var air = ordinal >= 8;
+                slots[ordinal] = new CookedSlotDefinition(
+                    ordinal, (air ? "air." : "ground.") + suffixes[ordinal % 8], air,
+                    "Engine fixture", "", "", AuthoringAbilityBehavior.MeleeCombo,
+                    AuthoringAimMode.None, 0, false, false,
+                    new CookedTimeline(new[]
+                    {
+                        new CookedStage(30, 0, 0, 0, 0,
+                            Array.Empty<string>(), Array.Empty<CookedTimelineOperation>()),
+                    }));
+            }
+            return new CharacterDefinition
+            {
+                Class = CharacterClass.Manki,
+                DisplayName = "Engine fixture",
+                CapsuleRadius = 0.3f,
+                CapsuleHeight = 1.5f,
+                HipHeight = 0.75f,
+                ShieldRadius = 0.9f,
+                HurtboxRadius = 0.3f,
+                HurtboxCapsules = new[] { new HurtboxCapsule(0, -0.65f, 0, 0, 0.65f, 0, 0.3f) },
+                CookedSlots = slots,
+                HurtboxBoneScale = 1f,
+                VisualScale = 1f,
+                Movement = new MovementStats
+                {
+                    RunSpeed = 14f, RunAccelerationA = 20f, RunAccelerationB = 12f,
+                    DashSpeed = 20f, AirDodgeSpeed = 11f, AirSpeedMax = 7.5f,
+                    AirAccelStick = 16f, AirAccelBase = 3f,
+                    JumpForce = 12f, ShortHopForce = 7.2f,
+                    AirJumpVMultiplier = 0.85f, AirJumpHMultiplier = 0.8f,
+                    Gravity = 36f, AirFloatGravity = 0f,
+                    DashDurationTicks = 20, DashCooldownTicks = 48,
+                    GroundFriction = 8f, AirFriction = 6f,
+                    MaxFallSpeed = 14.2f, FastFallSpeed = 22f,
+                    MaxJumps = 2, JumpSquatTicks = 4, FloatWindowTicks = 35, RushTicks = 10,
+                },
+            };
         }
-        return BuiltInContentResolver.Resolve(selector).Definition;
     }
 
     /// <summary>
@@ -202,12 +237,10 @@ public static class TestHelpers
             $"Expected {expected:F6} ± {tolerance:F6} but got {actual:F6} (diff={diff:F6})");
     }
 
-    /// <summary>
-    /// A fresh CharacterDefinition with Manki's ability specs but simple capsule
+    /// A fresh CharacterDefinition with Manki's cooked slots but simple capsule
     /// hurtboxes (a standing capsule from feet to head). This lets hitbox collision
     /// tests run without baked skeleton data.
     /// Returns a new instance each access — safe to mutate in tests.
-    /// Shared AbilitySpec references are read-only during collision checks.
     /// </summary>
     public static CharacterDefinition CombatDef
     {
@@ -223,10 +256,6 @@ public static class TestHelpers
                 ShieldRadius = src.ShieldRadius,
                 HurtboxRadius = src.HurtboxRadius,
                 Movement = src.Movement,
-                LMB = src.LMB,
-                RMB = src.RMB,
-                AirLMB = src.AirLMB,
-                AirRMB = src.AirRMB,
                 Slot1 = src.Slot1,
                 E = src.E,
                 R = src.R,
@@ -245,11 +274,11 @@ public static class TestHelpers
                 AirSlot4 = src.AirSlot4,
                 AirSlot5 = src.AirSlot5,
                 AirA = src.AirA,
+                CookedSlots = src.CookedSlots,
                 ClipOverrides = src.ClipOverrides,
                 // Use a simple full-body capsule instead of bone-attached hurtboxes
                 HurtboxCapsules = new[] { new HurtboxCapsule(0, -0.65f, 0, 0, 0.65f, 0, 0.3f) },
                 HurtboxBoneDefs = null,
-                CookedSlots = src.CookedSlots,
                 IdleAnim = src.IdleAnim,
                 RunAnim = src.RunAnim,
                 DashAnim = src.DashAnim,
@@ -277,9 +306,8 @@ public static class TestHelpers
     public static float CombatGroundPY => 0.65f;
 
     /// <summary>
-    /// A CharacterDefinition with Manki's specs, HurtboxBoneDefs set (for BoneName lookup),
-    /// but no baked data path. Falls back to capsule hurtboxes for collision.
-    /// Useful for testing bone-attached hitbox fallback behavior.
+    /// A CharacterDefinition with Manki's cooked slots and HurtboxBoneDefs (for BoneName
+    /// lookup), but no baked data path. Useful for testing bone-attached hitbox geometry.
     /// </summary>
     public static CharacterDefinition BoneHitboxTestDef
     {
@@ -294,10 +322,6 @@ public static class TestHelpers
                 CapsuleHeight = src.CapsuleHeight,
                 HurtboxRadius = src.HurtboxRadius,
                 Movement = src.Movement,
-                LMB = src.LMB,
-                RMB = src.RMB,
-                AirLMB = src.AirLMB,
-                AirRMB = src.AirRMB,
                 Slot1 = src.Slot1,
                 E = src.E,
                 R = src.R,
@@ -316,6 +340,7 @@ public static class TestHelpers
                 AirSlot4 = src.AirSlot4,
                 AirSlot5 = src.AirSlot5,
                 AirA = src.AirA,
+                CookedSlots = src.CookedSlots,
                 ClipOverrides = src.ClipOverrides,
                 // HurtboxBoneDefs for BoneName lookup
                 HurtboxBoneDefs = new HurtboxBoneDef[]
@@ -354,34 +379,33 @@ public static class TestHelpers
         {
             Class = src.Class,
             DisplayName = src.DisplayName,
+            Movement = mov,
+            Weight = src.Weight,
+            CaptureGeometry = src.CaptureGeometry,
             CapsuleRadius = src.CapsuleRadius,
             CapsuleHeight = src.CapsuleHeight,
             ShieldRadius = src.ShieldRadius,
             HurtboxRadius = src.HurtboxRadius,
             HipHeight = src.HipHeight,
-            Movement = mov,
-            LMB = src.LMB,
-            RMB = src.RMB,
-            AirLMB = src.AirLMB,
-            AirRMB = src.AirRMB,
             Slot1 = src.Slot1,
             E = src.E,
             R = src.R,
             F = src.F,
-                Slot2 = src.Slot2,
-                Slot3 = src.Slot3,
-                Slot4 = src.Slot4,
-                Slot5 = src.Slot5,
-                A = src.A,
-                AirSlot1 = src.AirSlot1,
-                AirE = src.AirE,
-                AirR = src.AirR,
-                AirF = src.AirF,
-                AirSlot2 = src.AirSlot2,
-                AirSlot3 = src.AirSlot3,
-                AirSlot4 = src.AirSlot4,
-                AirSlot5 = src.AirSlot5,
-                AirA = src.AirA,
+            Slot2 = src.Slot2,
+            Slot3 = src.Slot3,
+            Slot4 = src.Slot4,
+            Slot5 = src.Slot5,
+            A = src.A,
+            AirSlot1 = src.AirSlot1,
+            AirE = src.AirE,
+            AirR = src.AirR,
+            AirF = src.AirF,
+            AirSlot2 = src.AirSlot2,
+            AirSlot3 = src.AirSlot3,
+            AirSlot4 = src.AirSlot4,
+            AirSlot5 = src.AirSlot5,
+            AirA = src.AirA,
+            CookedSlots = src.CookedSlots,
             ClipOverrides = src.ClipOverrides,
             HurtboxCapsules = src.HurtboxCapsules,
             HurtboxBoneDefs = src.HurtboxBoneDefs,
@@ -401,7 +425,6 @@ public static class TestHelpers
             ModelResourcePath = src.ModelResourcePath,
             LandStartOffset = src.LandStartOffset,
             HurtboxBoneScale = src.HurtboxBoneScale,
-            CookedSlots = null,
         };
     }
 

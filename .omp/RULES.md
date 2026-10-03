@@ -7,8 +7,14 @@
 - Implement numeric choices without arguing. Suggest once only if correctness issue, then implement their value.
 - Never install anything without asking.
 - Server-side simulation is the source of truth for everything — no client-side hacks for gameplay mechanics.
-- Unity interaction MUST use the installed Unity CLI and `com.unity.pipeline`:
-  `unity pipeline list --format json`, `unity command --project-path client/Unity ...`.
-  NEVER use the removed Unity MCP tools, `gamedev-mcp-server`, `localhost:26356`,
-  or deleted `scripts/mcp-*.sh` wrappers. Follow `docs/contributing/unity-cli.md`.
+- Live Unity interaction MUST use the project-local gateway around the installed Unity CLI
+  and `com.unity.pipeline`: `bun /home/binoui/Documents/projects/sloparena-workspace/scripts/unity-editor-gateway.ts --project-path <approved-canonical-project> -- <command>`.
+  Set your own runtime-issued `ORCA_TERMINAL_HANDLE` explicitly; never infer caller identity
+  from the active pane. Wait for your own lease, run/restoration, then settled release;
+  no ordinary owner-inbox verification delegation. Runtime status is authoritative,
+  historical ownership records are not. `blocked`/unknown/ambiguous work never permits takeover.
+  Coordinate source writers before imports/plugin copies/reload/restart. Offline player/release
+  builds retain separate approval and confirmed-closed-project requirements.
+  NEVER use raw unowned Editor commands, removed Unity MCP tools, `gamedev-mcp-server`,
+  `localhost:26356`, or deleted `scripts/mcp-*.sh` wrappers. Follow `docs/contributing/unity-cli.md`.
 - General verification follows [`docs/testing.md`](../docs/testing.md).

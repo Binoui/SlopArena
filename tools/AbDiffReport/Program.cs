@@ -76,8 +76,7 @@ internal static class Program
             "fightguy" or "fg" => CharacterClass.FightGuy,
             "wibou" => CharacterClass.Wibou,
             "manki" => CharacterClass.Manki,
-            "nilus" => CharacterClass.Nilus,
-            _ => CharacterClass.FightGuy,
+            _ => throw new ArgumentException($"unknown character: {charName}"),
         };
         var entry = BuiltInContentResolver.Resolve(cls);
         var def = entry.Definition;
@@ -88,7 +87,7 @@ internal static class Program
         }
 
         string commit = CurrentCommit();
-        var baked = SelfPlay.LoadBakedData(entry);
+        var baked = entry.BakedAnimation;
         var hits = MoveData.CollectHits(def);
         var arena = SelfPlay.BuildKillArena();
 

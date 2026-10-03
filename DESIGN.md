@@ -11,6 +11,13 @@ colors:
   utility-surface: "#24202B"
   utility-border: "#625C6B"
   highlight: "#FFFFFF"
+  fightguy-ki-blue: "#39A9FF"
+  fightguy-ki-light: "#A8DEFF"
+  fightguy-ki-core: "#F0FAFF"
+  fightguy-ki-edge: "#1764D9"
+  bonk-steel: "#B8B2A8"
+  bonk-impact: "#EEE8DD"
+  bonk-iron: "#67635D"
 typography:
   display:
     fontFamily: "Archivo Black"
@@ -50,7 +57,7 @@ components:
 
 # Design System: SlopArena
 
-**Authority and status:** [Visual Language](docs/design/visual-language.md) owns the shared identity; [Art and Asset Conventions](docs/contributing/conventions.md) own 3D presentation and assets. This document specifies the native approved target, mirrored by `.impeccable/design.json` and its surface brief. The unreleased solo-developed game is not on Steam. The player-facing identity rollout is implemented across Home, shared shell, fighter/stage selection, Results, browser/lobby, Settings, pause/Training controls, chat, and entry/confirmation dialogs. HUD neutral chrome is harmonized without changing geometry or functional colors. Creator/Ability Lab tools, website migration, connected-room acceptance, and release-copy changes are not claimed.
+**Authority and status:** [Visual Language](docs/design/visual-language.md) owns the shared identity; [Art and Asset Conventions](docs/contributing/conventions.md) own 3D presentation and assets. This document specifies the native approved target, mirrored by `.impeccable/design.json` and its surface brief. The unreleased solo-developed game is not on Steam. The player-facing identity rollout is implemented across Home, shared shell, fighter/stage selection, Results, browser/lobby, Settings, pause/Training controls, chat, and entry/confirmation dialogs. Gameplay HUD now uses the separately approved fight-card treatment: prominent lives, clipped-square slots, and an independent target marker with optional damage. Functional colors and gameplay authority remain. Creator/Ability Lab tools, website migration, connected-room acceptance, and release-copy changes are not claimed.
 
 ## Overview
 
@@ -97,7 +104,7 @@ The palette uses local paper and ink values, with Action Yellow reserved for pri
 
 ## Typography
 
-**Display Font:** Archivo Black is implemented on player-facing menu, selection, outcome, Settings, pause, and dialog declarations/actions. Chat uses it only for short actions. Settings rows, message bodies, percentages, stocks, cooldowns, bindings, and other dense utility remain readable sans or quiet utility mono.
+**Display Font:** Archivo Black is implemented on player-facing menu, selection, outcome, Settings, pause, dialog declarations/actions, and short HUD fighter names. Chat uses it only for short actions. Settings rows, message bodies, percentages, stocks, cooldowns, bindings, and other dense utility remain readable sans or quiet utility mono.
 **Body Font:** Native utility sans-serif remains allowed, especially where readability or dense information benefits.
 **Label/Mono Font:** Marketing pairs Archivo Black with Space Mono. Short native utility labels may use mono where practical; dense settings and HUD text should stay readable sans.
 
@@ -115,7 +122,7 @@ The palette uses local paper and ink values, with Action Yellow reserved for pri
 
 **Settings, match overlays, and chat:** Settings now uses paper outer framing, ink Archivo title, bordered paper category tabs, yellow selection, and a quiet dark scroll/control field. Keyboard-focused tabs and Back use ink/paper contrast with a yellow frame; outer status text is ink, not yellow on paper. All five categories retain actual values, controls, scrolling, remap, reset, and display-revert behavior. Migrated controls out-specify optional local licensed-study images without editing those excluded assets. Training/Solo pause retains paper controls and yellow Resume; Training utility stays quieter ink. Gameplay join dialogs preserve input/modal/pause ownership. Chat retains channel/history/draft/mute/resize and hide/reopen behavior; maximize is removed. Native evidence: `.impeccable/review/remaining-ui-20261001/`, `.impeccable/review/settings-paper-20261001/`, and `.impeccable/review/chat-contrast-controls-20261001/`.
 
-**Restrained HUD finish:** Only neutral text/background/outline/decorative edges changed. Billboard/portrait/diamond/slot/readout geometry, assets, rotations, animations, P1–P4 identity colors, damage-tier/target colors, living/lost stocks, and normal-orange/special-blue ability semantics remain. Ordinary utility typography remains; combat numbers are not turned into menu declarations.
+**Fight-card HUD:** Stable 308×102 player cards use portrait cutouts, identity badges/edges, large utility percentages, and a dedicated LIVES count plus filled/outlined-struck tickets. Training omits stocks; 5–8 use tighter ticket spacing and larger stock counts remain count-only. Eliminated portraits quiet down without fading critical numbers. Two existing orange-normal/blue-special diamonds use flat ink plates and clipped-square slot frames; real move icons, effective bindings, cooldowns, and brief state feedback remain. Keyboard bindings are printed ink-on-paper tabs; controller face-button artwork retains a dark backing. A fixed bracket/pointer target marker survives the default-ON `Show overhead damage` setting being switched OFF: only its upper percentage tab disappears, with no anchor shift. All visible percentages share white below 40%, orange 40–89%, and red 90%+; identity and targeting colors remain independent. Native evidence: `.impeccable/review/fight-card-hud-20261001/`. Controlled snapshots and labelled layout specimens are presentation proof, not online gameplay acceptance.
 
 **Character:** Heavy, blocky declarations paired with clear utility typography. Display type makes one statement at a time; utility type carries actions, status, and annotations.
 
@@ -192,7 +199,36 @@ Navigation stays stable: the current persistent Training/Solo/Online tabs and fl
 
 ### HUD Billboards
 
-Player identity, damage, and stocks live in stable left-side billboard cards with portrait cutouts, accent edges, and large outlined percentage readouts. The local kit uses an orange normal diamond (`1–4`) beside a blue special diamond (`A/E/R/F`) at the bottom center. Each has four circular slots ordered top, right, bottom, left, with an effective-binding prompt above each slot and cooldown feedback inside it. Physical number-row keys show digits even when the keyboard layout displays punctuation; other prompts follow effective labels. Controller specials show only the face button; actual gameplay input still requires LB. Unsupported glyphs fall back to text. Slot readiness uses brief feedback rather than constant decorative animation.
+Player identity, damage, and lives live in stable left-side fight cards with portrait cutouts, identity accents, large percentage readouts, and explicit stock counts/tickets. The local kit uses an orange normal diamond (`1–4`) beside a blue special diamond (`A/E/R/F`) at the bottom center. Each has four clipped-square slots ordered top, right, bottom, left, with a printed effective keyboard binding or controller glyph above the slot and cooldown feedback inside it. Physical number-row keys show digits even when the keyboard layout displays punctuation; other prompts follow effective labels. Controller specials show only the face button; actual gameplay input still requires LB. Missing controller artwork falls back to text. Slot readiness uses brief feedback rather than constant decorative animation. The locked-target pointer/brackets remain visible when overhead damage is disabled; player-panel percentages remain visible and use the same damage-tier colors.
+
+**Wibou identity accent (approved 2026-10-02):** Matrix/hacker green belongs to Wibou's ability artwork and existing sword VFX. Flat icon blades/arcs use the authored trail's base tint, `#91FF69`. Current samples add no HDR glow or code-rain texture and do not change the global menu palette. The normal/special diamond frames and damage-tier colors keep their functional meanings. Grounded icons read as G1 forward-down, G2 forward-up, G3 vertical-up, and G4 downward hit, using dominant active-hitbox motion only. Inspected samples live in `.impeccable/review/wibou-grounded-blade-icons-20261002/`; runtime binding is not claimed.
+
+**FightGuy ki identity (approved 2026-10-03; direction only):** Physical strikes lead; ki amplifies them. Ki Blue `#39A9FF` owns flat ability icons and the dominant colored body of energy. Light energy `#A8DEFF` supplies inner streaks, hot core `#F0FAFF` stays small and concentrated, and deep edge `#1764D9` defines bright energy without a purple hue. Keep the blue visible rather than washing the effect into white or pale cyan.
+
+FightGuy's energy is compressed, directional, and punchy: Q/Ki Shot has a dense rounded head and a short swept-back tail; melee uses compact tapered arcs following fists and feet; contact uses a brief pressure burst or flattened ring that disappears quickly. Stronger moves gain weight and a stronger core rather than indiscriminate particles or lingering glow. Avoid ice shards, frost, snow-like particles, crystalline facets, lingering clouds, and lightning branches. Flat icons use the identity blue and distinct move silhouettes; glow belongs to VFX. These character-local colors do not replace HUD category frames, damage tiers, or global UI accents. Current ice-derived projectile assets remain unchanged; runtime appearance and arena readability are not yet verified against this direction.
+
+FightGuy special-effect grammar (approved 2026-10-03; direction only):
+
+- **E — Rising Dragon / rise:** Concentrated blue-white energy on the punching fist leads the ascent. A tapered upward streak trails below the fist along its actual motion; a subordinate short takeoff accent may reinforce lift. Contact adds a compact fist burst; whiffs retain the movement trail without contact feedback. Avoid a lifting beam or full-body glow.
+- **R — Cyclone Kick / rotate:** Two or three broken circling ki ribbons wrap the lower torso and kicking leg into a compact moving vortex. The kicking foot owns the strongest streak. Gaps preserve pose readability; no solid tornado cone or lingering cloud. Ribbons travel with him and clear when the spin ends.
+- **F — Fist of Fury / strike:** Brief energy wraps and short dense trails alternate with the six punches. Actual connections add compact blue-white bursts; misses retain limb accents only. The right-foot finisher receives a heavier accent and one decisive contact burst. No surrounding aura or long ribbons.
+
+Blue carries motion; a small white core carries force. Future icon subjects are uppercut, rotating kick, and empowered strike, distinguished by silhouette rather than glow. These are accepted design intentions, not implemented or runtime-verified effects.
+
+FightGuy selected VFX starting points (agreed 2026-10-03; not implemented or preview-verified):
+
+- **Q / Ki Shot:** Keep the current projectile unchanged. Add `CFXR4 Plasma Shoot (Blue)` at the hands, directed along the shot, once when the release animation starts; not while aiming and not attached to the traveling projectile.
+- **F / Fist of Fury:** Trial `CFXR3 Hit Ice A (Air)` at actual punch contacts, smaller for repeated punches and stronger for the final kick. Misses retain limb accents without contact bursts. Start from the existing effect; reduce steam, lingering stars, or other layers only if repeated hits obscure the fighters.
+- **R / Cyclone Kick:** Trial `CFXR4 Sword Trail ICE (180 Thin Spiral)` around the kicking-leg region, oriented to the spin. Preserve readable gaps and clear it when the spin ends. Start with this asset rather than authoring a custom tornado.
+- **E / Rising Dragon:** The fist-led upward-trail direction is accepted; its source effect remains unselected.
+
+These assets are installed under `Assets/~AnimationPacks/JMO Assets/Cartoon FX Remaster/CFXR Prefabs/`. Ice-labelled sources are acceptable if their resulting motion and appearance serve the ki direction. Verify placement, scale, and timing first; do not blanket-recolor the existing effects upfront. The accepted FightGuy icon review exports are under the workspace's `_bmad-output/fightguy-ability-icons/specials-review/`; their PNGs are installed through the HUD Resources path, including the revised circular-kick R and multistrike F.
+
+**Bonk steel identity (approved 2026-10-03):** Warm steel `#B8B2A8` owns flat ability icons and the main character-local effect direction, distinct from Manki's orange combustion. Pale stone `#EEE8DD` supplies brief impact highlights; dark iron `#67635D` supports definition but is not the primary icon fill. Existing orange model accents may remain small details, not Bonk's identifying color. Favor weight, metal, and physical impact: broad short blade sweeps, dust, and chipped-metal fragments rather than orange energy trails. Global UI, HUD category frames, and damage-tier colors stay unchanged. Icons are installed; model recolor and VFX adaptation remain direction only.
+
+Bonk normal artwork lives under the workspace's `_bmad-output/bonk-ability-icons/normals-review/`: eight ground/air icons use a mesh-derived greatsword silhouette and a dominant cutting-phase arrow, not full looping paths, raw pose kinks, or knockback direction. Accepted specials under `_bmad-output/bonk-ability-icons/specials-review/` depict shoulder bash, leaping sword slam, charging double slash, and blade storm. Repeated blade symbols are motion echoes, not extra equipped weapons or guaranteed contacts.
+
+The accepted 36 transparent PNGs for Wibou, FightGuy, Manki and Bonk are installed at `Assets/Resources/Icons/{CharacterClass}/{IconName}.png`. Optional `Air/{IconName}.png` artwork overrides the airborne image; otherwise the HUD uses that airborne ability's base icon key. Bonk has four distinct aerial normal icons; the other three characters intentionally share input-slot artwork across ground/air. Textures preserve sRGB/alpha with bilinear filtering, clamp, no mipmaps and no compression. The HUD caches textures during character setup and changes the image only when needed; frames, prompts, cooldowns, locks and cast feedback remain unchanged. The existing 70 px slot has a 50 px image inset, smaller than the artwork review previews.
 
 ## Do's and Don'ts
 

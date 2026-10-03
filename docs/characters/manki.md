@@ -59,7 +59,7 @@ A pyromaniac/inventor macaque monkey. Always tinkering with explosives — bombs
 
 ## Archetype
 
-**Explosive all-rounder / Jetpack-bazooka hybrid** — mobile skirmisher with flexible approach options.
+**Floaty explosive skirmisher / Jetpack-bazooka hybrid** — sustained airtime and strong aerial repositioning distinguish Manki from FightGuy's baseline.
 - Poke with round bombs, zone with aerosol flame, control space with Q pressure
 - Recover vertically with Jetpack Boost (E), then regain air drift at the apex
 - Gameplan: poke with Q → commit with ground combo → Jetpack Boost to recover → rocket jump for air follow-up
@@ -67,19 +67,43 @@ A pyromaniac/inventor macaque monkey. Always tinkering with explosives — bombs
 - R is fast fire-and-forget poke with rocket jump utility; aim at feet for vertical launch, aim at distant enemies for explosive poking
 - F is a committed area-denial finisher with a tall forward hitbox
 
-### Movement tuning — 2026-09-15
+### Local gamefeel tuning — 2026-10-03
 
-Ordinary movement supports the mobile-skirmisher role without relying on specials
-to compensate for weaknesses in every category:
+This source-only Editor pass supersedes the September movement values:
 
-- Run speed: 12 → 13.5 m/s; air-speed cap: 6.5 → 8 m/s, the roster's highest.
-- Air acceleration: 14 + 2.8 → 16 + 3.2 m/s².
-- Full-jump launch speed: 10 → 11.5 m/s; short-hop launch: 6 → 7.2 m/s.
-- JumpSquat: 6 → 4 ticks; the existing short-hop decision window still applies.
-- Dash duration: 15 → 18 ticks at the unchanged 20 m/s; cooldown: 60 → 48 ticks.
+- Run 11.5 m/s; air cap 9 m/s; air acceleration 20 + 4 m/s².
+- Jump/short-hop impulses 10.4/6.6 m/s; gravity 24 m/s².
+- Fall/fast-fall caps 11/18 m/s; squat, jumps and air-dodge tuning unchanged.
 
-Full-jump height measures 1.79 m, up from 1.35 m, through the authoritative
-flat-arena probe. Gravity, fall speeds, weight, and ability data are unchanged.
+The October 3 adjustment partially rolls back excessive floatiness: gravity
+18 → 24 and fall/fast-fall caps 9/15 → 11/18, retaining jump impulses so both
+height and airtime decrease without another impulse reduction.
+
+Source-compiled Shared measurements: full hop **50 airborne ticks / 2.167 m**
+(previously 67 / 2.918); short hop **31 airborne ticks / 0.853 m** (previously
+42 / 1.155). Fresh descending Down reaches **-18 m/s**, with full/short-hop
+airtime **33/19 ticks**. Both hops take off and land. The initial 6.3 m/s
+short-hop candidate snapped back to the floor; the approved 6.6 is retained.
+
+Normals use approximately 1.15× previous durations with matched contact windows,
+IASA and auto-cancel thresholds. Landing lag, hit grouping, geometry and reward
+are unchanged. Grounded recovery has at least four inactive ticks before another
+ability, eight for ground.4. Special timings and the F hold/fire/alias path are untouched.
+
+| Normal | Duration | IASA | Hit trigger / active length |
+|---|---:|---:|---|
+| ground.1 | 35 | 18 | 9 / 6 |
+| ground.2 | 58 | 26 | 9 / 6 |
+| ground.3 | 44 | 29 | 9 / 12 |
+| ground.4 | 69 | 64 | 12 / 8 |
+| air.1 | 38 | 33 | 7 / 6; 18 / 6 |
+| air.2 | 48 | 41 | 8 / 6; 14 / 23 |
+| air.3 | 51 | 48 | 16 / 7 |
+| air.4 | 62 | 57 | 23 / 8 |
+
+All entries are authored 60-Hz ticks. Shared lifetime/IASA probes passed; cooked
+content remains unchanged. Live Lab/Training alignment and human feel are not
+yet accepted; the retained Editor owner controls that verification window.
 
 ## Palette
 
@@ -104,9 +128,18 @@ flat-arena probe. Gravity, fall speeds, weight, and ability data are unchanged.
 | **R** | Bazooka | Short cast → fire rocket in camera direction | FPS-style fire-and-forget. Projectile arcs, explodes on impact. Rocket jump (4 self-dmg) |
 | **F** | Aerosol Inferno | Hold aerosol can → release into a tall orange flame column | Hold-to-aim while stationary; camera yaw tracks facing; release attack fires after 18 ticks; 15 damage, 55° launch, 30 ticks stun |
 
+## Local cooldown tuning — 2026-10-03
+
+Round Bomb's ground and aliased air cooldown is **240 ticks / 4 s**, reduced
+from 300 / 5 s. The explosive mobile-aim option remains costlier than a plain
+two-second projectile without changing its reward, aim hold or release timing.
+E/R/F remain **210 / 240 / 600 ticks** (3.5 / 4 / 10 s); normals remain zero.
+These are playtest tuning values, not a match-balance verdict. Cooldown begins
+on completion/cancellation, so time spent aiming is separate. Source-compiled
+Shared ground/air timer and expiry probes passed; persisted cooked content and
+roster pins are unchanged.
+
 ## Design Notes
-- **Air LMB**: Air Kick — 2-hit combo via `AirLmbCombo` (generic `StageChainAbility` subclass, shared by all characters). First kick (16 ticks, 4 dmg, lunge) chains to second kick (18 ticks, 6 dmg, higher KB). Buffer input during stage 1 to chain.
-- **Air RMB**: Knuckle Spike — hold-to-charge via `AirChargeAttack` (shared charge lifecycle, `ChargeHoldTicks=45`). Pressing mid-ascent stops the climb and the charge hovers in place (deliberately unlike air LMB, which keeps momentum). Tap (release before threshold) = the original spike (16 tick startup, 30 total, capsule straight down OffY=-0.5 to -1.5, 10 damage); charged = bigger knuckle (radius 1.0, 14 damage, 40t stun). Spike knockback (downward). Punish tool for reads.
 - **E**: Jetpack Boost. On activation, Manki compresses for 3 vulnerable ticks while preserving vertical fall velocity and clearing horizontal velocity. On ignition, the authoritative simulation samples the current movement stick, normalizes it when above 0.001 magnitude, and launches at `VY=15` with horizontal speed `3.5` along that direction. A single owner-centered sphere (radius 1.25, damage 4, 75° angle, base 2, growth 8, stun 8, duration 4) resolves the ignition hit. The ascent is unsteerable; gravity is active immediately, and normal air drift/actions return when `VY <= 0`. Cooldown: 210 ticks. The move is a recovery move and aliases `air.E` to `ground.E`.
 - **R**: Bazooka (FPS-style). Short cast (20 ticks), fire a rocket projectile in camera direction (AimYaw/AimPitch). Projectile has gravity (15 m/s²), speed 40 m/s, max flight 45 ticks. Explodes on entity hit or ground contact with 3m AoE. CanHitOwner=true on explosion — aim at feet for rocket jump (4 self-damage, upward knockback). No rise, no hover, no hold-to-aim. 240 tick cooldown (4s).
 - **F**: Aerosol Inferno. Hold enters the loop animation and freezes horizontal movement. Manki follows camera yaw only; vertical aim is ignored. Release switches to the attack animation, then emits the right-hand aerosol VFX and forward flame hitbox at the authored 18-tick trigger. Cooldown: 600 ticks.

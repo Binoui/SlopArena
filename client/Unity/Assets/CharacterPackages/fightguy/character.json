@@ -3,26 +3,26 @@
   "displayName": "FightGuy",
   "weight": 100,
   "movement": {
-    "runSpeed": 14,
+    "runSpeed": 12,
     "runAccelerationA": 20,
     "runAccelerationB": 12,
     "dashSpeed": 20,
     "airDodgeSpeed": 11,
-    "airSpeedMax": 7.5,
+    "airSpeedMax": 7,
     "airAccelStick": 16,
     "airAccelBase": 3.2,
-    "jumpForce": 12,
-    "shortHopForce": 7.2,
+    "jumpForce": 10.8,
+    "shortHopForce": 6.5,
     "airJumpVMultiplier": 0.8,
     "airJumpHMultiplier": 0.85,
-    "gravity": 36,
+    "gravity": 28,
     "airFloatGravity": 0,
     "dashDurationTicks": 20,
     "dashCooldownTicks": 48,
     "groundFriction": 8,
     "airFriction": 6,
-    "maxFallSpeed": 14,
-    "fastFallSpeed": 22,
+    "maxFallSpeed": 12,
+    "fastFallSpeed": 18,
     "maxJumps": 2,
     "jumpSquatTicks": 4,
     "floatWindowTicks": 35,
@@ -170,7 +170,7 @@
   ],
   "attachmentBoneIds": [],
   "presentationIds": [
-    "presentation.cyclone-kick.start"
+    "presentation.fightguy.ki-shot.hit"
   ],
   "capabilityRequirements": [
     {
@@ -202,8 +202,8 @@
       "timeline": {
         "stages": [
           {
-            "durationTicks": 25,
-            "iasaTicks": 13,
+            "durationTicks": 29,
+            "iasaTicks": 16,
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
             "autoCancelAfterTicks": 0,
@@ -218,7 +218,7 @@
             "operations": [
               {
                 "kind": "spawnHitbox",
-                "tick": 6,
+                "tick": 7,
                 "unit": "meters",
                 "hitbox": {
                   "shape": "sphere",
@@ -236,7 +236,7 @@
                   "baseKnockback": 4,
                   "knockbackGrowth": 20,
                   "stunTicks": 14,
-                  "durationTicks": 5,
+                  "durationTicks": 6,
                   "interruptible": true,
                   "hitGroup": 0,
                   "knockbackDirection": "awayFromOwner"
@@ -262,11 +262,11 @@
       "timeline": {
         "stages": [
           {
-            "durationTicks": 33,
-            "iasaTicks": 29,
+            "durationTicks": 38,
+            "iasaTicks": 33,
             "landingLagTicks": 9,
-            "autoCancelBeforeTicks": 5,
-            "autoCancelAfterTicks": 23,
+            "autoCancelBeforeTicks": 6,
+            "autoCancelAfterTicks": 26,
             "attackRange": 1.75,
             "warpRange": 0,
             "useTargetLock": true,
@@ -278,7 +278,7 @@
             "operations": [
               {
                 "kind": "spawnHitbox",
-                "tick": 6,
+                "tick": 7,
                 "unit": "meters",
                 "hitbox": {
                   "shape": "sphere",
@@ -296,7 +296,7 @@
                   "baseKnockback": 5,
                   "knockbackGrowth": 24,
                   "stunTicks": 12,
-                  "durationTicks": 5,
+                  "durationTicks": 6,
                   "interruptible": true,
                   "hitGroup": 0,
                   "knockbackDirection": "awayFromOwner"
@@ -304,7 +304,7 @@
               },
               {
                 "kind": "spawnHitbox",
-                "tick": 16,
+                "tick": 18,
                 "unit": "meters",
                 "hitbox": {
                   "shape": "sphere",
@@ -322,7 +322,7 @@
                   "baseKnockback": 7,
                   "knockbackGrowth": 30,
                   "stunTicks": 16,
-                  "durationTicks": 5,
+                  "durationTicks": 6,
                   "interruptible": true,
                   "hitGroup": 0,
                   "knockbackDirection": "awayFromOwner"
@@ -348,8 +348,8 @@
       "timeline": {
         "stages": [
           {
-            "durationTicks": 25,
-            "iasaTicks": 22,
+            "durationTicks": 29,
+            "iasaTicks": 26,
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
             "autoCancelAfterTicks": 0,
@@ -364,7 +364,7 @@
             "operations": [
               {
                 "kind": "spawnHitbox",
-                "tick": 5,
+                "tick": 6,
                 "unit": "meters",
                 "hitbox": {
                   "shape": "sphere",
@@ -382,7 +382,7 @@
                   "baseKnockback": 5,
                   "knockbackGrowth": 26,
                   "stunTicks": 18,
-                  "durationTicks": 5,
+                  "durationTicks": 6,
                   "interruptible": true,
                   "hitGroup": 0,
                   "knockbackDirection": "awayFromOwner"
@@ -408,11 +408,11 @@
       "timeline": {
         "stages": [
           {
-            "durationTicks": 42,
-            "iasaTicks": 36,
+            "durationTicks": 48,
+            "iasaTicks": 41,
             "landingLagTicks": 9,
-            "autoCancelBeforeTicks": 5,
-            "autoCancelAfterTicks": 29,
+            "autoCancelBeforeTicks": 6,
+            "autoCancelAfterTicks": 33,
             "attackRange": 1.75,
             "warpRange": 0,
             "useTargetLock": true,
@@ -424,7 +424,7 @@
             "operations": [
               {
                 "kind": "spawnHitbox",
-                "tick": 7,
+                "tick": 8,
                 "unit": "meters",
                 "hitbox": {
                   "shape": "capsule",
@@ -442,7 +442,7 @@
                   "baseKnockback": 5,
                   "knockbackGrowth": 26,
                   "stunTicks": 18,
-                  "durationTicks": 5,
+                  "durationTicks": 6,
                   "interruptible": true,
                   "hitGroup": 1,
                   "knockbackDirection": "awayFromOwner"
@@ -450,7 +450,7 @@
               },
               {
                 "kind": "spawnHitbox",
-                "tick": 12,
+                "tick": 14,
                 "unit": "meters",
                 "hitbox": {
                   "shape": "capsule",
@@ -468,7 +468,7 @@
                   "baseKnockback": 3,
                   "knockbackGrowth": 16,
                   "stunTicks": 12,
-                  "durationTicks": 20,
+                  "durationTicks": 23,
                   "interruptible": true,
                   "hitGroup": 1,
                   "knockbackDirection": "awayFromOwner"
@@ -494,8 +494,8 @@
       "timeline": {
         "stages": [
           {
-            "durationTicks": 29,
-            "iasaTicks": 25,
+            "durationTicks": 33,
+            "iasaTicks": 28,
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
             "autoCancelAfterTicks": 0,
@@ -510,7 +510,7 @@
             "operations": [
               {
                 "kind": "spawnHitbox",
-                "tick": 7,
+                "tick": 8,
                 "unit": "meters",
                 "hitbox": {
                   "shape": "sphere",
@@ -528,7 +528,7 @@
                   "baseKnockback": 5,
                   "knockbackGrowth": 24,
                   "stunTicks": 18,
-                  "durationTicks": 6,
+                  "durationTicks": 7,
                   "interruptible": true,
                   "hitGroup": 0,
                   "knockbackDirection": "awayFromOwner"
@@ -554,11 +554,11 @@
       "timeline": {
         "stages": [
           {
-            "durationTicks": 44,
-            "iasaTicks": 41,
+            "durationTicks": 51,
+            "iasaTicks": 48,
             "landingLagTicks": 9,
-            "autoCancelBeforeTicks": 5,
-            "autoCancelAfterTicks": 30,
+            "autoCancelBeforeTicks": 6,
+            "autoCancelAfterTicks": 35,
             "attackRange": 1.75,
             "warpRange": 0,
             "useTargetLock": true,
@@ -570,7 +570,7 @@
             "operations": [
               {
                 "kind": "spawnHitbox",
-                "tick": 14,
+                "tick": 16,
                 "unit": "meters",
                 "hitbox": {
                   "shape": "sphere",
@@ -588,7 +588,7 @@
                   "baseKnockback": 5,
                   "knockbackGrowth": 26,
                   "stunTicks": 20,
-                  "durationTicks": 6,
+                  "durationTicks": 7,
                   "interruptible": true,
                   "hitGroup": 0,
                   "knockbackDirection": "awayFromOwner"
@@ -614,8 +614,8 @@
       "timeline": {
         "stages": [
           {
-            "durationTicks": 60,
-            "iasaTicks": 56,
+            "durationTicks": 69,
+            "iasaTicks": 64,
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
             "autoCancelAfterTicks": 0,
@@ -630,7 +630,7 @@
             "operations": [
               {
                 "kind": "spawnHitbox",
-                "tick": 10,
+                "tick": 12,
                 "unit": "meters",
                 "hitbox": {
                   "shape": "sphere",
@@ -648,7 +648,7 @@
                   "baseKnockback": 9,
                   "knockbackGrowth": 42,
                   "stunTicks": 26,
-                  "durationTicks": 7,
+                  "durationTicks": 8,
                   "interruptible": true,
                   "hitGroup": 0,
                   "knockbackDirection": "awayFromOwner"
@@ -674,11 +674,11 @@
       "timeline": {
         "stages": [
           {
-            "durationTicks": 54,
-            "iasaTicks": 50,
+            "durationTicks": 62,
+            "iasaTicks": 57,
             "landingLagTicks": 12,
-            "autoCancelBeforeTicks": 5,
-            "autoCancelAfterTicks": 38,
+            "autoCancelBeforeTicks": 6,
+            "autoCancelAfterTicks": 44,
             "attackRange": 0,
             "warpRange": 0,
             "useTargetLock": true,
@@ -690,7 +690,7 @@
             "operations": [
               {
                 "kind": "spawnHitbox",
-                "tick": 20,
+                "tick": 23,
                 "unit": "meters",
                 "hitbox": {
                   "shape": "sphere",
@@ -708,7 +708,7 @@
                   "baseKnockback": 8,
                   "knockbackGrowth": 42,
                   "stunTicks": 26,
-                  "durationTicks": 7,
+                  "durationTicks": 8,
                   "interruptible": true,
                   "hitGroup": 0,
                   "knockbackDirection": "awayFromOwner"
@@ -728,6 +728,7 @@
       "aimMode": "cameraForward3D",
       "aimMovement": "fixed",
       "aimAnimationId": "anim.ki-shot-loop",
+      "hitPresentationId": "presentation.fightguy.ki-shot.hit",
       "cooldownTicks": 120,
       "isRecoveryMove": false,
       "preserveMomentumOnStart": false,
@@ -907,7 +908,7 @@
       "behavior": "meleeCombo",
       "aimMode": "none",
       "aimMovement": "fixed",
-      "cooldownTicks": 360,
+      "cooldownTicks": 240,
       "isRecoveryMove": false,
       "preserveMomentumOnStart": false,
       "allowSlideCarry": false,
@@ -950,26 +951,6 @@
                   "bodyY": 0.8,
                   "sideY": 0.3
                 }
-              },
-              {
-                "kind": "emitPresentation",
-                "tick": 0,
-                "unit": "ticks",
-                "presentationId": "presentation.cyclone-kick.start",
-                "placement": {
-                  "attachmentMode": "world",
-                  "boneId": null,
-                  "localPositionX": 0,
-                  "localPositionY": 0,
-                  "localPositionZ": 0,
-                  "localRotationX": 0,
-                  "localRotationY": 0,
-                  "localRotationZ": 0,
-                  "localScaleX": 1,
-                  "localScaleY": 1,
-                  "localScaleZ": 1,
-                  "durationTicks": 28
-                }
               }
             ]
           }
@@ -984,7 +965,7 @@
       "behavior": "meleeCombo",
       "aimMode": "none",
       "aimMovement": "fixed",
-      "cooldownTicks": 1200,
+      "cooldownTicks": 720,
       "isRecoveryMove": false,
       "preserveMomentumOnStart": false,
       "allowSlideCarry": false,

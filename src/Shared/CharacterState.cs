@@ -109,10 +109,6 @@ namespace SlopArena.Shared
         /// <summary>Increments on every ability activation so clients can restart same-slot attack clips.</summary>
         public byte AttackSequence;
         /// <summary>
-        /// chain window remaining
-        /// </summary>
-        public ushort ComboTimerTicks;
-        /// <summary>
         /// self-lock from attack (remaining)
         /// </summary>
         public ushort AnimLockTicks;
@@ -160,6 +156,12 @@ namespace SlopArena.Shared
         public float QueuedKBBase, QueuedKBGrowth, QueuedKBDamage;
         public float QueuedKBForce;
         public ushort QueuedKBStun;
+        /// <summary>Fixed hitstun to apply with the queued hit launch; zero uses the formula.</summary>
+        public ushort QueuedKBFixedHitstunTicks;
+        /// <summary>Authored stun gate preserved separately from hook-resolved queued stun.</summary>
+        public ushort QueuedKBStunGate;
+        /// <summary>Local-only marker: this hit added hitstop without adding a reaction.</summary>
+        public bool QueuedArmorHitstop;
         /// <summary>True when the hit's OnHitEntity supplied a complete direct launch force.</summary>
         public bool QueuedKBResolvedForce;
         /// <summary>True when the hit's OnHitEntity rewrote the launch velocity directly.</summary>

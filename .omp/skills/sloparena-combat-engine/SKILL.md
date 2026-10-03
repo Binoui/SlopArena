@@ -63,11 +63,11 @@ Bone-attached hitboxes use cooked pose data and semantic bone IDs. Projectile pa
 
 FightGuy may use versioned `slop.internal.fightguy.*` capabilities while native behavior is decomposed into public primitives. They are trusted built-in exceptions, not package-defined behavior. Only the trusted built-in cook profile may admit them; Workshop content cannot reference them. Each exception requires an owner, reason, and migration path under ADR-0022.
 
-## Legacy compatibility
+## Shared runtime lifecycle
 
-`ServerAbility` remains a real Shared compatibility/runtime base. The existing legacy Nilus implementation, built-in capability adapters, and FightGuy capability adapters may use its `OnStart`, `Tick`, `OnEnd`, `OnCancel`, `OnHitEntity`, resolver, and presentation sink hooks. `CookedTimelineAbility` also currently derives from it as the interpreter seam.
+`ServerAbility` remains the Shared runtime base for `CookedTimelineAbility` and built-in capability adapters. They use its `OnStart`, `Tick`, `OnEnd`, `OnCancel`, `OnHitEntity`, resolver, and presentation sink hooks.
 
-This does **not** make polymorphic `ServerAbility` subclasses or `AbilityFactory(CharacterClass, slot)` the universal authoring architecture. New package behavior belongs in cooked timelines and typed/versioned operations. The legacy Nilus implementation is modification-only compatibility until migrated. Do not add new global character/slot dispatch, raw authoring loaders, or manual data/config ownership.
+Nilus, the old LMB combo classes, and character/slot factory dispatch have been removed. New package behavior belongs in cooked timelines and typed/versioned operations. Do not add new global character/slot dispatch, raw authoring loaders, or manual data/config ownership.
 
 ## Change checklist
 

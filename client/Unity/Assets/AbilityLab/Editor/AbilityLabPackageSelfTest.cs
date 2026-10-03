@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Linq;
 using UnityEditor;
+using UnityEngine;
 using SlopArena.Client.Tools;
 using SlopArena.Client;
 using SlopArena.Shared;
@@ -28,6 +29,39 @@ public static class AbilityLabPackageSelfTest
                 lunge.Speed != 12f ||
                 lunge.DurationTicks != 6)
                 throw new InvalidOperationException("Forward lunge source edit did not add the default typed operation.");
+
+            if (!workspace.AddTargetedLeap("ground.E", 0) ||
+                workspace.LiveDraftInvalid || workspace.LiveDraftPackage == null ||
+                workspace.Draft.CapabilityRequirements.Count != 1)
+                throw new InvalidOperationException("A targeted leap did not create one valid public capability requirement and live draft.");
+            if (!workspace.TryResolveCanonicalSlot("ground.E", out int leapSlotIndex, out var leapSlot))
+                throw new InvalidOperationException("Targeted leap slot did not resolve.");
+            int leapIndex = leapSlot.Timeline.Stages[0].Operations
+                .Select((operation, index) => (operation, index))
+                .First(item => item.operation is StartCapabilityOperationSource).index;
+            var leap = (StartCapabilityOperationSource)leapSlot.Timeline.Stages[0].Operations[leapIndex];
+            float baselineLaunch = SampleLeapLaunch();
+            if (!workspace.ReplaceOperation(leapSlotIndex, 0, leapIndex,
+                    leap with { Parameters = ((TargetedLeapCapabilityParameters)leap.Parameters) with { LaunchVerticalSpeed = 14f } }) ||
+                workspace.LiveDraftInvalid || SampleLeapLaunch() <= baselineLaunch + 1f)
+                throw new InvalidOperationException("Editing the authored launch speed did not change the Shared scenario.");
+            workspace.Undo();
+            if (Math.Abs(SampleLeapLaunch() - baselineLaunch) > 0.01f)
+                throw new InvalidOperationException("Undo did not restore the previous Shared leap.");
+            workspace.Undo();
+            if (workspace.Draft.CapabilityRequirements.Count != 0 ||
+                workspace.Draft.Slots[leapSlotIndex].Timeline.Stages[0].Operations
+                    .Any(operation => operation is StartCapabilityOperationSource))
+                throw new InvalidOperationException("Undo did not remove the leap and its capability requirement together.");
+
+            float SampleLeapLaunch()
+            {
+                var definition = CookedCharacterRuntimeAdapter.ToCharacterDefinition(workspace.LiveDraftPackage!);
+                var scenario = new AbilityLabSimulationController().RunScenario(
+                    definition, null, new AbilityLabScenarioOptions("ground.E", 20, 4f), Vector3.zero, 0f);
+                return scenario.Frames.First(frame => !frame.Actor.IsGrounded &&
+                    frame.Actor.State == ActionState.Attacking).Actor.VY;
+            }
 
             string characterPath = Path.Combine(full, "character.json");
             string before = File.ReadAllText(characterPath);
@@ -241,5 +275,52 @@ public static class AbilityLabPackageSelfTest
             if (Directory.Exists(full)) Directory.Delete(full, true);
             AssetDatabase.Refresh();
         }
+    }
+    public static void RunTargetedLeapAuthoringSelfTest()
+    {
+        const string packagePath = "Assets/CharacterPackages/bonk";
+        string characterPath = Path.Combine(UnityCharacterAssetCooker.ProjectRoot(), packagePath, "character.json");
+        byte[] sourceBefore = File.ReadAllBytes(characterPath);
+        var workspace = new AbilityLabPackageWorkspace();
+        if (!workspace.OpenPackage(packagePath) ||
+            !workspace.TryResolveCanonicalSlot("ground.E", out int slotIndex, out var slot))
+            throw new InvalidOperationException("Bonk E source is unavailable for the authoring test.");
+        var stage = slot.Timeline.Stages[0];
+        int operationIndex = stage.Operations
+            .Select((operation, index) => (operation, index))
+            .First(item => item.operation is StartCapabilityOperationSource).index;
+        var operation = (StartCapabilityOperationSource)stage.Operations[operationIndex];
+        var parameters = (TargetedLeapCapabilityParameters)operation.Parameters;
+
+        float LaunchSpeed()
+        {
+            if (!workspace.PrepareScenarioPreview() || workspace.LiveDraftPackage == null)
+                throw new InvalidOperationException("Targeted-leap live draft did not compile.");
+            var def = CookedCharacterRuntimeAdapter.ToCharacterDefinition(workspace.LiveDraftPackage);
+            var result = new AbilityLabSimulationController().RunScenario(def, null,
+                new AbilityLabScenarioOptions("ground.E", 20, 4f),
+                new Vector3(0f, def.CapsuleHeight * 0.5f, 0f), 0f);
+            return result.Frames.First(frame => !frame.Actor.IsGrounded &&
+                frame.Actor.State == ActionState.Attacking).Actor.VY;
+        }
+
+        try
+        {
+            float original = LaunchSpeed();
+            if (!workspace.ReplaceOperation(slotIndex, 0, operationIndex,
+                    operation with { Parameters = parameters with { LaunchVerticalSpeed = parameters.LaunchVerticalSpeed + 2f } }) ||
+                LaunchSpeed() <= original + 1f)
+                throw new InvalidOperationException("Edited vertical launch speed did not change the recorded Shared flight.");
+            workspace.Undo();
+            if (Math.Abs(LaunchSpeed() - original) > 0.01f)
+                throw new InvalidOperationException("Undo did not restore the original recorded flight.");
+        }
+        finally
+        {
+            if (workspace.CanUndo) workspace.Undo();
+            if (!File.ReadAllBytes(characterPath).SequenceEqual(sourceBefore))
+                throw new InvalidOperationException("Transient authoring test changed Bonk's source file.");
+        }
+        Debug.Log("[AbilityLabPackageSelfTest] Targeted-leap edit changed Shared flight; Undo restored it without saving.");
     }
 }

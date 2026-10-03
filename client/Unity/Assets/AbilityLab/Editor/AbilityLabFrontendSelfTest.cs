@@ -4,6 +4,7 @@ using System.Reflection;
 using System.Linq;
 using UnityEditor;
 using UnityEditor.UIElements;
+using SlopArena.Client.Entities;
 using SlopArena.Client.Animation;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -14,8 +15,103 @@ namespace SlopArena.EditorTools;
 
 public static class AbilityLabFrontendSelfTest
 {
+    public static void RunAttachmentDraftInvariants()
+    {
+        var config = ScriptableObject.CreateInstance<WeaponAttachConfig>();
+        var catalog = ScriptableObject.CreateInstance<CharacterAssetCatalog>();
+        var workspace = new AbilityLabPackageWorkspace();
+        WeaponAttachConfig preview = null;
+        string assetPath = $"Assets/__AttachmentDraftTest-{Guid.NewGuid():N}.asset";
+        var entry = new WeaponEntry
+        {
+            AttackSlot = 7,
+            BoneName = "hand",
+            PositionOffset = new Vector3(1f, 2f, 3f),
+            RotationOffset = new Vector3(4f, 5f, 6f),
+            TrailBladeWidth = 0.63f,
+            TrailHiltAnchor = "hilt",
+        };
+        config.Entries = new[] { entry, new WeaponEntry() };
+        catalog.WeaponConfig = config;
+        typeof(AbilityLabPackageWorkspace).GetProperty(nameof(AbilityLabPackageWorkspace.Catalog))!
+            .SetValue(workspace, catalog);
+        try
+        {
+            AssetDatabase.CreateAsset(config, assetPath);
+            Vector3 originalPosition = entry.PositionOffset;
+            Vector3 originalRotation = entry.RotationOffset;
+            if (!workspace.BeginAttachmentDraft(0) ||
+                !workspace.SetAttachmentPositionOffset(new Vector3(11f, 12f, 13f)) ||
+                entry.PositionOffset != originalPosition ||
+                workspace.AttachmentHasFirePhaseOverride ||
+                !workspace.SetAttachmentFirePhaseOverride(true) ||
+                workspace.AttachmentFirePositionOffset != new Vector3(11f, 12f, 13f) ||
+                workspace.AttachmentFireRotationOffset != originalRotation ||
+                workspace.BeginAttachmentDraft(1) ||
+                workspace.OpenPackage("different-package"))
+                throw new InvalidOperationException("Attachment edits mutated source, failed fire override initialization, or lost a dirty selection.");
+
+            if (workspace.SetAttachmentFirePositionOffset(new Vector3(float.PositiveInfinity, 0f, 0f)) ||
+                workspace.AttachmentFirePositionOffset != new Vector3(11f, 12f, 13f))
+                throw new InvalidOperationException("Nonfinite attachment offsets were accepted.");
+            preview = workspace.CreateAttachmentPreviewConfig();
+            var previewEntry = preview.Entries[0];
+            if (ReferenceEquals(previewEntry, entry) ||
+                previewEntry.PositionOffset != new Vector3(11f, 12f, 13f) ||
+                previewEntry.FirePositionOffset != new Vector3(11f, 12f, 13f) ||
+                previewEntry.TrailBladeWidth != entry.TrailBladeWidth ||
+                previewEntry.TrailHiltAnchor != entry.TrailHiltAnchor ||
+                entry.PositionOffset != originalPosition)
+                throw new InvalidOperationException("Attachment preview did not clone draft placement while preserving source and trail data.");
+            UnityEngine.Object.DestroyImmediate(preview);
+            preview = null;
+
+            if (!workspace.SetAttachmentFirePositionOffset(new Vector3(21f, 22f, 23f)) ||
+                !workspace.UndoAttachmentDraft() ||
+                workspace.AttachmentFirePositionOffset != new Vector3(11f, 12f, 13f) ||
+                !workspace.RedoAttachmentDraft() ||
+                workspace.AttachmentFirePositionOffset != new Vector3(21f, 22f, 23f))
+                throw new InvalidOperationException("Attachment draft Undo/Redo did not restore placement values.");
+
+            entry.PositionOffset = new Vector3(31f, 32f, 33f);
+            if (workspace.SaveAttachmentDraft() || entry.PositionOffset != new Vector3(31f, 32f, 33f))
+                throw new InvalidOperationException("Attachment source conflict did not block save without overwriting the external value.");
+            if (!workspace.RevertAttachmentDraft() || workspace.HasAttachmentDraft)
+                throw new InvalidOperationException("Attachment Revert did not discard the transient draft.");
+
+            if (!workspace.BeginAttachmentDraft(0) ||
+                !workspace.SetAttachmentPositionOffset(new Vector3(41f, 42f, 43f)) ||
+                !workspace.SetAttachmentFirePhaseOverride(true) ||
+                !workspace.SetAttachmentFireRotationOffset(new Vector3(51f, 52f, 53f)) ||
+                !workspace.SaveAttachmentDraft() ||
+                entry.PositionOffset != new Vector3(41f, 42f, 43f) ||
+                !entry.HasFirePhaseOverride ||
+                entry.FireRotationOffset != new Vector3(51f, 52f, 53f) ||
+                entry.TrailBladeWidth != 0.63f || entry.TrailHiltAnchor != "hilt" ||
+                entry.AttackSlot != 7 || entry.BoneName != "hand")
+                throw new InvalidOperationException("Attachment Save did not persist only attachment fields while preserving trail and unrelated entry data.");
+            if (!workspace.SetAttachmentRotationOffset(new Vector3(61f, 62f, 63f)) ||
+                !workspace.RevertAttachmentDraft() ||
+                entry.RotationOffset != originalRotation)
+                throw new InvalidOperationException("Attachment Revert failed to discard unsaved changes after save.");
+            AssetDatabase.ImportAsset(assetPath, ImportAssetOptions.ForceUpdate);
+            var reloaded = AssetDatabase.LoadAssetAtPath<WeaponAttachConfig>(assetPath);
+            if (reloaded == null || reloaded.Entries[0].PositionOffset != new Vector3(41f, 42f, 43f)
+                || reloaded.Entries[0].FireRotationOffset != new Vector3(51f, 52f, 53f)
+                || reloaded.Entries[0].RotationOffset != originalRotation)
+                throw new InvalidOperationException("Saved attachment values did not survive source asset reimport.");
+        }
+        finally
+        {
+            if (preview != null) UnityEngine.Object.DestroyImmediate(preview);
+            UnityEngine.Object.DestroyImmediate(catalog);
+            if (!AssetDatabase.DeleteAsset(assetPath) && config != null) UnityEngine.Object.DestroyImmediate(config);
+        }
+    }
+
     public static void RunCommandInvariants()
     {
+        RunAttachmentDraftInvariants();
         var stages = new[]
         {
             new CharacterStageSource(4, 0, 0, 0, 0, Array.Empty<string>(), Array.Empty<CharacterTimelineOperationSource>()),
@@ -720,74 +816,8 @@ public static class AbilityLabFrontendSelfTest
             if (unavailable.IsAvailable || unavailable.Diagnostics.Count == 0 || unavailable.Identity != null)
                 throw new InvalidOperationException("Unavailable package did not expose structured diagnostics.");
 
-            var compatibility = root.Q<Label>("compatibility-banner");
-            if (compatibility == null || !compatibility.text.Contains("read-only", StringComparison.OrdinalIgnoreCase))
-                throw new InvalidOperationException("Compatibility legacy-authority banner is missing.");
-            var legacySelector = root.Q<DropdownField>("legacy-selector");
-            if (legacySelector == null || !legacySelector.choices.SequenceEqual(new[] { "Nilus" }))
-                throw new InvalidOperationException("Compatibility selector must expose exactly Nilus.");
-            var authority = root.Q<Label>("compatibility-authority");
-            if (authority == null ||
-                !authority.text.Contains("Compatibility Preview", StringComparison.Ordinal) ||
-                !authority.text.Contains("legacy authority", StringComparison.OrdinalIgnoreCase) ||
-                !authority.text.Contains("read-only", StringComparison.OrdinalIgnoreCase))
-                throw new InvalidOperationException("Compatibility authority status is missing.");
 
-            SelectTab(window, "compatibility-page");
-            if (root.Q<DropdownField>("package-selector").style.display != DisplayStyle.None ||
-                root.Q<Button>("package-status-toggle").style.display != DisplayStyle.None ||
-                root.Q<Button>("toolbar-undo").style.display != DisplayStyle.None ||
-                root.Q<Button>("toolbar-redo").style.display != DisplayStyle.None ||
-                root.Q<Button>("toolbar-save").style.display != DisplayStyle.None ||
-                root.Q<ScrollView>("diagnostics-panel").style.display != DisplayStyle.None)
-                throw new InvalidOperationException("Compatibility mode left package controls or diagnostics visible.");
-
-            SelectTab(window, "moves-page");
-            if (lab.SelectedPackageId != "fightguy")
-                throw new InvalidOperationException("Leaving Compatibility did not restore the last valid FightGuy preview.");
-
-            if (Application.isPlaying)
-            {
-                legacySelector.value = "Manki";
-                InvokeButton(root.Q<Button>("tab-compatibility"));
-                InvokeButton(root.Q<Button>("legacy-load"));
-                if (lab.Character != CharacterClass.Manki || lab.Renderer == null ||
-                    !authority.text.Contains("Compatibility Preview · Manki · Legacy authority · Read-only", StringComparison.Ordinal))
-                    throw new InvalidOperationException("Manki compatibility preview did not load through the rooted resolver.");
-                if (!root.Q<Toggle>("compatibility-show-hurtboxes").enabledSelf ||
-                    !root.Q<Toggle>("compatibility-show-hitboxes").enabledSelf ||
-                    !root.Q<Toggle>("compatibility-show-baked-bones").enabledSelf ||
-                    !root.Q<Toggle>("compatibility-show-dummy").enabledSelf ||
-                    !lab.ShowHurtboxes || !lab.ShowHitboxes || lab.ShowBakedBones || lab.ShowDummy)
-                    throw new InvalidOperationException("Compatibility preview debug toggles are not exposed with legacy defaults.");
-
-                if (!lab.TryGetStage(out var stage) || stage.DurationTicks < 2)
-                    throw new InvalidOperationException("Loaded legacy stage is not scrub-able.");
-                int scrubTick = Math.Min(1, stage.DurationTicks - 1);
-                var compatibilitySlider = root.Q<SliderInt>("compatibility-slider");
-                compatibilitySlider.SetValueWithoutNotify(scrubTick);
-                var sliderChange = ChangeEvent<int>.GetPooled(0, scrubTick);
-                sliderChange.target = compatibilitySlider;
-                compatibilitySlider.SendEvent(sliderChange);
-                sliderChange.Dispose();
-                var compatibilitySlot = root.Q<DropdownField>("compatibility-slot-selector");
-                compatibilitySlot.SetValueWithoutNotify(AbilityLab.SlotNames[1]);
-                lab.SetSlot(AbilityLab.SlotIndices[1]);
-                if (lab.SlotIndex != AbilityLab.SlotIndices[1])
-                    throw new InvalidOperationException("Compatibility slot selection did not update the runtime preview.");
-                int stageCount = lab.CurrentSpec()?.Stages?.Length ?? 0;
-                if (stageCount > 1)
-                {
-                    var compatibilityStage = root.Q<DropdownField>("compatibility-stage-selector");
-                    compatibilityStage.SetValueWithoutNotify("Stage 2");
-                    lab.SetStage(1);
-                    if (lab.StageIndex != 1)
-                        throw new InvalidOperationException("Compatibility stage selection did not update the runtime preview.");
-                }
-
-            }
-
-            Debug.Log("[AbilityLabFrontendSelfTest] Passed stable preview roots, missing-model recovery, canonical controls, compatibility mode boundary, legacy bindings, package preview seam, and source-edit boundary checks.");
+            Debug.Log("[AbilityLabFrontendSelfTest] Passed stable preview roots, missing-model recovery, canonical controls, package preview seam, and source-edit boundary checks.");
         }
         finally
         {

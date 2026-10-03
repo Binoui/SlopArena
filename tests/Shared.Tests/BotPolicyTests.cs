@@ -125,6 +125,88 @@ public class BotPolicyTests
             state.SetCooldown(slot, 999);
     }
 
+    private static CharacterDefinition IasaCooldownDef(ushort cooldown)
+    {
+        var def = TestHelpers.EngineDef;
+        var slots = System.Linq.Enumerable.ToArray(def.CookedSlots!);
+        foreach (var (ordinal, id, air, ticks) in new[]
+        {
+            (0, "ground.1", false, cooldown), (1, "ground.2", false, (ushort)0),
+            (8, "air.1", true, cooldown), (9, "air.2", true, (ushort)0),
+        })
+            slots[ordinal] = new CookedSlotDefinition(
+                ordinal, id, air, "IASA fixture", "", "",
+                AuthoringAbilityBehavior.MeleeCombo, AuthoringAimMode.None, ticks, false, false,
+                new CookedTimeline(new[]
+                {
+                    new CookedStage(20, 4, 0, 0, 0, Array.Empty<string>(),
+                        new CookedTimelineOperation[]
+                        {
+                            new CookedSpawnHitboxOperation(1, AuthoringUnit.Meters,
+                                new CookedHitbox(AuthoringHitboxShape.Sphere, 1,
+                                    0, 0, 1, 0, 0, 0, null, null, 6, 30, 4, 20, 12, 2, true, 0)),
+                        }),
+                }));
+        def.CookedSlots = slots;
+        return def;
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Iasa_AttackSelection_ExcludesPendingCooldownSlot(bool airborne)
+    {
+        var def = IasaCooldownDef(120);
+        var self = TestHelpers.PlayerState() with
+        {
+            PY = TestHelpers.GroundPY(def), IsGrounded = !airborne,
+            State = ActionState.Attacking, AttackSlot = AbilitySlots.Slot1,
+            AttackElapsedTicks = 4, AnimLockTicks = 16,
+        };
+        var target = self with
+        {
+            EntityId = 2, PZ = 1, State = ActionState.Idle, AttackSlot = 0,
+        };
+        var policy = new HeuristicBotPolicy();
+        int alternatives = 0;
+        for (int seed = 0; seed < 32; seed++)
+        {
+            var memory = new BotMemory { Difficulty = CpuDifficulty.Hard };
+            Prime(memory, target);
+            var input = policy.Decide(self, target, def, new Random(seed), memory, RecoveryArena());
+            Assert.NotEqual(AbilitySlots.Slot1, input.ActiveSlot);
+            if (input.ActiveSlot == AbilitySlots.Slot2) alternatives++;
+        }
+        Assert.True(alternatives > 0, "Another ready move must remain selectable at IASA.");
+    }
+
+    [Theory]
+    [InlineData(false, 120, AbilitySlots.Slot1, false)]
+    [InlineData(true, 120, AbilitySlots.Slot1, false)]
+    [InlineData(false, 0, AbilitySlots.Slot1, true)]
+    [InlineData(false, 120, AbilitySlots.Slot2, true)]
+    public void Iasa_QueuedPress_RespectsPendingCooldown(
+        bool airborne, ushort cooldown, byte slot, bool accepted)
+    {
+        var def = IasaCooldownDef(cooldown);
+        var self = TestHelpers.PlayerState() with
+        {
+            PY = TestHelpers.GroundPY(def), IsGrounded = !airborne,
+            State = ActionState.Attacking, AttackSlot = AbilitySlots.Slot1,
+            AttackElapsedTicks = 4, AnimLockTicks = 16,
+        };
+        var target = self with { EntityId = 2, PZ = 1, State = ActionState.Idle, AttackSlot = 0 };
+        var memory = new BotMemory { Difficulty = CpuDifficulty.Hard };
+        Prime(memory, target);
+        memory.StartPlan(slot, false, 0, 0, 0, 0, self.Deaths, self.IsGrounded, pressIssued: false);
+
+        var input = new HeuristicBotPolicy().Decide(
+            self, target, def, new Random(42), memory, RecoveryArena());
+
+        Assert.Equal(accepted ? slot : AbilitySlots.None, input.ActiveSlot);
+        Assert.Equal(accepted, memory.PlanPressIssued);
+    }
+
     [Fact]
     public void FarOpponent_ApproachesWithWorldSpaceMovement_DespiteReservedBurstRecovery()
     {
@@ -746,15 +828,17 @@ public class BotPolicyTests
         self.IsGrounded = false;
         self.JumpsLeft = 0;
         self.DashCooldownTicks = 999;
-        var target = TestHelpers.NpcState(x: 14f); // Within homing range, but away from safety.
+        var target = TestHelpers.NpcState(x: 14f); // Outward opponent must not redirect recovery.
         var memory = new BotMemory { Difficulty = CpuDifficulty.Hard };
         Prime(memory, target);
 
         var input = Policy.Decide(self, target, TestHelpers.WibouDef,
             new Random(0), memory, RecoveryArena());
 
-        Assert.Equal(0, input.ActiveSlot);
+        Assert.Equal(AbilitySlots.E, input.ActiveSlot);
         Assert.True(input.MoveX < 0f, "Recovery must drift toward the stage, not the opponent.");
+        Assert.True(MathF.Sin(input.AimYaw * MathF.PI / 18000f) < 0f,
+            "Recovery aim must point toward the stage, not the outward opponent.");
     }
 
     [Fact]

@@ -30,6 +30,8 @@ namespace SlopArena.Shared
         /// <summary>Knockback profile + optional custom overrides. Resolved at spawn time.</summary>
         public KnockbackData Knockback;
         public ushort StunTicks;
+        /// <summary>Optional fixed hitstun override; zero uses the launch formula.</summary>
+        public ushort FixedHitstunTicks;
         /// <summary>If false: persists even if attacker is hit during startup.</summary>
         public bool Interruptible;
 

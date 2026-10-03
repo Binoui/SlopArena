@@ -5,14 +5,14 @@ namespace SlopArena.Shared.Tests;
 /// <summary>Demo edge behavior: no automatic ledge grab; normal landing remains available.</summary>
 public class LedgeSnapTests
 {
-    private static readonly CharacterDefinition Def = TestHelpers.MankiDef;
-    private static readonly float GroundPx = TestHelpers.MankiGroundPY; // 0.75 (capsuleHalf)
+    private static readonly CharacterDefinition Def = TestHelpers.EngineDef;
+    private static readonly float GroundPy = TestHelpers.GroundPY(Def);
 
     [Fact]
     public void FallingBesideStage_DoesNotGrabOrGainResources()
     {
         var sim = TestHelpers.MakeSim(TestHelpers.TestArena());
-        var state = TestHelpers.EdgeState(posX: 199.5f);
+        var state = TestHelpers.PlayerState(x: 199.5f) with { PY = GroundPy, VY = -5f, IsGrounded = false };
         state.JumpsLeft = 0;
         TestHelpers.RegisterPlayer(sim, Def, state);
 
@@ -32,7 +32,7 @@ public class LedgeSnapTests
     {
         var sim = TestHelpers.MakeSim(TestHelpers.TestArena());
         var state = TestHelpers.PlayerState(x: 10f, z: 10f);
-        state.PY = GroundPx + 0.1f; // just above ground
+        state.PY = GroundPy + 0.1f; // just above ground
         state.VY = -5f;
         state.IsGrounded = false;
         TestHelpers.RegisterPlayer(sim, Def, state);
@@ -41,7 +41,7 @@ public class LedgeSnapTests
 
         // Normal ground collision still works.
         Assert.True(after.IsGrounded);
-        TestHelpers.AssertNear(GroundPx, after.PY, 0.01f);
+        TestHelpers.AssertNear(GroundPy, after.PY, 0.01f);
         TestHelpers.AssertNear(0f, after.VY, 0.01f);
     }
 
@@ -49,7 +49,7 @@ public class LedgeSnapTests
     public void AirDodgeRecoveryBesideStage_ContinuesFallingWithoutRefillingResources()
     {
         var sim = TestHelpers.MakeSim(TestHelpers.TestArena());
-        var state = TestHelpers.EdgeState(posX: 199.5f);
+        var state = TestHelpers.PlayerState(x: 199.5f) with { PY = GroundPy, VY = -5f, IsGrounded = false };
         state.State = ActionState.AirDodgeRecovery;
         state.StateTicks = 20;
         state.AirDodgeRecoveryTicks = 20;

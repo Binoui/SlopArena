@@ -8,7 +8,7 @@ public sealed class CrouchBraceTests
 {
     private const ulong Attacker = 1;
     private const ulong Target = 100;
-    private static readonly float GroundPy = TestHelpers.CombatGroundPY;
+    private static readonly float GroundPy = TestHelpers.GroundPY(TestHelpers.EngineDef);
 
     [Fact]
     public void SettledCrouch_DeferredMeleeLaunch_IsExactlyNinetyPercent()
@@ -177,8 +177,8 @@ public sealed class CrouchBraceTests
         bool releaseDuringFreeze = false, bool replacementHit = false)
     {
         var sim = TestHelpers.MakeSim(TestHelpers.TestArena());
-        var attackerDef = TestHelpers.CombatDef;
-        var targetDef = TestHelpers.CombatDef;
+        var attackerDef = TestHelpers.EngineDef;
+        var targetDef = TestHelpers.EngineDef;
         if (withPose)
         {
             targetDef.CrouchAnim = "crouch";

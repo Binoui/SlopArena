@@ -200,6 +200,7 @@ public sealed class CookedSlotDefinition
     public bool IsRecoveryMove { get; }
     public bool PreserveMomentumOnStart { get; }
     public bool AllowSlideCarry { get; }
+    public string? HitPresentationId { get; }
     public CookedChargePool? ChargePool { get; }
     public AuthoringAimMovementMode AimMovement { get; }
     public string? AimAnimationId { get; }
@@ -221,7 +222,8 @@ public sealed class CookedSlotDefinition
         CookedChargePool? chargePool = null,
         AuthoringAimMovementMode aimMovement = AuthoringAimMovementMode.Fixed,
         string? aimAnimationId = null,
-        bool allowSlideCarry = false)
+        bool allowSlideCarry = false,
+        string? hitPresentationId = null)
     {
         Ordinal = ordinal;
         Id = id;
@@ -239,6 +241,7 @@ public sealed class CookedSlotDefinition
         ChargePool = chargePool;
         AimMovement = aimMovement;
         AimAnimationId = aimAnimationId;
+        HitPresentationId = hitPresentationId;
     }
 }
 
@@ -307,8 +310,8 @@ public enum CookedOperationKind : byte
     CompleteTimeline = 6,
     ForwardLunge = 7,
     GravityWindow = 8,
+    ArmorWindow = 9,
 }
-
 public abstract class CookedTimelineOperation
 {
     public ushort Tick { get; }
@@ -364,6 +367,15 @@ public sealed class CookedGravityWindowOperation : CookedTimelineOperation
     }
 }
 
+public sealed class CookedArmorWindowOperation : CookedTimelineOperation
+{
+    public ushort DurationTicks { get; }
+
+    public CookedArmorWindowOperation(ushort tick, AuthoringUnit unit, ushort durationTicks)
+        : base(tick, unit, CookedOperationKind.ArmorWindow)
+        => DurationTicks = durationTicks;
+}
+
 
 public sealed class CookedSpawnHitboxOperation : CookedTimelineOperation
 {
@@ -391,7 +403,8 @@ public sealed record CookedHitbox(
     ushort DurationTicks,
     bool Interruptible,
     byte HitGroup,
-    AuthoringKnockbackDirection KnockbackDirection = AuthoringKnockbackDirection.AwayFromOwner);
+    AuthoringKnockbackDirection KnockbackDirection = AuthoringKnockbackDirection.AwayFromOwner,
+    ushort FixedHitstunTicks = 0);
 
 public sealed class CookedSpawnProjectileOperation : CookedTimelineOperation
 {
@@ -495,19 +508,15 @@ public sealed record CookedWibouRisingSlashCapabilityParameters(
 public sealed record CookedWibouBladeFlurryCapabilityParameters(
     float ForwardSpeed,
     ushort MoveTicks) : CookedCapabilityParameters;
-public sealed record CookedBonkTargetedJumpSlamCapabilityParameters(
+public sealed record CookedTargetedLeapCapabilityParameters(
     ushort MaxAimTicks,
     ushort MaxFlightTicks,
     float MinRange,
     float MaxRange,
     float LaunchVerticalSpeed,
-    float SlamRadius,
-    float SlamDamage,
-    float SlamAngle,
-    float SlamBaseKnockback,
-    float SlamKnockbackGrowth,
-    ushort SlamStunTicks,
-    ushort SlamDurationTicks) : CookedCapabilityParameters;
+    ushort LandingSeekTick,
+    ushort RecoveryTicks,
+    CookedHitbox Hitbox) : CookedCapabilityParameters;
 public sealed record CookedMankiRoundBombCapabilityParameters(
     ushort ThrowTriggerTick,
     float MaxRange,

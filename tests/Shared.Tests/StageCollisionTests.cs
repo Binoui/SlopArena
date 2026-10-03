@@ -386,26 +386,6 @@ public void Knockback_DoesNotTunnelThroughThinWall()
         Assert.False(state.IsGrounded);
         Assert.True(state.PX > 2f);
     }
-    [Fact]
-    public void Riftwalk_UsesStageResolverForRecoveryDisplacement()
-    {
-        var arena = Arena(Floor(0f, -10f, 10f, -10f, 10f), WallX(2f, 0f, 4f));
-        var state = TestHelpers.PlayerState(0f, 0f);
-        state.PY = TestHelpers.NilusDef.CapsuleHeight * 0.5f;
-        state.IsGrounded = true;
-        state.FacingYaw = MathF.PI * 0.5f;
-        var ability = new SlopArena.Shared.Abilities.NilusRiftwalk
-        {
-            Slot = 3,
-            Arena = arena,
-        };
-        ability.OnStart(ref state, TestHelpers.NilusDef);
-        var input = default(InputState);
-        ability.Tick(ref state, ref input, TestHelpers.NilusDef);
-
-        Assert.InRange(state.PX, 2f - TestHelpers.NilusDef.CapsuleRadius - 0.03f,
-            2f - TestHelpers.NilusDef.CapsuleRadius + 0.03f);
-    }
 
     [Fact]
     public void TriangleMovement_IsDeterministicAcrossIdenticalRuns()

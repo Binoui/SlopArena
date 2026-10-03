@@ -18,12 +18,12 @@ SlopArena is a Unity 6 C# 3D platform fighter with a server-authoritative 60 Hz 
 - `client/Unity/Assets/Scripts/` owns input, presentation, networking, UI, and editor tooling. `client/Unity/Assets/AbilityLab/` owns package editing and authoritative preview. Shared coverage lives in `tests/Shared.Tests/`.
 - For new character work, read `docs/characters/adding-a-new-character.md`: edit `client/Unity/Assets/CharacterPackages/<package>/package.json` for identity/version/dependencies/license/attribution, `character.json` for gameplay and canonical slots, and `CharacterAssetCatalog.asset` for Unity bindings. `content-cooked/<package>/` is the immutable runtime result, not authoring source.
 - Use `docs/architecture-overview.md` for runtime boundaries, `docs/systems/ability-architecture.md` for cooked abilities, `docs/systems/combat-systems.md` for combat, and `docs/systems/netcode-architecture.md` for prediction/rollback.
-- For Unity Editor/Pipeline work, read `docs/contributing/unity-cli.md`; for verification, read `docs/testing.md`.
+- For Unity Editor/Pipeline work, read `docs/contributing/unity-cli.md` and `/home/binoui/Documents/projects/sloparena-workspace/docs/unity-editor-coordination.md` before operating. Use the gateway with your own explicit `ORCA_TERMINAL_HANDLE`; wait for your own bounded runtime lease, never request insertion into another owner's batch. Historical Markdown ownership and active panes are not authority. For verification, read `docs/testing.md`.
 
 ## Running and verifying
 
 - Choose the applicable mode in `docs/testing.md`: local iteration, integrated change, or distributable demo. Keep focused behavioral coverage and applicable Shared/Server/Unity/package checks; do not force a publishing cook or unrelated runtime checks for ordinary tuning.
-- For Unity-facing implementation, leave a short Test in Unity checklist in the gitignored root `TESTING-UNITY.md`. Unity Editor/Pipeline operations target the main checkout; worktree agents must not operate the main Editor through a worktree.
+- For Unity-facing implementation, leave a short Test in Unity checklist in the gitignored root `TESTING-UNITY.md`. Editor operations use the approved canonical project through the gateway, not a worktree-local connection or unowned raw CLI. Worktree agents share the same runtime lease and honor source windows; never silently substitute main for an invalid explicit target.
 
 ## Conventions that differ from defaults
 
@@ -31,14 +31,14 @@ SlopArena is a Unity 6 C# 3D platform fighter with a server-authoritative 60 Hz 
 - Keep `src/Shared/` free of Unity types and engine physics queries. Use deterministic math and existing `SpellResolver`/geometry APIs for collision. Represent gameplay durations in 60 Hz ticks, normally `ushort`; preserve server/client Shared equivalence and immutable match content.
 - New characters use the package-native path. The Shared compiler and Unity cook produce normalized runtime definitions, deterministic poses, generated client bindings, and a manifest; the Match Content Catalog pins package IDs, versions, dependencies, capability versions, and hashes. Raw authoring JSON is cook input, never the runtime contract.
 - Use the canonical 16-entry grid: ground and air variants of `1`, `2`, `3`, `4`, `A`, `E`, `R`, and `F`. Physical controls are adapters, not persisted move identity; use semantic package IDs and canonical slot projection, not a second mapping.
-- Author new abilities as fixed cooked timelines with ordered typed/versioned operations. Engine-owned deterministic primitives own movement, hitboxes, projectiles, damage, Knockback, Hitstun, Hitstop, Clash, Burst, timing locks, and presentation events. `ServerAbility` remains a Shared lifecycle seam for `CookedTimelineAbility`, trusted temporary built-ins, and legacy Nilus—not the universal new-content model.
+- Author new abilities as fixed cooked timelines with ordered typed/versioned operations. Engine-owned deterministic primitives own movement, hitboxes, projectiles, damage, Knockback, Hitstun, Hitstop, Clash, Burst, timing locks, and presentation events. `ServerAbility` remains a Shared lifecycle seam for `CookedTimelineAbility` and trusted built-in capabilities—not the universal new-content model. Nilus and legacy character/slot factory dispatch have been removed.
 - Only the trusted built-in cook profile may admit FightGuy's temporary `slop.internal.*` capabilities; Workshop/package content cannot self-grant access. Each exception needs an owner and migration path.
 - Use `MonoBehaviour.Update`/`FixedUpdate` and Unity InputSystem APIs. Animancer plays semantic package bindings directly; do not give AnimatorController gameplay ownership.
 - Reuse existing infrastructure before adding abstractions.
 
 ## Known pitfalls
 
-- Nilus remains behind `LegacyCharacterCatalogAdapter`: its legacy files are modification-only compatibility, never templates for new packages. FightGuy, Manki, Kistu, and Bonk are package-native roster characters; admission does not prove kit completeness or player acceptance.
+- FightGuy, Manki, Wibou, and Bonk are package-native roster characters; admission does not prove kit completeness or player acceptance. Nilus, the Compatibility preview tab, and the old LMB combo classes are retired. Do not recreate a legacy character execution path.
 - Warp is not a current gameplay contract. Do not add or document Warp mechanics as new behavior; use current movement, targeting, Dash, and recovery rules in `CONTEXT.md` and `docs/systems/combat-systems.md`.
 
 <!-- /bmad:context -->

@@ -19,32 +19,17 @@ namespace SlopArena.Shared.Tests;
 ///   - Ground-truth documentation of how abilities behave at the tick level
 ///   - A reference for agents modeling the game runtime
 ///
-/// All tests use CombatDef (Manki stats + simple capsule hurtboxes) so
-/// collision math works without baked skeleton data.
+/// Generic hit-response and raw-hit cases use TestHelpers.EngineDef so their
+/// mechanics do not inherit roster tuning. The Q projectile scenario deliberately
+/// executes Manki's authored kit against a synthetic target.
 /// ═══════════════════════════════════════════════════════════════════════
 public class CombatPipelineTests
 {
-    private static readonly float Gpy = TestHelpers.CombatGroundPY;
+    private static readonly float Gpy = TestHelpers.GroundPY(TestHelpers.MankiDef);
 
     // ═══════════════════════════════════════════════════════════════════
-    // TEST 1: LMB melee combo hits NPC
-    // ═══════════════════════════════════════════════════════════════════
-    //
-    // Manki LMB stage 1:
-    //   Hitbox: sphere at Z=0.9 (in front), radius 1.0
-    //   TriggerTick: 6 (hitbox appears on the 6th Tick call)
-    //   Damage: 4, BaseKnockback: 1.5, KnockbackGrowth: 2.5, KnockbackUpward: 1, StunTicks: 10
-    //
-    // NPC is placed at Z=1.5 with a 0.3-radius capsule hurtbox.
-    //   NPC Hurbox capsule: (0, -0.65, 1.5) → (0, 0.65, 1.5), Radius 0.3
-    //   Hitbox center: (0, GroundPY, 0.9) at spawn tick
-    //   Distance from hitbox center to closest point on NPC capsule: ≈0.6m
-    //   Combined radius: 1.0 + 0.3 = 1.3 → HIT within margin
-    //
-    // Expected: NPC takes 4 damage, gains knockback velocity
-    // ADR-0019 derives hitstun from the applied knockback magnitude.
-    // The old authored StunTicks override is intentionally removed.
-
+    // The authored Manki Q regression below verifies its real projectile path;
+    // its receiver and hurtbox geometry are synthetic.
 
     // ═══════════════════════════════════════════════════════════════════
     // TEST 1b: Re-hit while in hitstun resets HitstunTicks
@@ -115,14 +100,14 @@ public class CombatPipelineTests
         var arena = TestHelpers.TestArena();
         var sim = TestHelpers.MakeSim(arena);
 
-        var def = TestHelpers.CombatDef;
+        var def = TestHelpers.MankiDef;
         var player = TestHelpers.PlayerState();
         player.PY = Gpy;
         sim.RegisterEntity(1, def, player);
 
         var npc = TestHelpers.NpcState(0f, 3.5f);
-        npc.PY = Gpy;
-        sim.RegisterEntity(100, def, npc);
+        npc.PY = TestHelpers.GroundPY(TestHelpers.EngineDef);
+        sim.RegisterEntity(100, TestHelpers.EngineDef, npc);
 
         // Build the aim input once
         var aimInput = TestHelpers.Input(activeSlot: AbilitySlots.A, aiming: true, aimDistance: 500);
@@ -215,11 +200,11 @@ public class CombatPipelineTests
     {
         var sim = TestHelpers.MakeSim(TestHelpers.TestArena());
         var attacker = TestHelpers.PlayerState();
-        attacker.PY = TestHelpers.CombatGroundPY;
-        sim.RegisterEntity(1, TestHelpers.CombatDef, attacker);
+        attacker.PY = TestHelpers.GroundPY(TestHelpers.EngineDef);
+        sim.RegisterEntity(1, TestHelpers.EngineDef, attacker);
         var target = TestHelpers.NpcState(0f, 1.5f);
-        target.PY = TestHelpers.CombatGroundPY;
-        sim.RegisterEntity(100, TestHelpers.CombatDef, target);
+        target.PY = TestHelpers.GroundPY(TestHelpers.EngineDef);
+        sim.RegisterEntity(100, TestHelpers.EngineDef, target);
 
         sim.Resolver.Spawn(new Hitbox
         {

@@ -19,14 +19,14 @@ public sealed class ShieldBlockTests
         float attackerX = -2f)
     {
         var sim = new ServerSimulation(arena ?? TestHelpers.TestArena());
-        attackerDef = TestHelpers.CombatDef;
+        attackerDef = TestHelpers.EngineDef;
         defenderDef ??= attackerDef;
 
         var attacker = TestHelpers.PlayerState(attackerX);
-        attacker.PY = TestHelpers.CombatGroundPY;
+        attacker.PY = attackerDef.CapsuleHeight * 0.5f;
         var defender = TestHelpers.PlayerState(defenderX);
         defender.EntityId = DefenderId;
-        defender.PY = TestHelpers.CombatGroundPY;
+        defender.PY = attackerDef.CapsuleHeight * 0.5f;
         sim.RegisterEntity(AttackerId, attackerDef, attacker);
         sim.RegisterEntity(DefenderId, defenderDef, defender);
         return sim;
@@ -132,7 +132,7 @@ public sealed class ShieldBlockTests
         Assert.Equal((byte)1, ownerState.ChargeStockSpent);
         Assert.Equal(ActionState.Shielding, defender.State);
         Assert.Equal((byte)DefenseBlockHitstopKind.ShieldContact, defender.BlockHitstopKind);
-        Assert.Equal(ServerSimulation.ComputeHitstopTicks(5f, def.GetSlotAbility(0, false)), blocked.HitstopTicks);
+        Assert.Equal(ServerSimulation.ComputeHitstopTicks(5f, def.GetSlotAbility(2, false)), blocked.HitstopTicks);
         Assert.Equal(blocked.HitstopTicks, defender.HitstopTicks);
         Assert.Equal(blocked.HitstopTicks, ownerState.HitstopTicks);
         Assert.False(defender.QueuedKVOverride);
@@ -419,7 +419,7 @@ public sealed class ShieldBlockTests
     [Fact]
     public void MultihitContactAcrossMultipleHurtboxesEmitsOneBlockFeedbackEvent()
     {
-        var targetDef = TestHelpers.CloneDef(TestHelpers.CombatDef);
+        var targetDef = TestHelpers.EngineDef;
         var capsule = new HurtboxCapsule(0, -0.65f, 0, 0, 0.65f, 0, 0.3f);
         targetDef.HurtboxCapsules = new[] { capsule, capsule, capsule };
         var sim = CreateSimulation(out _, targetDef);
@@ -488,14 +488,14 @@ public sealed class ShieldBlockTests
         {
             Assert.Equal(ActionState.Shielding, state.State);
             Assert.Equal((byte)0, state.AttackSlot);
-            Assert.Equal(expectedCooldown, state.GetCooldown(AbilitySlots.Lmb));
+            Assert.Equal(expectedCooldown, state.GetCooldown(AbilitySlots.Slot1));
             Assert.Null(sim.GetActiveAbility(AttackerId));
         }
         else
         {
             Assert.Equal(ActionState.Attacking, state.State);
-            Assert.Equal((byte)1, state.AttackSlot);
-            Assert.Equal((ushort)0, state.GetCooldown(AbilitySlots.Lmb));
+            Assert.Equal(AbilitySlots.Slot1, state.AttackSlot);
+            Assert.Equal((ushort)0, state.GetCooldown(AbilitySlots.Slot1));
             Assert.Same(ability, sim.GetActiveAbility(AttackerId));
         }
     }
@@ -509,7 +509,7 @@ public sealed class ShieldBlockTests
             [AttackerId] = new InputState
             {
                 ShieldHeld = true,
-                ActiveSlot = AbilitySlots.Lmb,
+                ActiveSlot = AbilitySlots.Slot1,
             },
         });
 
@@ -525,11 +525,11 @@ public sealed class ShieldBlockTests
     {
         var sim = CreateSimulation(out var def);
         var secondAttacker = TestHelpers.PlayerState(3f);
-        secondAttacker.PY = TestHelpers.CombatGroundPY;
+        secondAttacker.PY = def.CapsuleHeight * 0.5f;
         sim.RegisterEntity(2, def, secondAttacker);
         var secondDefender = TestHelpers.PlayerState(5f);
         secondDefender.EntityId = 101;
-        secondDefender.PY = TestHelpers.CombatGroundPY;
+        secondDefender.PY = def.CapsuleHeight * 0.5f;
         sim.RegisterEntity(101, def, secondDefender);
 
         var firstDefender = sim.GetState(DefenderId);
@@ -559,7 +559,7 @@ public sealed class ShieldBlockTests
     [Fact]
     public void BlockPushbackStopsAtWallAndDoesNotPushOffHeightmapEdge()
     {
-        var def = TestHelpers.CombatDef;
+        var def = TestHelpers.EngineDef;
         const float wallX = 2f;
         float wallStartX = wallX - def.CapsuleRadius - 0.04f;
         var wallSim = CreateSimulation(out _, def, ArenaWithWall(wallX), wallStartX, wallStartX - 2f);
@@ -597,23 +597,27 @@ public sealed class ShieldBlockTests
 
     private static (ServerSimulation sim, CleanupRewriterAbility ability) IasaSimulation(ushort elapsed)
     {
-        var def = TestHelpers.CloneDef(TestHelpers.CombatDef);
-        def.LMB = new AbilitySpec
-        {
-            CooldownTicks = 23,
-            Stages = new[] { new AttackStage { DurationTicks = 20, IasaTicks = 4 } },
-        };
+        var def = TestHelpers.EngineDef;
+        var slots = def.CookedSlots!.ToArray();
+        slots[0] = new CookedSlotDefinition(
+            0, "ground.1", false, "IASA test", "", "",
+            AuthoringAbilityBehavior.MeleeCombo, AuthoringAimMode.None, 23, false, false,
+            new CookedTimeline(new[]
+            {
+                new CookedStage(20, 4, 0, 0, 0, Array.Empty<string>(), Array.Empty<CookedTimelineOperation>()),
+            }));
+        def.CookedSlots = slots;
         var sim = new ServerSimulation(TestHelpers.TestArena());
         var attacker = TestHelpers.PlayerState(2f);
-        attacker.PY = TestHelpers.CombatGroundPY;
+        attacker.PY = def.CapsuleHeight * 0.5f;
         sim.RegisterEntity(AttackerId, def, attacker);
         var defender = TestHelpers.PlayerState();
         defender.EntityId = DefenderId;
-        defender.PY = TestHelpers.CombatGroundPY;
+        defender.PY = def.CapsuleHeight * 0.5f;
         sim.RegisterEntity(DefenderId, def, defender);
 
         var ability = new CleanupRewriterAbility { Cooldown = 23 };
-        sim.ActivateAbility(AttackerId, ability, 0, def);
+        sim.ActivateAbility(AttackerId, ability, 2, def);
         var state = sim.GetState(AttackerId);
         state.AttackElapsedTicks = elapsed;
         sim.SetState(AttackerId, state);

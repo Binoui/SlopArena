@@ -44,6 +44,100 @@ public sealed class CharacterPackageAssemblerTests
         Assert.Equal(1.05f, loaded.ToCharacterDefinition(CharacterClass.FightGuy).ShieldRadius);
     }
     [Fact]
+    public void TargetedLeap_LoadedCookedPackageProducesLandingImpactAndRecovery()
+    {
+        string root = FindRepoFile("client/Unity/Assets/CharacterPackages/bonk");
+        var compile = CharacterPackageCompiler.Compile(
+            File.ReadAllText(Path.Combine(root, "package.json")),
+            File.ReadAllText(Path.Combine(root, "character.json")),
+            CharacterCookProfile.TrustedBuiltIn);
+        Assert.True(compile.CookedPackage != null,
+            string.Join("; ", compile.Diagnostics.Select(x => $"{x.Code}: {x.Message} ({x.Path})")));
+
+        var package = compile.CookedPackage!;
+        var assembly = CharacterPackageAssembler.Assemble(BuildInput(
+            package, Array.Empty<PackageDependencySource>(), package.Definition.CapabilityRequirements,
+            Array.Empty<CharacterDiagnostic>()));
+        Assert.True(assembly.IsValid, string.Join("; ", assembly.Diagnostics.Select(x => x.Message)));
+
+        var loaded = CookedCharacterPackageLoader.LoadAssembly(assembly);
+        Assert.True(loaded.IsValid, string.Join("; ", loaded.Diagnostics.Select(x => x.Message)));
+        var def = CookedCharacterRuntimeAdapter.ToCharacterDefinition(loaded.Package!);
+        var sim = TestHelpers.MakeSim();
+        var state = TestHelpers.PlayerState(x: 20f, z: 10f);
+        state.PY = TestHelpers.GroundPY(def);
+        sim.RegisterEntity(1, def, state, loaded.BakedAnimation);
+        sim.Tick(new Dictionary<ulong, InputState> { [1] = new InputState
+            { ActiveSlot = 4, AimDistance = 400, IsAiming = true } });
+        for (var i = 0; i < 9; i++)
+            sim.Tick(new Dictionary<ulong, InputState> { [1] = new InputState
+                { AimDistance = 400, IsAiming = true } });
+        sim.Tick(new Dictionary<ulong, InputState> { [1] = new InputState { AimDistance = 400 } });
+        Assert.True(sim.GetState(1).VY > 0f, "loaded move must launch toward its target");
+
+        int impactTick = -1, endTick = -1, windows = 0;
+        bool wasActive = false;
+        for (var i = 0; i < 200; i++)
+        {
+            sim.Tick(new Dictionary<ulong, InputState> { [1] = default });
+            var current = sim.GetState(1);
+            bool active = sim.Resolver.GetActiveHitboxes().Any(x => x.OwnerId == 1 && x.Damage == 13f);
+            if (active && !wasActive)
+            {
+                windows++;
+                impactTick = i;
+                Assert.Equal((ushort)56, current.AttackElapsedTicks);
+            }
+            if (impactTick >= 0 && endTick < 0 && current.State != ActionState.Attacking)
+                endTick = i;
+            wasActive = active;
+        }
+        Assert.Equal(1, windows);
+        Assert.Equal(52, endTick - impactTick);
+    }
+    [Fact]
+    public void CookedLoader_RejectsRetiredTargetedLeapInIsolatedPackage()
+    {
+        const string retiredId = "slop.internal.bonk.targeted-jump-slam.v1";
+        string root = FindRepoFile("client/Unity/Assets/CharacterPackages/bonk");
+        var compile = CharacterPackageCompiler.Compile(
+            File.ReadAllText(Path.Combine(root, "package.json")),
+            File.ReadAllText(Path.Combine(root, "character.json")),
+            CharacterCookProfile.TrustedBuiltIn);
+        Assert.True(compile.CookedPackage != null,
+            string.Join("; ", compile.Diagnostics.Select(x => $"{x.Code}: {x.Message} ({x.Path})")));
+
+        var package = compile.CookedPackage!;
+        var runtime = JsonNode.Parse(Encoding.UTF8.GetString(package.CanonicalBytes))!.AsObject();
+        var character = runtime["character"]!.AsObject();
+        character["capabilityRequirements"]![0]!["capabilityId"] = retiredId;
+        foreach (var slot in character["slots"]!.AsArray())
+        {
+            string? slotId = slot?["id"]?.GetValue<string>();
+            if (slotId != "ground.E" && slotId != "air.E")
+                continue;
+            foreach (var operation in slot!["timeline"]!["stages"]![0]!["operations"]!.AsArray())
+                if (operation?["kind"]?.GetValue<int>() == (int)CookedOperationKind.StartCapability)
+                    operation!["capabilityId"] = retiredId;
+        }
+
+        byte[] runtimeBytes = Encoding.UTF8.GetBytes(runtime.ToJsonString());
+        var retiredPackage = new CookedCharacterPackage(
+            package.Metadata, package.Definition, package.Budget, package.Diagnostics, runtimeBytes);
+        var input = BuildInput(
+            retiredPackage, Array.Empty<PackageDependencySource>(),
+            new[] { new CookedCapabilityRequirement(retiredId, "1") },
+            Array.Empty<CharacterDiagnostic>());
+        var assembly = CharacterPackageAssembler.Assemble(input);
+        Assert.True(assembly.IsValid, string.Join("; ", assembly.Diagnostics.Select(x => x.Message)));
+
+        var loaded = CookedCharacterPackageLoader.LoadAssembly(assembly);
+        Assert.False(loaded.IsValid);
+        Assert.Contains(loaded.Diagnostics, x => x.Code == "package.capability.retired");
+    }
+
+
+    [Fact]
     public void CookedLoader_RejectsPreviousSchemaVersion()
     {
         var current = Compile();
@@ -154,6 +248,49 @@ public sealed class CharacterPackageAssemblerTests
     }
 
     [Fact]
+    public void HitPresentationRequiresPrefabBindingButNotAnimationOrPose()
+    {
+        string root = FindRepoFile("client/Unity/Assets/CharacterPackages/fightguy");
+        var character = JsonNode.Parse(File.ReadAllText(Path.Combine(root, "character.json")))!.AsObject();
+        const string hitId = "presentation.test.contact";
+        character["presentationIds"]!.AsArray().Add(hitId);
+        character["slots"]![0]!["hitPresentationId"] = hitId;
+        var compiled = CharacterPackageCompiler.Compile(File.ReadAllText(Path.Combine(root, "package.json")),
+            character.ToJsonString(), CharacterCookProfile.TrustedBuiltIn);
+        Assert.True(compiled.CookedPackage != null, string.Join("; ", compiled.Diagnostics.Select(x => x.Message)));
+        var package = compiled.CookedPackage!;
+        var input = BuildInput(package, Array.Empty<PackageDependencySource>(),
+            Array.Empty<CookedCapabilityRequirement>(), Array.Empty<CharacterDiagnostic>());
+        var assembled = CharacterPackageAssembler.Assemble(input);
+        Assert.True(assembled.IsValid, string.Join("; ", assembled.Diagnostics.Select(x => x.Message)));
+        var loaded = CookedCharacterPackageLoader.LoadAssembly(assembled);
+        Assert.True(loaded.IsValid, string.Join("; ", loaded.Diagnostics.Select(x => x.Message)));
+        Assert.Equal(hitId, loaded.ToCharacterDefinition().Slot1!.HitPresentationId);
+
+        var bindings = JsonNode.Parse(input.BindingBytes)!.AsObject();
+        bindings["presentations"] = new JsonArray();
+        var missing = new CharacterPackageAssemblyInput(
+            input.PackageId, input.Version, input.Creator, input.License, input.Attribution,
+            input.AuthoringSchemaVersion, input.CookedSchemaVersion, input.RuntimeApiMin, input.RuntimeApiMax,
+            input.SourceHash, input.Dependencies, input.CapabilityRequirements, input.CookerVersion, input.UnityVersion,
+            input.BindingSchemaVersion, input.PoseFormat, input.PoseVersion, input.SampleRate, input.Warnings,
+            input.RuntimeBytes, input.PoseBytes, Encoding.UTF8.GetBytes(bindings.ToJsonString()), input.CookedPackage);
+        var rejected = CharacterPackageAssembler.Assemble(missing);
+        Assert.Contains(rejected.Diagnostics, diagnostic => diagnostic.Code == "package.binding.presentation-missing");
+
+        var runtime = JsonNode.Parse(package.CanonicalBytes)!.AsObject();
+        var declared = runtime["character"]!["presentationIds"]!.AsArray();
+        declared.Remove(declared.Single(id => id!.GetValue<string>() == hitId));
+        var undeclaredPackage = new CookedCharacterPackage(package.Metadata, package.Definition,
+            package.Budget, package.Diagnostics, Encoding.UTF8.GetBytes(runtime.ToJsonString()));
+        var undeclared = CharacterPackageAssembler.Assemble(BuildInput(undeclaredPackage,
+            Array.Empty<PackageDependencySource>(), Array.Empty<CookedCapabilityRequirement>(), Array.Empty<CharacterDiagnostic>()));
+        var rejectedRuntime = CookedCharacterPackageLoader.LoadAssembly(undeclared);
+        Assert.False(rejectedRuntime.IsValid);
+        Assert.Contains(rejectedRuntime.Diagnostics, diagnostic => diagnostic.Code == "package.binding.presentation-undeclared");
+    }
+
+    [Fact]
     public void GravityWindowSurvivesCookedAssemblyAndRuntimeLoading()
     {
         string root = FindRepoFile("client/Unity/Assets/CharacterPackages/fightguy");
@@ -197,7 +334,8 @@ public sealed class CharacterPackageAssemblerTests
     [InlineData("1.0.0", true)]
     [InlineData("1.1.0", true)]
     [InlineData("1.2.0", true)]
-    [InlineData("1.3.0", false)]
+    [InlineData("1.3.0", true)]
+    [InlineData("1.4.0", false)]
     [InlineData("2.0.0", false)]
     public void Loader_AdmitsOnlyKnownRuntimeMinimums(string minimum, bool supported)
     {
@@ -288,8 +426,10 @@ public sealed class CharacterPackageAssemblerTests
                 foreach (string id in stage.AnimationIds) names.Add(id);
         }
 
-        var binding = new StringBuilder("{\"packageId\":\"fightguy\",\"catalogSchemaVersion\":1,\"bindingSchemaVersion\":1,\"poseFormat\":\"SKEL\",\"poseVersion\":1,\"sampleRate\":60,\"sourceHash\":\"");
-        binding.Append(sourceHash).Append("\",\"rigGlobalObjectId\":\"rig\",\"animations\":[");
+        var binding = new StringBuilder("{\"packageId\":")
+            .Append(JsonSerializer.Serialize(package.Metadata.PackageId))
+            .Append(",\"catalogSchemaVersion\":1,\"bindingSchemaVersion\":1,\"poseFormat\":\"SKEL\",\"poseVersion\":1,\"sampleRate\":60,\"sourceHash\":\"")
+            .Append(sourceHash).Append("\",\"rigGlobalObjectId\":\"rig\",\"animations\":[");
         bool first = true;
         foreach (string name in names.OrderBy(x => x, StringComparer.Ordinal))
         {
@@ -297,14 +437,32 @@ public sealed class CharacterPackageAssemblerTests
             first = false;
             binding.Append("{\"semanticId\":").Append(JsonSerializer.Serialize(name)).Append(",\"poseTrackId\":").Append(JsonSerializer.Serialize(name)).Append(",\"clipGlobalObjectId\":\"clip\",\"poseName\":").Append(JsonSerializer.Serialize(name)).Append(",\"frameCount\":1,\"clipLengthBits\":0,\"sampleRate\":60,\"extrapolation\":0}");
         }
+        binding.Append("],\"presentations\":[");
+        first = true;
+        foreach (string id in package.Definition.PresentationIds.OrderBy(x => x, StringComparer.Ordinal))
+        {
+            if (!first) binding.Append(',');
+            first = false;
+            binding.Append("{\"semanticId\":").Append(JsonSerializer.Serialize(id)).Append(",\"prefabGlobalObjectId\":\"prefab\"}");
+        }
         binding.Append("]}");
 
+        var boneNames = new[] { "root" }
+            .Concat(package.Definition.AttachmentBoneIds)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
         using var poses = new MemoryStream();
-        WriteUInt32(poses, 0x4C454B53); WriteUInt32(poses, 1); WriteUInt32(poses, 1); WriteUInt32(poses, (uint)names.Count);
-        WriteString(poses, "root");
+        WriteUInt32(poses, 0x4C454B53); WriteUInt32(poses, 1);
+        WriteUInt32(poses, (uint)boneNames.Length); WriteUInt32(poses, (uint)names.Count);
+        foreach (string boneName in boneNames) WriteString(poses, boneName);
         foreach (string name in names.OrderBy(x => x, StringComparer.Ordinal))
         {
-            WriteString(poses, name); WriteUInt32(poses, 1); WriteUInt32(poses, 0); WriteUInt32(poses, 0); WriteUInt32(poses, 0);
+            WriteString(poses, name);
+            WriteUInt32(poses, 1);
+            foreach (string _ in boneNames)
+            {
+                WriteUInt32(poses, 0); WriteUInt32(poses, 0); WriteUInt32(poses, 0);
+            }
         }
         return new CharacterPackageAssemblyInput(
             package.Metadata.PackageId, package.Metadata.Version, "Binoui", "MIT", "SlopArena", 3,

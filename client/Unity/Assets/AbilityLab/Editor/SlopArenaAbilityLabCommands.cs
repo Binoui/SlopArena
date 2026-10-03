@@ -134,16 +134,20 @@ public static class SlopArenaAbilityLabCommands
 
     [CliCommand(
         "sloparena.lab.preview",
-        "Select an action and seek its cumulative 60 Hz timeline tick or recorded scenario frame.",
+        "Select an action and seek its timeline/scenario tick; optionally configure supported preview overlays and dummy visibility.",
         MainThreadRequired = true,
         Tags = new[] { "authoring/lab" })]
     public static AbilityLabCommandResult Preview(
         [CliArg("action", "Canonical action ID, for example ground.1 or air.R, or grab.", Required = true)] string action,
-        [CliArg("tick", "Cumulative authoring tick or recorded scenario frame.", Required = true)] int tick)
+        [CliArg("tick", "Cumulative authoring tick or recorded scenario frame.", Required = true)] int tick,
+        [CliArg("overlays", "'current', 'none', or comma-separated hitboxes,hurtboxes,bones,trajectory. 'none' also hides the coupled dummy hurtbox overlay.")] string overlays = null,
+        [CliArg("dummy", "'on' or 'off' for preview opponent and its coupled hurtbox overlay; omit to retain current.")] string dummy = null)
     {
         AbilityLabWindow? window = AbilityLabWindow.FindExistingForCommand();
         if (!CanMutate(out var modeError))
             return Failure("lab.mode.unsupported", modeError, window);
+        if (!TryParseViewOptions(null, null, null, overlays, dummy, out var viewOptions, out string viewError))
+            return Failure("preview.options.invalid", viewError, window);
         if (window == null || !window.CommandWorkspace.HasPackage)
             return Failure("workspace.missing", "Open a Character Package with sloparena.lab.open first.", window);
         if (window.CommandWorkspace.LiveDraftInvalid || window.CommandWorkspace.Preview?.IsAvailable != true)
@@ -161,6 +165,7 @@ public static class SlopArenaAbilityLabCommands
             try
             {
                 lab!.SeekScenario(tick);
+                ApplyViewFlags(lab, viewOptions);
                 window.RefreshScenarioControls();
                 SceneView.RepaintAll();
                 return Snapshot(window);
@@ -188,6 +193,7 @@ public static class SlopArenaAbilityLabCommands
                     return Failure("scenario.action.unavailable", "Shared grab is unavailable for the current preview.", window);
                 lab.RunScenario(new AbilityLabScenarioOptions("grab"));
                 lab.SeekScenario(tick);
+                ApplyViewFlags(lab, viewOptions);
                 window.RefreshScenarioControls();
                 SceneView.RepaintAll();
                 return Snapshot(window);
@@ -219,6 +225,7 @@ public static class SlopArenaAbilityLabCommands
             hasCursor = true;
             window.ApplyCommandTimeline(action, address, projection, tick);
             window.CompleteCommandPreview(address);
+            ApplyViewFlags(lab, viewOptions);
             window.RefreshScenarioControls();
             var result = Snapshot(window);
             result.Success = true;
@@ -238,15 +245,29 @@ public static class SlopArenaAbilityLabCommands
 
     [CliCommand(
         "sloparena.lab.inspect",
-        "Read the current Ability Lab workspace, selection, preview, rig, and diagnostics without refreshing or opening anything.",
+        "Read current Lab workspace/preview and evaluated actor presentation; optional named bones, without refreshing or opening anything.",
         MainThreadRequired = true,
         Tags = new[] { "authoring/lab" })]
-    public static AbilityLabCommandResult Inspect()
-        => Snapshot(AbilityLabWindow.FindExistingForCommand());
+    public static AbilityLabCommandResult Inspect(
+        [CliArg("bones", "Comma-separated presentation bone names or bone.* aliases to observe; omit for actor/attachment snapshot.")]
+        string bones = null)
+    {
+        var window = AbilityLabWindow.FindExistingForCommand();
+        var result = Snapshot(window);
+        var names = string.IsNullOrWhiteSpace(bones) ? Array.Empty<string>()
+            : bones.Split(',').Select(name => name.Trim()).Where(name => name.Length > 0)
+                .Distinct(StringComparer.Ordinal).ToArray();
+        var observed = SlopArenaPresentationCommands.ReadLab(
+            window != null ? window.CommandLab : AbilityLab.Instance, names);
+        result.Presentation = observed.Actor;
+        if (!observed.Success)
+            result.PresentationError = observed.Error;
+        return result;
+    }
 
 [CliCommand(
         "sloparena.lab.capture",
-        "Render authoring samples or recorded scenario frames into PNG files under .ability-lab-cache.",
+        "Render authoring/scenario PNGs with explicit actor-relative view or world camera angles and temporary overlay controls.",
         MainThreadRequired = true,
         Tags = new[] { "authoring/lab" })]
     public static AbilityLabCommandResult Capture(
@@ -254,11 +275,18 @@ public static class SlopArenaAbilityLabCommands
         [CliArg("ticks", "Comma-separated distinct cumulative ticks or scenario frame indexes.", Required = true)] string ticks,
         [CliArg("output", "Repository-relative output directory below .ability-lab-cache.", Required = true)] string output,
         [CliArg("width", "PNG width (64–4096).", Required = false, DefaultValue = 1280)] int width = 1280,
-        [CliArg("height", "PNG height (64–4096).", Required = false, DefaultValue = 720)] int height = 720)
+        [CliArg("height", "PNG height (64–4096).", Required = false, DefaultValue = 720)] int height = 720,
+        [CliArg("view", "'current', 'front', 'back', 'left', 'right', 'top', or 'bottom', relative to the actor's facing; omit to retain camera orientation.")] string view = null,
+        [CliArg("camera-yaw", "Absolute world camera yaw in degrees [-180,180]; cannot combine with --view.")] string cameraYaw = null,
+        [CliArg("camera-pitch", "Absolute world camera pitch in degrees [-90,90]; cannot combine with --view.")] string cameraPitch = null,
+        [CliArg("overlays", "'current', 'none', or comma-separated hitboxes,hurtboxes,bones,trajectory. 'none' also hides the coupled dummy hurtbox overlay.")] string overlays = null,
+        [CliArg("dummy", "'on' or 'off' for the rendered opponent and its coupled hurtbox overlay; omit to retain current.")] string dummy = null)
     {
         AbilityLabWindow? window = AbilityLabWindow.FindExistingForCommand();
         if (!CanMutate(out var modeError))
             return Failure("lab.mode.unsupported", modeError, window);
+        if (!TryParseViewOptions(view, cameraYaw, cameraPitch, overlays, dummy, out var viewOptions, out string viewError))
+            return Failure("capture.options.invalid", viewError, window);
         if (width is < 64 or > 4096 || height is < 64 or > 4096)
             return Failure("capture.dimensions.invalid", "Capture width and height must each be between 64 and 4096.", window);
         if (!TryParseTicks(ticks, out var requestedTicks, out string tickError))
@@ -328,6 +356,9 @@ public static class SlopArenaAbilityLabCommands
         var writtenPaths = new List<string>();
         var captures = new List<AbilityLabCommandCapture>(requestedTicks.Count);
         Exception? captureError = null;
+        GameObject? captureCameraObject = null;
+        var excludedRenderers = new List<Renderer>();
+        var offscreenSkins = new List<SkinnedMeshRenderer>();
         try
         {
             if (!window.EnsureCommandUi())
@@ -337,6 +368,13 @@ public static class SlopArenaAbilityLabCommands
             hasCursor = true;
             cameraState = lab.CaptureCameraState();
             hasCameraState = true;
+            // Bone evaluation alone does not refresh an offscreen skinned mesh.
+            foreach (var skin in lab.GetComponentsInChildren<SkinnedMeshRenderer>(true))
+            {
+                if (skin.forceMatrixRecalculationPerRender) continue;
+                offscreenSkins.Add(skin);
+                skin.forceMatrixRecalculationPerRender = true;
+            }
             if (createDefaultGrab)
             {
                 lab.RunScenario(new AbilityLabScenarioOptions("grab"));
@@ -344,8 +382,29 @@ public static class SlopArenaAbilityLabCommands
                 scenarioFrames = true;
             }
             lab.EnsureCamera();
-            camera = lab.PreviewCamera;
-            if (camera == null) throw new InvalidOperationException("Ability Lab has no camera to capture.");
+            if (lab.PreviewCamera == null) throw new InvalidOperationException("Ability Lab has no camera to capture.");
+            captureCameraObject = new GameObject("AbilityLabCaptureCamera") { hideFlags = HideFlags.HideAndDontSave };
+            camera = captureCameraObject.AddComponent<Camera>();
+            camera.CopyFrom(lab.PreviewCamera);
+            camera.transform.rotation = lab.PreviewCamera.transform.rotation;
+            camera.enabled = false;
+            camera.cullingMask = ~0;
+            camera.rect = new Rect(0f, 0f, 1f, 1f);
+            camera.usePhysicalProperties = false;
+            camera.lensShift = Vector2.zero;
+            camera.ResetProjectionMatrix();
+            camera.ResetCullingMatrix();
+            camera.clearFlags = CameraClearFlags.SolidColor;
+            camera.backgroundColor = new Color(0.1f, 0.1f, 0.12f);
+            foreach (var renderer in Resources.FindObjectsOfTypeAll<Renderer>())
+            {
+                if (!renderer.gameObject.scene.IsValid() || !renderer.gameObject.scene.isLoaded ||
+                    !renderer.gameObject.activeInHierarchy || renderer.transform.IsChildOf(lab.transform) ||
+                    renderer.forceRenderingOff)
+                    continue;
+                excludedRenderers.Add(renderer);
+                renderer.forceRenderingOff = true;
+            }
 
             Directory.CreateDirectory(outputDirectory);
             if (!HasNoOutputSymlinks(outputDirectory, out outputError))
@@ -374,6 +433,16 @@ public static class SlopArenaAbilityLabCommands
                 else
                     window.ApplyCommandTimeline(action, address, projection!, requestedTick);
 
+                ApplyViewFlags(lab, viewOptions);
+                if (viewOptions.View != "current")
+                {
+                    var actor = lab.Renderer;
+                    if (actor == null) throw new InvalidOperationException("Ability Lab has no actor whose facing can define the capture view.");
+                    camera.transform.rotation = ResolveViewRotation(
+                        viewOptions, camera.transform.rotation, actor.transform.forward);
+                }
+
+                FrameCapture(camera, lab);
                 camera.Render();
                 RenderTexture.active = renderTexture;
                 texture.ReadPixels(new Rect(0, 0, width, height), 0, 0, false);
@@ -386,7 +455,11 @@ public static class SlopArenaAbilityLabCommands
                     stream.Write(png, 0, png.Length);
                 }
 
-                var capture = new AbilityLabCommandCapture { Action = action, Tick = requestedTick, Path = RepositoryRelativePath(path) };
+                var capture = new AbilityLabCommandCapture
+                {
+                    Action = action, Tick = requestedTick, Path = RepositoryRelativePath(path),
+                    Camera = CaptureViewInfo(camera, lab, viewOptions.View)
+                };
                 if (scenarioFrame.HasValue)
                 {
                     capture.Frame = ToFrameDto(scenario!, scenarioFrame.Value);
@@ -409,6 +482,23 @@ public static class SlopArenaAbilityLabCommands
         }
         finally
         {
+            foreach (var skin in offscreenSkins)
+                if (skin != null) skin.forceMatrixRecalculationPerRender = false;
+            foreach (var renderer in excludedRenderers)
+                if (renderer != null) renderer.forceRenderingOff = false;
+            // Camera destruction can release SRP targets; unbind before destroying it.
+            try { RenderTexture.active = oldActive; }
+            catch (Exception ex) { captureError ??= ex; }
+            if (camera != null)
+            {
+                try { camera.targetTexture = null; }
+                catch (Exception ex) { captureError ??= ex; }
+            }
+            if (captureCameraObject != null)
+            {
+                try { UnityEngine.Object.DestroyImmediate(captureCameraObject); }
+                catch (Exception ex) { captureError ??= ex; }
+            }
             if (hasCursor && lab != null)
             {
                 try { lab.RestoreTimelineCursor(cursor); }
@@ -419,8 +509,6 @@ public static class SlopArenaAbilityLabCommands
                 try { lab.RestoreCameraState(cameraState); }
                 catch (Exception ex) { captureError ??= ex; }
             }
-            try { RenderTexture.active = oldActive; }
-            catch (Exception ex) { captureError ??= ex; }
             if (texture != null)
             {
                 try { UnityEngine.Object.DestroyImmediate(texture); }
@@ -448,6 +536,202 @@ public static class SlopArenaAbilityLabCommands
         result.Success = true;
         result.Captures = captures;
         return result;
+    }
+
+    internal readonly struct CommandViewOptions
+    {
+        internal readonly string View;
+        internal readonly float? Yaw, Pitch;
+        internal readonly int? OverlayMask;
+        internal readonly bool? Dummy;
+
+        internal CommandViewOptions(string view, float? yaw, float? pitch, int? overlayMask, bool? dummy)
+        {
+            View = view; Yaw = yaw; Pitch = pitch; OverlayMask = overlayMask; Dummy = dummy;
+        }
+    }
+
+    internal static bool TryParseViewOptions(
+        string? view, string? yaw, string? pitch, string? overlays, string? dummy,
+        out CommandViewOptions options, out string error)
+    {
+        options = default;
+        error = "";
+        string selected = view == null ? "current" : view.Trim().ToLowerInvariant();
+        if (selected is not ("current" or "front" or "back" or "left" or "right" or "top" or "bottom"))
+        {
+            error = "View must be current, front, back, left, right, top, or bottom.";
+            return false;
+        }
+        if (view != null && (yaw != null || pitch != null))
+        {
+            error = "Provide --view or --camera-yaw/--camera-pitch, not both.";
+            return false;
+        }
+        if (!TryViewAngle(yaw, -180f, 180f, "camera-yaw", out var parsedYaw, out error) ||
+            !TryViewAngle(pitch, -90f, 90f, "camera-pitch", out var parsedPitch, out error))
+            return false;
+        if (parsedYaw.HasValue || parsedPitch.HasValue)
+            selected = "custom";
+
+        int? mask = null;
+        if (overlays != null)
+        {
+            string value = overlays.Trim().ToLowerInvariant();
+            if (value == "none") mask = 0;
+            else if (value != "current")
+            {
+                int flags = 0;
+                foreach (string part in value.Split(','))
+                {
+                    int flag = part.Trim() switch
+                    {
+                        "hitboxes" => 1, "hurtboxes" => 2, "bones" => 4, "trajectory" => 8, _ => 0
+                    };
+                    if (flag == 0 || (flags & flag) != 0)
+                    {
+                        error = "Overlays must be current, none, or distinct comma-separated hitboxes,hurtboxes,bones,trajectory.";
+                        return false;
+                    }
+                    flags |= flag;
+                }
+                mask = flags;
+            }
+        }
+        bool? showDummy = null;
+        if (dummy != null)
+        {
+            switch (dummy.Trim().ToLowerInvariant())
+            {
+                case "on": case "true": case "1": showDummy = true; break;
+                case "off": case "false": case "0": showDummy = false; break;
+                default: error = "Dummy must be on or off."; return false;
+            }
+        }
+        if (mask == 0)
+        {
+            if (showDummy == true)
+            {
+                error = "--overlays none cannot combine with --dummy on: dummy visibility and its hurtbox overlay are coupled.";
+                return false;
+            }
+            showDummy = false;
+        }
+        options = new CommandViewOptions(selected, parsedYaw, parsedPitch, mask, showDummy);
+        return true;
+    }
+
+    private static bool TryViewAngle(
+        string? value, float min, float max, string name, out float? angle, out string error)
+    {
+        angle = null;
+        error = "";
+        if (value == null) return true;
+        if (!float.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out float parsed) ||
+            !float.IsFinite(parsed) || parsed < min || parsed > max)
+        {
+            error = $"{name} must be a finite angle in [{min}, {max}] degrees.";
+            return false;
+        }
+        angle = parsed;
+        return true;
+    }
+
+    internal static Quaternion ResolveViewRotation(CommandViewOptions options, Quaternion current, Vector3 actorForward)
+    {
+        if (options.View == "current") return current;
+        if (options.View == "custom")
+        {
+            Vector3 angles = current.eulerAngles;
+            return Quaternion.Euler(
+                options.Pitch ?? Mathf.DeltaAngle(0f, angles.x),
+                options.Yaw ?? Mathf.DeltaAngle(0f, angles.y), 0f);
+        }
+        actorForward.y = 0f;
+        if (!float.IsFinite(actorForward.x) || !float.IsFinite(actorForward.z) || actorForward.sqrMagnitude < 0.0001f)
+            throw new InvalidOperationException("Actor facing is unavailable for a relative capture view.");
+        actorForward.Normalize();
+        Vector3 actorRight = Vector3.Cross(Vector3.up, actorForward);
+        return options.View switch
+        {
+            "front" => Quaternion.LookRotation(-actorForward, Vector3.up),
+            "back" => Quaternion.LookRotation(actorForward, Vector3.up),
+            "left" => Quaternion.LookRotation(actorRight, Vector3.up),
+            "right" => Quaternion.LookRotation(-actorRight, Vector3.up),
+            "top" => Quaternion.LookRotation(Vector3.down, actorForward),
+            "bottom" => Quaternion.LookRotation(Vector3.up, actorForward),
+            _ => throw new ArgumentException("Unsupported capture view.")
+        };
+    }
+
+    private static void ApplyViewFlags(AbilityLab lab, CommandViewOptions options)
+    {
+        if (options.OverlayMask.HasValue)
+        {
+            int mask = options.OverlayMask.Value;
+            lab.ShowHitboxes = (mask & 1) != 0;
+            lab.ShowHurtboxes = (mask & 2) != 0;
+            lab.ShowBakedBones = (mask & 4) != 0;
+            lab.ShowTrajectory = (mask & 8) != 0;
+        }
+        if (options.Dummy.HasValue && lab.ShowDummy != options.Dummy.Value)
+        {
+            lab.ShowDummy = options.Dummy.Value;
+            lab.RefreshPose();
+        }
+    }
+
+    private static AbilityLabCommandCaptureCamera CaptureViewInfo(Camera camera, AbilityLab lab, string view)
+    {
+        Vector3 position = camera.transform.position;
+        Vector3 forward = camera.transform.forward;
+        Quaternion rotation = camera.transform.rotation;
+        return new AbilityLabCommandCaptureCamera
+        {
+            View = view, Position = new[] { position.x, position.y, position.z },
+            Forward = new[] { forward.x, forward.y, forward.z },
+            Rotation = new[] { rotation.x, rotation.y, rotation.z, rotation.w },
+            Hitboxes = lab.ShowHitboxes, Hurtboxes = lab.ShowHurtboxes,
+            BakedBones = lab.ShowBakedBones, Trajectory = lab.ShowTrajectory, Dummy = lab.ShowDummy
+        };
+    }
+
+    private static void FrameCapture(Camera camera, AbilityLab lab)
+    {
+        bool hasBounds = false;
+        Bounds bounds = default;
+        foreach (var renderer in lab.GetComponentsInChildren<Renderer>())
+        {
+            if (!renderer.enabled || renderer.forceRenderingOff) continue;
+            if (!hasBounds)
+            {
+                bounds = renderer.bounds;
+                hasBounds = true;
+            }
+            else bounds.Encapsulate(renderer.bounds);
+        }
+        if (!hasBounds) throw new InvalidOperationException("Ability Lab has no visible model to capture.");
+
+        // Fit all corners in the selected view; scenario motion must not leave
+        // only the idle dummy onscreen. Keep the preview camera's orientation.
+        float halfHeight = Mathf.Tan(camera.fieldOfView * Mathf.Deg2Rad * 0.5f);
+        float halfWidth = halfHeight * camera.aspect;
+        float distance = camera.nearClipPlane;
+        Quaternion inverseRotation = Quaternion.Inverse(camera.transform.rotation);
+        Vector3 extents = bounds.extents;
+        for (int x = -1; x <= 1; x += 2)
+        for (int y = -1; y <= 1; y += 2)
+        for (int z = -1; z <= 1; z += 2)
+        {
+            Vector3 corner = inverseRotation * Vector3.Scale(extents, new Vector3(x, y, z));
+            distance = Mathf.Max(distance, camera.nearClipPlane - corner.z);
+            distance = Mathf.Max(distance, Mathf.Abs(corner.x) * 1.1f / halfWidth - corner.z);
+            distance = Mathf.Max(distance, Mathf.Abs(corner.y) * 1.1f / halfHeight - corner.z);
+        }
+        if (camera.orthographic)
+            camera.orthographicSize = Mathf.Max(bounds.extents.magnitude, 0.1f) * 1.1f / Mathf.Min(camera.aspect, 1f);
+        camera.transform.position = bounds.center - camera.transform.forward * distance;
+        camera.farClipPlane = Mathf.Max(camera.farClipPlane, distance + extents.magnitude + 1f);
     }
 
     private static bool CanMutate(out string error)
@@ -928,6 +1212,8 @@ public sealed class AbilityLabCommandResult
     [JsonProperty("slots", NullValueHandling = NullValueHandling.Ignore)] public List<AbilityLabCommandSlot>? Slots { get; set; }
     [JsonProperty("diagnostics")] public List<AbilityLabCommandDiagnostic> Diagnostics { get; } = new();
     [JsonProperty("captures", NullValueHandling = NullValueHandling.Ignore)] public List<AbilityLabCommandCapture>? Captures { get; set; }
+    [JsonProperty("presentation", NullValueHandling = NullValueHandling.Ignore)] public SlopArenaPresentationActorInfo? Presentation { get; set; }
+    [JsonProperty("presentationError", NullValueHandling = NullValueHandling.Ignore)] public string? PresentationError { get; set; }
 }
 
 [JsonObject(MemberSerialization.OptIn)]
@@ -966,6 +1252,21 @@ public sealed class AbilityLabCommandCapture
     [JsonProperty("matchTick", NullValueHandling = NullValueHandling.Ignore)] public uint? MatchTick { get; set; }
     [JsonProperty("frame", NullValueHandling = NullValueHandling.Ignore)] public AbilityLabCommandFrame? Frame { get; set; }
     [JsonProperty("path")] public string Path { get; set; } = "";
+    [JsonProperty("camera")] public AbilityLabCommandCaptureCamera? Camera { get; set; }
+}
+
+[JsonObject(MemberSerialization.OptIn)]
+public sealed class AbilityLabCommandCaptureCamera
+{
+    [JsonProperty("view")] public string View { get; set; } = "";
+    [JsonProperty("position")] public float[] Position { get; set; } = Array.Empty<float>();
+    [JsonProperty("forward")] public float[] Forward { get; set; } = Array.Empty<float>();
+    [JsonProperty("rotation")] public float[] Rotation { get; set; } = Array.Empty<float>();
+    [JsonProperty("hitboxes")] public bool Hitboxes { get; set; }
+    [JsonProperty("hurtboxes")] public bool Hurtboxes { get; set; }
+    [JsonProperty("bakedBones")] public bool BakedBones { get; set; }
+    [JsonProperty("trajectory")] public bool Trajectory { get; set; }
+    [JsonProperty("dummy")] public bool Dummy { get; set; }
 }
 
 [JsonObject(MemberSerialization.OptIn)]

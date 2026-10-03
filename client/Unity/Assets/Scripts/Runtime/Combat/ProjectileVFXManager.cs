@@ -40,6 +40,74 @@ namespace SlopArena.Client.Combat
         private uint _lastRemoteTick;
         private bool _hasRemoteTick;
 
+        private struct HeldProjectile
+        {
+            public GameObject Visual;
+            public Transform Hand;
+            public byte AttackSequence;
+            public int Deaths;
+        }
+
+        private readonly Dictionary<ulong, HeldProjectile> _heldVisuals = new();
+
+        public void UpdateHeldVisual(ulong owner, CharacterState state, Transform hand)
+        {
+            bool aiming = state.State == ActionState.Aiming && state.AttackSlot == AbilitySlots.A;
+            bool firing = state.State == ActionState.Attacking && state.AttackSlot == AbilitySlots.A;
+            if (_heldVisuals.TryGetValue(owner, out var held)
+                && (held.AttackSequence != state.AttackSequence || held.Deaths != state.Deaths))
+                ClearHeldVisual(owner);
+            if ((!aiming && !firing) || hand == null)
+            {
+                ClearHeldVisual(owner);
+                return;
+            }
+            if (!_heldVisuals.TryGetValue(owner, out held))
+            {
+                if (!aiming) return;
+                held = new HeldProjectile
+                {
+                    Visual = CreateProjectileVisual(CharacterClass.FightGuy, AbilitySlots.A, !state.IsGrounded),
+                    Hand = hand,
+                    AttackSequence = state.AttackSequence,
+                    Deaths = state.Deaths,
+                };
+                held.Visual.transform.position = hand.position;
+            }
+            _heldVisuals[owner] = held;
+        }
+
+        public void ClearHeldVisual(ulong owner)
+        {
+            if (!_heldVisuals.TryGetValue(owner, out var held)) return;
+            DestroyVisual(held.Visual);
+            _heldVisuals.Remove(owner);
+        }
+
+        private GameObject TakeHeldVisual(ulong owner, CharacterClass character, byte slot,
+            byte? attackSequence = null)
+        {
+            if (character != CharacterClass.FightGuy || slot != AbilitySlots.A
+                || !_heldVisuals.TryGetValue(owner, out var held)
+                || (attackSequence.HasValue && held.AttackSequence != attackSequence.Value))
+                return null;
+            var visual = held.Visual;
+            // The projectile itself proves launch; PvP's projectile packet can
+            // arrive before the fighter's release-state packet.
+            // Keep the consumed record until the activation ends: late/repeated aim
+            // states must not recreate a second Iceball after launch.
+            held.Visual = null;
+            _heldVisuals[owner] = held;
+            return visual;
+        }
+
+        private void LateUpdate()
+        {
+            foreach (var held in _heldVisuals.Values)
+                if (held.Visual != null && held.Hand != null)
+                    held.Visual.transform.position = held.Hand.position;
+        }
+
         public void SetSimulation(ServerSimulation sim)
         {
             _sim = sim;
@@ -67,7 +135,8 @@ namespace SlopArena.Client.Combat
                 _matchedRemote.Add(key);
                 if (!_remoteVisuals.TryGetValue(key, out var visual))
                 {
-                    visual = CreateProjectileVisual(projectile.Character, projectile.AttackSlot, projectile.Airborne);
+                    visual = TakeHeldVisual(projectile.OwnerId, projectile.Character, projectile.AttackSlot)
+                        ?? CreateProjectileVisual(projectile.Character, projectile.AttackSlot, projectile.Airborne);
                     _remoteVisuals.Add(key, visual);
                 }
                 visual.transform.position = new Vector3(projectile.X, projectile.Y, projectile.Z);
@@ -103,7 +172,8 @@ namespace SlopArena.Client.Combat
                 _matchedLocal.Add(projectileKey);
                 if (!_activeVisuals.TryGetValue(projectileKey, out var vis))
                 {
-                    vis = CreateProjectileVisual(character, hb.AttackSlot, hb.ActivationAirborne);
+                    vis = TakeHeldVisual(hb.OwnerId, character, hb.AttackSlot, hb.AttackSequence)
+                        ?? CreateProjectileVisual(character, hb.AttackSlot, hb.ActivationAirborne);
                     _activeVisuals[projectileKey] = vis;
                     _activeProjectileClasses[projectileKey] = character;
                 }
@@ -267,6 +337,12 @@ namespace SlopArena.Client.Combat
             }
             float speedSq = hb.VX * hb.VX + hb.VY * hb.VY + hb.VZ * hb.VZ;
             if (speedSq <= 0.0001f) return;
+            // Contact/cancellation marks the hitbox inactive; configured hits have
+            // their own confirmed effect (or shield feedback). Keep expiry bursts.
+            if (!hb.Active && hb.AttackSlot > 0
+                && !string.IsNullOrEmpty(_sim.GetDefinition(hb.OwnerId)
+                    ?.GetSlotAbility((byte)(hb.AttackSlot - 1), hb.ActivationAirborne)?.HitPresentationId))
+                return;
             SpawnImpact(new Vector3(lastX, lastY, lastZ));
         }
 
@@ -376,6 +452,7 @@ namespace SlopArena.Client.Combat
                 _resolver.OnHitboxRemoved -= OnHitboxRemoved;
             foreach (var visual in _activeVisuals.Values) DestroyVisual(visual);
             foreach (var visual in _remoteVisuals.Values) DestroyVisual(visual);
+            foreach (var held in _heldVisuals.Values) DestroyVisual(held.Visual);
         }
     }
 }

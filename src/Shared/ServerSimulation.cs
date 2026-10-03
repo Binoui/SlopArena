@@ -80,6 +80,7 @@ namespace SlopArena.Shared
 		private readonly Dictionary<ulong, byte> _pendingWarpAttacks = new();
 		// ── Ability pool ──
 		private readonly Dictionary<ulong, ServerAbility> _activeAbilities = new();
+		private bool _abilityTickPhaseComplete;
 		private readonly IMatchRule _rule;
 		private readonly DownActionTuning _downActionTuning;
 		private readonly ArenaCollision.BlastLines _blastLines;
@@ -174,6 +175,7 @@ namespace SlopArena.Shared
 			if (_activeAbilities.TryGetValue(id, out var ability))
 			{
 				ability.OnCancel(ref state);
+				ability.ClearArmorWindow();
 				_spellResolver.RemoveOwnedHitboxes(id, ability.ActivationId);
 				_activeAbilities.Remove(id);
 			}
@@ -258,7 +260,10 @@ namespace SlopArena.Shared
 			unchecked { state.AttackSequence++; }
 			ability.PresentationAttackSequence = state.AttackSequence;
 			ability.PresentationOperationIndex = -1;
+			ability.ClearArmorWindow();
 			ability.OnStart(ref state, def);
+			if (_abilityTickPhaseComplete)
+				ability.AccountForCurrentContactFrame();
             bool aimingAbility = cookedSlot != null
                 ? cookedSlot.AimMode != AuthoringAimMode.None
                 : spec != null && spec.AimMode != AimMode.None;
@@ -313,10 +318,13 @@ namespace SlopArena.Shared
 				var ability = kvp.Value;
 				if (!_states.TryGetValue(id, out var state)) continue;
 				if (!_defs.TryGetValue(id, out var def)) continue;
+				bool frozenForTick = ability.FrozenForSimulationTick;
+				ability.FrozenForSimulationTick = false;
 
 				if (state.State != ActionState.Attacking && state.State != ActionState.Aiming)
 				{
 					ability.OnCancel(ref state);
+					ability.ClearArmorWindow();
 					state.SlideAttackCarryActive = false;
 					_states[id] = state;
 					ended.Add(id);
@@ -331,19 +339,27 @@ namespace SlopArena.Shared
 				// Hitstop pauses the attacker's ability (ADR-0012): timers pause, so recovery
 				// extends symmetrically with the victim's lock. Do NOT interrupt — the ability
 				// resumes when the freeze expires.
-				if (state.HitstopTicks > 0)
+				if (state.HitstopTicks > 0 || frozenForTick)
 				{
 					_states[id] = state;
 					continue;
 				}
 
-				ability.Tick(ref state, ref input, def);
+				ability.TickArmorWindow();
+				try
+				{
+					ability.Tick(ref state, ref input, def);
+				}
+				finally
+				{
+					ability.EndArmorTick();
+				}
 				state.AnimIndex = ability.AnimIndex;
-
 				// Check if ability ended itself (EndAbility set AttackSlot=0)
 				if (state.AttackSlot == 0)
 				{
 					state.SlideAttackCarryActive = false;
+					ability.ClearArmorWindow();
 					ended.Add(id);
 					_states[id] = state; // Persist EndAbility changes (State=Idle, AttackSlot=0)
 				}
@@ -382,12 +398,7 @@ namespace SlopArena.Shared
 								$"[Cooldown] Set slot={(byte)(ability.Slot + 1)} cooldown={ability.Cooldown} entity={id}");
 					}
 
-					// Clear buffered slot to prevent data-driven re-trigger.
-					// Without this, a LMB press during the last stage gets buffered by
-					// SimulateTick's input buffer (line 268) before the ability expires.
-					// On the next tick, the buffered slot creates a data-driven attack
-					// with no ServerAbility — the character appears stuck in Attacking
-					// with no animation for the full stage duration.
+					// Clear buffered input when the active ability ends to prevent stale reactivation.
 					if (state.BufferedSlot > 0)
 					{
 						state.BufferedSlot = 0;
@@ -513,12 +524,6 @@ namespace SlopArena.Shared
                     var stage = cooked.Timeline.Stages[stageIdx];
                     targetAnim = stage.AnimationIds.Count > 0 ? stage.AnimationIds[0] : "idle";
                 }
-                else
-                {
-                    var ability = def.GetSlotAbility(state.AttackSlot - 1, airborne);
-                    int stageIdx = ability != null ? Math.Min(state.ComboStage, (byte)(ability.Stages.Length - 1)) : 0;
-                    targetAnim = ability != null && stageIdx >= 0 && stageIdx < ability.AnimationNames.Length ? ability.AnimationNames[stageIdx] : "melee";
-                }
             }
             else if (state.State == ActionState.Hitstun) targetAnim = state.HitstunLevel switch
             {
@@ -552,19 +557,6 @@ namespace SlopArena.Shared
                     int stageIdx = Math.Min(state.ComboStage, (byte)(cooked.Timeline.Stages.Count - 1));
                     int durationTicks = cooked.Timeline.Stages[stageIdx].DurationTicks;
                     if (durationTicks > 0) bakedFrame = Math.Min(frame * fc / durationTicks, fc - 1);
-                }
-                else
-                {
-                    var ability = def.GetSlotAbility(state.AttackSlot - 1, airborne);
-                    if (ability != null)
-                    {
-                        int stageIdx = Math.Min(state.ComboStage, (byte)(ability.Stages.Length - 1));
-                        if (stageIdx >= 0 && stageIdx < ability.Stages.Length)
-                        {
-                            int durationTicks = ability.Stages[stageIdx].DurationTicks;
-                            if (durationTicks > 0) bakedFrame = Math.Min(frame * fc / durationTicks, fc - 1);
-                        }
-                    }
                 }
             }
 
@@ -620,26 +612,14 @@ namespace SlopArena.Shared
 			ushort autoCancelBeforeTicks;
 			ushort autoCancelAfterTicks;
 			int elapsed;
-			if (cooked != null)
-			{
-				var stage = cooked.Timeline.Stages[Math.Min(state.ComboStage, (byte)(cooked.Timeline.Stages.Count - 1))];
-				landingLagTicks = stage.LandingLagTicks;
-				autoCancelBeforeTicks = stage.AutoCancelBeforeTicks;
-				autoCancelAfterTicks = stage.AutoCancelAfterTicks;
-				elapsed = state.AttackElapsedTicks;
-				for (var i = 0; i < state.ComboStage && i < cooked.Timeline.Stages.Count; i++)
-					elapsed -= cooked.Timeline.Stages[i].DurationTicks;
-			}
-			else
-			{
-				var spec = def.GetSlotAbility(state.AttackSlot - 1, airborne: true);
-				if (spec?.Stages is not { Length: > 0 }) return;
-				var stage = Simulation.ResolveStage(spec, state);
-				landingLagTicks = stage.LandingLagTicks;
-				autoCancelBeforeTicks = stage.AutoCancelBeforeTicks;
-				autoCancelAfterTicks = stage.AutoCancelAfterTicks;
-				elapsed = Simulation.ElapsedInStage(state, spec);
-			}
+			if (cooked == null) return;
+			var stage = cooked.Timeline.Stages[Math.Min(state.ComboStage, (byte)(cooked.Timeline.Stages.Count - 1))];
+			landingLagTicks = stage.LandingLagTicks;
+			autoCancelBeforeTicks = stage.AutoCancelBeforeTicks;
+			autoCancelAfterTicks = stage.AutoCancelAfterTicks;
+			elapsed = state.AttackElapsedTicks;
+			for (var i = 0; i < state.ComboStage && i < cooked.Timeline.Stages.Count; i++)
+				elapsed -= cooked.Timeline.Stages[i].DurationTicks;
 			bool autoCancel = (autoCancelBeforeTicks > 0 && elapsed <= autoCancelBeforeTicks)
 				|| (autoCancelAfterTicks > 0 && elapsed >= autoCancelAfterTicks);
 
@@ -675,14 +655,11 @@ namespace SlopArena.Shared
 			for (byte slot = 1; slot <= AbilitySlots.Count; slot++)
 			{
 				var cooked = def.GetCookedSlotAbility(slot, airborne);
-				var spec = def.GetSlotAbility(slot - 1, airborne);
-				if (cooked == null && spec == null)
+				if (cooked == null)
 					continue;
 				if (state.GetCooldown(slot) != 0)
 					continue;
-				int maxCharges = cooked?.ChargePool?.MaxCharges
-					?? (spec?.Params != null && spec.Params.TryGetValue("max_charges", out var charges)
-						? (int)charges : 0);
+				int maxCharges = cooked.ChargePool?.MaxCharges ?? 0;
 				if (maxCharges > 0 && state.ChargeStockSpent >= maxCharges)
 					continue;
 				return true;
@@ -716,6 +693,7 @@ namespace SlopArena.Shared
                 || !_activeAbilities.TryGetValue(id, out var ability))
                 return false;
             ability.OnCancel(ref state);
+            ability.ClearArmorWindow();
             state.SlideAttackCarryActive = false;
             _spellResolver.RemoveOwnedHitboxes(id, ability.ActivationId);
             _activeAbilities.Remove(id);
@@ -834,8 +812,7 @@ namespace SlopArena.Shared
 				var cookedSlot = def.GetCookedSlotAbility(input.ActiveSlot, airborne);
 				var spec = def.GetSlotAbility(input.ActiveSlot - 1, airborne);
 
-				// Issue #117: reject slots with no cooked or legacy definition.
-				if (cookedSlot == null && spec == null)
+				if (cookedSlot == null)
 				{
 					var rejected = input;
 					rejected.ActiveSlot = 0;
@@ -843,7 +820,12 @@ namespace SlopArena.Shared
 					continue;
 				}
 
+				_activeAbilities.TryGetValue(id, out var currentAbility);
 				ushort cooldown = state.GetCooldown(input.ActiveSlot);
+				// A self-recast must respect the cooldown pending on the outgoing move.
+				if (cooldown == 0 && currentAbility != null
+					&& currentAbility.Slot + 1 == input.ActiveSlot)
+					cooldown = currentAbility.Cooldown;
 				if (cooldown > 0 && id != NoCooldownsEntityId)
 				{
 					if (Simulation.OnDebugLog != null)
@@ -904,36 +886,30 @@ namespace SlopArena.Shared
 				tryDirectAttack:
 
 
-                // Cooked slots use their typed charge pool; legacy slots retain their parameter compatibility.
-                int maxCharges = cookedSlot?.ChargePool?.MaxCharges
-                    ?? (spec?.Params != null && spec.Params.TryGetValue("max_charges", out var mc) ? (int)mc : 0);
+                int maxCharges = cookedSlot.ChargePool?.MaxCharges ?? 0;
 				if (maxCharges > 0 && state.ChargeStockSpent >= maxCharges)
 				{
-					// Consume the input so SimulateTick doesn't start a data-driven attack.
 					var blockedInput = input;
 					blockedInput.ActiveSlot = 0;
 					inputs[id] = blockedInput;
 					continue;
 				}
-
-                var ability = cookedSlot != null
-                    ? new CookedTimelineAbility(cookedSlot, cookedSlot.Timeline.Stages.SelectMany(x => x.AnimationIds).ToArray())
-                    : AbilityFactory.CreateServer(def.Class, (byte)(input.ActiveSlot - 1), airborne);
-                if (ability == null) continue;
+                var ability = new CookedTimelineAbility(cookedSlot, cookedSlot.Timeline.Stages.SelectMany(x => x.AnimationIds).ToArray());
 
 				// ── IASA interrupt ──
 				// An active ability whose stage has passed its IasaTicks is dropped without
 				// OnEnd (same semantics as hitstun/dash interrupts) so the new ability takes
-				// over. Placed AFTER the activation gates (cooldown, charge stock, factory
-				// support) so a blocked press never cancels the current attack. The move was
+				// over. Placed AFTER the activation gates (cooldown and cooked charge pool)
+				// so a blocked press never cancels the current attack. The move was
 				// used — its cooldown still applies, mirroring the dash-cancel path in
 				// TickAbilities. Attack state is cleared so the new ability's OnStart begins
 				// clean and no stale buffered press double-fires when the new attack's lock
 				// expires.
-				if (_activeAbilities.TryGetValue(id, out var currentAbility))
+				if (currentAbility != null)
 				{
 					if (!iasaUnlocked) continue;
 					currentAbility.OnCancel(ref state);
+					currentAbility.ClearArmorWindow();
 					state.SlideAttackCarryActive = false;
 					_activeAbilities.Remove(id);
 					if (currentAbility.Slot < AbilitySlots.Count && NoCooldownsEntityId != id)
@@ -946,23 +922,15 @@ namespace SlopArena.Shared
 					_states[id] = state;
 				}
 
-				if (cookedSlot != null)
-				{
-					ability.Cooldown = cookedSlot.CooldownTicks;
-                    ability.AnimationNames = cookedSlot.Timeline.Stages.SelectMany(x => x.AnimationIds).ToArray();
-				}
-				else
-				{
-					AbilityFactory.InitFromSpec(ability, spec!, (byte)(input.ActiveSlot - 1));
-				}
+				ability.Cooldown = cookedSlot.CooldownTicks;
+                ability.AnimationNames = cookedSlot.Timeline.Stages.SelectMany(x => x.AnimationIds).ToArray();
 				ActivateAbility(id, ability, (byte)(input.ActiveSlot - 1), def, input.AimYaw);
 
-                // Spend a charge from the cooked or legacy pool; capabilities refund valid hits.
+                // Spend charges from the cooked pool; capabilities refund valid hits.
                 if (maxCharges > 0 && _states.TryGetValue(id, out var afterState))
                 {
                     afterState.ChargeStockSpent++;
-                    ushort regenPeriod = cookedSlot?.ChargePool?.RegenTicks
-                        ?? (ushort)(spec?.Params != null && spec.Params.TryGetValue("charge_regen_ticks", out var rg) ? rg : 180f);
+                    ushort regenPeriod = cookedSlot.ChargePool?.RegenTicks ?? 180;
                     afterState.ChargeStockRegenPeriod = regenPeriod;
                     if (afterState.ChargeStockRegenTicks == 0)
                         afterState.ChargeStockRegenTicks = regenPeriod;
@@ -1403,6 +1371,8 @@ namespace SlopArena.Shared
 				var input = inputs.TryGetValue(id, out var i2) ? i2 : default;
 				bool wasGrounded = state.IsGrounded;
 				_activeAbilities.TryGetValue(id, out var activeAbility);
+				if (activeAbility != null)
+					activeAbility.FrozenForSimulationTick = state.HitstopTicks > 0;
 				bool verticalMotionOwned = activeAbility?.OwnsVerticalMotion == true;
                 Simulation.SimulateTick(ref state, def, input, _arena,
 					out bool ordinaryActionOpportunity, out bool movementActionAccepted,
@@ -1439,6 +1409,7 @@ namespace SlopArena.Shared
 
 			// ── Step 1b: Tick server-side abilities (overrides movement, spawns hitboxes) ──
 			TickAbilities(inputs);
+			_abilityTickPhaseComplete = true;
 
 			// ── Step 1c: Landing lag freeze (issue #125 / ADR-0021 §3) ──
 			// The lock is "no input, no movement": the aerial has already ENDED on the landing
@@ -2065,7 +2036,15 @@ namespace SlopArena.Shared
 			var attackEntities = BuildAttackEntities(entityList);
 			LastTickAttackEntities = attackEntities;
 			var hits = _spellResolver.Tick(attackEntities);
+			for (int i = 0; i < hits.Count; i++)
+			{
+				var contact = hits[i];
+				contact.ArmorProtected = _activeAbilities.TryGetValue(contact.TargetEntityId, out var defender)
+					&& defender.HasArmor;
+				hits[i] = contact;
+			}
 			LastTickHits.Clear();
+			int hitContactOperationIndex = 0;
 			foreach (var hit in hits)
 			{
 				if (!_states.TryGetValue(hit.TargetEntityId, out var targetState)) continue;
@@ -2106,7 +2085,8 @@ namespace SlopArena.Shared
 
 				bool crouchBraceEligible = IsCrouchBraceEligible(
 					hit.TargetEntityId, in targetState, _defs[hit.TargetEntityId]);
-				Simulation.ClearMovementInterruptionFlags(ref targetState);
+				if (!hit.ArmorProtected)
+					Simulation.ClearMovementInterruptionFlags(ref targetState);
 				if (attackerExists && hit.OwnerEntityId != hit.TargetEntityId)
 					_lastHitCredits[hit.TargetEntityId] = (hit.OwnerEntityId, _tick, hit.AttackSlot);
 				if (hit.OwnerEntityId != 0)
@@ -2136,7 +2116,8 @@ namespace SlopArena.Shared
 				// Hit-reaction facing: the victim turns to face the attacker (the direction the
 				// hit came from — opposite the launch). Persists through the hitstun flight;
 				// ProcessNormalMovement re-faces on the next input/land.
-				targetState.FacingYaw = MathF.Atan2(-dirX, -dirZ);
+				if (!hit.ArmorProtected)
+					targetState.FacingYaw = MathF.Atan2(-dirX, -dirZ);
 
 
 
@@ -2163,12 +2144,35 @@ namespace SlopArena.Shared
             float kbForce = kbForceDefault;
                 bool hookSuppliedForce = false;
                 bool hookZeroForce = false;
+                CharacterState armoredReaction = default;
                 if (attackerExists
                     && _activeAbilities.TryGetValue(hit.OwnerEntityId, out var attackerAbility)
                     && _defs.TryGetValue(hit.OwnerEntityId, out var attackerDef))
                 {
+                    if (hit.ArmorProtected)
+                        armoredReaction = targetState;
                     attackerAbility.OnHitEntity(ref attackerState, ref targetState,
                         attackerDef, _defs[hit.TargetEntityId], ref finalDamage, ref kbForce);
+                    if (hit.ArmorProtected)
+                    {
+                        targetState.KVX = armoredReaction.KVX;
+                        targetState.KVY = armoredReaction.KVY;
+                        targetState.KVZ = armoredReaction.KVZ;
+                        targetState.HitstunTicks = armoredReaction.HitstunTicks;
+                        targetState.HitstunLevel = armoredReaction.HitstunLevel;
+                        targetState.FacingYaw = armoredReaction.FacingYaw;
+                        targetState.State = armoredReaction.State;
+                        targetState.IsGrounded = armoredReaction.IsGrounded;
+                        targetState.AirTimeTicks = armoredReaction.AirTimeTicks;
+                        targetState.DashDurationTicks = armoredReaction.DashDurationTicks;
+                        targetState.AirDodgeRecoveryTicks = armoredReaction.AirDodgeRecoveryTicks;
+                        targetState.StateTicks = armoredReaction.StateTicks;
+                        targetState.WasAirborneDuringKnockback = armoredReaction.WasAirborneDuringKnockback;
+                        targetState.InPostHitstunFlight = armoredReaction.InPostHitstunFlight;
+                        targetState.LandingLagTicks = armoredReaction.LandingLagTicks;
+                        targetState.IsFastFalling = armoredReaction.IsFastFalling;
+                        targetState.JumpFromSlide = armoredReaction.JumpFromSlide;
+                    }
                     hookSuppliedForce = kbForce != kbForceDefault;
                     hookZeroForce = hookSuppliedForce && kbForce <= 0f;
                 }
@@ -2184,59 +2188,70 @@ namespace SlopArena.Shared
 				if (freeze > 0)
 				{
 					targetState.HitstopTicks = freeze;
-                    targetState.QueuedKBDirX = dirX; targetState.QueuedKBDirZ = dirZ;
-                    targetState.QueuedKBAngle = hit.KnockbackAngle;
-                    targetState.QueuedKBBase = launchBase;
-                    targetState.QueuedKBGrowth = launchGrowth;
-                    targetState.QueuedKBForce = kbForce;
-                    targetState.QueuedKBResolvedForce = hookSuppliedForce;
-                    targetState.QueuedKBZero = hookZeroForce;
-                    targetState.QueuedKBDamage = finalDamage;
-                    targetState.QueuedKBStun = hit.StunTicks;
-                    targetState.QueuedKVOverride = false;
-                    targetState.QueuedCrouchBrace = crouchBraceEligible && ordinaryFormulaLaunch;
-                    targetState.QueuedKVX = 0f; targetState.QueuedKVY = 0f; targetState.QueuedKVZ = 0f;
-                    if (hit.FreezesOwner && attackerExists && hit.OwnerEntityId != hit.TargetEntityId)
-                        attackerState.HitstopTicks = freeze;
-                }
-                else
-                {
-                    // Tuner zeroed the freeze for this ability — launch immediately.
-                    if (hookAppliedLaunch)
-                    {
-                    }
-                    else if (hookSuppliedForce)
-                    {
-                        Simulation.ApplyKnockbackForce(ref targetState, dirX, dirZ,
-                            hit.KnockbackAngle, kbForce, hit.StunTicks);
-                    }
-                    else if (hookZeroForce)
-                    {
-                        targetState.KVX = targetState.KVY = targetState.KVZ = 0f;
-                        targetState.HitstunTicks = 0;
-                        targetState.HitstunLevel = 0;
-                        targetState.State = ActionState.Idle;
-                    }
-                    else
-                    {
-                        Simulation.ApplyKnockback(ref targetState, dirX, dirZ,
-                            hit.KnockbackAngle, launchBase, launchGrowth,
-                            finalDamage, hit.StunTicks, _defs[hit.TargetEntityId].Weight);
-                        Simulation.ApplyCrouchBrace(
-                            ref targetState, crouchBraceEligible && ordinaryFormulaLaunch,
-                            _downActionTuning.CrouchLaunchMultiplier);
-                    }
-                    if (inputs.TryGetValue(hit.TargetEntityId, out var targetInput)
-                        && (targetInput.MoveX != 0f || targetInput.MoveY != 0f))
-                    {
-                        targetState.DIX = targetInput.MoveX;
-                        targetState.DIY = targetInput.MoveY;
-                        Simulation.ApplySdi(ref targetState, targetState.DIX, targetState.DIY,
-                            _defs[hit.TargetEntityId], _arena);
-                        Simulation.ApplyDirectionalInfluence(ref targetState);
-                        targetState.DIX = targetState.DIY = 0f;
-                    }
-                }
+					if (hit.ArmorProtected)
+					{
+						targetState.QueuedArmorHitstop = true;
+					}
+					else
+					{
+						targetState.QueuedArmorHitstop = false;
+						targetState.QueuedKBDirX = dirX; targetState.QueuedKBDirZ = dirZ;
+						targetState.QueuedKBAngle = hit.KnockbackAngle;
+						targetState.QueuedKBBase = launchBase;
+						targetState.QueuedKBGrowth = launchGrowth;
+						targetState.QueuedKBForce = kbForce;
+						targetState.QueuedKBResolvedForce = hookSuppliedForce;
+						targetState.QueuedKBZero = hookZeroForce;
+						targetState.QueuedKBDamage = finalDamage;
+						targetState.QueuedKBStun = hit.StunTicks;
+						targetState.QueuedKBFixedHitstunTicks = hit.FixedHitstunTicks;
+						targetState.QueuedKBStunGate = hit.StunTicks;
+						targetState.QueuedCrouchBrace = crouchBraceEligible && ordinaryFormulaLaunch;
+					}
+					if (hit.FreezesOwner && attackerExists && hit.OwnerEntityId != hit.TargetEntityId)
+						attackerState.HitstopTicks = freeze;
+				}
+
+				else if (!hit.ArmorProtected)
+				{
+					if (hookAppliedLaunch)
+					{
+						Simulation.ApplyFixedHitstun(ref targetState, hit.FixedHitstunTicks, hit.StunTicks);
+					}
+					else if (hookSuppliedForce)
+					{
+						Simulation.ApplyKnockbackForce(ref targetState, dirX, dirZ,
+							hit.KnockbackAngle, kbForce, hit.StunTicks);
+						Simulation.ApplyFixedHitstun(ref targetState, hit.FixedHitstunTicks, hit.StunTicks);
+					}
+					else if (hookZeroForce)
+					{
+						targetState.KVX = targetState.KVY = targetState.KVZ = 0f;
+						targetState.HitstunTicks = 0;
+						targetState.HitstunLevel = 0;
+						targetState.State = ActionState.Idle;
+					}
+					else
+					{
+						Simulation.ApplyKnockback(ref targetState, dirX, dirZ,
+							hit.KnockbackAngle, launchBase, launchGrowth,
+							finalDamage, hit.StunTicks, _defs[hit.TargetEntityId].Weight);
+						Simulation.ApplyFixedHitstun(ref targetState, hit.FixedHitstunTicks, hit.StunTicks);
+						Simulation.ApplyCrouchBrace(
+							ref targetState, crouchBraceEligible && ordinaryFormulaLaunch,
+							_downActionTuning.CrouchLaunchMultiplier);
+					}
+					if (inputs.TryGetValue(hit.TargetEntityId, out var targetInput)
+						&& (targetInput.MoveX != 0f || targetInput.MoveY != 0f))
+					{
+						targetState.DIX = targetInput.MoveX;
+						targetState.DIY = targetInput.MoveY;
+						Simulation.ApplySdi(ref targetState, targetState.DIX, targetState.DIY,
+							_defs[hit.TargetEntityId], _arena);
+						Simulation.ApplyDirectionalInfluence(ref targetState);
+						targetState.DIX = targetState.DIY = 0f;
+					}
+				}
 
 
 
@@ -2265,29 +2280,31 @@ namespace SlopArena.Shared
 					targetState.QueuedKBStun = targetState.HitstunTicks;
 				}
 
-				float impactForce;
-				if (targetState.QueuedKVOverride)
+				float impactForce = 0f;
+				if (!hit.ArmorProtected)
 				{
-					impactForce = MathF.Sqrt(
-						targetState.QueuedKVX * targetState.QueuedKVX
-						+ targetState.QueuedKVY * targetState.QueuedKVY
-						+ targetState.QueuedKVZ * targetState.QueuedKVZ);
+					if (targetState.QueuedKVOverride)
+					{
+						impactForce = MathF.Sqrt(
+							targetState.QueuedKVX * targetState.QueuedKVX
+							+ targetState.QueuedKVY * targetState.QueuedKVY
+							+ targetState.QueuedKVZ * targetState.QueuedKVZ);
+					}
+					else if (hookSuppliedForce)
+					{
+						impactForce = MathF.Max(0f, kbForce);
+					}
+					else
+					{
+						float mass = MathF.Max(0.01f, _defs[hit.TargetEntityId].Weight + 100f);
+						float braceMultiplier = ordinaryFormulaLaunch && crouchBraceEligible
+							? _downActionTuning.CrouchLaunchMultiplier : 1f;
+						impactForce = (launchBase
+							+ launchGrowth * (targetState.DamagePercent * 0.01f + 1f)
+							+ finalDamage * 0.1f) * 200f / mass * Simulation.KbScaleFactor
+							* braceMultiplier;
+					}
 				}
-				else if (hookSuppliedForce)
-				{
-					impactForce = MathF.Max(0f, kbForce);
-				}
-				else
-				{
-					float mass = MathF.Max(0.01f, _defs[hit.TargetEntityId].Weight + 100f);
-					float braceMultiplier = ordinaryFormulaLaunch && crouchBraceEligible
-					    ? _downActionTuning.CrouchLaunchMultiplier : 1f;
-					impactForce = (launchBase
-						+ launchGrowth * (targetState.DamagePercent * 0.01f + 1f)
-						+ finalDamage * 0.1f) * 200f / mass * Simulation.KbScaleFactor
-					    * braceMultiplier;
-				}
-
 				var resolvedHit = hit;
 				resolvedHit.MatchTick = _tick;
 				resolvedHit.Damage = finalDamage;
@@ -2298,6 +2315,25 @@ namespace SlopArena.Shared
 
 				_states[hit.TargetEntityId] = targetState;
 				LastTickHits.Add(resolvedHit);
+				if (_defs.TryGetValue(hit.OwnerEntityId, out var hitOwnerDefinition)
+				    && hit.AttackSlot > 0)
+				{
+					var attackSpec = hitOwnerDefinition.GetSlotAbility(
+						hit.AttackSlot - 1, hit.Airborne);
+					if (!string.IsNullOrEmpty(attackSpec?.HitPresentationId))
+					{
+						_presentationEvents.Add(new TimelinePresentationEvent(
+							_tick, hit.OwnerEntityId, hitContactOperationIndex,
+							attackSpec.HitPresentationId!, hit.AttackSequence,
+							PresentationEventSource.HitContact,
+							hit.HitX, hit.HitY, hit.HitZ,
+							attackerExists ? attackerState.FacingYaw : 0f)
+						{
+							Placement = new PresentationPlacement(DurationTicks: 150),
+						});
+					}
+				}
+				hitContactOperationIndex++;
 			}
 		}
 
@@ -2311,9 +2347,8 @@ namespace SlopArena.Shared
             // NOTE: The ProjectileExplosion config is baked at spawn time, so nothing here
             // applies owner-state changes — explosions are secondary effects detached from
             // the owner's state by the time they resolve. An ability MAY therefore bake
-            // values into the config itself before Resolver.Spawn: NilusVoidRift does
-            // exactly that (its explosion IS the payload rift), while MankiBazooka and
-            // NilusEventHorizon use their authored configs.
+            // values into the config itself before Resolver.Spawn: custom payload explosions
+            // and authored MankiBazooka configs both use this path.
 			foreach (var (ex, ey, ez, explosion, ownerId, attackSlot, activationId, airborne, attackSequence) in _spellResolver.DrainPendingExplosions())
 			{
 				var (kbAngle, kbBase, kbGrowth) = explosion.Knockback.Resolve();
@@ -2375,32 +2410,15 @@ namespace SlopArena.Shared
 				var def = _defs[id];
 				bool airborne = !state.IsGrounded;
 				var cookedSlot = def.GetCookedSlotAbility(slot, airborne);
-				var spec = def.GetSlotAbility(slot - 1, airborne);
-				if (cookedSlot == null && spec == null)
+				if (cookedSlot == null)
 				{
 					state.State = ActionState.Idle;
 					_states[id] = state;
 					continue;
 				}
-
-                var ability = cookedSlot != null
-                    ? new CookedTimelineAbility(cookedSlot, cookedSlot.Timeline.Stages.SelectMany(x => x.AnimationIds).ToArray())
-                    : AbilityFactory.CreateServer(def.Class, (byte)(slot - 1), airborne);
-				if (ability == null)
-				{
-					state.State = ActionState.Idle;
-					_states[id] = state;
-					continue;
-				}
-				if (cookedSlot != null)
-				{
-					ability.Cooldown = cookedSlot.CooldownTicks;
-					ability.AnimationNames = cookedSlot.Timeline.Stages.SelectMany(x => x.AnimationIds).ToArray();
-				}
-				else
-				{
-					AbilityFactory.InitFromSpec(ability, spec!, (byte)(slot - 1));
-				}
+                var ability = new CookedTimelineAbility(cookedSlot, cookedSlot.Timeline.Stages.SelectMany(x => x.AnimationIds).ToArray());
+				ability.Cooldown = cookedSlot.CooldownTicks;
+				ability.AnimationNames = cookedSlot.Timeline.Stages.SelectMany(x => x.AnimationIds).ToArray();
 				ActivateAbility(id, ability, (byte)(slot - 1), def);
 			}
 		}
@@ -2460,6 +2478,7 @@ namespace SlopArena.Shared
 				if (_activeAbilities.TryGetValue(id, out var deadAbility))
 				{
 					deadAbility.OnCancel(ref oldState);
+					deadAbility.ClearArmorWindow();
 					oldState.SlideAttackCarryActive = false;
 					_activeAbilities.Remove(id);
 				}
@@ -2553,42 +2572,50 @@ namespace SlopArena.Shared
 
 		public void Tick(Dictionary<ulong, InputState> inputs)
 		{
-			LastTickDeaths.Clear();
-			_lastTickDownAdmissions.Clear();
-			_lastTickOrdinaryActionOpportunities.Clear();
-			_lastTickAcceptedActions.Clear();
-			_lastTickTouchdowns.Clear();
-			_settledCrouchCandidates.Clear();
-			_damagedThisTick.Clear();
-			_tick++;
-			if (PredictCoupledInteractions && HasCoupledInteraction())
-				UpdateCoupledInteractions(releaseDue: false, inputs);
-			CaptureSettledCrouchCandidates();
-			PreTickAbilities(inputs);
+			_abilityTickPhaseComplete = false;
+			try
+			{
+				LastTickDeaths.Clear();
+				_lastTickDownAdmissions.Clear();
+				_lastTickOrdinaryActionOpportunities.Clear();
+				_lastTickAcceptedActions.Clear();
+				_lastTickTouchdowns.Clear();
+				_settledCrouchCandidates.Clear();
+				_damagedThisTick.Clear();
+				_tick++;
+				if (PredictCoupledInteractions && HasCoupledInteraction())
+					UpdateCoupledInteractions(releaseDue: false, inputs);
+				CaptureSettledCrouchCandidates();
+				PreTickAbilities(inputs);
 
-			ProcessTargetLock(inputs);
+				ProcessTargetLock(inputs);
 
-			SimulateMovement(inputs);
-			// Grab contact is committed after ordinary damage has interrupted candidates.
+				SimulateMovement(inputs);
+				// Grab contact is committed after ordinary damage has interrupted candidates.
 
-			// ── Warp arrival: activate pending attacks ──
-			ProcessWarpArrivals();
-            AdmitLowLandings(inputs);
-			// Settlement is finalized after all movement, ability, lag, and pushbox work,
-			// but before hurtbox construction and hit resolution.
-			FinalizeSettledCrouch();
+				// ── Warp arrival: activate pending attacks ──
+				ProcessWarpArrivals();
+				AdmitLowLandings(inputs);
+				// Settlement is finalized after all movement, ability, lag, and pushbox work,
+				// but before hurtbox construction and hit resolution.
+				FinalizeSettledCrouch();
 
-			var entityList = BuildHurtboxList();
+				var entityList = BuildHurtboxList();
 
-            ResolveHits(entityList, inputs);
-			ResolveGrabAttempts();
-			if (PredictCoupledInteractions && HasCoupledInteraction())
-				UpdateCoupledInteractions(releaseDue: true, inputs);
+				ResolveHits(entityList, inputs);
+				ResolveGrabAttempts();
+				if (PredictCoupledInteractions && HasCoupledInteraction())
+					UpdateCoupledInteractions(releaseDue: true, inputs);
 
 
-			ProcessProjectileExplosions();
+				ProcessProjectileExplosions();
 
-			CheckBlastDeaths();
+				CheckBlastDeaths();
+			}
+			finally
+			{
+				_abilityTickPhaseComplete = false;
+			}
 		}
 	}
 }

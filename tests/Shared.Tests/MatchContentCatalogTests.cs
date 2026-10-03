@@ -22,72 +22,45 @@ public sealed class MatchContentCatalogTests
         Assert.NotNull(result.BakedAnimation);
     }
 
-    [Fact]
-    public void LegacyAdapter_SnapshotsAreIndependent()
-    {
-        var adapter = new LegacyCharacterCatalogAdapter();
-        var first = adapter.Snapshot(CharacterClass.Nilus);
-        var second = adapter.Snapshot(CharacterClass.Nilus);
-        Assert.NotSame(first.Definition, second.Definition);
-        Assert.Equal(first.Identity, second.Identity);
-        Assert.Equal(11.55f, second.Definition.Movement.AirDodgeSpeed);
-        Assert.Equal(1.025f, first.Definition.ShieldRadius);
-        Assert.Equal(1.025f, second.Definition.ShieldRadius);
-        first.Definition.DisplayName = "mutated";
-        Assert.NotEqual("mutated", second.Definition.DisplayName);
-    }
-
-    [Fact]
-    public void LegacyAdapter_RejectsManki()
-    {
-        var adapter = new LegacyCharacterCatalogAdapter();
-        Assert.False(adapter.TrySnapshot(CharacterClass.Manki, out _, out var diagnostics));
-        Assert.Contains(diagnostics, x => x.Code == "catalog.legacy.selector");
-    }
-
-    [Fact]
-    public void LegacyAdapter_RejectsWibou()
-    {
-        var adapter = new LegacyCharacterCatalogAdapter();
-        Assert.False(adapter.TrySnapshot(CharacterClass.Wibou, out _, out var diagnostics));
-        Assert.Contains(diagnostics, x => x.Code == "catalog.legacy.selector");
-    }
 
     [Fact]
     public void Catalog_AssignsHandlesByStablePackageId()
     {
-        var manifest = BuiltInRosterManifestCodec.Load(Path.Combine(Root, "content-cooked/roster/manifest.json"));
-        var fightGuy = manifest.Resolve(CharacterClass.FightGuy)!;
+        var roster = BuiltInRosterManifestCodec.Load(Path.Combine(Root, "content-cooked/roster/manifest.json"));
+        var fightGuy = roster.Resolve(CharacterClass.FightGuy)!;
+        var bonk = roster.Resolve(CharacterClass.Bonk)!;
+        var wibou = roster.Resolve(CharacterClass.Wibou)!;
+        var manki = roster.Resolve(CharacterClass.Manki)!;
+        var manifest = new BuiltInRosterManifest(roster.SchemaVersion, new[] { bonk, fightGuy, wibou, manki });
         var loadedFightGuy = CookedCharacterPackageLoader.LoadDirectory(
-            Path.Combine(Root, "content-cooked/fightguy"),
-            fightGuy.Requirement);
-        var wibou = manifest.Resolve(CharacterClass.Wibou)!;
+            Path.Combine(Root, "content-cooked/fightguy"), fightGuy.Requirement);
         var loadedWibou = CookedCharacterPackageLoader.LoadDirectory(
-            Path.Combine(Root, "content-cooked/wibou"),
-            wibou.Requirement);
-        var bonk = manifest.Resolve(CharacterClass.Bonk)!;
-        var loadedBonk = CookedCharacterPackageLoader.LoadDirectory(
-            Path.Combine(Root, "content-cooked/bonk"),
-            bonk.Requirement);
-        var manki = manifest.Resolve(CharacterClass.Manki)!;
+            Path.Combine(Root, "content-cooked/wibou"), wibou.Requirement);
         var loadedManki = CookedCharacterPackageLoader.LoadDirectory(
-            Path.Combine(Root, "content-cooked/manki"),
-            manki.Requirement);
+            Path.Combine(Root, "content-cooked/manki"), manki.Requirement);
+        var loadedBonk = CookedCharacterPackageLoader.LoadDirectory(
+            Path.Combine(Root, "content-cooked/bonk"), bonk.Requirement);
+
+        Assert.True(loadedFightGuy.IsValid, string.Join("; ", loadedFightGuy.Diagnostics));
+        Assert.True(loadedWibou.IsValid, string.Join("; ", loadedWibou.Diagnostics));
+        Assert.True(loadedManki.IsValid, string.Join("; ", loadedManki.Diagnostics));
+        Assert.True(loadedBonk.IsValid, string.Join("; ", loadedBonk.Diagnostics));
         var result = new MatchContentCatalogBuilder().Build(
             manifest,
             new Dictionary<string, CookedCharacterPackageLoadResult>
             {
+                ["bonk"] = loadedBonk,
                 ["fightguy"] = loadedFightGuy,
                 ["wibou"] = loadedWibou,
-                ["bonk"] = loadedBonk,
                 ["manki"] = loadedManki,
-            },
-            new LegacyCharacterCatalogAdapter());
+            });
         Assert.True(result.IsValid, string.Join("; ", result.Diagnostics));
         var catalog = result.Catalog!;
-        Assert.NotNull(catalog);
         Assert.Equal(4, catalog.Entries.Count);
+        Assert.Equal(1, catalog.ResolvePackage("bonk")!.Handle.Value);
         Assert.Equal(2, catalog.ResolvePackage("fightguy")!.Handle.Value);
+        Assert.Equal(3, catalog.ResolvePackage("manki")!.Handle.Value);
+        Assert.Equal(4, catalog.ResolvePackage("wibou")!.Handle.Value);
     }
 
     [Fact]
@@ -96,7 +69,7 @@ public sealed class MatchContentCatalogTests
         var manifest = BuiltInRosterManifestCodec.Load(Path.Combine(Root, "content-cooked/roster/manifest.json"));
         var fightGuy = manifest.Resolve(CharacterClass.FightGuy)!;
         var loaded = CookedCharacterPackageLoader.LoadDirectory(Path.Combine(Root, "content-cooked/fightguy"), fightGuy.Requirement);
-        var result = new MatchContentCatalogBuilder().Build(manifest, new Dictionary<string, CookedCharacterPackageLoadResult> { ["fightguy"] = loaded }, new LegacyCharacterCatalogAdapter());
+        var result = new MatchContentCatalogBuilder().Build(manifest, new Dictionary<string, CookedCharacterPackageLoadResult> { ["fightguy"] = loaded });
         Assert.False(result.IsValid);
         Assert.Contains(result.Diagnostics, x => x.Code == "catalog.package.missing" && x.Path == "wibou");
     }

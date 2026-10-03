@@ -51,6 +51,7 @@ namespace SlopArena.Client.UI
             public float targetOpacity = 100f;
             public float screenShake = 100f;
             public bool reducedFlashing;
+            public bool showOverheadDamage = true;
             public int targetLockMode = (int)TargetLockMode.Always;
         }
 
@@ -89,6 +90,7 @@ namespace SlopArena.Client.UI
         public float TargetOpacity => _settings.targetOpacity / 100f;
         public float ScreenShake => _settings.screenShake / 100f;
         public bool ReducedFlashing => _settings.reducedFlashing;
+        public bool ShowOverheadDamage => _settings.showOverheadDamage;
         public TargetLockMode AutoLockMode => (TargetLockMode)_settings.targetLockMode;
         public AudioMixerGroup? FindBus(string name)
         {
@@ -205,6 +207,7 @@ namespace SlopArena.Client.UI
         public void SetInvertCameraVertical(bool value) { _settings.invertCameraVertical = value; ChangedAndApply(); }
         public void SetNetworkStats(int value) { _settings.networkStats = Mathf.Clamp(value, 0, 2); ChangedAndApply(); }
         public void SetTargetOpacity(float percent) { _settings.targetOpacity = Mathf.Clamp(Mathf.Round(percent), 20f, 100f); ChangedAndApply(); }
+        public void SetShowOverheadDamage(bool value) { _settings.showOverheadDamage = value; ChangedAndApply(); }
         public void SetScreenShake(float percent) { _settings.screenShake = Clamp(percent); ChangedAndApply(); }
         public void SetReducedFlashing(bool value) { _settings.reducedFlashing = value; ChangedAndApply(); }
         public void SetAutoLockMode(TargetLockMode value)

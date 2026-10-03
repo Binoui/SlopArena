@@ -24,8 +24,15 @@ public class KnockbackPhysicsDataTests
     private readonly ITestOutputHelper _output;
     public KnockbackPhysicsDataTests(ITestOutputHelper output) => _output = output;
 
-    private static readonly CharacterDefinition Def = TestHelpers.MankiDef;
-    private static readonly float GroundPy = TestHelpers.MankiGroundPY;
+    private static readonly CharacterDefinition Def = KnockbackFixture();
+    private static readonly float GroundPy = TestHelpers.GroundPY(Def);
+
+    private static CharacterDefinition KnockbackFixture()
+    {
+        var def = TestHelpers.EngineDef;
+        def.Weight = 100f;
+        return def;
+    }
 
     private static readonly int[] Percents = { 0, 25, 50, 75, 100, 125, 150, 175, 200 };
 

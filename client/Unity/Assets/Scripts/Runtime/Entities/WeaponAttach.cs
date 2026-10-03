@@ -7,13 +7,13 @@ namespace SlopArena.Client.Entities
     [ExecuteAlways]
     public class WeaponAttach : MonoBehaviour
     {
-        private const int HistoryCapacity = 64;
         private PlayerRenderer _owner;
         private CharacterDefinition _characterDefinition;
         private SkinnedMeshRenderer _skin;
         private bool _previewStateActive;
         private byte _previewAttackSlot;
         private int _previewAttackElapsedTicks;
+        private bool _previewFirePhase;
         private Transform[] _bones;
         private Transform[] _hilts;
         private Transform[] _tips;
@@ -21,11 +21,6 @@ namespace SlopArena.Client.Entities
         private SwordSweepTrail[] _sweepTrails;
         private WeaponEntry[] _entries;
         private WeaponAttachConfig _config;
-        private readonly CapturedState[] _history = new CapturedState[HistoryCapacity];
-        private int _historyStart;
-        private int _historyCount;
-        private int _captureSerial;
-        private int _processedSerial;
         private bool _hitboxTrailActive;
         private bool _hasAttackIdentity;
         private byte _attackSequence;
@@ -36,22 +31,9 @@ namespace SlopArena.Client.Entities
         private bool _hasCapturedPosition;
         private Vector3 _lastPosition;
         private float _runtimeClock;
-        private float _lastSampleTime;
-        private int _lastSampleSequence = -1;
-        private int _lastSampleStage = -1;
-        private int _lastSampleElapsed = -1;
+        private ushort _lastHitstopTicks;
         private float _previewTimelineSeconds = -1f;
         public bool HasSwordTrail { get; private set; }
-
-        private struct CapturedState
-        {
-            public CharacterState State;
-            public bool Airborne;
-            public int Serial;
-            public bool HasPose;
-            public Vector3 Hilt;
-            public Vector3 Tip;
-        }
 
         public void Init(PlayerRenderer owner, WeaponAttachConfig config)
         {
@@ -84,7 +66,7 @@ namespace SlopArena.Client.Entities
                     Debug.LogWarning($"[WeaponAttach] Prefab is null for entry {i} ({_entries[i].BoneName})");
                     continue;
                 }
-                _instances[i] = Instantiate(_entries[i].Prefab);
+                _instances[i] = Instantiate(_entries[i].Prefab, owner.transform, true);
                 _instances[i].SetActive(false);
                 if (_entries[i].TrailStylePrefab == null)
                     continue;
@@ -98,35 +80,39 @@ namespace SlopArena.Client.Entities
                 _hilts[i] = weapon.Find(_entries[i].TrailHiltAnchor);
                 _tips[i] = weapon.Find(_entries[i].TrailTipAnchor);
                 _sweepTrails[i] = new SwordSweepTrail(
-                    weapon, _entries[i].TrailStylePrefab, _entries[i].HitboxMotionTime,
+                    owner.transform, _entries[i].TrailStylePrefab, _entries[i].HitboxMotionTime,
                     _entries[i].TrailBladeWidth);
                 HasSwordTrail = true;
             }
         }
 
-        public void SetPreviewState(byte attackSlot, int attackElapsedTicks)
+        public void SetPreviewState(byte attackSlot, int attackElapsedTicks, bool firePhase = false)
         {
             _previewStateActive = true;
             _previewAttackSlot = attackSlot;
             _previewAttackElapsedTicks = attackElapsedTicks;
+            _previewFirePhase = firePhase;
         }
 
-        public void SetHitboxTrailActive(bool active, float previewSeconds = -1f)
+        public void SetHitboxTrailActive(bool active)
         {
-            if (_sweepTrails == null)
+            // Baked swings own their cosmetic window; resolver/snapshot gates
+            // remain authoritative for the unbaked legacy attachment path.
+            if (_sweepTrails == null || !_previewStateActive && _owner?.BakedData != null)
                 return;
-            _hitboxTrailActive = active;
-            foreach (var trail in _sweepTrails)
-                trail?.SetActive(active);
+            SetTrailActive(active);
             if (_previewStateActive && !active)
             {
                 ClearTrails();
                 _previewTimelineSeconds = -1f;
             }
-            if (active && previewSeconds < 0f)
-                ProcessPendingHistory();
-            else if (!active)
-                ClearPendingHistory();
+        }
+
+        private void SetTrailActive(bool active)
+        {
+            _hitboxTrailActive = active;
+            foreach (var trail in _sweepTrails)
+                trail?.SetActive(active);
         }
 
         /// <summary>Capture every authoritative presentation tick, not just rendered frames.</summary>
@@ -138,7 +124,6 @@ namespace SlopArena.Client.Entities
             if (_owner.CharacterDef != _characterDefinition)
             {
                 ClearTrails();
-                ClearPendingHistory();
                 _hasAttackIdentity = false;
                 _characterDefinition = _owner.CharacterDef;
             }
@@ -154,10 +139,17 @@ namespace SlopArena.Client.Entities
 
             if (teleported || newIdentity)
                 ClearTrails();
+            if (_owner.BakedData != null)
+            {
+                // Hitstop's final zero-tick snapshot still holds the prior pose.
+                if (_hasCapturedPosition && _lastHitstopTicks == 0)
+                    _runtimeClock += 1f / 60f;
+                SetTrailActive(_owner.IsSwordTrailTick(state, airborne));
+            }
+            _lastHitstopTicks = state.HitstopTicks;
             if (!attacking)
             {
                 _hasAttackIdentity = false;
-                ClearPendingHistory();
                 _deaths = state.Deaths;
                 _lastPosition = position;
                 _hasCapturedPosition = true;
@@ -172,21 +164,9 @@ namespace SlopArena.Client.Entities
             _deaths = state.Deaths;
             _lastPosition = position;
             _hasCapturedPosition = true;
-            if (_historyCount == HistoryCapacity)
-            {
-                _historyStart = (_historyStart + 1) % HistoryCapacity;
-                _historyCount--;
-            }
-            int index = (_historyStart + _historyCount++) % HistoryCapacity;
-            _history[index] = new CapturedState
-            {
-                State = state,
-                Airborne = airborne,
-                Serial = ++_captureSerial,
-                HasPose = hasPose,
-                Hilt = hilt,
-                Tip = tip,
-            };
+            if (_hitboxTrailActive && hasPose)
+                foreach (var trail in _sweepTrails)
+                    trail?.SampleAt(_runtimeClock, hilt, tip);
         }
 
         /// <summary>
@@ -199,22 +179,52 @@ namespace SlopArena.Client.Entities
             if (!HasSwordTrail || states == null || targetTick < 0)
                 return;
             UpdateTrailWidths();
+            int lastTick = Mathf.Min(targetTick, states.Count - 1);
+            if (lastTick < 0)
+            {
+                ClearTrails();
+                SetTrailActive(false);
+                return;
+            }
             float targetTime = targetTick / 60f;
             _previewTimelineSeconds = targetTime;
             float oldestTime = targetTime - TrailLifetime();
+            float sampleTime = lastTick / 60f;
+            int firstTick = lastTick;
+            // Walk by animation time, not wall ticks: frozen poses retain the tail.
+            while (firstTick > 0 && sampleTime >= oldestTime)
+            {
+                if (states[firstTick - 1].HitstopTicks == 0)
+                    sampleTime -= 1f / 60f;
+                firstTick--;
+            }
             ClearTrails();
-            foreach (var trail in _sweepTrails)
-                trail?.SetActive(true);
-
-            int firstTick = Mathf.Max(0, targetTick - Mathf.CeilToInt(TrailLifetime() * 60f));
             bool wasSampling = false;
-            for (int tick = firstTick; tick < states.Count && tick <= targetTick; tick++)
+            for (int tick = firstTick; tick <= lastTick; tick++)
             {
                 CharacterState state = states[tick];
-                float sampleTime = tick / 60f;
+                if (tick > firstTick && states[tick - 1].HitstopTicks == 0)
+                    sampleTime += 1f / 60f;
+                if (tick > firstTick)
+                {
+                    CharacterState previous = states[tick - 1];
+                    Vector3 movement = new(state.PX - previous.PX, state.PY - previous.PY, state.PZ - previous.PZ);
+                    bool reset = state.Deaths != previous.Deaths || movement.sqrMagnitude > 9f
+                        || state.State == ActionState.Attacking
+                            && (previous.State != ActionState.Attacking
+                                || state.AttackSequence != previous.AttackSequence
+                                || state.AttackSlot != previous.AttackSlot
+                                || state.ComboStage != previous.ComboStage
+                                || state.AttackElapsedTicks < previous.AttackElapsedTicks);
+                    if (reset)
+                    {
+                        ClearTrails();
+                        wasSampling = false;
+                    }
+                }
                 Vector3 hilt = default, tip = default;
                 bool sampleable = sampleTime >= oldestTime
-                    && _owner.IsSwordWindowTick(state, airborne);
+                    && _owner.IsSwordTrailTick(state, airborne);
                 if (sampleable)
                     sampleable = _owner.TrySampleBakedWeaponPath(
                         state, airborne, out hilt, out tip);
@@ -240,9 +250,10 @@ namespace SlopArena.Client.Entities
 
             foreach (var trail in _sweepTrails)
             {
-                trail?.SetActive(_hitboxTrailActive);
+                trail?.SetActive(_owner.IsSwordTrailTick(states[lastTick], airborne));
                 trail?.DrawAt(targetTime);
             }
+            _hitboxTrailActive = _owner.IsSwordTrailTick(states[lastTick], airborne);
         }
 
         private float TrailLifetime()
@@ -255,54 +266,11 @@ namespace SlopArena.Client.Entities
             return lifetime;
         }
 
-        private void ProcessPendingHistory()
-        {
-            if (!_hitboxTrailActive || _owner == null)
-                return;
-
-            for (int i = 0; i < _historyCount; i++)
-            {
-                CapturedState captured = _history[(_historyStart + i) % HistoryCapacity];
-                if (captured.Serial <= _processedSerial)
-                    continue;
-                _processedSerial = captured.Serial;
-                CharacterState state = captured.State;
-                if (!_owner.IsSwordWindowTick(state, captured.Airborne)
-                    || (state.AttackSequence == _lastSampleSequence
-                        && state.ComboStage == _lastSampleStage
-                        && state.AttackElapsedTicks == _lastSampleElapsed))
-                    continue;
-                if (!captured.HasPose)
-                    continue;
-                int deltaTicks = _lastSampleElapsed < 0
-                    ? 0 : Mathf.Max(0, state.AttackElapsedTicks - _lastSampleElapsed);
-                float currentTime = Application.isPlaying ? Time.unscaledTime : _runtimeClock;
-                float sampleTime = Mathf.Max(currentTime, _lastSampleTime + deltaTicks / 60f);
-                _runtimeClock = Mathf.Max(_runtimeClock, sampleTime);
-                _lastSampleTime = sampleTime;
-                foreach (var trail in _sweepTrails)
-                    trail?.SampleAt(sampleTime, captured.Hilt, captured.Tip);
-                _lastSampleSequence = state.AttackSequence;
-                _lastSampleStage = state.ComboStage;
-                _lastSampleElapsed = state.AttackElapsedTicks;
-            }
-        }
-
-        private void ClearPendingHistory()
-        {
-            _historyStart = 0;
-            _historyCount = 0;
-            _processedSerial = _captureSerial;
-        }
 
         private void ClearTrails()
         {
             foreach (var trail in _sweepTrails)
                 trail?.Clear();
-            ClearPendingHistory();
-            _lastSampleSequence = -1;
-            _lastSampleStage = -1;
-            _lastSampleElapsed = -1;
         }
 
         private void UpdateTrailWidths()
@@ -316,7 +284,7 @@ namespace SlopArena.Client.Entities
                 if (_sweepTrails[i]?.StylePrefab != entry.TrailStylePrefab)
                 {
                     var replacement = entry.TrailStylePrefab != null
-                        ? new SwordSweepTrail(_instances[i].transform, entry.TrailStylePrefab,
+                        ? new SwordSweepTrail(_owner.transform, entry.TrailStylePrefab,
                             entry.HitboxMotionTime, entry.TrailBladeWidth)
                         : null;
                     var previous = _sweepTrails[i];
@@ -339,16 +307,22 @@ namespace SlopArena.Client.Entities
             if (_owner == null || _entries == null || _instances == null || _sweepTrails == null)
                 return;
             UpdateTrailWidths();
-            if (Application.isPlaying)
-                _runtimeClock = Mathf.Max(_runtimeClock, Time.unscaledTime);
-            else if (!_previewStateActive)
-                _runtimeClock += 1f / 60f;
+            if (_owner.BakedData == null)
+            {
+                if (Application.isPlaying)
+                    _runtimeClock = Mathf.Max(_runtimeClock, Time.unscaledTime);
+                else if (!_previewStateActive)
+                    _runtimeClock += 1f / 60f;
+            }
             float drawTime = _previewStateActive && _previewTimelineSeconds >= 0f
                 ? _previewTimelineSeconds : _runtimeClock;
 
             byte slot = _previewStateActive ? _previewAttackSlot : _owner.CurrentAttackSlot;
             bool isAttacking = _previewStateActive || _owner.CurrentActionState == ActionState.Attacking;
             bool isAiming = !_previewStateActive && _owner.CurrentActionState == ActionState.Aiming;
+            bool firePhase = _previewStateActive
+                ? _previewFirePhase
+                : _owner.CurrentActionState == ActionState.Attacking;
             int elapsedTicks = _previewStateActive
                 ? _previewAttackElapsedTicks : _owner.CurrentAttackElapsedTicks;
             for (int i = 0; i < _entries.Length; i++)
@@ -365,15 +339,55 @@ namespace SlopArena.Client.Entities
                     go.SetActive(visible);
                 if ((visible || _hitboxTrailActive) && _bones[i] != null)
                 {
-                    go.transform.position = _bones[i].TransformPoint(_entries[i].PositionOffset);
+                    Vector3 positionOffset = firePhase && _entries[i].HasFirePhaseOverride
+                        ? _entries[i].FirePositionOffset : _entries[i].PositionOffset;
+                    Vector3 rotationOffset = firePhase && _entries[i].HasFirePhaseOverride
+                        ? _entries[i].FireRotationOffset : _entries[i].RotationOffset;
+                    go.transform.position = _bones[i].TransformPoint(positionOffset);
                     go.transform.rotation = _bones[i].rotation
-                        * Quaternion.Euler(_entries[i].RotationOffset);
+                        * Quaternion.Euler(rotationOffset);
                 }
                 if (_hitboxTrailActive && _owner.BakedData == null
                     && _hilts[i] != null && _tips[i] != null && visible)
                     _sweepTrails[i]?.SampleAt(drawTime, _hilts[i].position, _tips[i].position);
                 _sweepTrails[i]?.DrawAt(drawTime);
             }
+        }
+
+        public WeaponAttachInspectionEntry[] ReadInspectionEntries()
+        {
+            if (_entries == null) return null;
+            var result = new WeaponAttachInspectionEntry[_entries.Length];
+            for (int i = 0; i < _entries.Length; i++)
+            {
+                WeaponEntry entry = _entries[i];
+                Transform bone = _bones != null && i < _bones.Length ? _bones[i] : null;
+                GameObject instance = _instances != null && i < _instances.Length ? _instances[i] : null;
+                result[i] = new WeaponAttachInspectionEntry
+                {
+                    Index = i,
+                    BoneName = entry != null ? entry.BoneName : null,
+                    BoneResolved = bone != null,
+                    InstanceName = instance != null ? instance.name : null,
+                    InstanceExists = instance != null,
+                    Active = instance != null && instance.activeSelf,
+                    WorldPosition = instance != null ? new[] { instance.transform.position.x, instance.transform.position.y, instance.transform.position.z } : null,
+                    WorldRotation = instance != null ? new[] { instance.transform.rotation.x, instance.transform.rotation.y, instance.transform.rotation.z, instance.transform.rotation.w } : null
+                };
+            }
+            return result;
+        }
+
+        public sealed class WeaponAttachInspectionEntry
+        {
+            [Newtonsoft.Json.JsonProperty("index")] public int Index { get; set; }
+            [Newtonsoft.Json.JsonProperty("boneName")] public string BoneName { get; set; }
+            [Newtonsoft.Json.JsonProperty("boneResolved")] public bool BoneResolved { get; set; }
+            [Newtonsoft.Json.JsonProperty("instanceName")] public string InstanceName { get; set; }
+            [Newtonsoft.Json.JsonProperty("instanceExists")] public bool InstanceExists { get; set; }
+            [Newtonsoft.Json.JsonProperty("active")] public bool Active { get; set; }
+            [Newtonsoft.Json.JsonProperty("worldPosition")] public float[] WorldPosition { get; set; }
+            [Newtonsoft.Json.JsonProperty("worldRotation")] public float[] WorldRotation { get; set; }
         }
 
         private void OnDestroy() => Cleanup();
@@ -403,14 +417,13 @@ namespace SlopArena.Client.Entities
             _hitboxTrailActive = false;
             HasSwordTrail = false;
             _previewStateActive = false;
-            _previewAttackSlot = 0;
+            _previewFirePhase = false;
             _previewAttackElapsedTicks = 0;
             _hasAttackIdentity = false;
             _hasCapturedPosition = false;
-            _historyStart = 0;
-            _historyCount = 0;
-            _captureSerial = 0;
-            _processedSerial = 0;
+            _runtimeClock = 0f;
+            _lastHitstopTicks = 0;
+            _previewTimelineSeconds = -1f;
         }
 
         private Transform FindBone(string boneName)

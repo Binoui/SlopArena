@@ -287,8 +287,19 @@ public class AbilityLifecycleTests
         state.PY = TestHelpers.MankiGroundPY;
         TestHelpers.RegisterPlayer(sim, Def, state);
 
-        var after = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 4), 40);
+        bool launched = false;
+        var after = state;
+        for (int tick = 0; tick < 180; tick++)
+        {
+            after = TestHelpers.TickN(sim,
+                tick == 0 ? TestHelpers.Input(activeSlot: AbilitySlots.E) : default, 1);
+            launched |= after.VY > 0f;
+            if (launched && after.VY <= 0f)
+                break;
+        }
 
+        Assert.True(launched, "Jetpack must launch before its apex can be checked.");
+        Assert.True(after.VY <= 0f, "Jetpack must reach its apex within the scenario.");
         Assert.Equal(ActionState.Idle, after.State);
         Assert.Equal((byte)0, after.AttackSlot);
     }
@@ -307,21 +318,16 @@ public class AbilityLifecycleTests
 
         public static IEnumerable<object[]> GroundAndAirAimingAbilityCases()
     {
-        foreach (var character in new[] { CharacterClass.Manki, CharacterClass.FightGuy, CharacterClass.Wibou, CharacterClass.Bonk, CharacterClass.Nilus })
+        foreach (var character in new[] { CharacterClass.Manki, CharacterClass.FightGuy, CharacterClass.Wibou, CharacterClass.Bonk })
         {
-            var def = character == CharacterClass.Nilus
-                ? TestHelpers.ResolveDef(character)
-                : BuiltInContentResolver.Resolve(character).Definition;
+            var def = BuiltInContentResolver.Resolve(character).Definition;
             for (byte wireSlot = 1; wireSlot <= AbilitySlots.Count; wireSlot++)
             {
                 for (int air = 0; air < 2; air++)
                 {
                     bool airborne = air != 0;
                     var cooked = def.GetCookedSlotAbility(wireSlot, airborne);
-                    var spec = def.GetSlotAbility(wireSlot - 1, airborne);
-                    bool aiming = cooked != null
-                        ? cooked.AimMode != AuthoringAimMode.None
-                        : spec != null && spec.AimMode != AimMode.None;
+                    bool aiming = cooked != null && cooked.AimMode != AuthoringAimMode.None;
                     if (aiming)
                         yield return new object[] { character, wireSlot, airborne };
                 }
@@ -334,9 +340,7 @@ public class AbilityLifecycleTests
     public void EveryAuthoredAimingAbility_FacesActivationAim(
         CharacterClass character, byte wireSlot, bool airborne)
     {
-        var def = character == CharacterClass.Nilus
-            ? TestHelpers.ResolveDef(character)
-            : BuiltInContentResolver.Resolve(character).Definition;
+        var def = BuiltInContentResolver.Resolve(character).Definition;
         var sim = TestHelpers.MakeSim();
         var state = TestHelpers.PlayerState();
         state.PY = TestHelpers.GroundPY(def) + (airborne ? 2f : 0f);

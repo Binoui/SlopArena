@@ -1,3 +1,5 @@
+using System;
+using System.Linq;
 using Xunit;
 
 namespace SlopArena.Shared.Tests;
@@ -10,10 +12,36 @@ namespace SlopArena.Shared.Tests;
 /// </summary>
 public class RollbackConvergenceTests
 {
-    private static readonly CharacterDefinition Def = TestHelpers.MankiDef;
+    private static readonly CharacterDefinition Def = TestHelpers.EngineDef;
 
-    private static NetplayHarness Harness(int delayTicks = 0, int dropEvery = 0)
-        => new NetplayHarness(TestHelpers.TestArena(), Def, delayTicks, dropEvery);
+    private static NetplayHarness Harness(int delayTicks = 0, int dropEvery = 0, CharacterDefinition? def = null)
+        => new NetplayHarness(TestHelpers.TestArena(), def ?? Def, delayTicks, dropEvery);
+
+    private static CharacterDefinition AttackDef()
+    {
+        var def = TestHelpers.EngineDef;
+        var slots = def.CookedSlots!.ToArray();
+        slots[0] = AttackSlot(0, "ground.1", isAir: false);
+        def.CookedSlots = slots;
+        return def;
+    }
+
+    private static CookedSlotDefinition AttackSlot(int ordinal, string id, bool isAir)
+    {
+        var hitbox = new CookedHitbox(
+            AuthoringHitboxShape.Sphere, 0.5f, 0f, 0f, 0f, 0f, 0f, 0f,
+            null, null, 5f, 0f, 2f, 1f, 5, 3, true, 0);
+        var timeline = new CookedTimeline(new[]
+        {
+            new CookedStage(8, 0, 0, 0, 0, Array.Empty<string>(),
+                new CookedTimelineOperation[]
+                {
+                    new CookedSpawnHitboxOperation(0, AuthoringUnit.Meters, hitbox),
+                }),
+        });
+        return new CookedSlotDefinition(ordinal, id, isAir, "Rollback fixture attack", "", "",
+            AuthoringAbilityBehavior.MeleeCombo, AuthoringAimMode.None, 0, false, false, timeline);
+    }
 
     [Fact]
     public void MovementTrace_ConvergesExact_NoDelay()
@@ -74,14 +102,17 @@ public class RollbackConvergenceTests
         // Entity 2 attacks early while ~9.5m from entity 1 (no cross-hit): the client
         // must route the Complex state to RawTrack, then re-register + rebuild the
         // predicted track when the attack ends, and land back on exact convergence.
-        var h = Harness();
+        var h = Harness(def: AttackDef());
+        bool sawAttack = false;
         for (int t = 0; t < 120; t++)
         {
             InputState in1 = TestHelpers.Input();
             InputState in2 = TestHelpers.Input(moveX: -0.5f,
-                activeSlot: t is >= 5 and < 12 ? (byte)1 : (byte)0);
+                activeSlot: t is >= 5 and < 12 ? AbilitySlots.Slot1 : AbilitySlots.None);
             h.Step(in1, in2);
+            sawAttack |= h.ServerState(NetplayHarness.OpponentId).State == ActionState.Attacking;
         }
+        Assert.True(sawAttack, "the explicit fixture attack should enter its timeline");
         NetplayHarness.AssertSelfConverged(h);
         NetplayHarness.AssertOpponentConverged(h);
     }

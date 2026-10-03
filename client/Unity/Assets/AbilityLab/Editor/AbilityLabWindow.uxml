@@ -13,11 +13,9 @@
       <ui:Button name="tab-moves" text="Moves" class="tab-button" />
       <ui:Button name="tab-character" text="Character" class="tab-button" />
       <ui:Button name="tab-assets" text="Assets" class="tab-button" />
-      <ui:Button name="tab-compatibility" text="Compatibility" class="tab-button" />
       <ui:Button name="tab-advanced" text="Advanced" class="tab-button" />
     </ui:VisualElement>
     <ui:ScrollView name="diagnostics-panel" class="diagnostics-panel" />
-    <ui:Label name="compatibility-banner" text="Compatibility mode is read-only and uses the legacy authority. Package SAVE + COOK is unavailable here." class="legacy-banner" />
     <ui:VisualElement name="moves-page" class="page moves-page">
       <ui:VisualElement name="move-selector" class="move-selector">
         <ui:VisualElement name="ground-air-selector" class="ground-air-selector">
@@ -40,6 +38,8 @@
           </ui:VisualElement>
           <ui:Label name="scenario-outcomes" text="No scenario run." class="scenario-outcomes" />
         </ui:Foldout>
+        <ui:DropdownField name="authoring-phase" label="Preview" />
+        <ui:Label name="authoring-phase-clip" text="Timeline preview" />
 
         <ui:ScrollView name="inspector" class="inspector">
           <ui:DropdownField name="stage-selector" label="Stage" />
@@ -159,28 +159,6 @@
       </ui:Foldout>
       <ui:Foldout name="assets-validation" text="Validation" value="true" class="asset-group" />
     </ui:ScrollView>
-    <ui:VisualElement name="compatibility-page" class="page foundation-page">
-      <ui:Label text="Legacy compatibility" class="page-title" />
-      <ui:Label text="This read-only page is the only Ability Lab path that may use the legacy CharacterClass adapter." />
-      <ui:Label name="compatibility-authority" text="Compatibility Preview · Legacy authority · Read-only" class="preview-status" />
-      <ui:DropdownField name="legacy-selector" label="Legacy character" />
-      <ui:Button name="legacy-load" text="Load in Play Mode" />
-      <ui:Toggle name="compatibility-airborne" label="Airborne" />
-      <ui:DropdownField name="compatibility-slot-selector" label="Slot" />
-      <ui:DropdownField name="compatibility-stage-selector" label="Stage" />
-      <ui:VisualElement name="compatibility-timeline" class="move-timeline">
-        <ui:Label name="compatibility-tick" text="Tick 0" />
-        <ui:Button name="compatibility-play" text="Play" />
-        <ui:Button name="compatibility-step-back" text="−1" />
-        <ui:Button name="compatibility-step-forward" text="+1" />
-        <ui:SliderInt name="compatibility-slider" low-value="0" high-value="0" value="0" />
-        <ui:Label name="compatibility-duration" text="Duration —" />
-      </ui:VisualElement>
-      <ui:Toggle name="compatibility-show-hurtboxes" label="Show hurtboxes" />
-      <ui:Toggle name="compatibility-show-hitboxes" label="Show hitboxes" />
-      <ui:Toggle name="compatibility-show-baked-bones" label="Show baked bones" />
-      <ui:Toggle name="compatibility-show-dummy" label="Show dummy" />
-    </ui:VisualElement>
     <ui:ScrollView name="advanced-page" class="page advanced-page">
       <ui:Label text="Advanced" class="page-title" />
       <ui:Foldout name="advanced-package-paths" text="Package paths" value="true" class="advanced-group">

@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using Xunit;
 using SlopArena.Shared.Abilities;
 
@@ -77,8 +78,10 @@ public class WibouAbilityTests
         npc.PY = GroundPY;
         sim.RegisterEntity(100, Def, npc, baked);
 
+        var duration = Def.GetCookedSlotAbility(slot, airborne: false)!.Timeline.Stages
+            .Sum(stage => stage.DurationTicks);
         sim.Tick(new() { { 1, new InputState { ActiveSlot = slot } }, { 100, default } });
-        for (int i = 0; i < 40; i++) sim.Tick(new() { { 1, default }, { 100, default } });
+        for (int i = 0; i < duration; i++) sim.Tick(new() { { 1, default }, { 100, default } });
 
         Assert.True(sim.GetState(100).DamagePercent > 0, $"slot {slot} should hit the enemy in reach");
     }

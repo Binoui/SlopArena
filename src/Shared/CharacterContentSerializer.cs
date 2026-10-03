@@ -273,10 +273,6 @@ public static class CharacterContentSerializer
         var abilities = new Dictionary<string, AbilitySpec?>();
         aliases = new Dictionary<string, string>();
 
-        AddAbility(abilities, "lmb", definition.LMB);
-        AddAbility(abilities, "rmb", definition.RMB);
-        AddAbility(abilities, "airLmb", definition.AirLMB);
-        AddAbility(abilities, "airRmb", definition.AirRMB);
         AddAbility(abilities, "slot1", definition.Slot1);
         AddAbility(abilities, "airSlot1", definition.AirSlot1);
         AddAbility(abilities, "e", definition.E);
@@ -296,8 +292,6 @@ public static class CharacterContentSerializer
         AddAbility(abilities, "a", definition.A);
         AddAbility(abilities, "airA", definition.AirA);
 
-        AddAliasIfShared(aliases, "airLmb", "lmb", definition.AirLMB, definition.LMB);
-        AddAliasIfShared(aliases, "airRmb", "rmb", definition.AirRMB, definition.RMB);
         AddAliasIfShared(aliases, "airE", "e", definition.AirE, definition.E);
         AddAliasIfShared(aliases, "airR", "r", definition.AirR, definition.R);
         AddAliasIfShared(aliases, "airF", "f", definition.AirF, definition.F);
@@ -331,8 +325,7 @@ public static class CharacterContentSerializer
 
     private static bool IsAbilityName(string name) => name switch
     {
-        "lmb" or "rmb" or "airLmb" or "airRmb" or "slot1" or "airSlot1"
-            or "e" or "airE" or "r" or "airR" or "f" or "airF"
+        "slot1" or "airSlot1" or "e" or "airE" or "r" or "airR" or "f" or "airF"
             or "slot2" or "airSlot2" or "slot3" or "airSlot3"
             or "slot4" or "airSlot4" or "slot5" or "airSlot5"
             or "a" or "airA" => true,
@@ -341,15 +334,14 @@ public static class CharacterContentSerializer
 
     private static bool IsAirAbilityName(string name) => name switch
     {
-        "airLmb" or "airRmb" or "airSlot1" or "airE" or "airR" or "airF"
+        "airSlot1" or "airE" or "airR" or "airF"
             or "airSlot2" or "airSlot3" or "airSlot4" or "airSlot5" or "airA" => true,
         _ => false,
     };
 
     private static bool IsGroundAbilityName(string name) => name switch
     {
-        "lmb" or "rmb" or "slot1" or "e" or "r" or "f" or "slot2"
-            or "slot3" or "slot4" or "slot5" or "a" => true,
+        "slot1" or "e" or "r" or "f" or "slot2" or "slot3" or "slot4" or "slot5" or "a" => true,
         _ => false,
     };
 
@@ -357,10 +349,6 @@ public static class CharacterContentSerializer
     {
         switch (name)
         {
-            case "lmb": definition.LMB = ability; break;
-            case "rmb": definition.RMB = ability; break;
-            case "airLmb": definition.AirLMB = ability; break;
-            case "airRmb": definition.AirRMB = ability; break;
             case "slot1": definition.Slot1 = ability; break;
             case "airSlot1": definition.AirSlot1 = ability; break;
             case "e": definition.E = ability; break;

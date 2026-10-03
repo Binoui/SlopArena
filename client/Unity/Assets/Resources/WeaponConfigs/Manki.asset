@@ -28,6 +28,6 @@ MonoBehaviour:
   - AttackSlot: 6
     BoneName: mixamorig:RightHand
     Prefab: {fileID: 549402415988426766, guid: e8283359ce6830a83b95ef89361f2f9a, type: 3}
-    PositionOffset: {x: 0, y: 0, z: 0}
-    RotationOffset: {x: 0, y: 0, z: 0}
+    PositionOffset: {x: 0, y: 0.14, z: 0.06}
+    RotationOffset: {x: 180, y: 0, z: 0}
     HideAfterTicks: 0

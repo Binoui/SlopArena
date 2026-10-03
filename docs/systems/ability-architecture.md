@@ -45,13 +45,47 @@ cap or resetting FloatWindow. FastFall overrides the window. Time pauses during 
 the most recently started overlapping window replaces the earlier one. The operation
 is part of runtime API `1.2.0`.
 
+`armorWindow` uses ticks and a positive duration that ends within its stage.
+It protects ordinary damaging contacts without reducing damage or granting
+invincibility; grabs remain effective. The timer belongs to the active ability,
+pauses in Hitstop, and disappears when that activation ends or is canceled.
+Overlapping operations replace the remaining window.
+
+Hitboxes may opt into `fixedHitstunTicks` (1–240) with a nonzero `stunTicks`
+gate. This changes reaction duration, not launch velocity, so linking contacts
+can retain proximity without changing the global knockback formula. Zero/omitted
+keeps formula-derived hitstun and canonical bytes. Packages using either feature
+require runtime API `1.3.0`; older supported content remains admitted.
+
 Authoring does not contain arbitrary branches, expressions, or transition predicates. Hold/release and other variable-duration behavior lives in bounded engine capabilities. Ground/air aliases are expanded by the compiler and do not exist as runtime dispatch rules.
+
+`slop.ability.targeted-leap.v1` is a public, bounded stateful lifecycle:
+mobile aim/release, clamped target-relative ballistic flight, no-landing
+timeout, and a landing-triggered pose seek, ordinary typed hitbox and recovery.
+The package authors its movement/landing/hitbox values; Shared owns every
+transition and interruption. At most one targeted leap may own a slot, its
+seek plus recovery fits the authored stage, and its hitbox lifetime fits
+recovery. Ability Lab edits the same typed source contract, not a separate
+simulation or a Bonk-specific ability.
 
 ## Engine-owned mechanics
 
 The engine owns deterministic implementation of movement, target/aim state, hitbox geometry, baked-bone resolution, projectiles, explosions, damage, Knockback, Hitstun, Hitstop, Clash, Burst, cooldowns, IASA, landing lag, and air-use limits. Package data composes these capabilities; it does not execute code on the authoritative server.
 
-`CookedTimelineAbility` is the current Shared interpreter. It advances stages, executes operations, starts capability instances, and emits presentation events. `InternalCapabilityRegistry` resolves trusted built-in capabilities by versioned semantic ID.
+`CookedTimelineAbility` is the current Shared interpreter. It advances stages,
+executes operations, starts admitted public or trusted built-in capability
+instances, and emits presentation events. `InternalCapabilityRegistry` resolves
+the exact admitted ID/version; unknown and retired capability IDs fail closed.
+
+Slot cooldowns are authored in 60-Hz ticks and begin when the ability completes
+or is cancelled, not when it starts. Ground and air variants share the input-slot
+timer. At IASA, another ready slot may cancel the current move and apply its
+cooldown; a same-slot recast must also respect that pending outgoing cooldown,
+without cancelling the rejected move. Zero-cooldown moves remain repeatable at
+IASA. Training's entity-specific `NoCooldownsEntityId` bypasses both the timer
+and pending-cooldown gate for that entity only.
+CPU attack/recovery selection and queued presses also exclude the active slot
+while its authored cooldown is pending.
 
 ## Interruption and lifecycle ownership
 
@@ -63,9 +97,9 @@ A presentation event contains stable match-tick/entity/operation identity. Clien
 
 FightGuy currently uses explicitly admitted `slop.internal.fightguy.*` capability IDs for native behavior that has not yet been decomposed into public creator primitives. These IDs are available only to the trusted built-in cook profile. A package cannot grant itself access, and Workshop content cannot reference them. Each exception needs an owner, reason, scope, and migration path under [ADR-0022](../adr/0022-workshop-first-content-architecture.md).
 
-## Legacy ServerAbility compatibility
+## Shared ability lifecycle
 
-`ServerAbility` remains a concrete Shared lifecycle seam. The existing legacy Nilus implementation and built-in capability adapters may implement:
+`ServerAbility` remains a concrete Shared lifecycle seam. Cooked timelines and built-in capability adapters may implement:
 
 - `OnStart` for activation;
 - `Tick` for per-tick behavior;
@@ -74,7 +108,7 @@ FightGuy currently uses explicitly admitted `slop.internal.fightguy.*` capabilit
 - `OnHitEntity` for hit-time effects;
 - resolver, baked-data, simulation-state, arena, and presentation-event context supplied by `ServerSimulation`.
 
-The base class is also the current superclass of `CookedTimelineAbility`. This implementation detail does not make polymorphic subclasses the universal authoring contract. Do not present `AbilityFactory(CharacterClass, slot)` or a new character-specific subclass as the default path for package content. New behavior belongs in the compiler's typed timeline/capability model unless it is an explicitly recorded trusted exception.
+The base class is also the current superclass of `CookedTimelineAbility`. This implementation detail does not make polymorphic subclasses the universal authoring contract. Character/slot factory dispatch and the old LMB combo classes have been removed. New behavior belongs in the compiler's typed timeline/capability model unless it is an explicitly recorded trusted exception.
 
 ## Runtime flow
 
@@ -98,4 +132,4 @@ The Match Content Catalog is immutable for the match. A later cook applies only 
 4. Define natural completion, cancellation, hit identity, and presentation events.
 5. Validate and cook the package, then test the Shared observable behavior through the catalog path.
 
-For package creation, follow [Adding a Character](../characters/adding-a-new-character.md). For universal mechanics, see [Combat Systems](combat-systems.md). For legacy maintenance, scope changes to the affected compatibility implementation and do not use it as a new-content template.
+For package creation, follow [Adding a Character](../characters/adding-a-new-character.md). For universal mechanics, see [Combat Systems](combat-systems.md). There is no legacy character execution path.

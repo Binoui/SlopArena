@@ -5,7 +5,7 @@
 
 ## Product target
 
-The admitted roster is **Manki, FightGuy, Wibou, Bonk** (`content-cooked/roster/manifest.json`). Nilus remains legacy compatibility, not a fifth demo requirement. Package admission does not prove kit completeness or player acceptance.
+The admitted roster is **Manki, FightGuy, Wibou, Bonk** (`content-cooked/roster/manifest.json`). Nilus and its compatibility path were retired on 2026-10-02; no migration is planned. Package admission does not prove kit completeness or player acceptance.
 
 Use one existing stage and the existing dedicated-server Join flow for the first remote session. Keep all four characters as the demo milestone, but run a rough match with one friend before polishing all four. Host-and-play remains a technical fallback, not a second workflow to redesign.
 
@@ -48,7 +48,7 @@ packaged join-to-rematch smoke.
 | `client/Unity/Assets/Scripts/Editor/EditorDevelopmentContentProvider.cs`, runtime `ClientSession.cs`, `Content/LocalContentResolver.cs` | Use existing local iteration | Editor Training compiles source in memory through the same Shared catalog seam; publishing is not required for each tuning attempt. See `docs/testing.md`. |
 | `src/Server/MatchControlServer.cs`, `MultiMatchOrchestrator.cs`, `MatchContentCatalogProvider.cs` | Keep / freeze | Already own match startup and content admission; prove remote play before redesigning. |
 | `src/Shared/BuiltInContentResolver.cs`, server/client catalog-loading variants | Defer consolidation | Similar code has different roots, failure contracts and runtime duties. No deletion without callsite and behavior proof. |
-| Workshop capability generalization, legacy Nilus migration, expanded stage/asset tooling | Freeze expansion | Retain working infrastructure; no new platform features unless a demo move or observed bug requires them. |
+| Workshop capability generalization, expanded stage/asset tooling | Freeze expansion | Retain working infrastructure; no new platform features unless a demo move or observed bug requires them. Nilus compatibility was removed on 2026-10-02. |
 
 No new abstraction, event bus, registry, content format, or networking rewrite is part of this reset. Profile actual frame/network problems before optimizing speculative hot paths.
 

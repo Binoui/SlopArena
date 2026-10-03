@@ -12,8 +12,7 @@ namespace SlopArena.Shared
         Manki,
         FightGuy,
         Wibou,
-        Bonk,
-        Nilus
+        Bonk
     }
 
     [Serializable]
@@ -171,10 +170,6 @@ namespace SlopArena.Shared
         /// <summary>Per-clip overrides for non-default timeline/loop settings.</summary>
         public AnimationClipConfig[]? ClipOverrides;
 
-        public AbilitySpec? LMB;
-        public AbilitySpec? RMB;
-        public AbilitySpec? AirLMB;
-        public AbilitySpec? AirRMB;
         /// <summary>Slot 2 (key "1" — the FG-normal tier, issue #117).</summary>
         public AbilitySpec? Slot1;
         public AbilitySpec? E;
@@ -186,11 +181,7 @@ namespace SlopArena.Shared
         public AbilitySpec? Slot4;
         public AbilitySpec? Slot5;
         public AbilitySpec? A;
-        // ── Air variants (issue #117 — the 3-state model) ──
-        // null = grounded-only (the move cannot fire airborne); same object reference as
-        // the ground spec = shared (works identically in the air); separate spec = distinct
-        // air move. LMB/RMB air variants are mandatory schema; the ability slots declare
-        // air specs only where a real air identity exists.
+        // null = grounded-only; shared = works identically in the air; separate spec = distinct air move.
         public AbilitySpec? AirSlot1;
         public AbilitySpec? AirE;
         public AbilitySpec? AirR;
@@ -243,8 +234,6 @@ namespace SlopArena.Shared
         /// </summary>
         public AbilitySpec? GetSlotAbility(int slotIndex, bool airborne = false) => (slotIndex, airborne) switch
         {
-            (0, true) => AirLMB,
-            (1, true) => AirRMB,
             (2, true) => AirSlot1,
             (3, true) => AirE,
             (4, true) => AirR,
@@ -254,8 +243,6 @@ namespace SlopArena.Shared
             (8, true) => AirSlot4,
             (9, true) => AirSlot5,
             (10, true) => AirA,
-            (0, _) => LMB,
-            (1, _) => RMB,
             (2, _) => Slot1,
             (3, _) => E,
             (4, _) => R,
@@ -269,34 +256,4 @@ namespace SlopArena.Shared
         };
     }
 
-    /// <summary>
-    /// Character registry with lazy initialization.
-    /// Factory methods live in separate per-character files (Shared/Characters/).
-    /// </summary>
-    public static partial class CharacterRegistry
-    {
-        /// <summary>
-        /// Standard 7-bone hurtbox defs shared by every character (all use the Mixamo
-        /// humanoid rig). Order MUST match the bake order in SlopArenaBaker
-        /// (Head, Spine2, Hips, RightHand, LeftHand, RightFoot, LeftFoot) —
-        /// GetBonePosition indexes by position in the baked array, not by name.
-        /// </summary>
-        private static readonly HurtboxBoneDef[] MixamorigBoneDefs = new HurtboxBoneDef[]
-        {
-            new("mixamorig:Head", 0, 0, 0, 0.22f),
-            new("mixamorig:Spine2", 0, 0, 0, 0.26f),
-            new("mixamorig:Hips", 0, 0, 0, 0.26f),
-            new("mixamorig:RightHand", 0, 0, 0, 0.12f),
-            new("mixamorig:LeftHand", 0, 0, 0, 0.12f),
-            new("mixamorig:RightFoot", 0, 0, 0, 0.16f),
-            new("mixamorig:LeftFoot", 0, 0, 0, 0.16f),
-        };
-
-        public static CharacterDefinition Get(CharacterClass c) => c switch
-        {
-            CharacterClass.Nilus => BuildNilus(),
-            _ => throw new InvalidDataException(
-                $"Character '{c}' is not provided by the legacy character catalog.")
-        };
-    }
 }

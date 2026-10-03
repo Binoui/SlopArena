@@ -18,7 +18,7 @@ public class MatchInputProtocolTests
         var manifest = BuiltInRosterManifestCodec.Load(Path.Combine(cooked, "roster/manifest.json"));
         var packages = manifest.Entries.ToDictionary(x => x.PackageId,
             x => CookedCharacterPackageLoader.LoadDirectory(Path.Combine(cooked, x.PackageId), x.Requirement));
-        var catalog = new MatchContentCatalogBuilder().Build(manifest, packages, new LegacyCharacterCatalogAdapter());
+        var catalog = new MatchContentCatalogBuilder().Build(manifest, packages);
         Assert.True(catalog.IsValid, string.Join("; ", catalog.Diagnostics));
         ArenaRegistry.LoadFromDirectory(Path.Combine(root, "data/arenas"));
         Assert.NotEmpty(ArenaRegistry.All);
@@ -112,7 +112,7 @@ public class MatchInputProtocolTests
         var manifest = BuiltInRosterManifestCodec.Load(Path.Combine(cooked, "roster/manifest.json"));
         var packages = manifest.Entries.ToDictionary(x => x.PackageId,
             x => CookedCharacterPackageLoader.LoadDirectory(Path.Combine(cooked, x.PackageId), x.Requirement));
-        var catalog = new MatchContentCatalogBuilder().Build(manifest, packages, new LegacyCharacterCatalogAdapter());
+        var catalog = new MatchContentCatalogBuilder().Build(manifest, packages);
         Assert.True(catalog.IsValid, string.Join("; ", catalog.Diagnostics));
         ArenaRegistry.LoadFromDirectory(Path.Combine(root, "data/arenas"));
         using var reservation = new UdpClient(new IPEndPoint(IPAddress.Loopback, 0));

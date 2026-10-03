@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using FsCheck;
 using FsCheck.Xunit;
 using Xunit;
@@ -24,7 +25,41 @@ namespace SlopArena.Shared.Tests;
 /// </summary>
 public class RollbackInvariantTests
 {
-    private static readonly CharacterDefinition Def = TestHelpers.MankiDef;
+    private static readonly CharacterDefinition Def = CreateFuzzDefinition();
+
+    private static CharacterDefinition CreateFuzzDefinition()
+    {
+        var def = TestHelpers.EngineDef;
+        var slots = def.CookedSlots!.ToArray();
+        slots[0] = AttackSlot(0, "ground.1", isAir: false);
+        slots[5] = AttackSlot(5, "ground.E", isAir: false);
+        slots[6] = AttackSlot(6, "ground.R", isAir: false);
+        slots[7] = AttackSlot(7, "ground.F", isAir: false);
+        slots[8] = AttackSlot(8, "air.1", isAir: true);
+        slots[13] = AttackSlot(13, "air.E", isAir: true);
+        slots[14] = AttackSlot(14, "air.R", isAir: true);
+        slots[15] = AttackSlot(15, "air.F", isAir: true);
+        def.CookedSlots = slots;
+        return def;
+    }
+
+    private static CookedSlotDefinition AttackSlot(int ordinal, string id, bool isAir)
+    {
+        var hitbox = new CookedHitbox(
+            AuthoringHitboxShape.Sphere, 1.5f, 0f, 0f, 0f, 0f, 0f, 0f,
+            null, null, 5f, 0f, 2f, 1f, 5, 3, true, 0);
+        var timeline = new CookedTimeline(new[]
+        {
+            new CookedStage(8, 0, 0, 0, 0, Array.Empty<string>(),
+                new CookedTimelineOperation[]
+                {
+                    new CookedForwardLungeOperation(0, AuthoringUnit.MetersPerSecond, 8f, 2),
+                    new CookedSpawnHitboxOperation(0, AuthoringUnit.Meters, hitbox),
+                }),
+        });
+        return new CookedSlotDefinition(ordinal, id, isAir, "Rollback fuzz attack", "", "",
+            AuthoringAbilityBehavior.MeleeCombo, AuthoringAimMode.None, 0, false, false, timeline);
+    }
 
     [Property(MaxTest = 1, EndSize = 300)]
     public void Rollback_DeepFuzz_NoCrash_Converges(PositiveInt seed)
@@ -102,7 +137,7 @@ public class RollbackInvariantTests
             Jump = rng.Next(8) == 0,
             Dash = rng.Next(8) == 0,
             Burst = rng.Next(10) == 0,
-            ActiveSlot = rng.Next(7) == 0 ? (byte)rng.Next(1, 7) : (byte)0,
+            ActiveSlot = rng.Next(10) == 0 ? (byte)rng.Next(3, 7) : (byte)0,
             IsAiming = rng.Next(10) == 0,
         };
         input.FacingYaw = (short)rng.Next(-18000, 18001);

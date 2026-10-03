@@ -224,7 +224,8 @@ public readonly struct PresentationEventPacket
     private static bool IsKnownSource(PresentationEventSource source)
         => source == PresentationEventSource.Timeline
             || source == PresentationEventSource.CapabilityExplosion
-            || source == PresentationEventSource.BlockContact;
+            || source == PresentationEventSource.BlockContact
+            || source == PresentationEventSource.HitContact;
 
     private static void ValidateTransform(float value, string name)
     {

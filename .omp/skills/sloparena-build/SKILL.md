@@ -1,12 +1,29 @@
 ---
 name: sloparena-build
-description: Verify SlopArena Unity compilation and affected runtime behavior through Unity CLI and com.unity.pipeline after Unity-facing changes or compiler errors. Use docs/testing.md to distinguish local iteration from package publishing.
+description: Verify SlopArena Unity compilation and affected runtime behavior through Unity CLI and com.unity.pipeline after Unity-facing changes or compiler errors; also use for runtime Unity screenshots, UI, HUD, and viewport tasks. Use docs/testing.md to distinguish local iteration from package publishing.
 ---
 # SlopArena Unity CLI Build Gate
 
-Use this skill after changes under `client/Unity/Assets/` or when Unity reports a
-compiler/runtime error. Choose the applicable verification mode in
-[`docs/testing.md`](../../../docs/testing.md).
+Before any gateway example, set `ORCA_TERMINAL_HANDLE` to your own runtime-issued terminal handle; the gateway verifies its incarnation and fails closed if missing or mismatched. Use the canonical gateway in [`docs/contributing/unity-cli.md`](../../../docs/contributing/unity-cli.md) and the [shared Editor coordination protocol](file:///home/binoui/Documents/projects/sloparena-workspace/docs/unity-editor-coordination.md). Wait for an independent lease; never inject work into an owner's batch. Status is observational: held/releasing means invoke the gateway and let it wait; blocked/unknown means stop. Runtime status replaces historical Markdown ownership.
+
+Use this skill for runtime visual inspection as well as compilation. For live menus, HUD,
+settings, or other runtime UI, first read the
+[`Unity CLI screenshot guide`](../../../docs/contributing/unity-cli.md#screenshots-and-visual-evidence).
+Use `sloparena.ui.status`, `sloparena.ui.navigate`, and `sloparena.ui.viewport` for live
+state/navigation/viewport, then await `sloparena.capture.game-view --source screen` for
+composited runtime UI. Discover its safe output syntax with `--query screenshot` before
+capturing and check `data.result.success`; route camera-only frames through its documented
+source options. A screenshot-only task preserves current Editor ownership and mode: do not
+recompile, stop, or restart it. Recompile only when actual C# changes require it.
+
+Example discovery and status:
+
+```bash
+bun /home/binoui/Documents/projects/sloparena-workspace/scripts/unity-editor-gateway.ts --project-path /home/binoui/Documents/projects/SlopArena/client/Unity -- --query screenshot --detail full
+bun /home/binoui/Documents/projects/sloparena-workspace/scripts/unity-editor-gateway.ts --project-path /home/binoui/Documents/projects/SlopArena/client/Unity -- sloparena.ui.status
+```
+
+Website/browser work and user-provided image/mockup review do not launch Unity.
 
 For package move preview, scrubbing, capture, or diagnostics, route through the
 [Ability Lab skill](../sloparena-ability-lab/SKILL.md) and
@@ -24,6 +41,12 @@ For Unity-facing code or plugin changes:
 
 1. Build Shared when Shared code or the Unity Shared plugin may be stale:
 
+   Before a Shared build, coordinate saved-source writers with the Editor owner and acquire your own bounded gateway hold; run the plugin-copying build from a separate shell while that hold remains active, wait for imports/compilation to settle, then end your hold. Do not build into another owner's active Editor and do not nest a fresh gateway claim while holding.
+   ```bash
+   bun /home/binoui/Documents/projects/sloparena-workspace/scripts/unity-editor-gateway.ts --project-path /home/binoui/Documents/projects/SlopArena/client/Unity --hold -- editor_status
+   ```
+
+   While the gateway hold remains open, run the copy-producing build in a separate shell:
    ```bash
    dotnet build src/Shared/ --nologo
    ```
@@ -31,35 +54,35 @@ For Unity-facing code or plugin changes:
 2. Confirm the live Editor/Pipeline connection:
 
    ```bash
-   unity pipeline list --format json
+   bun /home/binoui/Documents/projects/sloparena-workspace/scripts/unity-editor-gateway.ts status --project-path /home/binoui/Documents/projects/SlopArena/client/Unity
    ```
 
-   Require `isReachable: true`.
+   Status is read-only observation. If another owner reports `held` or `releasing`, invoke a gateway command and let it wait for your independent lease; do not exit or manually poll for `free`. If this is your own hold, wait for imports/compilation to settle and end that hold before any later gateway command. Stop on `blocked` or unknown. `free`, `settled: true`, and zero active operations only describe availability at that instant.
 
 3. Request and monitor a project recompile:
 
    ```bash
-   unity command --project-path client/Unity recompile --format json
-   unity command --project-path client/Unity recompile_status --format json
+bun /home/binoui/Documents/projects/sloparena-workspace/scripts/unity-editor-gateway.ts --project-path /home/binoui/Documents/projects/SlopArena/client/Unity -- recompile
+bun /home/binoui/Documents/projects/sloparena-workspace/scripts/unity-editor-gateway.ts --project-path /home/binoui/Documents/projects/SlopArena/client/Unity -- recompile_status
    ```
 
 4. Read current Unity errors and require zero compiler errors, exceptions, or asserts:
 
    ```bash
-   unity command --project-path client/Unity \
-     get_console_logs --severity error --limit 20 --format json
+bun /home/binoui/Documents/projects/sloparena-workspace/scripts/unity-editor-gateway.ts --project-path /home/binoui/Documents/projects/SlopArena/client/Unity -- get_console_logs --severity error --limit 20
    ```
-
 5. Exercise the affected path with typed CLI commands:
 
    ```bash
-   unity command --project-path client/Unity editor_status --format json
-   unity command --project-path client/Unity editor_play --format json
-   unity command --project-path client/Unity editor_stop --format json
+bun /home/binoui/Documents/projects/sloparena-workspace/scripts/unity-editor-gateway.ts --project-path /home/binoui/Documents/projects/SlopArena/client/Unity -- editor_status
+bun /home/binoui/Documents/projects/sloparena-workspace/scripts/unity-editor-gateway.ts --project-path /home/binoui/Documents/projects/SlopArena/client/Unity -- editor_play
+bun /home/binoui/Documents/projects/sloparena-workspace/scripts/unity-editor-gateway.ts --project-path /home/binoui/Documents/projects/SlopArena/client/Unity -- editor_stop
    ```
 
    Use `eval` or `eval_file` for targeted live C# probes. Prefer typed project commands
-   over ad-hoc probes.
+   over ad-hoc probes: for screenshots, viewport changes, or runtime UI/HUD state use
+   `sloparena.capture.game-view` and `sloparena.ui.*` (see `docs/contributing/unity-cli.md`,
+   *Screenshots and visual evidence*) instead of temporary eval code.
 
 ## Distributable demo
 
@@ -71,12 +94,9 @@ the packaged client/server path; do not treat local preview as package verificat
 Use the typed Pipeline commands for accepted package work:
 
 ```bash
-unity command --project-path client/Unity \
-  sloparena.character.inspect --target <package> --format json
-unity command --project-path client/Unity \
-  sloparena.character.cook --target <package> --format json
+bun /home/binoui/Documents/projects/sloparena-workspace/scripts/unity-editor-gateway.ts --project-path /home/binoui/Documents/projects/SlopArena/client/Unity -- sloparena.character.inspect --target <package>
+bun /home/binoui/Documents/projects/sloparena-workspace/scripts/unity-editor-gateway.ts --project-path /home/binoui/Documents/projects/SlopArena/client/Unity -- sloparena.character.cook --target <package>
 ```
-
 Inspect is read-only. Cook is the persistence boundary. Require valid inspect status,
 `dirtyOrStale: false`, and matching hashes where those fields apply.
 

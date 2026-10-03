@@ -313,7 +313,7 @@ public sealed class HeuristicBotPolicy
         {
             var candidate = air ? _airProfile[i] : _profile[i];
             if (!candidate.Functional || !candidate.IsRecovery
-                || self.GetCooldown(candidate.Slot) > 0
+                || HasCooldown(self, _profileDefinition!, candidate.Slot)
                 || IsChargePoolExhausted(self, candidate.Slot, air))
                 continue;
             float score = candidate.Reach - MathF.Abs(candidate.Reach - distance) * 0.25f
@@ -663,9 +663,14 @@ public sealed class HeuristicBotPolicy
             && (self.State == ActionState.Idle
                 || self.State == ActionState.Run
                 || Simulation.IsIasaUnlocked(self, def))
-            && self.GetCooldown(slot) == 0
+            && !HasCooldown(self, def, slot)
             && (def.GetCookedSlotAbility(slot, !self.IsGrounded) != null
                 || def.GetSlotAbility(slot - 1, !self.IsGrounded) != null);
+
+    private static bool HasCooldown(in CharacterState self, CharacterDefinition def, byte slot)
+        => self.GetCooldown(slot) > 0
+            || self.State == ActionState.Attacking && self.AttackSlot == slot
+                && (def.GetCookedSlotAbility(slot, !self.IsGrounded)?.CooldownTicks ?? 0) > 0;
 
     private static InputState PlanPressInput(BotMemory memory)
         => new()
@@ -868,7 +873,7 @@ public sealed class HeuristicBotPolicy
         bool air, bool allowRecoveryMove, in ArenaDefinition arena)
         => candidate.Functional
             && (allowRecoveryMove || !candidate.IsRecovery)
-            && self.GetCooldown(candidate.Slot) == 0
+            && !HasCooldown(self, _profileDefinition!, candidate.Slot)
             && !IsChargePoolExhausted(self, candidate.Slot, air)
             && HasSafeAttackTravel(self, candidate, in arena);
     private float MaxConnectReach(in CharacterState self, float rangeScale,
@@ -1159,6 +1164,7 @@ public sealed class HeuristicBotPolicy
             TriggerTick = (ushort)Math.Clamp(triggerTick, 0, ushort.MaxValue),
             DurationTicks = hitbox.DurationTicks,
             Damage = hitbox.Damage,
+            FixedHitstunTicks = hitbox.FixedHitstunTicks,
             StunTicks = hitbox.StunTicks,
             Interruptible = hitbox.Interruptible,
             HitGroup = hitbox.HitGroup,
@@ -1174,7 +1180,7 @@ public sealed class HeuristicBotPolicy
             or CookedWibouDashSlashCapabilityParameters
             or CookedWibouRisingSlashCapabilityParameters
             or CookedWibouBladeFlurryCapabilityParameters
-            or CookedBonkTargetedJumpSlamCapabilityParameters
+            or CookedTargetedLeapCapabilityParameters
             or CookedMankiRoundBombCapabilityParameters
             or CookedMankiJetpackBoostCapabilityParameters
             or CookedMankiBazookaCapabilityParameters;
@@ -1212,9 +1218,9 @@ public sealed class HeuristicBotPolicy
             case CookedWibouBladeFlurryCapabilityParameters x:
                 hitReach = MathF.Max(hitReach, x.ForwardSpeed * x.MoveTicks / 60f);
                 hasMovement = true; hasDamage = true; break;
-            case CookedBonkTargetedJumpSlamCapabilityParameters x:
-                hitReach = MathF.Max(hitReach, x.MaxRange + x.SlamRadius);
-                damage += x.SlamDamage; hasDamage |= x.SlamDamage > 0f; hasMovement = true; break;
+            case CookedTargetedLeapCapabilityParameters x:
+                hitReach = MathF.Max(hitReach, x.MaxRange + MathF.Max(x.Hitbox.OffsetZ, x.Hitbox.EndOffsetZ) + x.Hitbox.Radius);
+                damage += x.Hitbox.Damage; hasDamage |= x.Hitbox.Damage > 0f; hasMovement = true; break;
             case CookedMankiRoundBombCapabilityParameters x:
                 hitReach = MathF.Max(hitReach, x.MaxRange + x.ExplosionRadius);
                 damage += x.Damage + x.ExplosionDamage; hasDamage |= x.Damage > 0f || x.ExplosionDamage > 0f; break;
@@ -1237,7 +1243,7 @@ public sealed class HeuristicBotPolicy
             CookedDragonBeamCapabilityParameters x => x.FireTick,
             CookedWibouDashSlashCapabilityParameters x => x.MaxAimTicks,
             CookedWibouRisingSlashCapabilityParameters _ => 0,
-            CookedBonkTargetedJumpSlamCapabilityParameters x => x.MaxAimTicks,
+            CookedTargetedLeapCapabilityParameters x => x.MaxAimTicks,
             CookedMankiRoundBombCapabilityParameters x => x.ThrowTriggerTick,
             CookedMankiJetpackBoostCapabilityParameters x => x.StartupTicks,
             CookedMankiBazookaCapabilityParameters x => x.FireTriggerTick,
@@ -1266,7 +1272,7 @@ public sealed class HeuristicBotPolicy
                 travelSpeed = MathF.Max(travelSpeed, x.ProjectileSpeed);
                 travelOffset = MathF.Max(travelOffset, x.HitboxRadius);
                 break;
-            case CookedBonkTargetedJumpSlamCapabilityParameters x:
+            case CookedTargetedLeapCapabilityParameters x:
                 travelTicks = Math.Max(travelTicks, x.MaxFlightTicks);
                 break;
         }

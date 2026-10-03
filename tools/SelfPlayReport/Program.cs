@@ -78,7 +78,6 @@ internal static class Program
             "fightguy" or "fg" => CharacterClass.FightGuy,
             "wibou" => CharacterClass.Wibou,
             "manki" => CharacterClass.Manki,
-            "nilus" => CharacterClass.Nilus,
             "bonk" => CharacterClass.Bonk,
             _ => CharacterClass.None,
         };
@@ -98,7 +97,7 @@ internal static class Program
         Console.WriteLine($"Difficulty: {BotDifficultyProfile.DisplayName(difficulty)}  Seed: {seed}");
 
         var arena = BuildKillArena();
-        var baked = LoadBakedData(entry);
+        var baked = entry.BakedAnimation;
 
         var records = new List<MatchRecord>(matches);
         for (int m = 0; m < matches; m++)
@@ -250,7 +249,7 @@ internal static class Program
     {
         var def = entry.Definition;
         var result = new List<MoveEnvelope>();
-        var baked = LoadBakedData(entry);
+        var baked = entry.BakedAnimation;
         foreach (bool air in new[] { false, true })
         {
             for (int i = 0; i < SlotBytes.Length; i++)
@@ -522,18 +521,6 @@ internal static class Program
         };
     }
 
-    internal static BakedAnimationData? LoadBakedData(MatchContentEntry entry)
-    {
-        if (entry.CookedCharacterPackage != null)
-            return entry.BakedAnimation;
-
-        var def = entry.Definition;
-        if (string.IsNullOrEmpty(def.BakedDataPath)) return null;
-        string path = def.BakedDataPath.Replace("res://", "");
-        if (!File.Exists(path)) return null;
-        try { return BakedAnimationData.LoadFromBin(File.ReadAllBytes(path)); }
-        catch { return null; }
-    }
 
     // ── CLI helpers ────────────────────────────────────────────────────────
 

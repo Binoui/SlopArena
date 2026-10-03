@@ -21,7 +21,12 @@ namespace SlopArena.Client.Entities
 
         [Tooltip("Position in the attached bone's local bind space.")]
         public Vector3 PositionOffset;
-
+        [Tooltip("Use a separate local attachment transform during the fire/release phase.")]
+        public bool HasFirePhaseOverride;
+        [Tooltip("Fire/release position in the attached bone's local bind space.")]
+        public Vector3 FirePositionOffset;
+        [Tooltip("Fire/release rotation in the attached bone's local bind space.")]
+        public Vector3 FireRotationOffset;
         [Tooltip("Rotation in the attached bone's local bind space.")]
         public Vector3 RotationOffset;
         [Tooltip("Hide the prop this many ticks after the attack starts (0 = keep for the whole attack).")]

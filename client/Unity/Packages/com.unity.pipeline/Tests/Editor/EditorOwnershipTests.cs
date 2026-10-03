@@ -1,0 +1,373 @@
+using System;
+using System.Net;
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using NUnit.Framework;
+using Unity.Pipeline;
+using Unity.Pipeline.Commands;
+using Unity.Pipeline.Editor;
+using UnityEngine;
+
+namespace Unity.Pipeline.Tests.Editor
+{
+    public class EditorOwnershipTests
+    {
+        private static readonly ManualResetEventSlim s_WaitStarted = new ManualResetEventSlim(false);
+        private static readonly ManualResetEventSlim s_ReleaseWait = new ManualResetEventSlim(false);
+        private static readonly ManualResetEventSlim s_MainWaitStarted = new ManualResetEventSlim(false);
+        private static readonly ManualResetEventSlim s_MainReleaseWait = new ManualResetEventSlim(false);
+        private static int s_MutationCount;
+
+        private TestEditorPipelineServer m_Server;
+        private HttpClient m_Client;
+
+        [SetUp]
+        public void SetUp()
+        {
+            CommandRegistry.SetDiscovery(new TypeCacheCommandDiscovery());
+            Interlocked.Exchange(ref s_MutationCount, 0);
+            s_WaitStarted.Reset();
+            s_ReleaseWait.Reset();
+            s_MainWaitStarted.Reset();
+            s_MainReleaseWait.Reset();
+
+            var ownership = new EditorCommandOwnership(Guid.NewGuid().ToString("N"));
+            m_Server = new TestEditorPipelineServer(ownership);
+            m_Server.Start();
+            m_Client = new HttpClient
+            {
+                BaseAddress = new Uri($"http://localhost:{m_Server.Port}"),
+                Timeout = TimeSpan.FromSeconds(15)
+            };
+            m_Client.DefaultRequestHeaders.Authorization =
+                new AuthenticationHeaderValue("Bearer", m_Server.Token);
+        }
+
+        [TearDown]
+        public void TearDown()
+        {
+            s_ReleaseWait.Set();
+            s_MainReleaseWait.Set();
+            m_Client?.Dispose();
+            m_Server?.Stop();
+        }
+
+        [CliCommand("ownership_test_mutate", "Increment an observable ownership test counter", MainThreadRequired = false)]
+        public static int OwnershipTestMutate()
+        {
+            return Interlocked.Increment(ref s_MutationCount);
+        }
+
+        [CliCommand("ownership_test_wait", "Wait for ownership test release", MainThreadRequired = false)]
+        public static string OwnershipTestWait()
+        {
+            s_WaitStarted.Set();
+            if (!s_ReleaseWait.Wait(TimeSpan.FromSeconds(15)))
+                throw new TimeoutException("Ownership test did not release the command body.");
+            return "finished";
+        }
+
+        [CliCommand("ownership_test_main_wait", "Wait on the Editor thread for ownership test release", MainThreadRequired = true)]
+        public static string OwnershipTestMainWait()
+        {
+            s_MainWaitStarted.Set();
+            if (!s_MainReleaseWait.Wait(TimeSpan.FromSeconds(15)))
+                throw new TimeoutException("Ownership test did not release the main-thread command body.");
+            return "main-finished";
+        }
+
+        [Test]
+        public async Task CompetingClaims_AreAtomicAndConflictIncludesPublicOwner()
+        {
+            var manager = new EditorCommandOwnership("claim-race-session");
+            using (var barrier = new Barrier(2))
+            {
+                string firstToken = null;
+                string secondToken = null;
+                EditorCommandOwnership.Status firstStatus = null;
+                EditorCommandOwnership.Status secondStatus = null;
+                var firstClaimed = false;
+                var secondClaimed = false;
+
+                var first = Task.Run(() =>
+                {
+                    barrier.SignalAndWait(TimeSpan.FromSeconds(3));
+                    firstClaimed = manager.TryClaim("terminal-a", "incarnation-a", "batch-a",
+                        out firstToken, out firstStatus);
+                });
+                var second = Task.Run(() =>
+                {
+                    barrier.SignalAndWait(TimeSpan.FromSeconds(3));
+                    secondClaimed = manager.TryClaim("terminal-b", "incarnation-b", "batch-b",
+                        out secondToken, out secondStatus);
+                });
+                await Task.WhenAll(first, second);
+
+                Assert.AreNotEqual(firstClaimed, secondClaimed, "Exactly one simultaneous caller must own the lease.");
+                Assert.IsNotEmpty(firstClaimed ? firstToken : secondToken);
+                Assert.IsNull(firstClaimed ? secondToken : firstToken, "A rejected claim must not receive a token.");
+                Assert.AreEqual("held", manager.GetStatus().state);
+                Assert.AreEqual("held", firstStatus.state);
+                Assert.AreEqual("held", secondStatus.state);
+                Assert.AreEqual(0, manager.GetStatus().activeOperations);
+                Assert.IsTrue(manager.GetStatus().settled);
+            }
+        }
+
+        [Test]
+        public void Release_WaitsForCommandAndHostSettlement_AndReloadKeepsOnlyCurrentSessionToken()
+        {
+            var manager = new EditorCommandOwnership("reload-session");
+            Assert.IsTrue(manager.TryClaim("terminal", "incarnation", "batch", out var token, out _));
+            Assert.IsTrue(manager.TryBeginOperation(token, "operation-1", "run_tests", out var operation, out _));
+            Assert.IsTrue(manager.BeginHostActivity(operation, "test"));
+
+            var persisted = manager.SnapshotForPersistence();
+            var reloaded = new EditorCommandOwnership("reload-session");
+            reloaded.Restore(persisted);
+            Assert.IsTrue(reloaded.TryAuthorizeAdmission(token, out var reloadedStatus));
+            Assert.AreEqual("held", reloadedStatus.state);
+            Assert.IsFalse(reloadedStatus.settled);
+
+            Assert.IsTrue(reloaded.TryRelease(token, out var releasing));
+            Assert.AreEqual("releasing", releasing.state);
+            Assert.AreEqual(1, releasing.activeOperations);
+            Assert.IsFalse(releasing.settled);
+            Assert.IsTrue(reloaded.CanExecute(token, "operation-1"), "Release closes new admission but preserves admitted work.");
+
+            reloaded.CompleteOperation("operation-1");
+            Assert.AreEqual("releasing", reloaded.GetStatus().state, "The async test remains owned after its command returns.");
+            reloaded.CompleteHostActivity("operation-1");
+            Assert.AreEqual("free", reloaded.GetStatus().state);
+            Assert.IsTrue(reloaded.GetStatus().settled);
+
+            var restarted = new EditorCommandOwnership("new-editor-process");
+            Assert.IsFalse(restarted.TryAuthorize(token, out var restartedStatus));
+            Assert.AreEqual("free", restartedStatus.state);
+        }
+
+        [Test]
+        public async Task ExecWithoutLease_IsRejectedBeforeMutation_AndStatusNeverLeaksToken()
+        {
+            var rejected = await PostAsync("/api/exec", new
+            {
+                command = "ownership_test_mutate",
+                parameters = new { }
+            });
+
+            Assert.AreEqual((int)HttpStatusCode.Conflict, rejected.StatusCode);
+            Assert.AreEqual("exec", rejected.Json["operation"]?.ToString());
+            Assert.AreEqual("free", rejected.Json["state"]?.ToString());
+            Assert.AreEqual(0, Interlocked.CompareExchange(ref s_MutationCount, 0, 0));
+
+            var token = await ClaimAsync("terminal", "incarnation", "batch");
+            var status = await GetOwnershipStatusAsync();
+            Assert.IsFalse(status.Raw.Contains(token), "The public status route must not disclose the lease token.");
+
+            var accepted = await PostAsync("/api/exec", new
+            {
+                command = "ownership_test_mutate",
+                parameters = new { }
+            }, token);
+            Assert.AreEqual((int)HttpStatusCode.OK, accepted.StatusCode);
+            Assert.AreEqual(true, accepted.Json["success"]?.Value<bool>());
+            Assert.AreEqual(1, accepted.Json["result"]?.Value<int>());
+
+            var released = await PostAsync("/api/editor-ownership/release", new { }, token);
+            Assert.AreEqual((int)HttpStatusCode.OK, released.StatusCode);
+            Assert.AreEqual("free", released.Json["state"]?.ToString());
+        }
+
+        [Test]
+        public async Task CallerTimeout_DoesNotReleaseStartedMainThreadInvocation()
+        {
+            var token = await ClaimAsync("terminal", "incarnation", "main-timeout");
+            var requestCancellation = new CancellationTokenSource();
+            var execution = PostAsync("/api/exec", new
+            {
+                command = "ownership_test_main_wait",
+                parameters = new { },
+                timeout = 1
+            }, token, requestCancellation.Token);
+
+            var scenario = Task.Run(async () =>
+            {
+                try
+                {
+                    if (!s_MainWaitStarted.Wait(TimeSpan.FromSeconds(5)))
+                        throw new TimeoutException("Main-thread command did not start.");
+
+                    requestCancellation.Cancel();
+                    var releaseRequest = PostAsync("/api/editor-ownership/release", new { }, token);
+                    OwnershipStatus status = null;
+                    for (var attempt = 0; attempt < 100; attempt++)
+                    {
+                        status = await GetOwnershipStatusAsync();
+                        if (status.Json["state"]?.ToString() == "releasing")
+                            break;
+                        await Task.Delay(10);
+                    }
+
+                    if (status?.Json["state"]?.ToString() != "releasing")
+                        throw new AssertionException("Release did not retain the running main-thread command.");
+                    return await releaseRequest;
+                }
+                finally
+                {
+                    s_MainReleaseWait.Set();
+                }
+            });
+
+            var releaseResponse = await scenario;
+            Assert.AreEqual((int)HttpStatusCode.OK, releaseResponse.StatusCode);
+            Assert.AreEqual("releasing", releaseResponse.Json["state"]?.ToString());
+            Assert.AreEqual(1, releaseResponse.Json["activeOperations"]?.Value<int>());
+            Assert.AreEqual(false, releaseResponse.Json["settled"]?.Value<bool>());
+
+            var wasCallerTimedOut = false;
+            try
+            {
+                await execution;
+            }
+            catch (TaskCanceledException)
+            {
+                wasCallerTimedOut = true;
+            }
+            Assert.IsTrue(wasCallerTimedOut, "The caller's canceled HTTP wait should not cancel server-side execution.");
+            var free = await WaitForOwnershipStateAsync("free");
+            Assert.AreEqual(true, free.Json["settled"]?.Value<bool>());
+            requestCancellation.Dispose();
+        }
+
+        [Test]
+        public async Task DetachedCancellation_DoesNotReleaseUntilCommandBodyExits()
+        {
+            var token = await ClaimAsync("terminal", "incarnation", "detached-cancel");
+            var submission = await PostAsync("/api/exec", new
+            {
+                command = "ownership_test_wait",
+                parameters = new { },
+                job = true
+            }, token);
+            Assert.AreEqual((int)HttpStatusCode.OK, submission.StatusCode);
+            var jobId = submission.Json["result"]?["jobId"]?.ToString();
+            Assert.IsNotEmpty(jobId);
+            Assert.IsTrue(await Task.Run(() => s_WaitStarted.Wait(TimeSpan.FromSeconds(5))));
+            await WaitForJobStateAsync(jobId, "running");
+
+            var releasing = await PostAsync("/api/editor-ownership/release", new { }, token);
+            Assert.AreEqual("releasing", releasing.Json["state"]?.ToString());
+            var cancelled = await PostAsync("/api/job/cancel", new { id = jobId }, token);
+            Assert.AreEqual((int)HttpStatusCode.OK, cancelled.StatusCode);
+            Assert.AreEqual(true, cancelled.Json["cancellationRequested"]?.Value<bool>());
+
+            var whileBodyRuns = await GetOwnershipStatusAsync();
+            Assert.AreEqual("releasing", whileBodyRuns.Json["state"]?.ToString());
+            Assert.AreEqual(1, whileBodyRuns.Json["activeOperations"]?.Value<int>());
+            Assert.AreEqual(false, whileBodyRuns.Json["settled"]?.Value<bool>());
+
+            s_ReleaseWait.Set();
+            await WaitForJobStateAsync(jobId, "canceled");
+            var free = await WaitForOwnershipStateAsync("free");
+            Assert.AreEqual(true, free.Json["settled"]?.Value<bool>());
+        }
+
+        private async Task<string> ClaimAsync(string terminal, string incarnation, string batch)
+        {
+            var response = await PostAsync("/api/editor-ownership/claim", new
+            {
+                owner = new { terminalHandle = terminal, incarnationId = incarnation },
+                batchId = batch
+            });
+            Assert.AreEqual((int)HttpStatusCode.OK, response.StatusCode, response.Raw);
+            Assert.AreEqual(true, response.Json["success"]?.Value<bool>());
+            Assert.IsNotEmpty(response.Json["token"]?.ToString());
+            return response.Json["token"].ToString();
+        }
+
+        private async Task<OwnershipStatus> GetOwnershipStatusAsync()
+        {
+            var result = await GetAsync("/api/editor-ownership");
+            Assert.AreEqual((int)HttpStatusCode.OK, result.StatusCode, result.Raw);
+            return new OwnershipStatus { Json = result.Json, Raw = result.Raw };
+        }
+
+        private async Task<HttpResult> WaitForOwnershipStateAsync(string state)
+        {
+            for (var attempt = 0; attempt < 200; attempt++)
+            {
+                var result = await GetAsync("/api/editor-ownership");
+                if (result.Json["state"]?.ToString() == state)
+                    return result;
+                await Task.Delay(20);
+            }
+            Assert.Fail($"Ownership never reached state '{state}'.");
+            return null;
+        }
+
+        private async Task WaitForJobStateAsync(string jobId, string state)
+        {
+            for (var attempt = 0; attempt < 200; attempt++)
+            {
+                var result = await GetAsync($"/api/job?id={Uri.EscapeDataString(jobId)}");
+                if (result.Json["state"]?.ToString() == state)
+                    return;
+                await Task.Delay(20);
+            }
+            Assert.Fail($"Job '{jobId}' never reached state '{state}'.");
+        }
+
+        private Task<HttpResult> GetAsync(string path) => SendAsync(HttpMethod.Get, path, null, null, CancellationToken.None);
+
+        private Task<HttpResult> PostAsync(string path, object body, string token = null) =>
+            PostAsync(path, body, token, CancellationToken.None);
+
+        private async Task<HttpResult> PostAsync(string path, object body, string token, CancellationToken cancellationToken) =>
+            await SendAsync(HttpMethod.Post, path, body, token, cancellationToken);
+
+        private async Task<HttpResult> SendAsync(HttpMethod method, string path, object body, string token,
+            CancellationToken cancellationToken)
+        {
+            var request = new HttpRequestMessage(method, path);
+            if (body != null)
+                request.Content = new StringContent(JsonConvert.SerializeObject(body), Encoding.UTF8, "application/json");
+            if (!string.IsNullOrEmpty(token))
+                request.Headers.TryAddWithoutValidation("X-Editor-Ownership", token);
+            try
+            {
+                using (var response = await m_Client.SendAsync(request, cancellationToken))
+                {
+                    var raw = await response.Content.ReadAsStringAsync();
+                    return new HttpResult
+                    {
+                        StatusCode = (int)response.StatusCode,
+                        Raw = raw,
+                        Json = string.IsNullOrEmpty(raw) ? new JObject() : JObject.Parse(raw)
+                    };
+                }
+            }
+            finally
+            {
+                request.Dispose();
+            }
+        }
+
+        private sealed class HttpResult
+        {
+            public int StatusCode;
+            public string Raw;
+            public JObject Json;
+        }
+
+        private sealed class OwnershipStatus
+        {
+            public JObject Json;
+            public string Raw;
+        }
+    }
+}

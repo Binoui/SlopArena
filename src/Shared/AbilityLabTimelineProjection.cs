@@ -61,6 +61,7 @@ public sealed record AbilityLabTimelineProjection
                 {
                     SpawnHitboxOperationSource hitbox => operationStart + hitbox.Hitbox.DurationTicks,
                     GravityWindowOperationSource gravity => operationStart + gravity.DurationTicks,
+                    ArmorWindowOperationSource armorWindow => operationStart + armorWindow.DurationTicks,
                     ForwardLungeOperationSource lunge => operationStart + lunge.DurationTicks,
                     EmitPresentationOperationSource presentation => operationStart + presentation.Placement.DurationTicks,
                     _ => operationStart + 1,
@@ -98,6 +99,7 @@ public sealed record AbilityLabTimelineProjection
         SetVelocityOperationSource => CookedOperationKind.SetVelocity,
         ForwardLungeOperationSource => CookedOperationKind.ForwardLunge,
         GravityWindowOperationSource => CookedOperationKind.GravityWindow,
+        ArmorWindowOperationSource => CookedOperationKind.ArmorWindow,
         SpawnHitboxOperationSource => CookedOperationKind.SpawnHitbox,
         SpawnProjectileOperationSource => CookedOperationKind.SpawnProjectile,
         SetAimStateOperationSource => CookedOperationKind.SetAimState,
@@ -112,6 +114,7 @@ public sealed record AbilityLabTimelineProjection
         SetVelocityOperationSource => "Set velocity",
         ForwardLungeOperationSource => "Forward lunge",
         GravityWindowOperationSource => "Gravity window",
+        ArmorWindowOperationSource => "Armor window",
         SpawnHitboxOperationSource => "Hitbox",
         SpawnProjectileOperationSource => "Projectile",
         SetAimStateOperationSource => "Set aim",

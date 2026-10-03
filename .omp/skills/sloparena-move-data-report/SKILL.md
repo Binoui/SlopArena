@@ -61,8 +61,7 @@ scripts/move-data.sh <char> --json report.json --html report.html   # visual rep
 scripts/move-data.sh <char> --truecombos --di --html report.html    # + true-combo graph + DI escape-space
 ```
 
-- `<char>`: `fightguy` (default) | `wibou`. `manki`/`nilus` resolve but produce empty reports — they are not
-  Melee-converted to Custom-knockback normals yet (see caveats).
+- `<char>`: `fightguy` (default) | `manki` | `wibou` | `bonk`, resolved through the cooked roster.
 - Default markdown output: `docs/generated/<char>-move-data.md`.
 
 ### Analysis modes (issue #147)
@@ -140,7 +139,6 @@ scaled nothing while .NET tests were green.
 - **Multi-hit moves false-positive parity.** A 2-hit starter (e.g. Wibou g2 Double Slash) re-launches the
   victim with hit 2 in the pipeline run, inflating pipeline apex vs the single-hit direct row → `DIVERGE`.
   KV/stun still matching is the signal it's an artifact, not a real drift.
-- **Manki / Nilus produce empty reports** until their kits are Melee-converted. That is correct, not broken.
 - **Per-character combo routes:** only FightGuy has authored routes in `RoutesFor` (`DefaultRoutes`). Add a
   char's designed links there to get its combo matrix.
 - Hitstop is reported (`ComputeHitstopTicks`) but not simulated — flight starts at launch.
@@ -168,15 +166,13 @@ interactive main session, explain the proposal and wait for approval before edit
   `SpawnHitbox` operation as an independently authored contact, not merely each input label
   as one move.
 - Server simulation is authoritative. Read the package's `character.json` and cooked
-definition; for legacy Nilus maintenance, use the existing
-  `LegacyCharacterCatalogAdapter` definition. Use `HitboxGeometry.ResolvePositions` /
+  definition. Use `HitboxGeometry.ResolvePositions` /
   `ServerSimulation.BuildEntitiesFromState` geometry and simulation outcomes. Never infer
   gameplay behavior solely from a client animation.
 - Ability Lab is the visual truth surface: it scrubs the same sim-tick pose, green hurtboxes,
   and orange hitboxes that the server resolves. See `docs/systems/ability-lab.md`.
 - The report requires usable normal data. Wibou's Adaptive moves are representative-angle
-  trajectories; Manki/Nilus currently produce empty reports until their normals are
-  Melee-converted. Record that as a prerequisite, not as a balance verdict.
+  trajectories. Missing authored hits are a content prerequisite, not a balance verdict.
 
 ### Evidence pass
 

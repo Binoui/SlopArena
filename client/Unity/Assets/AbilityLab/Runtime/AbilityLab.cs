@@ -18,12 +18,12 @@ namespace SlopArena.Client.Tools
     ///
     /// Package source ownership, typed DTO editing, hashes, persistence, and cooking live
     ///
-    /// ExecuteAlways: the orbit camera and verified package preview work in edit mode.
-    /// Legacy compatibility preview remains play-mode only.
+        /// ExecuteAlways: the orbit camera and verified package preview work in edit mode.
     [ExecuteAlways]
     public class AbilityLab : MonoBehaviour
     {
         public const float TickRate = 60f; // sim ticks per second (matches bake sample rate)
+        public enum AuthoringPhase { Charge, Fire }
 
         /// <summary>Fixed Ability Lab slot order: 1, 2, 3, 4, A, E, R, F.</summary>
         public static readonly int[] SlotIndices = { 2, 6, 7, 8, 10, 3, 4, 5 };
@@ -42,10 +42,14 @@ namespace SlopArena.Client.Tools
             internal readonly int ScenarioFrame;
             internal readonly bool ShowDummy, ShowHitboxes, ShowHurtboxes, ShowBakedBones, ShowTrajectory;
             internal readonly bool PriorShowDummy;
+            internal readonly bool PhasePreviewActive;
+            internal readonly AuthoringPhase Phase;
+            internal readonly int PhaseTick;
 
             internal TimelineCursor(string slotId, int stage, ushort tick, int selectedHitbox, bool playing, float playAccumulator,
                 AbilityLabScenarioResult scenario, int scenarioFrame, bool showDummy, bool showHitboxes,
-                bool showHurtboxes, bool showBakedBones, bool showTrajectory, bool priorShowDummy)
+                bool showHurtboxes, bool showBakedBones, bool showTrajectory, bool priorShowDummy,
+                bool phasePreviewActive, AuthoringPhase phase, int phaseTick)
             {
                 SlotId = slotId;
                 Stage = stage;
@@ -61,6 +65,9 @@ namespace SlopArena.Client.Tools
                 ShowBakedBones = showBakedBones;
                 ShowTrajectory = showTrajectory;
                 PriorShowDummy = priorShowDummy;
+                PhasePreviewActive = phasePreviewActive;
+                Phase = phase;
+                PhaseTick = phaseTick;
             }
         }
 
@@ -102,7 +109,7 @@ namespace SlopArena.Client.Tools
         public TimelineCursor CaptureTimelineCursor()
             => new(SelectedSlotId, StageIndex, Tick, SelectedHitboxEventIndex, Playing, _playAccum,
                 Scenario, ScenarioFrame, ShowDummy, ShowHitboxes, ShowHurtboxes, ShowBakedBones, ShowTrajectory,
-                _scenarioPriorShowDummy);
+                _scenarioPriorShowDummy, PhasePreviewActive, Phase, PhaseTick);
 
         public void RestoreTimelineCursor(TimelineCursor cursor)
         {
@@ -124,6 +131,9 @@ namespace SlopArena.Client.Tools
             ShowHurtboxes = cursor.ShowHurtboxes;
             ShowBakedBones = cursor.ShowBakedBones;
             ShowTrajectory = cursor.ShowTrajectory;
+            PhasePreviewActive = cursor.PhasePreviewActive;
+            Phase = cursor.Phase;
+            _phaseTick = cursor.PhaseTick;
             _scenarioPriorShowDummy = cursor.PriorShowDummy;
             RebuildScenarioTrailHistory();
             RefreshPose();
@@ -184,6 +194,94 @@ namespace SlopArena.Client.Tools
         public bool Airborne { get; private set; }
         public int StageIndex { get; private set; }
         public ushort Tick { get; private set; }
+        public bool PhasePreviewActive { get; private set; }
+        public AuthoringPhase Phase { get; private set; }
+        private int _phaseTick;
+        public int PhaseTick => _phaseTick;
+        public bool CanPreviewCharge => TryResolvePhaseAnimation(AuthoringPhase.Charge, out _, out _, out _, out _);
+        public string PhaseClipName => TryResolvePhaseAnimation(Phase, out _, out AnimationClip clip, out _, out _)
+            ? clip.name : string.Empty;
+        public int PhaseDurationTicks => TryResolvePhaseAnimation(Phase, out _, out _, out int duration, out _)
+            ? duration : 0;
+        public string PhasePreviewStatus
+        {
+            get
+            {
+                if (!IsPackagePreview) return "Phase preview requires a package preview.";
+                if (Scenario != null) return "Phase preview is separate from recorded scenarios.";
+                if (TryResolvePhaseAnimation(Phase, out _, out _, out _, out _)) return "Ready";
+                return Phase == AuthoringPhase.Charge
+                    ? "Charge preview unavailable: the selected move has no resolved aim clip."
+                    : "Fire preview unavailable: the selected move has no resolved release clip.";
+            }
+        }
+        /// <summary>Select isolated Charge/Fire pose authoring without changing recorded scenario state.</summary>
+        public bool SetPhasePreview(bool active)
+        {
+            if (Scenario != null)
+                return false;
+            if (active && !TryResolvePhaseAnimation(Phase, out _, out _, out _, out _))
+                return false;
+            PhasePreviewActive = active;
+            _phaseTick = Mathf.Clamp(_phaseTick, 0, Mathf.Max(0, PhaseDurationTicks - 1));
+            Playing = false;
+            RefreshPose();
+            return true;
+        }
+
+        public void SetAuthoringPhase(AuthoringPhase phase)
+        {
+            if (Scenario != null || Phase == phase) return;
+            Phase = phase;
+            _phaseTick = 0;
+            Playing = false;
+            if (PhasePreviewActive && !TryResolvePhaseAnimation(phase, out _, out _, out _, out _))
+                PhasePreviewActive = false;
+            RefreshPose();
+        }
+
+        public void SetPhaseTick(int tick)
+        {
+            if (Scenario != null || !PhasePreviewActive) return;
+            int duration = PhaseDurationTicks;
+            if (duration <= 0) return;
+            int bounded = Mathf.Clamp(tick, 0, duration - 1);
+            if (_phaseTick == bounded) return;
+            _phaseTick = bounded;
+            RefreshPose();
+        }
+
+        /// <summary>Inject or clear the transient weapon config used by the Lab's preview actor.</summary>
+        public void SetWeaponAttachConfigOverride(WeaponAttachConfig config)
+        {
+            if (_weaponAttachConfigOverride == config)
+            {
+                RefreshPose();
+                return;
+            }
+            _weaponAttachConfigOverride = config;
+            if (_previewRenderer != null && DisplayDef != null)
+                _weaponAttach = AttachWeapon(_previewRenderer, DisplayDef);
+            RefreshPose();
+        }
+
+        private bool TryResolvePhaseAnimation(
+            AuthoringPhase phase,
+            out string clipName,
+            out AnimationClip clip,
+            out int durationTicks,
+            out float playbackSpeed)
+        {
+            clipName = null;
+            clip = null;
+            durationTicks = 0;
+            playbackSpeed = 1f;
+            return IsPackagePreview && Renderer != null
+                && Renderer.TryGetAbilityPhaseAnimation(
+                    (byte)(SlotIndex + 1), Airborne, StageIndex,
+                    phase == AuthoringPhase.Charge,
+                    out clipName, out clip, out durationTicks, out playbackSpeed);
+        }
         public int SelectedHitboxEventIndex { get; private set; } = -1;
         public bool Playing
         {
@@ -218,7 +316,7 @@ namespace SlopArena.Client.Tools
         public BakedAnimationData? Baked { get; private set; }
         public string[] BakedBoneNames => Baked?.BoneNames ?? Array.Empty<string>();
         public bool AuthoritativePreview { get; private set; }
-        public string PreviewStatus { get; private set; } = "Legacy";
+        public string PreviewStatus { get; private set; } = "Preview unavailable";
         private CharacterAnimationCatalog _previewAnimationCatalog;
         private GameObject _previewRig;
         [SerializeField] private PlayerRenderer _previewRenderer;
@@ -248,6 +346,7 @@ namespace SlopArena.Client.Tools
         private readonly List<(Vector3 pos, char phase)> _trajectory = new();
         private WeaponAttach _weaponAttach;
         private WeaponAttach _dummyWeaponAttach;
+        private WeaponAttachConfig _weaponAttachConfigOverride;
         private float _playAccum;
         [SerializeField] private UnityEngine.Camera _camera = null!;
         private Vector2 _orbitAngles = new(25f, 0f);
@@ -367,14 +466,16 @@ namespace SlopArena.Client.Tools
             if (!_previewRenderer.PlayScrubbedState(frame.Actor, airborne, frame.ActorPoseTicks)
                 || !_dummyRenderer.PlayScrubbedState(frame.Opponent, false, frame.OpponentPoseTicks))
                 throw new InvalidOperationException($"Scenario pose has a missing animation binding at frame {ScenarioFrame}.");
-            _weaponAttach?.SetPreviewState(frame.Actor.AttackSlot, frame.Actor.AttackElapsedTicks);
-            _weaponAttach?.SetHitboxTrailActive(frame.ActiveSwordHitboxSeconds >= 0f, frame.ActiveSwordHitboxSeconds);
+            _weaponAttach?.SetPreviewState(frame.Actor.AttackSlot, frame.Actor.AttackElapsedTicks,
+                frame.Actor.State == ActionState.Attacking);
+            _weaponAttach?.SetHitboxTrailActive(frame.ActiveSwordHitboxSeconds >= 0f);
             if (_scenarioActorHistory.Count > 0)
                 _weaponAttach?.SetPreviewTrailHistory(_scenarioActorHistory, ScenarioFrame, airborne);
             // Trail history samples the same rig. Restore the selected state
             // after those historical samples so recovery/interruption is visible.
             _previewRenderer.PlayScrubbedState(frame.Actor, airborne, frame.ActorPoseTicks);
-            _dummyWeaponAttach?.SetPreviewState(frame.Opponent.AttackSlot, frame.Opponent.AttackElapsedTicks);
+            _dummyWeaponAttach?.SetPreviewState(frame.Opponent.AttackSlot, frame.Opponent.AttackElapsedTicks,
+                frame.Opponent.State == ActionState.Attacking);
             _dummyWeaponAttach?.SetHitboxTrailActive(false);
             _presentationPreviewer.SetSimulationFrame(Scenario.PresentationEvents, frame.MatchTick,
                 _presentationBindings, _previewRenderer, _previewRenderer.transform);
@@ -390,6 +491,17 @@ namespace SlopArena.Client.Tools
 #endif
             return Time.realtimeSinceStartupAsDouble;
         }
+
+#if UNITY_EDITOR
+        private void OnEnable() => EditorApplication.update += UpdateEditorPlayback;
+        private void OnDisable() => EditorApplication.update -= UpdateEditorPlayback;
+
+        private void UpdateEditorPlayback()
+        {
+            if (EditorApplication.isPlayingOrWillChangePlaymode || !isActiveAndEnabled) return;
+            AdvancePlayback();
+        }
+#endif
 
         private void Awake()
         {
@@ -452,27 +564,45 @@ namespace SlopArena.Client.Tools
 
         private void Update()
         {
+            if (Application.isPlaying) AdvancePlayback();
+        }
+
+        private void AdvancePlayback()
+        {
             if (!Playing) return;
+            double now = PreviewClock();
+            float elapsed = Application.isPlaying && Scenario == null
+                ? Time.deltaTime
+                : Mathf.Max(0f, (float)(now - _previewPlaybackClock));
+            _previewPlaybackClock = now;
+            _playAccum += elapsed * PlaySpeed;
+            if (_playAccum < 1f / TickRate) return;
             if (Scenario != null)
             {
-                double now = PreviewClock();
-                float elapsed = Mathf.Max(0f, (float)(now - _previewPlaybackClock));
-                _previewPlaybackClock = now;
-                _playAccum += elapsed * PlaySpeed;
                 while (_playAccum >= 1f / TickRate)
                 {
                     _playAccum -= 1f / TickRate;
                     ScenarioFrame = (ScenarioFrame + 1) % Scenario.Frames.Count;
                 }
-                RefreshPose();
-                return;
             }
-            if (!TryGetStage(out var stage)) return;
-            _playAccum += Time.deltaTime * PlaySpeed;
-            while (_playAccum >= 1f / TickRate)
+            else if (PhasePreviewActive)
             {
-                _playAccum -= 1f / TickRate;
-                Tick = (ushort)((Tick + 1) % Math.Max(1, (int)stage.DurationTicks));
+                int duration = PhaseDurationTicks;
+                if (duration <= 0) { Playing = false; return; }
+                while (_playAccum >= 1f / TickRate)
+                {
+                    _playAccum -= 1f / TickRate;
+                    _phaseTick = (_phaseTick + 1) % duration;
+                }
+            }
+            else
+            {
+                if (!TryGetStage(out var stage)) return;
+                while (_playAccum >= 1f / TickRate)
+                {
+                    _playAccum -= 1f / TickRate;
+                    Tick = (ushort)((Tick + 1) % Math.Max(1, (int)stage.DurationTicks));
+                }
             }
             RefreshPose();
         }
@@ -544,25 +674,6 @@ namespace SlopArena.Client.Tools
             ResetCameraView();
         }
 
-        public bool LoadCharacter(CharacterClass character)
-        {
-            if (character == CharacterClass.None || character == Character) return character == Character;
-            var resolution = SlopArena.Client.LocalContentResolver.CreateDefault().ResolveLegacy(character);
-
-            if (!resolution.Success || resolution.LegacyEntry == null)
-            {
-                Debug.LogError($"[AbilityLab] Failed to resolve legacy content for {character}: {FormatDiagnostics(resolution.Diagnostics)}");
-                return false;
-            }
-            if (!Application.isPlaying)
-            {
-                Debug.Log("[AbilityLab] Legacy compatibility preview is available only in Play Mode.");
-                return false;
-            }
-
-            ApplyLegacyPreview(resolution.LegacyEntry);
-            return true;
-        }
 
         public void LoadCharacter(ContentHandle handle)
         {
@@ -592,55 +703,9 @@ namespace SlopArena.Client.Tools
                     Debug.LogError($"[AbilityLab] Cooked client assets failed for {entry.Identity.PackageId}: {error}");
                     return;
                 }
-                ApplyCookedPackagePreview(
-                    entry.CookedCharacterPackage, entry.BakedAnimation, animationCatalog, rig,
-                    CharacterClass.None, authoritative: true);
-                return;
+                ApplyPackageData(entry.CookedCharacterPackage, entry.BakedAnimation, animationCatalog, rig,
+                    entry.Identity.PackageId, "");
             }
-            if (!Application.isPlaying)
-            {
-                Debug.Log("[AbilityLab] Legacy compatibility preview is available only in Play Mode.");
-                return;
-            }
-
-            ApplyLegacyPreview(entry);
-        }
-
-        private void ApplyLegacyPreview(MatchContentEntry entry)
-        {
-            ClearScenario();
-            var loadedDef = entry.Definition;
-            var loadedBaked = LoadBaked(loadedDef);
-            var loadedWorkingDefs = LoadWorkingDefs(loadedDef, loadedBaked);
-            Character = entry.LegacySelector ?? CharacterClass.None;
-            SelectedPackageId = "";
-            SelectedPackageHash = "";
-            SelectedSlotId = "";
-            _packagePreviewAvailable = false;
-            Def = loadedDef;
-            Baked = loadedBaked;
-            WorkingDefs = loadedWorkingDefs;
-            DisplayDef = HurtboxOverride.Apply(Def, WorkingDefs);
-            AuthoritativePreview = false;
-            PreviewStatus = $"Compatibility Preview · {Character} · Legacy authority · Read-only";
-            ShowHurtboxes = true;
-            ShowHitboxes = true;
-            ShowBakedBones = false;
-            ShowDummy = false;
-            _sourceDocument = null;
-            _presentationPreviewer.Clear();
-            _simulationPreviewer.Clear();
-            _presentationBindings = Array.Empty<CharacterAssetCatalog.PresentationBinding>();
-            DestroyPreviewCatalog();
-            _previewRig = null;
-            SpawnRenderer();
-
-            Airborne = false;
-            SlotIndex = SlotIndices[0];
-            StageIndex = 0;
-            Tick = 0;
-            Playing = false;
-            RefreshPose();
         }
 
         public void ApplyPackagePreview(AbilityLabPackagePreviewResult result)
@@ -661,51 +726,6 @@ namespace SlopArena.Client.Tools
                 result.Identity.PackageHash);
         }
 
-        public void ApplyCookedPackagePreview(
-            CookedCharacterPackage package,
-            BakedAnimationData baked,
-            CharacterAnimationCatalog animationCatalog,
-            GameObject rig,
-            CharacterClass legacySelector = CharacterClass.None,
-            bool authoritative = true)
-        {
-            if (package == null || baked == null || animationCatalog == null || rig == null)
-            {
-                ApplyPreviewUnavailable(new[]
-                {
-                    new CharacterDiagnostic(CharacterDiagnosticSeverity.Error, "preview.binding.failed", "package", "Cooked package preview data is incomplete."),
-                });
-                return;
-            }
-
-            if (authoritative)
-            {
-                ApplyPackageData(package, baked, animationCatalog, rig, package.Metadata.PackageId, "");
-                return;
-            }
-
-            DestroyPreviewCatalog();
-            _previewAnimationCatalog = animationCatalog;
-            _previewRig = rig;
-            var definition = CookedCharacterRuntimeAdapter.ToCharacterDefinition(package, legacySelector);
-            Character = legacySelector;
-            SelectedPackageId = "";
-            SelectedPackageHash = "";
-            SelectedSlotId = "";
-            Def = definition;
-            Baked = baked;
-            WorkingDefs = definition.HurtboxBoneDefs != null ? (HurtboxBoneDef[])definition.HurtboxBoneDefs.Clone() : Array.Empty<HurtboxBoneDef>();
-            DisplayDef = definition;
-            AuthoritativePreview = false;
-            PreviewStatus = "Non-authoritative draft";
-            ShowHurtboxes = false;
-            ShowHitboxes = true;
-            ShowBakedBones = false;
-            ShowDummy = false;
-            SpawnRenderer();
-            Airborne = false; SlotIndex = SlotIndices[0]; StageIndex = 0; Tick = 0; Playing = false;
-            RefreshPose();
-        }
 
         public void ApplyPackageDraftPreview(CookedCharacterPackage package, AbilityLabPackagePreviewResult persistedPreview)
         {
@@ -769,12 +789,7 @@ namespace SlopArena.Client.Tools
             Tick = (ushort)Mathf.Clamp(priorTick, 0, Mathf.Max(0, stage.DurationTicks - 1));
             int hitboxCount = stage.HitboxEvents?.Length ?? 0;
             SelectedHitboxEventIndex = priorHitbox >= 0 && priorHitbox < hitboxCount ? priorHitbox : -1;
-            if (Renderer == null) SpawnRenderer();
-            else
-            {
-                UpdateRendererDefinition(Renderer, DisplayDef, "LabCharacter");
-                if (_dummyRenderer != null) UpdateRendererDefinition(_dummyRenderer, DisplayDef, "LabDummy");
-            }
+            SpawnRenderer();
             RefreshPose();
         }
         public void MarkPackageDraftInvalid()
@@ -939,19 +954,20 @@ namespace SlopArena.Client.Tools
 
         /// <summary>
         /// Attach the selected package's configured weapon prop to the preview model.
-        /// Package mode reads the generated catalog binding; legacy compatibility mode
-        /// retains the CharacterClass resource fallback.
+        /// Package mode reads the generated catalog binding.
         /// </summary>
         private WeaponAttach AttachWeapon(PlayerRenderer renderer, CharacterDefinition def)
         {
             var attach = renderer.GetComponent<WeaponAttach>();
             if (attach == null) attach = renderer.gameObject.AddComponent<WeaponAttach>();
 
-            WeaponAttachConfig config = _previewAnimationCatalog != null
-                ? _previewAnimationCatalog.WeaponConfig
-                : def != null && def.Class != CharacterClass.None
-                    ? Resources.Load<WeaponAttachConfig>($"WeaponConfigs/{def.Class}")
-                    : null;
+            WeaponAttachConfig config = renderer == _previewRenderer && _weaponAttachConfigOverride != null
+                ? _weaponAttachConfigOverride
+                : _previewAnimationCatalog != null
+                    ? _previewAnimationCatalog.WeaponConfig
+                    : def != null && def.Class != CharacterClass.None
+                        ? Resources.Load<WeaponAttachConfig>($"WeaponConfigs/{def.Class}")
+                        : null;
             attach.Init(renderer, config);
             return attach;
         }
@@ -967,12 +983,10 @@ namespace SlopArena.Client.Tools
             renderer.SetAnimationCatalog(_previewAnimationCatalog);
             renderer.SetCharacterDefinition(def);
             renderer.LoadModel(def, _previewRig);
+            foreach (var skin in renderer.GetComponentsInChildren<SkinnedMeshRenderer>(true))
+                skin.forceMatrixRecalculationPerRender = true;
         }
 
-        private void UpdateRendererDefinition(PlayerRenderer renderer, CharacterDefinition def, string name)
-        {
-            ConfigureRenderer(renderer, def, name);
-        }
 
 
         private Vector3 BasePosition() => transform.position + new Vector3(0f, Def.CapsuleHeight * 0.5f, 0f);
@@ -1021,6 +1035,9 @@ namespace SlopArena.Client.Tools
             StageIndex = 0;
             Tick = 0;
             SelectedHitboxEventIndex = -1;
+            _phaseTick = 0;
+            Playing = false;
+            EnsurePhaseSelectionSupported();
             RefreshPose();
         }
 
@@ -1037,7 +1054,8 @@ namespace SlopArena.Client.Tools
             SelectedSlotId = canonical.Id;
             StageIndex = 0;
             Tick = 0;
-            SelectedHitboxEventIndex = -1;
+            _phaseTick = 0;
+            EnsurePhaseSelectionSupported();
             Playing = false;
             RefreshPose();
         }
@@ -1050,7 +1068,9 @@ namespace SlopArena.Client.Tools
             UpdateSelectedSlotId();
             StageIndex = 0;
             Tick = 0;
-            SelectedHitboxEventIndex = -1;
+            _phaseTick = 0;
+            Playing = false;
+            EnsurePhaseSelectionSupported();
             RefreshPose();
         }
 
@@ -1061,12 +1081,26 @@ namespace SlopArena.Client.Tools
             if (labelIndex >= 0 && CanonicalSlotProjection.TryGet(Airborne, SlotNames[labelIndex], out var address))
                 SelectedSlotId = address.Id;
         }
+        private void EnsurePhaseSelectionSupported()
+        {
+            if (Phase == AuthoringPhase.Charge
+                && !TryResolvePhaseAnimation(AuthoringPhase.Charge, out _, out _, out _, out _))
+            {
+                Phase = AuthoringPhase.Fire;
+                _phaseTick = 0;
+                Playing = false;
+            }
+            if (PhasePreviewActive
+                && !TryResolvePhaseAnimation(Phase, out _, out _, out _, out _))
+                PhasePreviewActive = false;
+        }
 
         public void SetStage(int stage)
         {
             StageIndex = stage;
             Tick = 0;
-            SelectedHitboxEventIndex = -1;
+            _phaseTick = 0;
+            EnsurePhaseSelectionSupported();
             RefreshPose();
         }
 
@@ -1078,7 +1112,9 @@ namespace SlopArena.Client.Tools
 
         public void SetTick(ushort tick)
         {
-            if (Tick == tick) return;
+            bool leftPhasePreview = PhasePreviewActive;
+            PhasePreviewActive = false;
+            if (Tick == tick && !leftPhasePreview) return;
             Tick = tick;
             RefreshPose();
         }
@@ -1372,9 +1408,8 @@ namespace SlopArena.Client.Tools
         public void InvalidatePresentationPreview() => RefreshPose();
 
         /// <summary>
-        /// Pose the mesh at the current tick using the game's playback mapping:
-        /// clip progress = tick / DurationTicks (equivalent to the server's
-        /// frameCount / DurationTicks speed). The dummy (when shown) holds idle frame 0.
+        /// Pose package previews from the Shared animation phase and runtime playback speed.
+        /// Source-only previews sample the authored stage clip; the dummy holds idle frame 0.
         /// </summary>
         public void RefreshPose()
         {
@@ -1390,6 +1425,11 @@ namespace SlopArena.Client.Tools
             if (Scenario != null)
             {
                 RefreshScenarioPose();
+                return;
+            }
+            if (PhasePreviewActive)
+            {
+                RefreshPhasePose();
                 return;
             }
             var spec = CurrentSpec();
@@ -1408,7 +1448,7 @@ namespace SlopArena.Client.Tools
             _previewRenderer.transform.position = BasePosition() + lungeDisplacement;
             float normalized = stage.DurationTicks > 0 ? (float)Tick / stage.DurationTicks : 0f;
             _previewRenderer.PlayScrubbed(AnimNameFor(spec, StageIndex), normalized);
-            _weaponAttach?.SetPreviewState((byte)(SlotIndex + 1), Tick);
+            _weaponAttach?.SetPreviewState((byte)(SlotIndex + 1), Tick, true);
             if (_dummyRenderer != null)
             {
                 _dummyRenderer.EnsureModel();
@@ -1433,20 +1473,23 @@ namespace SlopArena.Client.Tools
                     BasePosition(),
                     FacingYaw,
                     simulationTick);
-                float hitboxSeconds = _simulationPreviewer.ActiveSwordHitboxSeconds;
-                _weaponAttach?.SetHitboxTrailActive(hitboxSeconds >= 0f, hitboxSeconds);
+                _weaponAttach?.SetHitboxTrailActive(_simulationPreviewer.ActiveSwordHitboxSeconds >= 0f);
                 _weaponAttach?.SetPreviewTrailHistory(
                     _simulationPreviewer.StateHistory, simulationTick, Airborne);
                 if (_simulationPreviewer.StateHistory.Count > simulationTick)
                 {
                     var previewState = _simulationPreviewer.StateHistory[simulationTick];
-                    _previewRenderer.transform.position = new Vector3(
-                        previewState.PX, previewState.PY + _previewRenderer.ModelYOffset, previewState.PZ);
-                    _previewRenderer.transform.rotation = Quaternion.Euler(
-                        0f, previewState.FacingYaw * Mathf.Rad2Deg, 0f);
-                    if (_weaponAttach?.HasSwordTrail == true
-                        && !_previewRenderer.TrySampleBakedWeaponPath(previewState, Airborne, out _, out _))
-                        _previewRenderer.PlayScrubbed(AnimNameFor(spec, StageIndex), normalized);
+                    _previewRenderer.transform.SetPositionAndRotation(
+                        new Vector3(previewState.PX, previewState.PY + _previewRenderer.ModelYOffset, previewState.PZ),
+                        Quaternion.Euler(0f, previewState.FacingYaw * Mathf.Rad2Deg, 0f));
+                    bool bakedWeaponPose = _weaponAttach?.HasSwordTrail == true
+                        && _previewRenderer.TrySampleBakedWeaponPath(previewState, Airborne, out _, out _);
+                    if (!bakedWeaponPose &&
+                        !_previewRenderer.PlayScrubbedState(previewState, Airborne, simulationTick))
+                        throw new InvalidOperationException($"Authoring pose has a missing animation binding at tick {simulationTick}.");
+                    _weaponAttach?.SetPreviewState(
+                        previewState.AttackSlot, previewState.AttackElapsedTicks,
+                        previewState.State == ActionState.Attacking);
                 }
                 _presentationPreviewer.SetSimulationFrame(
                     _simulationPreviewer.PresentationEvents,
@@ -1462,6 +1505,39 @@ namespace SlopArena.Client.Tools
             }
             _weaponAttach?.RefreshPresentation();
             if (ShowDummy) _dummyWeaponAttach?.RefreshPresentation();
+            QueueEditorRefresh();
+        }
+        private void RefreshPhasePose()
+        {
+            if (!TryResolvePhaseAnimation(
+                Phase, out string clipName, out AnimationClip clip, out int duration, out float playbackSpeed))
+            {
+                _presentationPreviewer.Clear();
+                _simulationPreviewer.Clear();
+                _weaponAttach?.SetHitboxTrailActive(false);
+                QueueEditorRefresh();
+                return;
+            }
+            _previewRenderer.EnsureModel();
+            if (_previewRenderer.transform.childCount == 0)
+                ConfigureRenderer(_previewRenderer, DisplayDef, "LabCharacter");
+            _phaseTick = Mathf.Clamp(_phaseTick, 0, duration - 1);
+            _previewRenderer.transform.SetPositionAndRotation(
+                BasePosition(), Quaternion.Euler(0f, FacingYaw * Mathf.Rad2Deg, 0f));
+            float sampleTime = _phaseTick / TickRate * playbackSpeed;
+            _previewRenderer.PlayScrubbed(
+                clipName, clip.length > 0f ? Mathf.Clamp01(sampleTime / clip.length) : 0f);
+            _weaponAttach?.SetPreviewState(
+                (byte)(SlotIndex + 1), _phaseTick, Phase == AuthoringPhase.Fire);
+            _weaponAttach?.SetHitboxTrailActive(false);
+            _simulationPreviewer.Clear();
+            if (Phase == AuthoringPhase.Fire)
+                _presentationPreviewer.SetFrame(
+                    CurrentSourceStage(), (ushort)_phaseTick, _presentationBindings,
+                    _previewRenderer.transform, _previewRenderer);
+            else
+                _presentationPreviewer.Clear();
+            _weaponAttach?.RefreshPresentation();
             QueueEditorRefresh();
         }
 

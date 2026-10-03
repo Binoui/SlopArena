@@ -249,7 +249,9 @@ public static class CharacterPackageAssembler
             PoseData poses = ParsePoses(input.PoseBytes, d);
             HashSet<string> required = RequiredAnimations(input.CookedPackage, d);
             if (binding == null || poses == null) return;
-            ValidateReferences(required, input.CookedPackage.Definition.PresentationIds, binding, poses, d);
+            ValidateReferences(required, input.CookedPackage.Definition.PresentationIds,
+                input.CookedPackage.Definition.Slots.Select(slot => slot.HitPresentationId).Where(id => !string.IsNullOrEmpty(id)).Select(id => id!),
+                binding, poses, d);
             if (binding.PackageId != input.PackageId || binding.SourceHash != input.SourceHash || binding.BindingSchemaVersion != input.BindingSchemaVersion || binding.PoseFormat != input.PoseFormat || binding.PoseVersion != input.PoseVersion || binding.SampleRate != input.SampleRate)
                 d.Add(Error("package.binding.metadata-mismatch", BindingPath, "Binding metadata does not match assembly input."));
         }
@@ -320,7 +322,7 @@ public static class CharacterPackageAssembler
             if (binding != null && pose != null)
             {
                 HashSet<string> required = RequiredAnimations(root, d);
-                ValidateReferences(required, RequiredPresentations(root, d), binding, pose, d);
+                ValidateReferences(required, RequiredPresentations(root, d), RequiredHitPresentations(root, d), binding, pose, d);
                 if (root.GetProperty("character").TryGetProperty("attachmentBoneIds", out var attachmentIds) && attachmentIds.ValueKind == JsonValueKind.Array)
                     foreach (var id in attachmentIds.EnumerateArray())
                         if (id.ValueKind != JsonValueKind.String || !pose.BoneNames.Contains(id.GetString() ?? ""))
@@ -402,10 +404,28 @@ public static class CharacterPackageAssembler
                 Add(required, id.GetString() ?? "", d, "character.presentationIds");
         return required;
     }
+    private static HashSet<string> RequiredHitPresentations(JsonElement root, List<CharacterDiagnostic> d)
+    {
+        var required = new HashSet<string>(StringComparer.Ordinal);
+        if (!HasObject(root, "character")) return required;
+        var character = root.GetProperty("character");
+        if (character.TryGetProperty("slots", out var slots) && slots.ValueKind == JsonValueKind.Array)
+            foreach (var slot in slots.EnumerateArray())
+                if (slot.TryGetProperty("hitPresentationId", out var hit))
+                {
+                    if (hit.ValueKind != JsonValueKind.String)
+                        d.Add(Error("package.runtime.value", "character.slots.hitPresentationId", "Hit presentation ID must be a string."));
+                    else
+                        AddOptional(required, hit.GetString() ?? "", d, "character.slots.hitPresentationId");
+                }
+        return required;
+    }
+
 
     private static void ValidateReferences(
         HashSet<string> required,
         IEnumerable<string> requiredPresentations,
+        IEnumerable<string> requiredHitPresentations,
         BindingData binding,
         PoseData poses,
         List<CharacterDiagnostic> d)
@@ -421,16 +441,18 @@ public static class CharacterPackageAssembler
         foreach (string name in poses.Names)
             if (!binding.ByPose.ContainsKey(name)) d.Add(Error("package.pose.orphan", name, "poses.bin contains an unreferenced pose track."));
 
+        var requiredPresentationSet = new HashSet<string>(requiredHitPresentations, StringComparer.Ordinal);
+        foreach (string id in requiredPresentationSet)
+            if (!requiredPresentations.Contains(id, StringComparer.Ordinal))
+                d.Add(Error("package.binding.presentation-undeclared", id, "Hit presentation ID is not declared by the cooked definition."));
         if (binding.HasPresentations)
-        {
-            var requiredPresentationSet = new HashSet<string>(requiredPresentations, StringComparer.Ordinal);
-            foreach (string id in requiredPresentationSet)
-                if (!binding.Presentations.Contains(id))
-                    d.Add(Error("package.binding.presentation-missing", id, "Required presentation binding is missing."));
-            foreach (string id in binding.Presentations)
-                if (!requiredPresentationSet.Contains(id))
-                    d.Add(Error("package.binding.presentation-orphan", id, "Presentation binding is not required by the cooked definition."));
-        }
+            requiredPresentationSet.UnionWith(requiredPresentations);
+        foreach (string id in requiredPresentationSet)
+            if (!binding.Presentations.Contains(id))
+                d.Add(Error("package.binding.presentation-missing", id, "Required presentation binding is missing."));
+        foreach (string id in binding.Presentations)
+            if (!requiredPresentationSet.Contains(id))
+                d.Add(Error("package.binding.presentation-orphan", id, "Presentation binding is not required by the cooked definition."));
     }
 
     private static BindingData? ParseBindings(byte[] bytes, List<CharacterDiagnostic> d)

@@ -92,8 +92,7 @@ internal static class Program
             "fightguy" => CharacterClass.FightGuy,
             "manki" => CharacterClass.Manki,
             "wibou" => CharacterClass.Wibou,
-            "nilus" => CharacterClass.Nilus,
-            _ => throw new ArgumentException($"unknown character: {which} (expected one of: fightguy, manki, wibou, nilus, all)"),
+            _ => throw new ArgumentException($"unknown character: {which} (expected one of: fightguy, manki, wibou, all)"),
         };
         return BuiltInContentResolver.Resolve(cls).Definition;
     }

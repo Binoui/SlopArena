@@ -92,7 +92,19 @@ public sealed class PresentationEventPacketTests
     [Fact]
     public void PredictedOpponentReplayEmitsAndSuppressesLateConfirmation()
     {
-        var def = TestHelpers.FightGuyDef;
+        var def = TestHelpers.EngineDef;
+        var slots = System.Linq.Enumerable.ToArray(def.CookedSlots!);
+        slots[6] = new CookedSlotDefinition(6, "ground.R", false, "Replay fixture", "", "",
+            AuthoringAbilityBehavior.MeleeCombo, AuthoringAimMode.None, 0, false, false,
+            new CookedTimeline(new[]
+            {
+                new CookedStage(20, 0, 0, 0, 0, Array.Empty<string>(),
+                    new CookedTimelineOperation[]
+                    {
+                        new CookedEmitPresentationOperation(0, AuthoringUnit.Ticks, "presentation.test.replay", 0),
+                    }),
+            }));
+        def.CookedSlots = slots;
         var sim = new SlopArena.Shared.Rollback.RollbackSimulator(TestHelpers.TestArena(), 1);
         sim.RegisterEntity(1, def, TestHelpers.PlayerState() with { PY = TestHelpers.GroundPY(def) });
         for (var tick = 0; tick < 11; tick++)
@@ -116,11 +128,39 @@ public sealed class PresentationEventPacketTests
             },
         });
         var predicted = Assert.Single(sim.DrainPresentationEvents());
-        Assert.Equal(new PresentationEventKey(11, 2, 1, PresentationEventSource.Timeline, 10), predicted.Key);
+        Assert.Equal(2UL, predicted.EntityId);
+        Assert.Equal(PresentationEventSource.Timeline, predicted.Source);
+        Assert.Equal("presentation.test.replay", predicted.PresentationId);
         sim.IngestPresentationEvent(predicted);
         Assert.Empty(sim.DrainPresentationEvents());
     }
 
+
+    [Fact]
+    public void HitContactPacketIngressAcceptsSourceAndDeduplicatesRepeatedReorderedEvents()
+    {
+        var first = new PresentationEventPacket(20, 2, 0, "presentation.hit.a", 7,
+            PresentationEventSource.HitContact, 1f, 2f, 3f, 0.5f,
+            new PresentationPlacement(DurationTicks: 150));
+        var second = new PresentationEventPacket(20, 2, 1, "presentation.hit.b", 7,
+            PresentationEventSource.HitContact, 4f, 5f, 6f, 0.5f,
+            new PresentationPlacement(DurationTicks: 150));
+        var sim = new SlopArena.Shared.Rollback.RollbackSimulator(TestHelpers.TestArena(), 1);
+
+        foreach (var packet in new[] { second, first, second })
+        {
+            var bytes = new byte[packet.WireSize];
+            packet.Serialize(bytes);
+            Assert.True(PresentationEventPacket.TryDeserialize(bytes, out var decoded));
+            sim.IngestPresentationEvent(decoded!.Value.ToEvent());
+        }
+
+        var accepted = sim.DrainPresentationEvents();
+        Assert.Equal(2, accepted.Count);
+        Assert.Equal(second.ToEvent(), accepted[0]);
+        Assert.Equal(first.ToEvent(), accepted[1]);
+        Assert.Empty(sim.DrainPresentationEvents());
+    }
     [Fact]
     public void IndependentKeysAndDroppedDatagramDoNotAffectState()
     {
@@ -139,7 +179,7 @@ public sealed class PresentationEventPacketTests
         Assert.True(PresentationEventPacket.TryDeserialize(thirdBytes, out var decodedThird));
 
         var sim = new SlopArena.Shared.Rollback.RollbackSimulator(TestHelpers.TestArena(), 1);
-        sim.RegisterEntity(1, TestHelpers.MankiDef, TestHelpers.PlayerState());
+        sim.RegisterEntity(1, TestHelpers.EngineDef, TestHelpers.PlayerState());
         var before = sim.GetState(1);
         sim.IngestPresentationEvent(decodedSecond!.Value.ToEvent());
         sim.IngestPresentationEvent(decodedThird!.Value.ToEvent());

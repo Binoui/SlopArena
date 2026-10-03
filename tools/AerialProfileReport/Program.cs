@@ -1152,7 +1152,7 @@ internal static class Program
                 CookedKiShotCapabilityParameters p => p.Damage > 0f,
                 CookedCycloneKickCapabilityParameters p => p.Damage > 0f,
                 CookedDragonBeamCapabilityParameters p => p.Damage > 0f,
-                CookedBonkTargetedJumpSlamCapabilityParameters p => p.SlamDamage > 0f,
+                CookedTargetedLeapCapabilityParameters p => p.Hitbox.Damage > 0f,
                 CookedMankiRoundBombCapabilityParameters p => p.Damage > 0f || p.ExplosionDamage > 0f,
                 CookedMankiJetpackBoostCapabilityParameters p => p.ExplosionDamage > 0f,
                 CookedMankiBazookaCapabilityParameters p => p.Damage > 0f,

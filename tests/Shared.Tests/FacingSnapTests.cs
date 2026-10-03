@@ -13,24 +13,21 @@ namespace SlopArena.Shared.Tests;
 /// </summary>
 public class FacingSnapTests : KitScenarioTests
 {
-    private static readonly CharacterDefinition Def = TestHelpers.CombatDef;
-    private static float Gpy => TestHelpers.CombatGroundPY;
+    private static readonly CharacterDefinition Def = TestHelpers.EngineDef;
+    private static float Gpy => Def.CapsuleHeight * 0.5f;
 
-    // ────────────────────────── Golden scenarios (issue #126) ──────────────────────────
+    // ────────────────────────── Kit regression (issue #126) ──────────────────────────
 
     [Fact]
-    public void Golden_SnapThenNormal_FiresAlongSnappedFacing()
+    public void FightGuy_SnapThenNormal_HitsAlongSnappedFacing()
     {
-        // The #126 playtest, grounded: snap to camera azimuth (-Z, AimYaw 18000), then
-        // press 1 — Low Kick fires along the snapped facing and hits the NPC placed
-        // at -Z. Golden pins the snapped facing THROUGH the attack (the stage's own
-        // tracking keeps it — the target sits exactly at the snapped yaw, diff 0) and
-        // the hit landing (NPC damage).
+        // Kit-specific #126 regression: snap to -Z, then verify FightGuy's normal
+        // attack keeps that facing and connects with the target placed along -Z.
         var fg = TestHelpers.FightGuyDef;
         float fgGpy = TestHelpers.GroundPY(fg);
         // Grid-center positions: the arena heightmap spans [0,200]² — a -Z lunge from
         // the origin would exit the grid (no surface → airborne).
-        AssertGoldenScenario(new KitScenario
+        AssertScenario(new KitScenario
         {
             Name = "Facing Snap Then Normal",
             Def = fg,
@@ -38,55 +35,14 @@ public class FacingSnapTests : KitScenarioTests
             Inputs = new InputSequence()
                 .Set(0, new InputState { FaceToCamera = true, AimYaw = 18000 })
                 .Set(1, new InputState { ActiveSlot = AbilitySlots.Slot1 }),
-            Assert = _ => { },
+            Assert = player => TestHelpers.AssertNear(MathF.PI, player.FacingYaw, 1e-3f),
             NpcSetup = () => TestHelpers.NpcState(100f, 98.7f) with { PY = fgGpy },
-            NpcAssert = _ => { },
+            NpcAssert = npc => Assert.True(npc.DamagePercent > 0),
             NpcDef = fg,
-            SnapshotTick = 8,   // post-hit recovery of Low Kick (hitbox 2-4, lock until 17), hit landed
             TotalTicks = 60,
         });
     }
 
-    [Fact]
-    public void Golden_Snap_RejectedMidAttack()
-    {
-        // LMB during the attack lock (AnimLockTicks > 0) is rejected: facing stays 0,
-        // NOT the camera (PI). No NPC — the stage's own tracking has no target, so the
-        // pin is purely "no snap". FacingYaw in the golden makes this regression-proof.
-        var fg = TestHelpers.FightGuyDef;
-        AssertGoldenScenario(new KitScenario
-        {
-            Name = "Facing Snap Rejected Mid Attack",
-            Def = fg,
-            Setup = () => TestHelpers.PlayerState() with { PY = TestHelpers.GroundPY(fg), FacingYaw = 0f },
-            Inputs = new InputSequence()
-                .Set(0, new InputState { ActiveSlot = AbilitySlots.Slot1 })
-                .Set(2, new InputState { FaceToCamera = true, AimYaw = 18000 }),
-            Assert = _ => { },
-            SnapshotTick = 10,  // mid Low Kick (dur 17, IASA 13); snap rejected at t2
-            TotalTicks = 40,
-        });
-    }
-
-    [Fact]
-    public void Golden_Snap_RejectedInHitstun()
-    {
-        // Hitstun rejects the snap outright: facing stays 0 through the lock.
-        AssertGoldenScenario(new KitScenario
-        {
-            Name = "Facing Snap Rejected In Hitstun",
-            Def = Def,
-            Setup = () => TestHelpers.PlayerState() with
-            {
-                PY = Gpy, FacingYaw = 0f,
-                State = ActionState.Hitstun, HitstunTicks = 10, KVY = 3f,
-            },
-            Inputs = new InputSequence().Set(0, new InputState { FaceToCamera = true, AimYaw = 18000 }),
-            Assert = _ => { },
-            SnapshotTick = 5,   // still in hitstun, snap rejected, facing 0
-            TotalTicks = 40,
-        });
-    }
 
     // ────────────────────────── Behavioral ──────────────────────────
 

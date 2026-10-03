@@ -30,36 +30,12 @@ public static class LocalContentResolverSelfTest
             if (!roster.Success || roster.Roster == null)
                 throw new InvalidOperationException("Valid rooted cooked roster could not be resolved: " + Format(roster));
 
-            var nilusLegacy = resolver.ResolveLegacy(CharacterClass.Nilus);
-            if (!nilusLegacy.Success || nilusLegacy.LegacyEntry == null ||
-                nilusLegacy.LegacyEntry.LegacySelector != CharacterClass.Nilus)
-                throw new InvalidOperationException("Valid rooted Nilus legacy snapshot could not be resolved: " + Format(nilusLegacy));
-
-            var wibouLegacy = resolver.ResolveLegacy(CharacterClass.Wibou);
-            if (wibouLegacy.Success || wibouLegacy.LegacyEntry != null ||
-                !wibouLegacy.Diagnostics.Any(d => d.Code == "content.legacy.selector"))
-                throw new InvalidOperationException("Wibou legacy resolution did not fail closed.");
-
-            var mankiLegacy = resolver.ResolveLegacy(CharacterClass.Manki);
-            if (mankiLegacy.Success || mankiLegacy.LegacyEntry != null ||
-                !mankiLegacy.Diagnostics.Any(d => d.Code == "content.legacy.selector"))
-                throw new InvalidOperationException("Manki legacy resolution did not fail closed.");
-
-            var fightGuyLegacy = resolver.ResolveLegacy(CharacterClass.FightGuy);
-            if (fightGuyLegacy.Success || fightGuyLegacy.LegacyEntry != null ||
-                !fightGuyLegacy.Diagnostics.Any(d => d.Code == "content.legacy.selector"))
-                throw new InvalidOperationException("FightGuy legacy resolution did not fail closed: " + Format(fightGuyLegacy));
-
-            var unavailableLegacy = resolver.ResolveLegacy((CharacterClass)255);
-            if (unavailableLegacy.Success || unavailableLegacy.LegacyEntry != null ||
-                !unavailableLegacy.Diagnostics.Any(d => d.Code == "content.legacy.selector"))
-                throw new InvalidOperationException("Unavailable legacy selector did not fail closed: " + Format(unavailableLegacy));
 
             var unavailable = resolver.ResolveCookedPackage("unavailable-package");
             if (unavailable.Success || unavailable.Roster != null || !unavailable.Diagnostics.Any(d => d.Code == "content.package.missing"))
                 throw new InvalidOperationException("Unavailable package resolved unexpectedly or did not fail closed: " + Format(unavailable));
 
-            Debug.Log("[LocalContentResolverSelfTest] Passed rooted roster, cooked packages, remaining Nilus legacy snapshot, unavailable package, and cwd-independence checks.");
+            Debug.Log("[LocalContentResolverSelfTest] Passed rooted cooked roster, unavailable package, and cwd-independence checks.");
 
         }
         finally

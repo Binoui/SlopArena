@@ -65,10 +65,45 @@ public static class AbilityLabScenarioSelfTest
         for (int index = captured.Frames.Count - 1; index >= 0; index--)
             Require(captured.Frames[index].Actor.Equals(replay.Frames[index].Actor)
                 && captured.Frames[index].Opponent.Equals(replay.Frames[index].Opponent), "Re-recording changed a prior Shared frame.");
+        VerifyTargetedLeapScenario();
         ExpectInvalid(new AbilityLabScenarioOptions("grab", AbilityLabScenarioOptions.MaxFrame + 1));
         ExpectInvalid(new AbilityLabScenarioOptions("unknown"));
         ExpectInvalid(new AbilityLabScenarioOptions("grab", distance: float.NaN));
-        Debug.Log("[AbilityLabScenarioSelfTest] Passed cooked hit/miss/block, grab capture/shield/whiff/release, deterministic replay, pose clocks and invalid requests.");
+        Debug.Log("[AbilityLabScenarioSelfTest] Passed cooked hit/miss/block, grab capture/shield/whiff/release, targeted-leap aim/release/landing, deterministic replay, pose clocks and invalid requests.");
+    }
+
+    private static void VerifyTargetedLeapScenario()
+    {
+        var package = BuiltInContentResolver.Resolve(CharacterClass.Bonk);
+        var def = package.Definition;
+        var origin = new Vector3(0f, def.CapsuleHeight * 0.5f, 0f);
+        var controller = new AbilityLabSimulationController();
+        AbilityLabScenarioResult Run(string action, float distance) =>
+            controller.RunScenario(def, package.BakedAnimation,
+                new AbilityLabScenarioOptions(action, 170, distance), origin, 0f);
+
+        var near = Run("ground.E", 1f);
+        var far = Run("ground.E", 4f);
+        float LaunchSpeed(AbilityLabScenarioResult result) =>
+            result.Frames.First(frame => frame.Actor.State == ActionState.Attacking &&
+                !frame.Actor.IsGrounded).Actor.VZ;
+        Require(LaunchSpeed(far) > LaunchSpeed(near) * 2f,
+            "Targeted leap ignored the recorded aim distance and flew to minimum range.");
+        Require(far.Frames.Any(frame => frame.Actor.IsGrounded &&
+                frame.Actor.State == ActionState.Attacking && frame.Actor.AttackElapsedTicks == 56),
+            "Landing did not seek the authored impact pose in the recorded scenario.");
+        Require(far.Contacts.Any(contact => contact.Hit.Damage == 13f && !contact.Hit.Blocked),
+            "Ground targeted leap missed an opponent at its selected distance.");
+
+        var airNear = Run("air.E", 1f);
+        var airFar = Run("air.E", 4f);
+        Require(LaunchSpeed(airFar) > LaunchSpeed(airNear) * 2f,
+            "Air targeted leap ignored the selected target distance.");
+        Require(airFar.Frames.Any(frame => frame.Actor.IsGrounded &&
+                frame.Actor.State == ActionState.Attacking && frame.Actor.AttackElapsedTicks == 56),
+            "Air targeted leap did not synchronize the landing impact pose.");
+        Require(airFar.Frames.Any(frame => frame.Actor.IsGrounded && frame.Actor.State == ActionState.Idle),
+            "Air targeted leap did not finish landing recovery.");
     }
 
     private static CharacterDefinition Fixture()

@@ -266,7 +266,7 @@ no child strokes or per-hit materials are allocated. The effect holds through hi
 expands and fades using unscaled time.
 
 The shared tier is deliberately character-neutral. Manki smoke/fire, Wibou blade fragments,
-FightGuy ki, and Nilus void effects must layer over it without changing its gameplay meaning.
+and FightGuy ki must layer over it without changing its gameplay meaning.
 
 ## BoneTrail Prefab
 
@@ -364,7 +364,6 @@ No code changes needed — PlayerRenderer picks it up automatically.
 | Manki flame and explosions | Not implemented |
 | Wibou blade fragments and glints | Not implemented |
 | FightGuy ki layer | Not implemented |
-| Nilus void layer | Not implemented |
 | KO and respawn presentation | Not implemented |
 
 ---

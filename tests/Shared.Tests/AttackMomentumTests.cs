@@ -1,9 +1,8 @@
 using System;
-
 using System.Collections.Generic;
+using System.Linq;
 using Xunit;
 using SlopArena.Shared;
-using SlopArena.Shared.Abilities;
 namespace SlopArena.Shared.Tests;
 
 /// <summary>
@@ -11,14 +10,13 @@ namespace SlopArena.Shared.Tests;
 ///   - A grounded ability activation zeroes the incoming horizontal velocity (VX/VZ) —
 ///     grounded moves stop movement.
 ///   - Aerials ride their trajectory untouched (drift carries into the attack).
-///   - AbilitySpec.PreserveMomentumOnStart opts a grounded move out of the stop
-///     (dash-attack style moves).
+///     CookedSlotDefinition.PreserveMomentumOnStart opts a grounded move out of the stop
 /// The stop happens BEFORE OnStart, so a move's own lunge / OnStart velocity still applies.
 /// </summary>
 public class AttackMomentumTests
 {
-    private static readonly CharacterDefinition Def = TestHelpers.FightGuyDef;
-    private static readonly float GroundPy = TestHelpers.GroundPY(Def);
+    private static readonly CharacterDefinition Def = TestHelpers.EngineDef;
+    private static readonly float GroundPy = Def.CapsuleHeight * 0.5f;
 
     [Fact]
     public void GroundedNormal_StopsIncomingMomentum()
@@ -53,8 +51,15 @@ public class AttackMomentumTests
     public void GroundedNormal_PreserveMomentumOverride_KeepsVelocity()
     {
         var sim = TestHelpers.MakeSim();
-        var def = TestHelpers.CloneDef(TestHelpers.WibouDef);
-        def.Slot1 = CloneSpec(def.Slot1!, preserveMomentum: true);
+        var def = TestHelpers.EngineDef;
+        var slots = def.CookedSlots!.ToArray();
+        var slot = slots[0];
+        slots[0] = new CookedSlotDefinition(
+            slot.Ordinal, slot.Id, slot.IsAir, slot.Name, slot.Description, slot.IconId,
+            slot.Behavior, slot.AimMode, slot.CooldownTicks, slot.IsRecoveryMove,
+            preserveMomentumOnStart: true, slot.Timeline, slot.ChargePool, slot.AimMovement,
+            slot.AimAnimationId, slot.AllowSlideCarry);
+        def.CookedSlots = slots;
         var groundPy = TestHelpers.GroundPY(def);
         var state = TestHelpers.PlayerState() with { PY = groundPy, VX = 10f, VZ = 5f };
         TestHelpers.RegisterPlayer(sim, def, state);
@@ -70,7 +75,7 @@ public class AttackMomentumTests
     [Fact]
     public void OptedInSlideNormal_CapsIncomingVectorAndDecaysOnceBeforeIntegration()
     {
-        var def = WithSlideCarry(TestHelpers.CombatDef);
+        var def = WithSlideCarry(TestHelpers.EngineDef);
         var sim = TestHelpers.MakeSim();
         var state = TestHelpers.PlayerState()
             with
@@ -99,7 +104,7 @@ public class AttackMomentumTests
     [Fact]
     public void SlideCarry_HitstopFreezesDecay()
     {
-        var def = TestHelpers.CombatDef;
+        var def = TestHelpers.EngineDef;
         var state = TestHelpers.PlayerState()
             with
             {
@@ -122,7 +127,7 @@ public class AttackMomentumTests
     [Fact]
     public void SlideCarry_NaturalAbilityCompletionClearsCarry()
     {
-        var def = WithSlideCarry(TestHelpers.CombatDef);
+        var def = WithSlideCarry(TestHelpers.EngineDef);
         var sim = TestHelpers.MakeSim();
         sim.RegisterEntity(1, def, TestHelpers.PlayerState()
             with
@@ -147,7 +152,7 @@ public class AttackMomentumTests
 [Fact]
 public void SlideCarry_ShieldAdmissionClearsCarryAndBrakes()
 {
-    var def = TestHelpers.CombatDef;
+    var def = TestHelpers.EngineDef;
     var sim = TestHelpers.MakeSim();
     sim.RegisterEntity(1, def, TestHelpers.PlayerState()
         with
@@ -183,18 +188,4 @@ public void SlideCarry_ShieldAdmissionClearsCarryAndBrakes()
         return source;
     }
 
-    /// <summary>Shallow-clone a spec with the momentum override flag flipped.</summary>
-    private static AbilitySpec CloneSpec(AbilitySpec src, bool preserveMomentum)
-    {
-        return new AbilitySpec
-        {
-            Behavior = src.Behavior,
-            Name = src.Name,
-            CooldownTicks = src.CooldownTicks,
-            Stages = src.Stages,
-            AnimationNames = src.AnimationNames,
-            Params = new Dictionary<string, float>(src.Params),
-            PreserveMomentumOnStart = preserveMomentum,
-        };
-    }
 }

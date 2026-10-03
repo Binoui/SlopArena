@@ -1,0 +1,178 @@
+using System.Collections.Generic;
+using System.Linq;
+using SlopArena.Shared.Abilities;
+using SlopArena.Shared.Rollback;
+using Xunit;
+
+namespace SlopArena.Shared.Tests;
+
+public sealed class HitContactEventTests
+{
+    private const ulong AttackerId = 1;
+    private const ulong VictimId = 2;
+    private const string GroundPresentationId = "presentation.test.hit.ground";
+    private const string AirPresentationId = "presentation.test.hit.air";
+    private static CharacterDefinition ConfiguredDefinition()
+    {
+        var def = TestHelpers.EngineDef;
+        var slots = def.CookedSlots!.ToArray();
+        slots[0] = WithPresentation(slots[0], GroundPresentationId);
+        slots[8] = WithPresentation(slots[8], AirPresentationId);
+        def.CookedSlots = slots;
+        def.Slot1 = new AbilitySpec { HitPresentationId = GroundPresentationId, Stages = Array.Empty<AttackStage>() };
+        def.AirSlot1 = new AbilitySpec { HitPresentationId = AirPresentationId, Stages = Array.Empty<AttackStage>() };
+        return def;
+    }
+
+    private static CookedSlotDefinition WithPresentation(CookedSlotDefinition slot, string id)
+        => new(slot.Ordinal, slot.Id, slot.IsAir, slot.Name, slot.Description, slot.IconId,
+            slot.Behavior, slot.AimMode, slot.CooldownTicks, slot.IsRecoveryMove, slot.PreserveMomentumOnStart,
+            slot.Timeline, slot.ChargePool, slot.AimMovement, slot.AimAnimationId, slot.AllowSlideCarry, id);
+
+    private static ServerSimulation CreateSimulation(CharacterDefinition def, params (ulong id, float x)[] entities)
+    {
+        var sim = new ServerSimulation(TestHelpers.TestArena());
+        foreach (var (id, x) in entities)
+        {
+            var state = TestHelpers.PlayerState(x) with { EntityId = id, PY = TestHelpers.GroundPY(def) };
+            sim.RegisterEntity(id, def, state);
+        }
+        return sim;
+    }
+
+    private static Hitbox Contact(in CharacterState victim, bool airborne = false, bool multiple = false) => new()
+    {
+        X = victim.PX,
+        Y = victim.PY,
+        Z = victim.PZ,
+        EndX = victim.PX,
+        EndY = victim.PY,
+        EndZ = victim.PZ,
+        Radius = 0.45f,
+        Shape = HitboxShape.Sphere,
+        Damage = 5f,
+        BaseKnockback = 2f,
+        KnockbackGrowth = 3f,
+        StunTicks = 20,
+        DurationTicks = 5,
+        OwnerId = AttackerId,
+        ActivationId = 9,
+        AttackSequence = 17,
+        AttackSlot = AbilitySlots.Slot1,
+        ActivationAirborne = airborne,
+        Airborne = airborne,
+        HitsMultipleOpponents = multiple,
+    };
+
+    [Theory]
+    [InlineData(false, GroundPresentationId)]
+    [InlineData(true, AirPresentationId)]
+    public void AcceptedConfiguredHitEmitsCapturedSlotPresentationAtContact(bool airborne, string presentationId)
+    {
+        var def = ConfiguredDefinition();
+        var sim = CreateSimulation(def, (AttackerId, -2f), (VictimId, 0f));
+        var victim = sim.GetState(VictimId);
+        sim.Resolver.Spawn(Contact(in victim, airborne));
+
+        sim.Tick(new Dictionary<ulong, InputState>());
+
+        var hit = Assert.Single(sim.LastTickHits);
+        var evt = Assert.Single(sim.GetPresentationEvents());
+        Assert.Equal(PresentationEventSource.HitContact, evt.Source);
+        Assert.Equal(presentationId, evt.PresentationId);
+        Assert.Equal(AttackerId, evt.EntityId);
+        Assert.Equal(hit.AttackSequence, evt.AttackSequence);
+        Assert.Equal(hit.HitX, evt.WorldX);
+        Assert.Equal(hit.HitY, evt.WorldY);
+        Assert.Equal(hit.HitZ, evt.WorldZ);
+    }
+
+    [Theory]
+    [InlineData("shield")]
+    [InlineData("invincible")]
+    [InlineData("counter")]
+    [InlineData("miss")]
+    public void RejectedOrBlockedConfiguredContactEmitsNoHitContact(string outcome)
+    {
+        var def = ConfiguredDefinition();
+        var sim = CreateSimulation(def, (AttackerId, -2f), (VictimId, 0f));
+        var victim = sim.GetState(VictimId);
+        if (outcome == "invincible")
+        {
+            victim.InvincibilityTicks = 3;
+            sim.SetState(VictimId, victim);
+        }
+        if (outcome == "counter")
+            sim.ActivateAbility(VictimId, new CounterAbility(), (byte)(AbilitySlots.Slot1 - 1), def);
+        if (outcome != "miss")
+            sim.Resolver.Spawn(Contact(in victim));
+        else
+        {
+            var miss = Contact(in victim);
+            miss.X += 5f;
+            miss.EndX += 5f;
+            sim.Resolver.Spawn(miss);
+        }
+
+        var inputs = outcome == "shield"
+            ? new Dictionary<ulong, InputState> { [VictimId] = new() { ShieldHeld = true } }
+            : new Dictionary<ulong, InputState>();
+        sim.Tick(inputs);
+
+        Assert.DoesNotContain(sim.GetPresentationEvents(), evt => evt.Source == PresentationEventSource.HitContact);
+    }
+
+    [Fact]
+    public void MultipleAcceptedVictimsReceiveDistinctHitContactKeys()
+    {
+        var def = ConfiguredDefinition();
+        var sim = CreateSimulation(def, (AttackerId, -2f), (VictimId, 0f), (3, 0f));
+        var victim = sim.GetState(VictimId);
+        sim.Resolver.Spawn(Contact(in victim, multiple: true));
+
+        sim.Tick(new Dictionary<ulong, InputState>());
+
+        var events = sim.GetPresentationEvents().Where(evt => evt.Source == PresentationEventSource.HitContact).ToArray();
+        Assert.Equal(2, events.Length);
+        Assert.Equal(2, events.Select(evt => evt.Key).Distinct().Count());
+        Assert.Equal(events.Length, events.Select(evt => evt.OperationIndex).Distinct().Count());
+        Assert.All(events, evt => Assert.Equal(AttackerId, evt.EntityId));
+    }
+
+    [Fact]
+    public void PredictedLocalHitContactWaitsForAuthoritativeIngestion()
+    {
+        var def = ConfiguredDefinition();
+        var sim = new RollbackSimulator(TestHelpers.TestArena(), AttackerId);
+        var attacker = TestHelpers.PlayerState(-2f) with { EntityId = AttackerId, PY = TestHelpers.GroundPY(def) };
+        var victim = TestHelpers.PlayerState() with { EntityId = VictimId, PY = TestHelpers.GroundPY(def) };
+        sim.RegisterEntity(AttackerId, def, attacker);
+        sim.RegisterEntity(VictimId, def, victim);
+        sim.Resolver!.Spawn(Contact(in victim));
+
+        sim.Tick(new Dictionary<ulong, InputState>());
+
+        var hit = Assert.Single(sim.LastTickHits);
+        Assert.Empty(sim.DrainPresentationEvents());
+        var authoritative = new TimelinePresentationEvent(hit.MatchTick, AttackerId, 0, GroundPresentationId,
+            hit.AttackSequence, PresentationEventSource.HitContact, hit.HitX, hit.HitY, hit.HitZ, 0f)
+        {
+            Placement = new PresentationPlacement(DurationTicks: 150),
+        };
+        sim.IngestPresentationEvent(authoritative);
+        sim.IngestPresentationEvent(authoritative);
+        Assert.Equal(authoritative, Assert.Single(sim.DrainPresentationEvents()));
+    }
+
+    private sealed class CounterAbility : ServerAbility
+    {
+        public override void OnStart(ref CharacterState state, CharacterDefinition def)
+        {
+            state.State = ActionState.Attacking;
+            state.AnimLockTicks = 60;
+        }
+        public override void Tick(ref CharacterState state, ref InputState input, CharacterDefinition def) { }
+        public override bool TryCounter(ref CharacterState defender, ref CharacterState attacker,
+            CharacterDefinition attackerDef, float incomingDamage) => true;
+    }
+}

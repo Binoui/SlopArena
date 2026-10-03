@@ -2,11 +2,11 @@
 version: 1
 slug: "client-unity-assets-ui-mainmenu-uxml"
 primary_target: "client/Unity/Assets/UI/MainMenu.uxml"
-related_targets: ["client/Unity/Assets/UI/CharSelect.uxml","client/Unity/Assets/UI/StageSelect.uxml","client/Unity/Assets/UI/ServerBrowser.uxml","client/Unity/Assets/UI/LobbyRoom.uxml"]
+related_targets: ["client/Unity/Assets/UI/CharSelect.uxml","client/Unity/Assets/UI/StageSelect.uxml","client/Unity/Assets/UI/ServerBrowser.uxml","client/Unity/Assets/UI/LobbyRoom.uxml","client/Unity/Assets/UI/HUD.uxml"]
 ---
 
 # Frontend match flow
-Mode: Operate. Scope: player-facing frontend match flow, Settings, pause/Training controls, chat, dialogs, and restrained HUD neutral chrome. The identity rollout is implemented; creator/Ability Lab tools remain excluded. Connected-room and distributable-player acceptance are separate from local native presentation checks.
+Mode: Operate. Scope: player-facing frontend match flow, Settings, pause/Training controls, chat, dialogs, and the separately approved fight-card gameplay HUD. The identity rollout is implemented; creator/Ability Lab tools remain excluded. Connected-room and distributable-player acceptance are separate from local native presentation checks.
 
 ## Direction contract
 THESIS: Get friends into a fight without teaching networking. Keep a connected composition with low-poly underground toy-fight-club and DIY internet-game energy: slightly crappy on purpose, extremely readable. “Toy” describes scavenged construction, not literal plastic or required cuteness.
@@ -28,6 +28,7 @@ Constraints: Unity desktop UI Toolkit, installed Unity CLI/Pipeline only, server
 - Remaining player-facing finish: all five Settings categories, reset/display confirmation, remap cancellation, match Settings, Training/Solo pause, gameplay join presentation, and frontend/gameplay chat. HUD neutral fields/outlines are harmonized without geometry/assets/animation or functional-color changes. Optional local PackSkin assets remain untouched; migrated Settings controls are independently styled. Evidence: `.impeccable/review/remaining-ui-20261001/`. Removed temporary online/Results palette classes and unsupported USS declarations after the shell cutover; no new theme framework.
 - Chat contrast/control refinement: paper frame and channel tabs, dark history/input with paper rules, yellow active/available actions, readable truthful disabled states. Grouped Hide/Resize only; removed maximize plus obsolete expanded host/focus APIs. Hidden CHAT anchors bottom-left. Existing Direct conversation/mute management remains without a duplicate sidebar. Top-bar modes have visible ink borders. Evidence: `.impeccable/review/chat-contrast-controls-20261001/`.
 - Settings material finish: paper outer panel, ink Archivo title, ink-bordered paper categories/yellow selection, dark scroll/control field, and readable ink status. Keyboard-focused categories/Back use ink/paper with a yellow frame. Same categories, bindings, slider values, confirmation/remap/reset/display-revert logic, and frontend/match ownership. Evidence: `.impeccable/review/settings-paper-20261001/`.
+- Fight-card HUD refinement: 308×102 portrait-led player cards, explicit lives count/tickets with visible lost marks, clipped-square slots in the existing orange/blue diamonds, and printed paper keyboard tabs. Controller glyphs, authored move icons, effective bindings, cooldowns, and state feedback remain. `Show overhead damage` defaults ON and persists; OFF removes only the percentage tab, not the independently anchored target bracket/pointer or panel damage. All visible damage uses the same 40%/90% tiers. Chat, camera/stages, Shared gameplay, and network state are unchanged. Native evidence: `.impeccable/review/fight-card-hud-20261001/`; controlled snapshots/labelled stock-layout specimens are not live multiplayer proof.
 - Address entry resolves registered servers through the existing directory and joins the
   same lobby session as browsing. The unreachable legacy UDP lobby scene/controller/UXML
   and build entry were retired; no second match protocol was added.

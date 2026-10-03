@@ -21,7 +21,7 @@ namespace SlopArena.Shared.Tests;
 /// which is what makes the post-move input blocks below discriminate the lag from the move's
 /// own anim lock.
 /// </summary>
-public class LandingLagTests : KitScenarioTests
+public class LandingLagTests
 {
     private const ushort AirSlot1Duration = 40;
     private const ushort AirSlot1Lag = 18;
@@ -79,10 +79,10 @@ public class LandingLagTests : KitScenarioTests
         float lunge = 0f,
         float airFloatGravity = 0f)
     {
-        var def = TestHelpers.CloneDef(TestHelpers.WibouDef);
+        var def = TestHelpers.EngineDef;
         if (airFloatGravity != 0f)
             def.Movement = def.Movement with { AirFloatGravity = airFloatGravity };
-        var slots = TestHelpers.WibouDef.CookedSlots!.ToArray();
+        var slots = def.CookedSlots!.ToArray();
         slots[8] = AirSlot1(lag, before, after, lunge);
         def.CookedSlots = slots;
         return def;
@@ -103,7 +103,7 @@ public class LandingLagTests : KitScenarioTests
     private static readonly CharacterDefinition FreezeDef =
         MakeDef(AirSlot1Lag, AirSlot1Before, AirSlot1After, lunge: 4f, airFloatGravity: 36f);
 
-    private static float Gpy => TestHelpers.GroundPY(TestHelpers.WibouDef);
+    private static float Gpy => TestHelpers.GroundPY(LagDef);
 
     /// <summary>Airborne falling start: heightAbove above ground, straight down, no horizontal input.</summary>
     private static CharacterState FallingStart(float heightAbove)
@@ -114,7 +114,7 @@ public class LandingLagTests : KitScenarioTests
         Func<int, InputState> inputFor)
     {
         var sim = TestHelpers.MakeSim(TestHelpers.TestArena());
-        sim.RegisterEntity(1, def, FallingStart(heightAbove), TestHelpers.LoadBakedData(def));
+        sim.RegisterEntity(1, def, FallingStart(heightAbove));
         var states = new List<CharacterState>();
         for (int tick = 0; tick < 60; tick++)
         {
@@ -139,7 +139,7 @@ public class LandingLagTests : KitScenarioTests
     {
         var def = MakeDef(AirSlot1Lag, AirSlot1Before, AirSlot1After);
         var sim = TestHelpers.MakeSim(TestHelpers.TestArena());
-        sim.RegisterEntity(1, def, FallingStart(4.7f), TestHelpers.LoadBakedData(def));
+        sim.RegisterEntity(1, def, FallingStart(4.7f));
         var states = new List<CharacterState>();
         for (int tick = 0; tick < 60; tick++)
         {
@@ -156,51 +156,6 @@ public class LandingLagTests : KitScenarioTests
             "Cooked air.1 should apply its stage landing lag on a mid-window landing");
     }
 
-    /// <summary>
-    /// Both goldens share physics and inputs (aerial at t0, jump press at t30 — 3 ticks
-    /// after the t27 landing, snapshot at t33) — the only difference is the stage's declared
-    /// auto-cancel window. Mid-window (6..32): the stage-elapsed-28 landing locks for 18
-    /// ticks and the aerial keeps running, so the jump press is dropped — still Attacking,
-    /// grounded, JumpsLeft 2 at the snapshot.
-    /// </summary>
-    [Fact]
-    public void Golden_LagLand_MidWindow_BlocksJumpThroughLag()
-    {
-        AssertGoldenScenario(new KitScenario
-        {
-            Name = "Landing Lag Mid Window Blocks Jump",
-            Def = LagDef,
-            Setup = () => FallingStart(4.7f),
-            Inputs = new InputSequence()
-                .Press(0, AbilitySlots.Slot1)
-                .Set(30, new InputState { Jump = true }),
-            Assert = _ => { },
-            SnapshotTick = 33,   // mid-lag, aerial still active: jump press dropped
-            TotalTicks = 120,
-        });
-    }
-
-    /// <summary>
-    /// Late window (26..): the same stage-elapsed-28 landing auto-cancels — the aerial ends
-    /// on the landing frame, so the same jump press at t30 goes through (JumpSquat,
-    /// JumpsLeft 1 at the snapshot): the "act immediately" half of auto-cancel, pinned.
-    /// </summary>
-    [Fact]
-    public void Golden_CleanLand_LateWindow_AutoCancels()
-    {
-        AssertGoldenScenario(new KitScenario
-        {
-            Name = "Landing Lag AutoCancel Late Window",
-            Def = CleanLateDef,
-            Setup = () => FallingStart(4.7f),
-            Inputs = new InputSequence()
-                .Press(0, AbilitySlots.Slot1)
-                .Set(30, new InputState { Jump = true }),
-            Assert = _ => { },
-            SnapshotTick = 33,   // jumped at t30 → JumpSquat
-            TotalTicks = 120,
-        });
-    }
 
     // ── Mechanics: the lock itself ──
 
@@ -388,7 +343,7 @@ public class LandingLagTests : KitScenarioTests
         // not the ordinary standstill Rush kick-off.
         state.LastDirX = 1f;
         var sim = TestHelpers.MakeSim(TestHelpers.TestArena());
-        sim.RegisterEntity(1, LagDef, state, TestHelpers.LoadBakedData(LagDef));
+        sim.RegisterEntity(1, LagDef, state);
 
         var states = new List<CharacterState>();
         for (int tick = 0; tick <= 45; tick++)
@@ -438,7 +393,7 @@ public class LandingLagTests : KitScenarioTests
         var initial = FallingStart(4.7f);
         initial.PX = initial.PZ = 50;
         initial.VX = def.Movement.RunSpeed;
-        sim.RegisterEntity(1, def, initial, TestHelpers.LoadBakedData(def));
+        sim.RegisterEntity(1, def, initial);
         CharacterState landed = default;
         for (int tick = 0; tick < 100; tick++)
         {

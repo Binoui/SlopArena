@@ -142,9 +142,9 @@
       "url": "https://packages.unity.com"
     },
     "com.unity.pipeline": {
-      "version": "0.5.0-exp.1",
+      "version": "file:com.unity.pipeline",
       "depth": 0,
-      "source": "registry",
+      "source": "embedded",
       "dependencies": {
         "com.unity.test-framework": "1.1.33",
         "com.unity.nuget.mono-cecil": "1.11.6",
@@ -152,8 +152,7 @@
         "com.unity.modules.jsonserialize": "1.0.0",
         "com.unity.modules.screencapture": "1.0.0",
         "com.unity.nuget.newtonsoft-json": "3.0.2"
-      },
-      "url": "https://packages.unity.com"
+      }
     },
     "com.unity.probuilder": {
       "version": "6.0.9",

@@ -45,7 +45,7 @@ content-cooked/<package>/
 
 FightGuy is the first cooked vertical slice. Its editable source is under `client/Unity/Assets/CharacterPackages/fightguy/`; its canonical runtime package is under `content-cooked/fightguy/`. The generated client catalog is a regenerable presentation cache.
 
-Manki, Wibou, and Bonk are package-native cooked roster characters. Nilus remains behind `LegacyCharacterCatalogAdapter` until migrated. Nilus's C# definition, legacy registry, source path, and baked data are modification-only compatibility. It is not a template for new packages. Do not widen legacy instructions into the cooked workflow or infer that a legacy file is current authority.
+FightGuy, Manki, Wibou, and Bonk are package-native cooked roster characters. Nilus, its registry/factory dispatch, and the old LMB combo classes were removed on 2026-10-02. Catalog admission and ability activation use cooked packages only; missing cooked content never falls back to a C# character definition.
 
 ## Runtime flow
 
@@ -122,10 +122,6 @@ Edit `src/Shared/`, add/update a behavioral test, build Shared, and run the rele
 ### Server or netcode
 
 Edit `src/Server/` or the Unity network bridge only after tracing the authoritative flow. Build the server and exercise a local match when the change affects admission, transport, reconciliation, or match lifecycle. See [Netcode Architecture](systems/netcode-architecture.md).
-
-### Legacy character maintenance
-
-Change only the compatibility implementation needed for Nilus. Preserve its existing contract unless the migration explicitly removes it. Do not create new legacy registry entries for a package-native character.
 
 ## Quick commands
 

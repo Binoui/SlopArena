@@ -26,11 +26,10 @@ public sealed class MatchContentCatalogProvider
             var packages = new Dictionary<string, CookedCharacterPackageLoadResult>(StringComparer.Ordinal);
             foreach (var rosterEntry in manifest.Entries)
             {
-                if (rosterEntry.Requirement.Version == "legacy-1") continue;
                 string directory = Path.Combine(_cookedRoot, rosterEntry.PackageId);
                 packages[rosterEntry.PackageId] = CookedCharacterPackageLoader.LoadDirectory(directory, rosterEntry.Requirement);
             }
-            var result = new MatchContentCatalogBuilder().Build(manifest, packages, new LegacyCharacterCatalogAdapter());
+            var result = new MatchContentCatalogBuilder().Build(manifest, packages);
             if (!result.IsValid || result.Catalog == null)
             {
                 error = string.Join("; ", result.Diagnostics);

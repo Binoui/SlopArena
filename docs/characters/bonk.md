@@ -7,13 +7,105 @@ It exercises the authoritative Shared compiler, trusted built-in capability
 admission, cooked package loading, Character Select discovery, and match
 content admission. Avatar visual/pose review remains a release prerequisite.
 
-## Movement tuning — 2026-09-15
+## Local cooldown tuning — 2026-10-03
 
-Bonk trades some ground speed for vertical reach: Run is reduced from 14 to
-13 m/s, while `jumpForce` rises from 12 to 13 m/s. Full-jump height measures
-2.24 m instead of 1.90 m through the authoritative flat-arena probe. The unchanged
-0.8 air-jump multiplier also raises double-jump launch speed from 9.6 to 10.4 m/s.
-Short hop, air control, dash, gravity, weight, and ability data are unchanged.
+Both explicit ground/air A variants now cost **120 ticks / 2 s**, and both R
+variants cost **240 / 4 s**, instead of zero. This adds a repeat-use cost to the
+armored engages without changing armor, linked contacts, reward or IASA.
+E remains **240 / 4 s**; F and its air alias remain **900 / 15 s**; normals
+remain zero. These are playtest tuning values, not a match-balance verdict.
+Cooldown begins on completion/cancellation. Shared now rejects same-slot IASA
+recasts that would bypass the pending cooldown while allowing another ready
+slot to cancel normally. Source-compiled ground/air probes verified the gate,
+exact timers and recast after expiry. Persisted cooked content/roster are unchanged.
+
+## Local gamefeel tuning — 2026-10-02
+
+Bonk is the slower, high-jumping acrobat: Run 10 m/s, air cap 6 m/s,
+air acceleration 10 + 2 m/s². Jump/short-hop impulses remain 13/7.2 m/s;
+gravity is 26 m/s² and fall/fast-fall caps are 13/20 m/s.
+Source-compiled Shared measures full hop **58 ticks / 3.142 m** and short hop
+**31 ticks / 0.938 m**. Manki has longer airtime and more air control; Bonk
+has the higher arc.
+
+Normal durations increase approximately 25%, with retimed contact windows,
+IASA and auto-cancel thresholds. Ground normals retain four inactive ticks
+before another ability, eight for ground.4. Bonk air.2's pre-hit cancel is
+removed: duration 53, IASA/late auto-cancel 45, landing lag 18, no early
+auto-cancel. Geometry, damage, knockback, special timelines and aliases are unchanged.
+
+This is source-only Editor tuning. Cooked packages/roster remain unchanged.
+Shared lifetime/IASA and representative landing probes passed; visual
+Lab/Training alignment verification awaits the retained Editor owner's window.
+
+## Targeted Jump Slam (E) — landing follow-through — 2026-10-02
+
+Authoritative timing contract for `ground.E` and `air.E` (`anim.bonk.ge`, 56
+frames at 30 fps; both stages run 112 ticks, so frame = elapsed / 2 in both
+authoritative pose sampling and rendered playback):
+
+- Landing synchronizes the move: the authoritative clock seeks to tick 56
+  (frame 28) regardless of flight duration, so the sword pose and the clip
+  enter the impact pose together.
+- One six-tick damage window opens at landing (`parameters.hitbox.durationTicks: 6`,
+  damage 13, radius 0.42 m, angle 55°, base 9, growth 32, stun 20). It is
+  independent of recovery and is the only damage source — the obsolete
+  operations at ticks 71/90 were removed.
+- Recovery runs 52 ticks to tick 108 (frame 54, the approved endpoint; the
+  import's extra frame 55 is unused), then locomotion returns — no six-tick cutoff.
+- `maxFlightTicks` is 96 (human-approved): the tuned gravity 26 m/s² makes the
+  leap land at tick 79, past the old 72 cap, which ended the ability mid-air and
+  killed the slam. The timeout still ends a no-landing flight in the air without
+  a slam.
+- Horizontal speed uses the same-height ballistic airtime estimate. Starting
+  above the landing surface lengthens flight and can overshoot the cursor:
+  native Lab `air.E` from 1.7 m above the floor targeted 4 m but landed at
+  4.733 m and whiffed. This is not a homing/guaranteed-hit move.
+- Interruption (hitstun, death, cancellation) removes the activation's hitboxes
+  and clears the attack marker and movement lock — no phantom impact or
+  lingering lock.
+
+Source-only Shared simulation using Bonk's baked poses produced one accepted
+13-damage contact for both E variants at 4 m when air E started 1 m above
+ground, and none at 20 m. The accepted native Lab ground.E scenario hit for
+13 at frame 84 (impact pose tick 56), froze during Hitstop and returned to
+locomotion at frame 146. Native Lab air.E from higher altitude sought tick 56
+on landing at frame 91 and recovered at frame 143 despite whiffing. Recorded
+frame captures show the airborne hold and distinct impact/follow-through poses;
+Training and human feel acceptance remain unverified.
+
+## Special roles — provisional tuning
+
+Q maps to canonical `ground.A` / `air.A`, not normal slot `3`.
+Both variants are Shoulder Bash: **6 damage, base 5, growth 20**, with
+armor on authored ticks **12–36**. It is a short forward check, not the
+kit's high-percent finisher.
+
+R is Charging Double Slash: a committed forward engage with two independent
+sword contacts. Hit 1 at ticks **22–28** deals **4 damage, base 2, growth 0**
+and opts into **24 fixed hitstun ticks** to retain proximity without a
+percent-scaled launch. Hit 2 at **42–50** deals **8 damage, base 7, growth 28**
+at **35°**. Armor covers only **12–28**; the second swing and recovery are exposed.
+
+Armor retains incoming damage and hitstop, but prevents ordinary launch,
+hitstun and SDI during the protected contact. Grabs still capture and cancel it;
+cancellation or a new activation cannot carry protection forward. Air A/R
+retain their existing temporary gravity windows. E/F reward values are unchanged;
+F's individual contacts are not a guaranteed full-damage sequence.
+
+These values establish roles, not final roster balance. Source-backed mirror
+scenarios verify the R link at 0/60/120/180% with escape inputs; human
+Lab/Training acceptance and accepted-package verification are separate gates.
+
+Native Ability Lab idle-target probes of the local Bonk package: ground Q
+connected once for 6 damage at 1.5 m (frame 20); ground R connected twice
+for 4 then 8 damage at 2.5 m (frames 22/48); ground F connected once for
+2.5 damage at 1.5 m (frame 9). Air Q at 1.5 m missed the grounded dummy from
+the Lab's elevated start; air R at 2.5 m connected its second 8-damage hit
+at frame 41; air F at 1.5 m connected once for 2.5 at frame 66. These are
+fixed-distance, idle-opponent contacts, not evidence of armor under incoming
+attacks, a guaranteed R link, or final visual/gamefeel acceptance. The Lab
+reported a live draft with a stale workspace, not an accepted cooked package.
 
 ## Package ownership
 
@@ -22,8 +114,8 @@ The package is `client/Unity/Assets/CharacterPackages/bonk/`:
 - `package.json` — package identity and attribution (`bonk`, `0.0.0-dev`, Binoui, MIT,
   SlopArena).
   `character.json` — authoritative gameplay source with the canonical sixteen slots.
-  Seven normals use sword capsules from `_weapon_hilt` to `_weapon_tip`; A is Shoulder
-  Bash, E is the targeted recovery slam, R remains a WIP probe, and F is Blade Storm.
+  Eight normals use sword capsules from `_weapon_hilt` to `_weapon_tip`; A is Shoulder
+  Bash, E is the targeted recovery slam, R is Charging Double Slash, and F is Blade Storm.
   `air.A` and `air.R` are explicit aerial variants with their own temporary gravity
   windows; other shared specials remain aliases.
 - `CharacterAssetCatalog.asset` — schema 1, 60 Hz, Bonk rig, presentation bindings,
@@ -35,29 +127,34 @@ hashes from its cooked manifest. Character Select discovers it from that roster.
 
 ## WIP gameplay kit
 
-All timings are 60 Hz ticks. Each named normal is an interruptible,
-independent `hitGroup: 0` capsule from `_weapon_hilt` to `_weapon_tip`.
+The table describes the local source candidate, in authored 60-Hz ticks.
+Each normal uses a `hitGroup: 0` capsule from `_weapon_hilt` to `_weapon_tip`;
+the existing air.2 probe is noninterruptible, while the other normals are interruptible.
 
 | Slot | Role | Duration | IASA | Trigger / active | Radius | Damage / angle | Base / growth | Stun |
 | --- | --- | ---: | ---: | --- | ---: | --- | --- | ---: |
-| `ground.1` | Reverse Slash — slower forward neutral check | 35 | 30 | 13 / 11 | 0.28 | 6 / 30° | 4 / 20 | 12 |
-| `ground.2` | Greatsword Swing — committed forward spacing | 42 | 37 | 16 / 12 | 0.33 | 10 / 35° | 7 / 30 | 16 |
-| `ground.3` | Reverse Rising Slash — faster vertical anti-air | 38 | 33 | 13 / 12 | 0.30 | 9 / 78° | 6 / 26 | 16 |
-| `ground.4` | Heavy Double Slice — grounded kill read | 58 | 52 | 20 / 13 | 0.38 | 15 / 25° | 10 / 42 | 22 |
-| `air.1` | Reverse Air Slash — aerial spacing check | 46 | 41 | 18 / 16 | 0.28 | 8 / 35° | 5 / 24 | 14 |
-| `air.3` | Downward Sweep — committed spike | 54 | 48 | 23 / 17 | 0.32 | 11 / -45° | 7 / 30 | 20 |
-| `air.4` | Acrobatic Double Slice — aerial kill read | 66 | 59 | 28 / 18 | 0.38 | 14 / 25° | 9 / 40 | 22 |
-Grounded landing/auto-cancel windows remain zero. Aerial landing lag and
-auto-cancel before/after are now `air.1: 20 / 15 / 34`, `air.3: 22 / 16 / 40`,
-and `air.4: 24 / 16 / 49`.
+| `ground.1` | Reverse Slash — forward check | 60 | 38 | 11 / 13 | 0.5 | 6 / 30° | 4 / 20 | 12 |
+| `ground.2` | Greatsword Swing — forward spacing | 93 | 47 | 20 / 15 | 0.5 | 10 / 35° | 7 / 30 | 16 |
+| `ground.3` | Reverse Rising Slash | 125 | 44 | 21 / 20 | 0.5 | 10 / 35° | 7 / 30 | 16 |
+| `ground.4` | Heavy Double Slice — kill read | 118 | 71 | 48 / 16 | 0.5 | 15 / 25° | 10 / 42 | 22 |
+| `air.1` | Reverse Air Slash — spacing | 88 | 52 | 19 / 21 | 0.5 | 8 / 35° | 5 / 24 | 14 |
+| `air.2` | Existing air.2 probe, recovery retimed | 53 | 45 | 15 / 14 | 0.5 | 1 / 45° | 5 / 80 | 8 |
+| `air.3` | Downward Sweep — spike | 100 | 60 | 19 / 16 | 0.5 | 11 / -45° | 7 / 30 | 20 |
+| `air.4` | Acrobatic Double Slice — kill read | 73 | 63 | 37 / 12 | 0.5 | 14 / 25° | 9 / 40 | 22 |
 
-`ground.E` and `air.E` are the same `Targeted Jump Slam` contract:
-`groundCursor` hold/release aim, a 240-tick cooldown, recovery semantics, and a
-180-tick timeline. The trusted Shared capability clamps the horizontal target
-to 1–12 m, launches at vertical speed 16, and spawns one 0.42 m capsule on
-authoritative landing for 13 damage at 55°, base/growth 9/32, 20 stun ticks,
-and a 6-tick hitbox. Aim yaw and distance are cached while held, so release
-input cannot replace the selected direction.
+Grounded landing/auto-cancel fields remain zero. Aerial landing lag / early
+auto-cancel / late auto-cancel: `air.1: 20 / 19 / 43`, `air.2: 18 / 0 / 45`,
+`air.3: 22 / 20 / 50`, `air.4: 24 / 20 / 62`. Zero early auto-cancel is disabled.
+
+`ground.E` and `air.E` use the same reusable targeted-leap lifecycle:
+`groundCursor` hold/release aim, a 240-tick cooldown, and a 112-tick authored
+timeline. The public Shared primitive clamps the horizontal target to 1–12 m,
+launches at vertical speed 16, and dispatches its authored sword hitbox only
+on landing. The source owns the 96-tick flight limit, pose seek to tick 56,
+52-tick recovery, and the nested six-tick hilt-to-tip hitbox; none of these
+values live in Bonk-specific C#. Aim yaw and distance are cached while held,
+so release input cannot replace the selected direction. Ability Lab's Moves
+inspector edits these parameters through the package draft and Undo.
 
 `ground.F` is `Blade Storm`: a 100-tick timeline with hitboxes at ticks 2, 16, 24,
 32, and 44, and a 900-tick cooldown. Its mobile aim ends at tick 75, locking
@@ -67,9 +164,9 @@ movement for the final 25 ticks. `air.F` aliases this definition.
 at tick 0: 0.5× the active airborne gravity for 30 ticks. FastFall overrides
 this temporary reduction; the operation does not reset FloatWindow.
 
-The capability requirement is
-`slop.internal.bonk.targeted-jump-slam.v1` version `1`. It is admitted only
-for the trusted built-in Bonk profile; Workshop content cannot use it.
+The capability requirement is `slop.ability.targeted-leap.v1` version `1`.
+This bounded primitive is admitted for validated Workshop and trusted
+built-in packages; the retired Bonk-only ID fails admission.
 
 Assets remain in the existing shared Bonk art tree, matching the FightGuy/Wibou convention,
 with their Unity `.meta` files preserved:
@@ -89,12 +186,12 @@ The package weapon config attaches the sword to the source rig's `hand_r` bone.
 Source licensing remains an approval prerequisite before release, not before the
 current built-in roster admission.
 
-## Air 2 design — Rising Greatsword Sweep
+## Historical air.2 design — Rising Greatsword Sweep
 
-Design agreed 2026-09-15. The animation candidate is authored and bound;
-gameplay is not implemented. `air.2` still has the 30-tick, hitbox-free probe
-timeline. The 42-tick specification below is the gameplay creation target,
-not a claim about current runtime behavior.
+The following September 15 animation/role proposal is historical, not the
+current gameplay table. The October local pass retimes the existing damaging
+air.2 probe and adopts the proposed recovery phase and landing commitment;
+it does not implement the proposal's different damage, angle, radius or active window.
 
 Animation candidate: `Assets/Art/Characters/bonk/Animations/bonk_a2_rising_sweep.FBX`,
 bound as `anim.bonk.a2`. Source frames 1–22 at 30 fps span 0.7 seconds.
@@ -103,11 +200,10 @@ actual rig. The normal Blender FBX export imports as Humanoid with a
 reference pose derived from Bonk's existing Avatar; no binary FBX patching
 or gameplay-root correction is used.
 
-Ability Lab resolved the binding through transient compiled content.
-Its unchanged 30-tick timeline compresses the clip to 0.5 seconds
-(1.4× intended speed): Lab tick 14 sampled clip time 0.326667 seconds.
-Judge the intended timing from the 0.7-second source preview until the
-separate gameplay timing change is implemented.
+Earlier Ability Lab review used a 30-tick probe, compressing the clip to
+0.5 seconds. The current source candidate uses 53 ticks; the historical
+42-tick proposal below is not its current timing contract. Live review of
+the new timing is pending.
 
 Editable source and review evidence:
 `art/blender/exports/bonk-a2-37jjjrkv/bonk-a2-source.blend`,
@@ -230,14 +326,15 @@ unity command --project-path client/Unity \
   sloparena.character.cook --target bonk --format json
 ```
 
-Observed inspection after the package retune: `success: true`, `packageId: bonk`,
-sixteen resolved slots, trusted built-in profile, `dirtyOrStale: false`, and no
-capability or binding diagnostics. Observed semantic cook: `success: true`,
-source/cooked-source hash `f7e6ac01abe4326a6141328584d12887cce5bdc865c943279da8b3b2136d86fa`,
-cooked-content hash `48e630f8c5e21172b1616df949cddbcb1a5f4268608efcbbe5cc074685a06149`,
-package hash `d9aa234efeb75322fed85229eef2b24a19ede9a5dae4a3d6fa3cc1146bfee43c`.
-The package is rostered as `Bonk`; a forced invalid cook preserved the last valid
-cooked payloads and generated catalog before the source was restored and recooked.
+The accepted 2026-10-03 combined Bonk cook and verification resolved all
+sixteen slots with no diagnostics and `dirtyOrStale: false`. Source/cooked-source
+hash: `596dc90049ad069f32f7be781b3b22988f30f40177c1b8ebbde2ea9cb9c46637`;
+cooked-content hash: `b7e7f6e3823a97860228789677eed6e457592f70953503388d48c596e9e3126c`;
+package hash: `835a7b93dc703e3c91e2d62d7cd56dab9740c04474086f3c9fee81fd8240e40d`.
+Runtime API minimum is `1.3.0`, and the verified requirement is the public
+`slop.ability.targeted-leap.v1` version `1`. The built-in Bonk roster pin was
+refreshed to this identity. An earlier forced invalid cook preserved the last
+valid cooked payloads and catalog; that check predates this cutover.
 
 Ability Lab and Character Select may discover Bonk through the verified package and
 roster manifests. Compatibility remains the legacy-only path; Training and online

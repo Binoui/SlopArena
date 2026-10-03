@@ -68,10 +68,9 @@ New packages live under `client/Unity/Assets/CharacterPackages/<package>/`. Cook
 | Bonk | Cooked package; rostered | [Bonk](characters/bonk.md) |
 | Manki | Cooked package; rostered | [Manki](characters/manki.md) |
 | Wibou | Cooked package; rostered | [Wibou](characters/wibou.md) |
-| Nilus | Legacy compatibility implementation | [Nilus](characters/nilus.md) |
 
-The Nilus page is a modification-only legacy implementation record. Its legacy details
-must not be copied into new package work.
+The [Nilus page](characters/nilus.md) is a historical record of a retired character, not
+an implementation or authoring guide.
 
 ## Contributing
 

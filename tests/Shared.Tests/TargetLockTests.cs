@@ -11,8 +11,8 @@ namespace SlopArena.Shared.Tests;
 /// </summary>
 public class TargetLockTests : KitScenarioTests
 {
-    private static readonly CharacterDefinition Def = TestHelpers.CombatDef;
-    private static float Gpy => TestHelpers.CombatGroundPY;
+    private static readonly CharacterDefinition Def = TestHelpers.EngineDef;
+    private static float Gpy => Def.CapsuleHeight * 0.5f;
 
     /// <summary>
     /// Test arena whose spawn point sits at feet-on-floor (Y = capsule half), so a
@@ -64,49 +64,37 @@ public class TargetLockTests : KitScenarioTests
 
 
     [Fact]
-    public void Golden_LockOn_LmbSnapKeepsLock()
+    public void LockOn_LmbSnapKeepsTargetIdentity()
     {
-        // Locked at t0; LMB facing snap at t10 changes facing without clearing LockOn.
-        AssertGoldenScenario(new KitScenario
-        {
-            Name = "Target Lock LMB Snap Keeps Lock",
-            Def = Def,
-            Setup = () => TestHelpers.PlayerState() with { PY = Gpy, FacingYaw = 0f },
-            Inputs = new InputSequence()
-                .Set(0, new InputState { ToggleLock = true })
-                .Set(10, new InputState { FaceToCamera = true, AimYaw = 18000 }),
-            Assert = _ => { },
-            NpcSetup = () => TestHelpers.NpcState(0f, 3f) with { PY = Gpy },
-            NpcAssert = _ => { },
-            NpcDef = Def,
-            SnapshotTick = 60,
-            TotalTicks = 120,
-        });
+        var sim = TestHelpers.MakeSim(TestHelpers.TestArena());
+        sim.RegisterEntity(1, Def, TestHelpers.PlayerState() with { PY = Gpy, FacingYaw = 0f });
+        sim.RegisterEntity(100, Def, TestHelpers.NpcState(0f, 3f) with { PY = Gpy });
+
+        sim.Tick(new() { { 1, new InputState { ToggleLock = true } } });
+        sim.Tick(new() { { 1, new InputState { FaceToCamera = true, AimYaw = 18000 } } });
+
+        var state = sim.GetState(1);
+        Assert.True(state.LockOn);
+        Assert.Equal(100UL, state.TargetEntityId);
+        TestHelpers.AssertNear(MathF.PI, state.FacingYaw, 1e-4f);
     }
 
     [Fact]
-    public void Golden_LockOn_DeathRetargets()
+    public void LockOn_DeathRetainsRespawnedTarget()
     {
-        // Locked on an NPC that starts in the void (PY -25 < KillHeight -20): it dies at
-        // the end of tick 0, respawns at the arena spawn (0,0) — still within lock range
-        // of the player at (0,5) — and the lock re-targets the respawned enemy. Golden
-        // pins: player LockOn true at snap+final, NPC Deaths=1, NPC back at spawn.
-        // NPC spawns at Z=-1 (off the heightmap grid): the below-floor force-snap only
-        // saves in-bounds spawns, so this one falls freely into the blast zone.
-        AssertGoldenScenario(new KitScenario
-        {
-            Name = "Target Lock Death Re-target",
-            Arena = DeathArena(),
-            Def = Def,
-            Setup = () => TestHelpers.PlayerState(0f, 5f) with { PY = Gpy, FacingYaw = 0f },
-            Inputs = new InputSequence().Set(0, new InputState { ToggleLock = true }),
-            Assert = _ => { },
-            NpcSetup = () => TestHelpers.NpcState(0f, -1f) with { PY = -25f, IsGrounded = false },
-            NpcAssert = _ => { },
-            NpcDef = Def,
-            SnapshotTick = 60,
-            TotalTicks = 120,
-        });
+        var sim = TestHelpers.MakeSim(DeathArena());
+        sim.RegisterEntity(1, Def, TestHelpers.PlayerState(0f, 5f) with { PY = Gpy });
+        sim.RegisterEntity(100, Def,
+            TestHelpers.NpcState(0f, -1f) with { PY = -25f, IsGrounded = false });
+
+        sim.Tick(new() { { 1, new InputState { ToggleLock = true } } });
+        for (int tick = 0; tick < 120; tick++)
+            sim.Tick(new() { [1] = default });
+
+        var state = sim.GetState(1);
+        Assert.True(state.LockOn);
+        Assert.Equal(100UL, state.TargetEntityId);
+        Assert.True(sim.GetState(100).Deaths > 0);
     }
 
     [Fact]
@@ -322,24 +310,9 @@ public class TargetLockTests : KitScenarioTests
         foreach (var entry in roster.Entries)
         {
             var def = TestHelpers.ResolveDef(entry.Selector);
-            // Legacy Nilus has LMB/AirLMB normals, not the package 1–4 grid;
-            // its Slot1 is the move-specific Void Rift special.
-            var slots = entry.Selector == CharacterClass.Nilus
-                ? new[] { AbilitySlots.Lmb }
-                : new[] { AbilitySlots.Slot1, AbilitySlots.Slot2, AbilitySlots.Slot3, AbilitySlots.Slot4 };
-            foreach (byte slot in slots)
+            foreach (byte slot in new[] { AbilitySlots.Slot1, AbilitySlots.Slot2, AbilitySlots.Slot3, AbilitySlots.Slot4 })
                 AssertNormalAttackFaces(def, slot, airborne, locked);
         }
-    }
-
-    [Theory]
-    [InlineData(false, false)]
-    [InlineData(false, true)]
-    [InlineData(true, false)]
-    [InlineData(true, true)]
-    public void LegacyNilusNormals_GroundAndAir_FaceTarget(bool airborne, bool locked)
-    {
-        AssertNormalAttackFaces(TestHelpers.NilusDef, AbilitySlots.Lmb, airborne, locked);
     }
 
     [Fact]
@@ -386,7 +359,7 @@ public class TargetLockTests : KitScenarioTests
             // after dozens of ticks. Multiplying the fraction by TickDt fails this.
             Assert.True(MathF.Abs(state.FacingYaw) <= MathF.PI * 0.25f,
                 $"{context}: tracking too weak, yaw={state.FacingYaw}.");
-            float strength = def.GetSlotAbility(activeSlot - 1, airborne)!.Stages[0].TrackingStrength;
+            float strength = def.GetCookedSlotAbility(activeSlot, airborne)!.Timeline.Stages[0].TrackingStrength;
             TestHelpers.AssertNear(MathF.PI * (1f - strength), state.FacingYaw, 1e-3f);
         }
     }

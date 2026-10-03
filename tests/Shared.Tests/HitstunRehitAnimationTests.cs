@@ -83,8 +83,8 @@ public class HitstunRehitAnimationTests
     {
         var sim = TestHelpers.MakeSim();
         npc = TestHelpers.NpcState(0f, 0f);
-        npc.PY = TestHelpers.CombatGroundPY;
-        TestHelpers.RegisterNpc(sim, TestHelpers.CombatDef, npc);
+        npc.PY = TestHelpers.GroundPY(TestHelpers.EngineDef);
+        TestHelpers.RegisterNpc(sim, TestHelpers.EngineDef, npc);
         return sim;
     }
 

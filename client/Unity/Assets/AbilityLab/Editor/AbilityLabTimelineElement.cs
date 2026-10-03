@@ -185,11 +185,13 @@ public sealed class AbilityLabTimelineElement : VisualElement
     private void BeginDrag(AbilityLabOperationProjection operation, Vector2 point, int pointerId)
     {
         _dragOperation = operation;
+        _dragStartTick = operation.Source.Tick;
         _dragStartDuration = operation.Source switch
         {
             SpawnHitboxOperationSource hitbox => hitbox.Hitbox.DurationTicks,
             EmitPresentationOperationSource presentation => presentation.Placement.DurationTicks,
             GravityWindowOperationSource gravity => gravity.DurationTicks,
+            ArmorWindowOperationSource armor => armor.DurationTicks,
             _ => 0,
         };
         _pendingTick = _dragStartTick;
@@ -224,7 +226,8 @@ public sealed class AbilityLabTimelineElement : VisualElement
             int maxTick = stage.DurationTicks - 1;
             if (_dragOperation.Source is SpawnHitboxOperationSource ||
                 _dragOperation.Source is EmitPresentationOperationSource ||
-                _dragOperation.Source is GravityWindowOperationSource)
+                _dragOperation.Source is GravityWindowOperationSource ||
+                _dragOperation.Source is ArmorWindowOperationSource)
                 maxTick = stage.DurationTicks - _dragStartDuration;
             _pendingTick = Mathf.Clamp(localTick, 0, Mathf.Max(0, maxTick));
         }
@@ -361,6 +364,7 @@ public sealed class AbilityLabTimelineElement : VisualElement
             {
                 SpawnHitboxOperationSource hitbox => hitbox.Hitbox.DurationTicks,
                 GravityWindowOperationSource gravity => gravity.DurationTicks,
+                ArmorWindowOperationSource armor => armor.DurationTicks,
                 _ => 0,
             };
             if (_dragging && _dragOperation != null && operation.SourceStageIndex == _dragOperation.SourceStageIndex && operation.SourceOperationIndex == _dragOperation.SourceOperationIndex)
@@ -368,7 +372,7 @@ public sealed class AbilityLabTimelineElement : VisualElement
                 tick = _pendingTick;
                 duration = _pendingDuration;
             }
-            bool timed = operation.Source is SpawnHitboxOperationSource or GravityWindowOperationSource;
+            bool timed = operation.Source is SpawnHitboxOperationSource or GravityWindowOperationSource or ArmorWindowOperationSource;
             float start = LabelColumnWidth + Mathf.Clamp01((stage.StartTick + tick) / (float)_projection.DurationTicks) * width;
             float end = timed
                 ? LabelColumnWidth + Mathf.Clamp01((stage.StartTick + tick + duration) / (float)_projection.DurationTicks) * width

@@ -17,7 +17,7 @@ namespace SlopArena.Client.World
         internal const int ExplosionPresentationLifetimeTicks = 150;
 
         internal static int LifetimeTicks(PresentationEventSource source)
-            => source == PresentationEventSource.CapabilityExplosion
+            => source is PresentationEventSource.CapabilityExplosion or PresentationEventSource.HitContact
                 ? ExplosionPresentationLifetimeTicks
                 : DefaultPresentationLifetimeTicks;
 

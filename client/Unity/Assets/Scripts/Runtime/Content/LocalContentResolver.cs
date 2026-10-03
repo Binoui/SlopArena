@@ -69,32 +69,6 @@ public sealed class LocalContentResolver
         return Failure("content.roster.missing", Path.Combine(_contentRoots[0], "roster", CharacterPackageAssembler.ManifestPath), "No rooted cooked roster manifest was found.");
     }
 
-    public LocalContentResolution ResolveLegacy(CharacterClass selector)
-    {
-        if (selector != CharacterClass.Nilus)
-            return Failure("content.legacy.selector", selector.ToString(), "Selector is not a legacy compatibility character.");
-
-        var rosterResolution = ResolveRoster();
-        if (!rosterResolution.Success || rosterResolution.Roster == null)
-            return rosterResolution;
-
-        var adapter = new LegacyCharacterCatalogAdapter();
-        if (!adapter.TrySnapshot(selector, out var legacyEntry, out var diagnostics))
-            return Failure(diagnostics);
-
-        var identity = legacyEntry.Identity;
-        var requirement = new MatchContentPackageRequirement(
-            identity.PackageId,
-            identity.Version,
-            identity.CookedContentHash,
-            identity.PackageHash);
-        return Success(
-            rosterResolution.RootPath,
-            rosterResolution.ManifestPath,
-            rosterResolution.Roster,
-            requirement,
-            legacyEntry);
-    }
 
     public LocalContentResolution ResolveCookedPackage(string packageId)
     {
@@ -147,15 +121,13 @@ public sealed class LocalContentResolver
         string rootPath,
         string manifestPath,
         BuiltInRosterManifest roster,
-        MatchContentPackageRequirement requirement,
-        MatchContentEntry? legacyEntry = null)
-        => new(true, rootPath, manifestPath, roster, requirement, legacyEntry, Array.Empty<CharacterDiagnostic>());
-
+        MatchContentPackageRequirement requirement)
+        => new(true, rootPath, manifestPath, roster, requirement, Array.Empty<CharacterDiagnostic>());
     private static LocalContentResolution Failure(string code, string path, string message)
         => Failure(new[] { new CharacterDiagnostic(CharacterDiagnosticSeverity.Error, code, path, message) });
 
     private static LocalContentResolution Failure(IReadOnlyList<CharacterDiagnostic> diagnostics)
-        => new(false, "", "", null, null, null, diagnostics);
+        => new(false, "", "", null, null, diagnostics);
 }
 
 public sealed class LocalContentResolution
@@ -166,7 +138,6 @@ public sealed class LocalContentResolution
         string manifestPath,
         BuiltInRosterManifest roster,
         MatchContentPackageRequirement requirement,
-        MatchContentEntry? legacyEntry,
         IReadOnlyList<CharacterDiagnostic> diagnostics)
     {
         Success = success;
@@ -174,7 +145,6 @@ public sealed class LocalContentResolution
         ManifestPath = manifestPath ?? "";
         Roster = roster;
         Requirement = requirement;
-        LegacyEntry = legacyEntry;
         Diagnostics = new ReadOnlyCollection<CharacterDiagnostic>(
             new List<CharacterDiagnostic>(diagnostics ?? Array.Empty<CharacterDiagnostic>()));
     }
@@ -184,7 +154,6 @@ public sealed class LocalContentResolution
     public string ManifestPath { get; }
     public BuiltInRosterManifest Roster { get; }
     public MatchContentPackageRequirement Requirement { get; }
-    public MatchContentEntry? LegacyEntry { get; }
     public IReadOnlyList<CharacterDiagnostic> Diagnostics { get; }
 }
 

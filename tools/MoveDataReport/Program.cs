@@ -24,7 +24,7 @@ namespace SlopArena.MoveDataReport;
 ///
 /// Usage: dotnet run --project tools/MoveDataReport -- [character] [--pcts 0,30,60] [--out path]
 ///        [--json report.json] [--html report.html] [--combos] [--example]
-/// Character: fightguy (default) | manki | wibou | bonk | nilus.
+/// Character: fightguy (default) | manki | wibou | bonk.
 /// Default markdown output: docs/generated/{character}-move-data.md.
 /// Kill % / blast clearance: on a Crossroads-style 60x60 proxy (top +20, sides ±40, bottom -10).
 /// </summary>
@@ -128,9 +128,8 @@ internal static class Program
             "manki"    => BuiltInContentResolver.Resolve(CharacterClass.Manki),
             "wibou"    => BuiltInContentResolver.Resolve(CharacterClass.Wibou),
             "bonk"     => BuiltInContentResolver.Resolve(CharacterClass.Bonk),
-            "nilus"    => BuiltInContentResolver.Resolve(CharacterClass.Nilus),
             var c => throw new ArgumentException(
-                $"unknown character: {c} (expected one of: fightguy, manki, wibou, bonk, nilus)"),
+                $"unknown character: {c} (expected one of: fightguy, manki, wibou, bonk)"),
         };
     }
 
@@ -139,6 +138,9 @@ internal static class Program
 
     internal static int Main(string[] args)
     {
+        if (args.Contains("--route-search") || args.Contains("--route-replay"))
+            return ComboRouteReport.Run(args);
+
         if (args.Contains("--coverage"))
             return ContactCoverageReport.Run(args);
 
@@ -162,9 +164,7 @@ internal static class Program
             hits = representative == null ? new List<HitSpec>() : new List<HitSpec> { representative };
         }
 
-        // Cooked FightGuy poses come from the admitted catalog entry; legacy characters
-        // retain their path-based baked data until their package migration.
-        var baked = LoadBakedData(entry);
+        var baked = entry.BakedAnimation;
 
         // --truecombos: freeform true-combo reachability graph (real sim, per starter × hit state
         // × %, which follow-ups connect while the victim is still in hitstun) + combo density.
@@ -406,7 +406,7 @@ internal static class Program
         var spec = def.E;
         if (spec == null || !spec.IsRecoveryMove) return null;
 
-        // E = factory slot 3 → ActiveSlot byte 4 (grounded and air share the spec; see AbilityFactory).
+        // E = ActiveSlot byte 4 (grounded and air share the cooked slot).
         const byte activeSlot = 4;
 
         var sim = new ServerSimulation(BuildArena());
@@ -943,18 +943,6 @@ internal static class Program
     internal static object? Get(Type t, object o, string name)
         => t.GetField(name, System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)!.GetValue(o);
 
-    internal static BakedAnimationData? LoadBakedData(MatchContentEntry entry)
-    {
-        if (entry.CookedCharacterPackage != null)
-            return entry.BakedAnimation;
-
-        var def = entry.Definition;
-        if (string.IsNullOrEmpty(def.BakedDataPath)) return null;
-        string path = def.BakedDataPath.Replace("res://", "");
-        if (!File.Exists(path)) return null;
-        try { return BakedAnimationData.LoadFromBin(File.ReadAllBytes(path)); }
-        catch { return null; }
-    }
 
     internal static int? ParseTraj(string[] args)
     {
@@ -973,7 +961,7 @@ internal static class Program
     internal static void PipeLaunch(MatchContentEntry entry)
     {
         var def = entry.Definition;
-        var baked = LoadBakedData(entry);
+        var baked = entry.BakedAnimation;
         float gpy = def.CapsuleHeight * 0.5f;
         foreach (var z in new[] { 0.8f, 1.0f, 1.2f, 1.5f, 2.0f })
         {

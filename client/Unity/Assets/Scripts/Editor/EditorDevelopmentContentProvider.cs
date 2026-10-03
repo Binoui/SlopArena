@@ -45,11 +45,6 @@ public static class EditorDevelopmentContentProvider
             var entries = new List<BuiltInRosterEntry>(rosterResolution.Roster.Entries.Count);
             foreach (var rosterEntry in rosterResolution.Roster.Entries)
             {
-                if (rosterEntry.Requirement.Version == "legacy-1")
-                {
-                    entries.Add(rosterEntry);
-                    continue;
-                }
 
                 if (!authoring.TryCompileForEditorPlay(rosterEntry.PackageId, out var package, out var animationCatalog, out var compileDiagnostics))
                 {
@@ -75,10 +70,7 @@ public static class EditorDevelopmentContentProvider
                 return Fail(diagnostics, transientCatalogs, out failure);
 
             var manifest = new BuiltInRosterManifest(rosterResolution.Roster.SchemaVersion, entries);
-            var built = new MatchContentCatalogBuilder().Build(
-                manifest,
-                packages,
-                new LegacyCharacterCatalogAdapter());
+            var built = new MatchContentCatalogBuilder().Build(manifest, packages);
             diagnostics.AddRange(built.Diagnostics);
             if (!built.IsValid || built.Catalog == null)
                 return Fail(diagnostics, transientCatalogs, out failure);

@@ -79,26 +79,24 @@ public sealed class CharacterContentSerializerTests
             "{\"schemaVersion\":1,\"id\":\"fightguy\",\"class\":\"FightGuy\",\"abilities\":{\"slot1\":{\"name\":\"No stages\"}}}" )).Message);
 
 
+
     [Fact]
-    public void LegacySnapshot_PreservesCapsuleCollisionForResolvedCharacter()
+    public void SharedAirA_AliasSurvivesSerializeLoadRoundTrip()
     {
-        var targetDef = new LegacyCharacterCatalogAdapter()
-            .Snapshot(CharacterClass.Nilus).Definition;
-        var sim = TestHelpers.MakeSim();
-        var player = TestHelpers.PlayerState();
-        player.PY = TestHelpers.GroundPY(targetDef);
-        sim.RegisterEntity(1, targetDef, player);
+        var shared = new AbilitySpec { Stages = Array.Empty<AttackStage>() };
+        var definition = new CharacterDefinition
+        {
+            Class = CharacterClass.FightGuy,
+            DisplayName = "FightGuy",
+            A = shared,
+            AirA = shared,
+        };
 
-        var target = TestHelpers.NpcState(0f, 6f);
-        target.PY = TestHelpers.GroundPY(targetDef);
-        sim.RegisterEntity(100, targetDef, target);
+        var serialized = CharacterContentSerializer.Serialize("fightguy", definition);
+        var roundTripped = LoadText(serialized);
 
-        TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 4), 10);
-
-        Assert.True(sim.GetState(100).DamagePercent > 0,
-            "the resolved legacy hurtbox must receive Riftwalk's arrival burst");
+        Assert.Same(roundTripped.A, roundTripped.AirA);
     }
-
     private static CharacterDefinition LoadText(string json) => CharacterContentSerializer.Load(json);
 
 

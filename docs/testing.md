@@ -1,5 +1,7 @@
 # Testing and Verification
 
+For gateway operations set `ORCA_TERMINAL_HANDLE` to your own runtime-issued terminal handle; the gateway verifies its incarnation and fails closed if it is missing or mismatched. Use the canonical gateway in [`docs/contributing/unity-cli.md`](contributing/unity-cli.md) and the [shared Editor coordination protocol](file:///home/binoui/Documents/projects/sloparena-workspace/docs/unity-editor-coordination.md). Wait for an independent lease; never inject work into an owner's batch. Runtime ownership status replaces historical Markdown ownership; blocked or unknown is not free.
+
 ## Local iteration
 
 Source or asset tuning uses the existing Editor development catalog and the affected
@@ -13,13 +15,17 @@ preview is not persisted package verification.
 ## Integrated change
 
 Shared edits require focused behavioral coverage while iterating, then `dotnet build
-src/Shared/ --nologo` and `dotnet test tests/Shared.Tests/ --nologo` at delivery. Server
-edits require `dotnet build src/Server/ --nologo` and `dotnet test tests/Server.Tests/
---nologo`. Unity-facing behavior needs the affected runtime check and current
-compile/console evidence, not all unrelated scenes. Accepted character source/asset
-changes intended to ship cross the explicit cook/inspect/roster-refresh boundary before
-delivery. Documentation/tooling-only edits use the Python checks from the documentation
-checker; no Shared build or Unity session is required for this cleanup.
+src/Shared/ --nologo` and `dotnet test tests/Shared.Tests/ --nologo` at delivery. Before a
+build that copies the Unity plugin, coordinate saved-source writers and acquire your own
+bounded gateway hold; run the build from a separate shell while held, wait for import and
+compile settlement, then end the hold. Never copy into another owner's active Editor or
+nested-claim while holding. Server edits require `dotnet build src/Server/ --nologo` and
+`dotnet test tests/Server.Tests/ --nologo`. Unity-facing behavior needs the affected
+runtime check and current compile/console evidence, not all unrelated scenes. Accepted
+character source/asset changes intended to ship cross the explicit cook/inspect/roster-
+refresh boundary before delivery. Documentation/tooling-only edits use the Python checks
+from the documentation checker; no Shared build or Unity session is required for this
+cleanup.
 
 ## Distributable demo
 
@@ -45,6 +51,31 @@ facing/lock transitions directly instead of pinning unrelated movement distances
 setups must hold through both JumpSquat and the short-hop decision window. Multi-hit tests
 should count accepted contacts, not gaps between hitboxes whose active windows may overlap.
 
+Use `TestHelpers.EngineDef` for generic Shared mechanics and reporting tests. It returns
+a fresh definition with explicit movement/body values and sixteen empty canonical cooked
+slots; install only the timelines or synthetic poses needed by the scenario. Do not load
+roster baked data for this fixture. `MankiDef`, `FightGuyDef`, `WibouDef`, and `ResolveDef`
+are for intentional roster/package integration. `CombatDef` remains a roster-backed kit
+fixture, not the default body for synthetic collision or rollback tests.
+
+Assert the mechanic being protected: authored-duration lock/unlock, accepted contact,
+facing/target identity, jump transitions, and deterministic replay. Do not freeze a
+character's current damage, startup, body offset, weapon pose, or complete state snapshot
+when the test only needs an engine rule. Keep deliberately kit-specific behavior separate;
+ordinary numerical tuning does not require golden regeneration.
+
+Kit contact scenarios must run through their authored active windows, not a fixed
+short tick budget. Check apex release on the observed ascent-to-descent transition.
+Cross-up whiffs must pass the opponent's actual position with nonzero momentum
+before release; pushbox displacement alone is not cross-up evidence. Stage-directed
+recovery may activate a recovery Slot even when an opponent is outward of the stage.
+
+Fixture isolation verified 2026-10-02: the full Shared suite passed with 1,137 tests,
+zero failures and two existing skips. A real Shared simulation smoke separated short/full
+hops, reflected an explicit fixture jump-force change, and retained the same engine launch
+after process-local Manki movement/body perturbation. All 87 protected character-source,
+cooked-content and generated-package file hashes matched the pre-cleanup baseline.
+
 ### Targeted contract tests
 
 Choose tests that cover the changed boundary:
@@ -60,14 +91,12 @@ New observable behavior needs a behavioral test when existing coverage would not
 
 ### Package and cook checks
 
-For a package change, inspect before cooking:
+For a package change, observe status first: `held`/`releasing` means invoke a gateway command and let it wait for an independent lease; `blocked`/unknown means stop. `free`, settled, and zero active operations are availability observations, not a reservation. Each command independently acquires its lease.
 
 ```bash
-unity pipeline list --format json
-unity command --project-path client/Unity \
-  sloparena.character.inspect --target <package> --format json
-unity command --project-path client/Unity \
-  sloparena.character.cook --target <package> --format json
+bun /home/binoui/Documents/projects/sloparena-workspace/scripts/unity-editor-gateway.ts status --project-path /home/binoui/Documents/projects/SlopArena/client/Unity
+bun /home/binoui/Documents/projects/sloparena-workspace/scripts/unity-editor-gateway.ts --project-path /home/binoui/Documents/projects/SlopArena/client/Unity -- sloparena.character.inspect --target <package>
+bun /home/binoui/Documents/projects/sloparena-workspace/scripts/unity-editor-gateway.ts --project-path /home/binoui/Documents/projects/SlopArena/client/Unity -- sloparena.character.cook --target <package>
 ```
 
 For a rostered package, require a successful semantic result, valid inspect status,
@@ -103,8 +132,7 @@ scripts/verify-fightguy-package.sh
 
 For integrated Unity-facing changes and accepted package verification:
 
-1. Confirm the Unity Pipeline is reachable, recompile the Editor when code or the
-   Shared plugin changed, and inspect current Unity errors.
+1. Observe gateway status. If `held`/`releasing`, invoke a gateway command and let it wait for an independent lease; stop on `blocked`/unknown. `free`, settled, and zero active operations are availability observations only. Recompile the Editor when code or the Shared plugin changed, and inspect current Unity errors.
 2. Run `EditorDevelopmentContentSelfTest.Run()` (or the named menu item) when
    content-resolution or cook behavior changed. A valid `character.json` edit must
    change the next Editor Training catalog without changing `content-cooked` or the
@@ -127,20 +155,11 @@ command runner uses Shared simulation; never infer hit success from command
 success. A focused native pass can exercise these outcomes:
 
 ```bash
-unity command --project-path client/Unity \
-  sloparena.lab.open --target fightguy --format json
-unity command --project-path client/Unity \
-  sloparena.lab.run --action ground.1 --ticks 60 --distance 1.2 \
-  --opponent idle --format json
-unity command --project-path client/Unity \
-  sloparena.lab.run --action ground.1 --ticks 60 --distance 1.2 \
-  --opponent shield --format json
-unity command --project-path client/Unity \
-  sloparena.lab.run --action ground.1 --ticks 60 --distance 12 \
-  --opponent idle --format json
-unity command --project-path client/Unity \
-  sloparena.lab.run --action grab --ticks 60 --distance 0.7 \
-  --opponent idle --format json
+bun /home/binoui/Documents/projects/sloparena-workspace/scripts/unity-editor-gateway.ts --project-path /home/binoui/Documents/projects/SlopArena/client/Unity -- sloparena.lab.open --target fightguy
+bun /home/binoui/Documents/projects/sloparena-workspace/scripts/unity-editor-gateway.ts --project-path /home/binoui/Documents/projects/SlopArena/client/Unity -- sloparena.lab.run --action ground.1 --ticks 60 --distance 1.2 --opponent idle
+bun /home/binoui/Documents/projects/sloparena-workspace/scripts/unity-editor-gateway.ts --project-path /home/binoui/Documents/projects/SlopArena/client/Unity -- sloparena.lab.run --action ground.1 --ticks 60 --distance 1.2 --opponent shield
+bun /home/binoui/Documents/projects/sloparena-workspace/scripts/unity-editor-gateway.ts --project-path /home/binoui/Documents/projects/SlopArena/client/Unity -- sloparena.lab.run --action ground.1 --ticks 60 --distance 12 --opponent idle
+bun /home/binoui/Documents/projects/sloparena-workspace/scripts/unity-editor-gateway.ts --project-path /home/binoui/Documents/projects/SlopArena/client/Unity -- sloparena.lab.run --action grab --ticks 60 --distance 0.7 --opponent idle
 ```
 
 Inspect semantic `data.result.success` and diagnostics, plus actual

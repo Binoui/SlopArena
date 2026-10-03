@@ -13,12 +13,12 @@ public class RehitZoneTests
     {
         var sim = TestHelpers.MakeSim();
         var player = TestHelpers.PlayerState();
-        player.PY = TestHelpers.GroundPY(TestHelpers.MankiDef);
-        TestHelpers.RegisterPlayer(sim, TestHelpers.MankiDef, player);
+        player.PY = TestHelpers.GroundPY(TestHelpers.EngineDef);
+        TestHelpers.RegisterPlayer(sim, TestHelpers.EngineDef, player);
 
         npc = TestHelpers.NpcState(0f, 0f);
-        npc.PY = TestHelpers.CombatGroundPY;
-        TestHelpers.RegisterNpc(sim, TestHelpers.CombatDef, npc);
+        npc.PY = TestHelpers.GroundPY(TestHelpers.EngineDef);
+        TestHelpers.RegisterNpc(sim, TestHelpers.EngineDef, npc);
         return sim;
     }
 
@@ -32,8 +32,8 @@ public class RehitZoneTests
         var sim = SimWithNpc(out npc);
 
         var npc2 = TestHelpers.NpcState(1.5f, 0f);
-        npc2.PY = TestHelpers.CombatGroundPY;
-        sim.RegisterEntity(101, TestHelpers.CombatDef, npc2);
+        npc2.PY = TestHelpers.GroundPY(TestHelpers.EngineDef);
+        sim.RegisterEntity(101, TestHelpers.EngineDef, npc2);
         return sim;
     }
 
@@ -177,12 +177,9 @@ public class RehitZoneTests
     }
 
     /// <summary>
-    /// <c>RehitIntervalTicks == DurationTicks</c> is the shape Nilus' F detonation uses
-    /// (5 and 5): the age gate only ever matches at 0, so the blast resolves exactly once
-    /// while still scanning every body on that pulse. Pinned separately from
-    /// <see cref="IntervalLongerThanDuration_HitsExactlyOnce"/> because the boundary case
-    /// (<c>AgeTicks</c> reaching the interval on the same tick it expires) is the one a
-    /// reader would have to re-derive.
+    /// When the rehit interval equals duration, the age gate matches only at age zero:
+    /// every target is hit once, then the zone expires before a second pulse.
+    /// This boundary matters because age reaches the interval on its expiry tick.
     /// </summary>
     [Fact]
     public void IntervalEqualToDuration_PulsesOnlyOnce_ForEveryTarget()
@@ -224,11 +221,9 @@ public class RehitZoneTests
         Assert.Empty(sim.Resolver.GetActiveHitboxes());
     }
 
-    /// <summary>
-    /// The flag opts out of the ENTITY scan only. Aging, expiry and explosion queueing are
-    /// untouched, which is what lets Nilus' Q seed carry the rift through a body and still
-    /// deliver it — the payload arrives, the seed just never touches anyone on the way.
-    /// </summary>
+    /// The flag opts out of the entity scan only. Aging, expiry and explosion queueing
+    /// continue independently, so a projectile can pass through bodies and deliver its
+    /// payload when it expires.
     [Fact]
     public void IgnoresEntities_StillQueuesItsExplosionOnExpiry()
     {

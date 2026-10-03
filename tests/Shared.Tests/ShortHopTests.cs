@@ -13,19 +13,18 @@ namespace SlopArena.Shared.Tests;
 /// </summary>
 public class ShortHopTests
 {
-    // Classic def: no FloatWindow so post-jump gravity is full from the first air tick.
+    // Classic definition: full gravity from the first air tick.
     private static readonly CharacterDefinition Def = CreateClassicDef();
     private static readonly MovementStats Move = Def.Movement;
-    private static readonly float GroundPy = TestHelpers.MankiGroundPY;
+    private static readonly float GroundPy = Def.CapsuleHeight * 0.5f;
     private static readonly float GravPerTick = Move.Gravity * Simulation.TickDt;
-    /// <summary>The reduced jump force — a per-character m/s value, not a JumpForce fraction.</summary>
     private static readonly float ShortHopForce = Move.ShortHopForce;
 
     private static CharacterDefinition CreateClassicDef()
     {
-        var mov = TestHelpers.MankiDef.Movement;
-        mov.FloatWindowTicks = 0;
-        return TestHelpers.CloneDef(TestHelpers.MankiDef, mov);
+        var def = TestHelpers.EngineDef;
+        def.Movement = def.Movement with { FloatWindowTicks = 0 };
+        return def;
     }
 
     private static ServerSimulation SimWithGroundedPlayer()
@@ -40,22 +39,13 @@ public class ShortHopTests
     [Fact]
     public void TapRelease_ShortHop_ReducedJumpVelocity()
     {
-        // Press for 1 tick then release: at squat expiry JumpHeldTicks = 0 ≤ window → short hop.
-        // FightGuy's ShortHopForce (7.2) clears the ground snap; Manki's 6.0 sits below the
-        // snap threshold (ADR-0020 data note) and re-grounds instead of hopping.
-        var fg = TestHelpers.FightGuyDef;
-        var sim = TestHelpers.MakeSim();
-        var state = TestHelpers.PlayerState();
-        state.PY = TestHelpers.GroundPY(fg);
-        TestHelpers.RegisterPlayer(sim, fg, state);
-
-        TestHelpers.TickN(sim, TestHelpers.Input(jump: true, jumpHeld: true), fg.Movement.JumpSquatTicks + 1);
+        var sim = SimWithGroundedPlayer();
+        TestHelpers.TickN(sim, TestHelpers.Input(jump: true, jumpHeld: true), Move.JumpSquatTicks + 1);
         var s = sim.GetState(1);
 
         Assert.False(s.IsGrounded);
         Assert.Equal(ActionState.Idle, s.State);
-        float fgGrav = fg.Movement.Gravity * Simulation.TickDt;
-        TestHelpers.AssertNear(fg.Movement.ShortHopForce - fgGrav, s.VY, 0.01f);
+        TestHelpers.AssertNear(ShortHopForce - GravPerTick, s.VY, 0.01f);
     }
 
     [Fact]
@@ -102,45 +92,30 @@ public class ShortHopTests
     [Fact]
     public void ReleaseInsideWindow_AfterSquatExpiry_ShortHop()
     {
-        // Deferral case: squat (4) < window (5). The player is still holding at squat expiry,
-        // so the force is deferred one tick; releasing within the window still short-hops.
-        var fg = TestHelpers.FightGuyDef; // JumpSquatTicks = 4
-        var sim = TestHelpers.MakeSim();
-        var state = TestHelpers.PlayerState();
-        state.PY = TestHelpers.GroundPY(fg);
-        TestHelpers.RegisterPlayer(sim, fg, state);
-
-        // Hold ticks 0-4 (5 held ticks = window), release on tick 5.
-        TestHelpers.TickHold(sim, TestHelpers.Input(jump: true, jumpHeld: true), 5);
-        var deferred = sim.GetState(1);
-        Assert.Equal(ActionState.JumpSquat, deferred.State); // decision pending at expiry
+        // Hold through squat expiry but release at the decision window boundary.
+        var sim = SimWithGroundedPlayer();
+        int heldTicks = Math.Max(Move.JumpSquatTicks + 1, Simulation.ShortHopWindowTicks);
+        TestHelpers.TickHold(sim, TestHelpers.Input(jump: true, jumpHeld: true), heldTicks);
+        Assert.Equal(ActionState.JumpSquat, sim.GetState(1).State);
 
         TestHelpers.TickN(sim, TestHelpers.Input(), 1);
         var s = sim.GetState(1);
         Assert.Equal(ActionState.Idle, s.State);
         Assert.False(s.IsGrounded);
-        float fgGrav = fg.Movement.Gravity * Simulation.TickDt;
-        TestHelpers.AssertNear(fg.Movement.ShortHopForce - fgGrav, s.VY, 0.01f);
+        TestHelpers.AssertNear(ShortHopForce - GravPerTick, s.VY, 0.01f);
     }
 
     [Fact]
     public void HoldPastWindow_AtSquatExpiry_FullJump()
     {
-        // Same squat<window setup: holding into tick 5 (6 held ticks > window) = full jump,
-        // even though the release comes later.
-        var fg = TestHelpers.FightGuyDef;
-        var sim = TestHelpers.MakeSim();
-        var state = TestHelpers.PlayerState();
-        state.PY = TestHelpers.GroundPY(fg);
-        TestHelpers.RegisterPlayer(sim, fg, state);
-
+        var sim = SimWithGroundedPlayer();
         TestHelpers.TickN(sim, TestHelpers.Input(jump: true, jumpHeld: true), 1);
-        TestHelpers.TickHold(sim, TestHelpers.Input(jumpHeld: true), 5);
+        int heldTicks = Math.Max(Move.JumpSquatTicks + 1, Simulation.ShortHopWindowTicks + 1);
+        TestHelpers.TickHold(sim, TestHelpers.Input(jumpHeld: true), heldTicks - 1);
         var s = sim.GetState(1);
         Assert.Equal(ActionState.Idle, s.State);
         Assert.False(s.IsGrounded);
-        float fgGrav = fg.Movement.Gravity * Simulation.TickDt;
-        TestHelpers.AssertNear(fg.Movement.JumpForce - fgGrav, s.VY, 0.01f);
+        TestHelpers.AssertNear(Move.JumpForce - GravPerTick, s.VY, 0.01f);
     }
 
     [Fact]

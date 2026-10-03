@@ -1,6 +1,9 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Reflection;
+using SlopArena.Client.Animation;
+using SlopArena.Client.Entities;
 using UnityEditor;
 using UnityEngine;
 using SlopArena.Client.Tools;
@@ -55,6 +58,9 @@ public static class AbilityLabScenarioCommandSelfTest
             AbilityLabScenarioResult recorded = lab.Scenario ?? throw new InvalidOperationException("Native run was not retained by Ability Lab.");
             if (recorded.Frames.Count != runScenario.Frames.Count || lab.ScenarioFrame != 24)
                 throw new InvalidOperationException("Native run result does not match the live recorded scenario.");
+            AssertOffscreenSkeletonMoves(lab, recorded);
+            AssertAimReleasePoseMatchesPlayback(lab);
+            AssertAttachmentPhasePreviewAndRuntime(lab);
             if (recorded.Contacts.Any(contact => !contact.Hit.Blocked))
             {
                 if (!runScenario.Contacts.Any(contact => !contact.Blocked && contact.Damage > 0f)
@@ -100,7 +106,7 @@ public static class AbilityLabScenarioCommandSelfTest
             lab.ShowHitboxes = !originalHitboxes;
             lab.ShowBakedBones = !originalBakedBones;
             lab.ShowDummy = !originalDummy;
-            var capture = SlopArenaAbilityLabCommands.Capture(action, "0,4", output, 320, 240);
+            var capture = CaptureFramed(lab, action, output);
             if (!capture.Success || capture.Captures?.Count != 2 || capture.Captures[0].Frame?.FrameIndex != 0 ||
                 capture.Captures[0].MatchTick != 1 || capture.Captures[1].Frame?.FrameIndex != 4 ||
                 !ReferenceEquals(recorded, lab.Scenario) || lab.ScenarioFrame != 4)
@@ -139,6 +145,309 @@ public static class AbilityLabScenarioCommandSelfTest
             window.RefreshScenarioControls();
             if (outputDirectory != null && Directory.Exists(outputDirectory))
                 Directory.Delete(outputDirectory, true);
+        }
+    }
+
+    private static void AssertOffscreenSkeletonMoves(AbilityLab lab, AbilityLabScenarioResult recorded)
+    {
+        var source = lab.GetComponentsInChildren<PlayerRenderer>().First(renderer => renderer.gameObject.activeInHierarchy);
+        var catalog = (CharacterAnimationCatalog)typeof(PlayerRenderer)
+            .GetField("_animationCatalog", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(source)!;
+        var sourceModel = source.GetComponentInChildren<Animator>().gameObject;
+        var clip = source.GetComponentInChildren<Animancer.AnimancerComponent>().States.Current.Clip;
+        string animationId = catalog.Animations.First(entry => entry.Clip == clip).SemanticId;
+        var fixture = new GameObject("OffscreenScrubRegression") { hideFlags = HideFlags.HideAndDontSave };
+        try
+        {
+            var renderer = fixture.AddComponent<PlayerRenderer>();
+            renderer.SetAnimationCatalog(catalog);
+            renderer.SetCharacterDefinition(source.CharacterDef);
+            renderer.SetBakedData(source.BakedData);
+            renderer.LoadModel(source.CharacterDef, sourceModel);
+            foreach (var mesh in fixture.GetComponentsInChildren<Renderer>()) mesh.forceRenderingOff = true;
+            var animator = fixture.GetComponentInChildren<Animator>();
+            animator.cullingMode = AnimatorCullingMode.CullUpdateTransforms;
+            var bones = new[] { HumanBodyBones.RightHand, HumanBodyBones.LeftHand, HumanBodyBones.Head };
+            Vector3[] ReadSkeleton() => bones.Select(bone =>
+                animator.transform.InverseTransformPoint(animator.GetBoneTransform(bone).position)).ToArray();
+            void AssertMoved(Vector3[] before, string path)
+            {
+                var after = ReadSkeleton();
+                if (!before.Where((position, index) => (position - after[index]).sqrMagnitude > 0.000001f).Any())
+                    throw new InvalidOperationException($"{path} advanced animation time but left the offscreen skeleton frozen.");
+                if (animator.cullingMode != AnimatorCullingMode.CullUpdateTransforms)
+                    throw new InvalidOperationException($"{path} did not restore the Animator culling policy.");
+            }
+
+            renderer.PlayScrubbed(animationId, 0.1f);
+            var authoringPose = ReadSkeleton();
+            renderer.PlayScrubbed(animationId, 0.7f);
+            AssertMoved(authoringPose, "Authoring scrub");
+
+            SlopArena.Shared.CanonicalSlotProjection.TryGet(recorded.Options.Action, out var address);
+            var first = recorded.Frames[0];
+            var last = recorded.Frames[recorded.Frames.Count - 1];
+            if (!renderer.PlayScrubbedState(first.Actor, address.IsAirborne, first.ActorPoseTicks))
+                throw new InvalidOperationException("Recorded first pose is unavailable.");
+            var recordedPose = ReadSkeleton();
+            if (!renderer.PlayScrubbedState(last.Actor, address.IsAirborne, last.ActorPoseTicks))
+                throw new InvalidOperationException("Recorded final pose is unavailable.");
+            AssertMoved(recordedPose, "Recorded-frame scrub");
+        }
+        finally { UnityEngine.Object.DestroyImmediate(fixture); }
+    }
+
+    private static void AssertAimReleasePoseMatchesPlayback(AbilityLab lab)
+    {
+        if (lab.SelectedPackageId != "manki") return;
+        var cursor = lab.CaptureTimelineCursor();
+        var fixture = new GameObject("AimReleasePoseRegression") { hideFlags = HideFlags.HideAndDontSave };
+        try
+        {
+            var run = SlopArenaAbilityLabCommands.Run("ground.F", ticks: 24, distance: 12f);
+            if (!run.Success) throw new InvalidOperationException("Aim-release scenario is unavailable.");
+            var frame = lab.Scenario.Frames[18];
+            var source = lab.Renderer;
+            var catalog = (CharacterAnimationCatalog)typeof(PlayerRenderer)
+                .GetField("_animationCatalog", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(source)!;
+            var prefab = (GameObject)typeof(PlayerRenderer)
+                .GetField("_modelPrefab", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(source)!;
+            var playback = fixture.AddComponent<PlayerRenderer>();
+            playback.SetAnimationCatalog(catalog);
+            playback.SetCharacterDefinition(source.CharacterDef);
+            playback.SetBakedData(source.BakedData);
+            playback.LoadModel(source.CharacterDef, prefab);
+            var normal = fixture.GetComponentInChildren<Animancer.AnimancerComponent>();
+            normal.Animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
+            var spec = source.CharacterDef.GetSlotAbility(frame.Actor.AttackSlot - 1, false);
+            typeof(PlayerRenderer).GetMethod("PlayAbilityAnim", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .Invoke(playback, new object[] { frame.Actor, spec, (int)frame.Actor.ComboStage });
+            normal.Evaluate(0f);
+            normal.Evaluate(frame.Actor.AttackElapsedTicks / 60f);
+            var bones = new[] { HumanBodyBones.Hips, HumanBodyBones.Head, HumanBodyBones.LeftHand, HumanBodyBones.RightHand };
+            var expected = bones.Select(bone => normal.transform.InverseTransformPoint(
+                normal.Animator.GetBoneTransform(bone).position)).ToArray();
+            void AssertPose(string path)
+            {
+                var preview = source.GetComponentInChildren<Animancer.AnimancerComponent>();
+                for (int index = 0; index < bones.Length; index++)
+                {
+                    Vector3 actual = preview.transform.InverseTransformPoint(
+                        preview.Animator.GetBoneTransform(bones[index]).position);
+                    if ((actual - expected[index]).sqrMagnitude > 0.000001f)
+                        throw new InvalidOperationException(
+                            $"{path} aim-release pose differs from normal playback at {bones[index]}.");
+                }
+            }
+            lab.SeekScenario(18);
+            AssertPose("Recorded");
+            lab.ExitScenario();
+            var authoring = SlopArenaAbilityLabCommands.Preview("ground.F", 18);
+            if (!authoring.Success) throw new InvalidOperationException("Aim-release authoring preview is unavailable.");
+            AssertPose("Authoring");
+        }
+        finally
+        {
+            UnityEngine.Object.DestroyImmediate(fixture);
+            lab.RestoreTimelineCursor(cursor);
+        }
+    }
+    private static void AssertAttachmentPhasePreviewAndRuntime(AbilityLab lab)
+    {
+        if (lab.SelectedPackageId != "manki") return;
+        var cursor = lab.CaptureTimelineCursor();
+        var phaseTestModel = new GameObject("PhaseAttachmentRuntimeRegression") { hideFlags = HideFlags.HideAndDontSave };
+        var weaponPrefab = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        weaponPrefab.hideFlags = HideFlags.HideAndDontSave;
+        WeaponAttachConfig config = ScriptableObject.CreateInstance<WeaponAttachConfig>();
+        try
+        {
+            AbilityLabScenarioResult scenario = lab.Scenario
+                ?? throw new InvalidOperationException("Scenario-preservation phase fixture requires a recorded run.");
+            int scenarioFrame = lab.ScenarioFrame;
+            if (lab.SetPhasePreview(true) || !ReferenceEquals(lab.Scenario, scenario)
+                || lab.ScenarioFrame != scenarioFrame)
+                throw new InvalidOperationException("Authoring phase activation altered or replaced the recorded scenario.");
+            lab.ExitScenario();
+            if (!SlopArena.Shared.CanonicalSlotProjection.TryGet("ground.F", out var address))
+                throw new InvalidOperationException("Manki F slot mapping is unavailable.");
+            lab.SetSlot(address);
+            var spec = lab.Def.GetSlotAbility(AbilityLab.SlotIndices[7], false);
+            if (spec?.AnimationNames is not { Length: > 0 } || string.IsNullOrEmpty(spec.AimAnimationId))
+                throw new InvalidOperationException("Manki F does not expose both authored aim and release clips.");
+            var source = lab.Renderer;
+            var catalog = (CharacterAnimationCatalog)typeof(PlayerRenderer)
+                .GetField("_animationCatalog", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(source)!;
+            string ActualClipName(string semanticId)
+                => catalog.Animations.First(entry => entry.SemanticId == semanticId).Clip.name;
+
+            lab.SetAuthoringPhase(AbilityLab.AuthoringPhase.Charge);
+            if (!lab.CanPreviewCharge || !lab.SetPhasePreview(true)
+                || lab.PhaseClipName != ActualClipName(spec.AimAnimationId) || lab.PhaseDurationTicks < 19)
+                throw new InvalidOperationException("Charge preview did not resolve the actual looping aim clip.");
+            var animator = lab.Renderer.GetComponentInChildren<Animator>();
+            Vector3[] ReadPose() => new[]
+            {
+                animator.GetBoneTransform(HumanBodyBones.Head).position,
+                animator.GetBoneTransform(HumanBodyBones.LeftHand).position,
+                animator.GetBoneTransform(HumanBodyBones.RightHand).position
+            };
+            lab.SetPhaseTick(0);
+            lab.SetPhaseTick(18);
+            float chargeSampledTime = lab.Renderer.GetComponentInChildren<Animancer.AnimancerComponent>()
+                .States.Current.Time;
+            if (Mathf.Abs(chargeSampledTime - 0.3f) > 0.00001f)
+                throw new InvalidOperationException($"Charge tick 18 sampled at {chargeSampledTime}s instead of 0.3s.");
+            lab.SetPhaseTick(0);
+            Vector3[] chargeStart = ReadPose();
+            lab.SetPhaseTick(Math.Max(1, lab.PhaseDurationTicks / 3));
+            Vector3[] chargeScrub = ReadPose();
+            if (!chargeStart.Where((position, index) =>
+                    (position - chargeScrub[index]).sqrMagnitude > 0.000001f).Any())
+                throw new InvalidOperationException("Charge-local scrubbing did not update the actual preview skeleton.");
+
+            lab.SetPhaseTick(0);
+            typeof(AbilityLab).GetField("_playAccum", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .SetValue(lab, 1f / AbilityLab.TickRate);
+            lab.Playing = true;
+            typeof(AbilityLab).GetMethod("AdvancePlayback", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .Invoke(lab, null);
+            lab.Playing = false;
+            if (lab.PhaseTick != 1)
+                throw new InvalidOperationException("Charge phase playback did not advance its independent local tick.");
+
+            lab.SetAuthoringPhase(AbilityLab.AuthoringPhase.Fire);
+            if (!lab.SetPhasePreview(true) || lab.PhaseClipName != ActualClipName(spec.AnimationNames[0]))
+                throw new InvalidOperationException("Fire preview did not resolve the selected release clip.");
+            lab.SetPhaseTick(18);
+            if (!source.TryGetAbilityPhaseAnimation(
+                (byte)(AbilityLab.SlotIndices[7] + 1), false, 0, false,
+                out _, out _, out _, out float fireSpeed))
+                throw new InvalidOperationException("Fire preview runtime speed mapping is unavailable.");
+            float expectedFireTime = 18f / AbilityLab.TickRate * fireSpeed;
+            float fireSampledTime = lab.Renderer.GetComponentInChildren<Animancer.AnimancerComponent>()
+                .States.Current.Time;
+            if (Mathf.Abs(fireSampledTime - expectedFireTime) > 0.00001f)
+                throw new InvalidOperationException(
+                    $"Fire tick 18 sampled at {fireSampledTime}s instead of runtime-mapped {expectedFireTime}s.");
+            lab.SetPhaseTick(Math.Max(0, lab.PhaseDurationTicks / 3));
+            Vector3[] firePose = ReadPose();
+            if (!chargeStart.Where((position, index) =>
+                    (position - firePose[index]).sqrMagnitude > 0.000001f).Any())
+                throw new InvalidOperationException("Charge and fire clips did not produce distinct actual bone poses.");
+
+            string aimAnimation = spec.AimAnimationId;
+            try
+            {
+                spec.AimAnimationId = null;
+                lab.SetAuthoringPhase(AbilityLab.AuthoringPhase.Charge);
+                if (lab.CanPreviewCharge || lab.SetPhasePreview(true) || lab.PhaseClipName.Length != 0
+                    || !lab.PhasePreviewStatus.Contains("no resolved aim clip"))
+                    throw new InvalidOperationException("Missing charge clip silently fell back to the fire pose.");
+                lab.SetAuthoringPhase(AbilityLab.AuthoringPhase.Fire);
+                if (lab.PhaseClipName != ActualClipName(spec.AnimationNames[0]))
+                    throw new InvalidOperationException("Missing charge clip made the valid fire preview unavailable.");
+            }
+            finally { spec.AimAnimationId = aimAnimation; }
+
+            var prefab = (GameObject)typeof(PlayerRenderer)
+                .GetField("_modelPrefab", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(source)!;
+            var runtimeRenderer = phaseTestModel.AddComponent<PlayerRenderer>();
+            runtimeRenderer.SetAnimationCatalog(catalog);
+            runtimeRenderer.SetCharacterDefinition(source.CharacterDef);
+            runtimeRenderer.SetBakedData(source.BakedData);
+            runtimeRenderer.LoadModel(source.CharacterDef, prefab);
+            var rightHand = runtimeRenderer.GetComponentInChildren<Animator>()
+                .GetBoneTransform(HumanBodyBones.RightHand);
+            config.Entries = new[]
+            {
+                new WeaponEntry
+                {
+                    AttackSlot = (byte)(AbilityLab.SlotIndices[7] + 1),
+                    BoneName = rightHand.name,
+                    Prefab = weaponPrefab,
+                    PositionOffset = Vector3.zero,
+                    HasFirePhaseOverride = true,
+                    FirePositionOffset = new Vector3(0.07f, 0.18f, -0.04f),
+                    FireRotationOffset = new Vector3(12f, 24f, 7f)
+                }
+            };
+            var weaponAttach = phaseTestModel.AddComponent<WeaponAttach>();
+            weaponAttach.Init(runtimeRenderer, config);
+            typeof(PlayerRenderer).GetField("_lastAttackSlot", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .SetValue(runtimeRenderer, (byte)(AbilityLab.SlotIndices[7] + 1));
+            var actionState = typeof(PlayerRenderer).GetField("_lastAnimState", BindingFlags.Instance | BindingFlags.NonPublic)!;
+            actionState.SetValue(runtimeRenderer, SlopArena.Shared.ActionState.Aiming);
+            weaponAttach.RefreshPresentation();
+            Vector3 sharedPosition = rightHand.TransformPoint(Vector3.zero);
+            Vector3 aimingPosition = Position(weaponAttach);
+            actionState.SetValue(runtimeRenderer, SlopArena.Shared.ActionState.Attacking);
+            weaponAttach.RefreshPresentation();
+            Vector3 firePosition = rightHand.TransformPoint(config.Entries[0].FirePositionOffset);
+            Vector3 attackingPosition = Position(weaponAttach);
+            if ((aimingPosition - sharedPosition).sqrMagnitude > 0.000001f
+                || (attackingPosition - firePosition).sqrMagnitude > 0.000001f
+                || (aimingPosition - attackingPosition).sqrMagnitude < 0.000001f)
+                throw new InvalidOperationException("Runtime attachment did not select shared Aim and fire override Attack transforms.");
+        }
+        finally
+        {
+            lab.RestoreTimelineCursor(cursor);
+            UnityEngine.Object.DestroyImmediate(phaseTestModel);
+            UnityEngine.Object.DestroyImmediate(weaponPrefab);
+            UnityEngine.Object.DestroyImmediate(config);
+        }
+
+        static Vector3 Position(WeaponAttach attach)
+        {
+            float[] position = attach.ReadInspectionEntries()[0].WorldPosition;
+            return new Vector3(position[0], position[1], position[2]);
+        }
+    }
+
+
+    private static AbilityLabCommandResult CaptureFramed(AbilityLab lab, string action, string output)
+    {
+        string? framingError = null;
+        int renderedFrames = 0;
+        Camera previewCamera = lab.PreviewCamera;
+        int originalMask = previewCamera.cullingMask;
+        void CheckFrame(UnityEngine.Rendering.ScriptableRenderContext context, Camera camera)
+        {
+            if (camera.targetTexture == null) return;
+            renderedFrames++;
+            foreach (var renderer in lab.GetComponentsInChildren<Renderer>())
+            {
+                if (!renderer.enabled || renderer.forceRenderingOff) continue;
+                if ((camera.cullingMask & (1 << renderer.gameObject.layer)) == 0)
+                    framingError = $"{renderer.name} is excluded by the capture camera.";
+                Bounds bounds = renderer.bounds;
+                for (int x = -1; x <= 1; x += 2)
+                for (int y = -1; y <= 1; y += 2)
+                for (int z = -1; z <= 1; z += 2)
+                {
+                    Vector3 corner = bounds.center + Vector3.Scale(bounds.extents, new Vector3(x, y, z));
+                    Vector3 viewport = camera.WorldToViewportPoint(corner);
+                    if (viewport.x < 0f || viewport.x > 1f || viewport.y < 0f || viewport.y > 1f ||
+                        viewport.z < camera.nearClipPlane || viewport.z > camera.farClipPlane)
+                        framingError = $"{renderer.name} is cropped at scenario frame {lab.ScenarioFrame}: {viewport}.";
+                }
+            }
+        }
+        UnityEngine.Rendering.RenderPipelineManager.beginCameraRendering += CheckFrame;
+        previewCamera.cullingMask = 0;
+        try
+        {
+            var result = SlopArenaAbilityLabCommands.Capture(action, "0,4", output, 320, 240);
+            if (framingError != null) throw new InvalidOperationException(framingError);
+            if (result.Success && renderedFrames != 2)
+                throw new InvalidOperationException("Capture framing was not observed for both requested frames.");
+            return result;
+        }
+        finally
+        {
+            previewCamera.cullingMask = originalMask;
+            UnityEngine.Rendering.RenderPipelineManager.beginCameraRendering -= CheckFrame;
         }
     }
 

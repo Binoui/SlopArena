@@ -3,6 +3,8 @@ name: sloparena-animation-authoring
 description: "Author and safely import SlopArena character animation clips through Blender, Unity Humanoid import, package catalog binding, cooking, and real-surface verification."
 category: game-dev
 ---
+
+Before gateway examples, set `ORCA_TERMINAL_HANDLE` to your own runtime-issued terminal handle; the gateway verifies its incarnation and fails closed if it is missing or mismatched. Use the canonical gateway in [`docs/contributing/unity-cli.md`](../../../docs/contributing/unity-cli.md) and the [shared Editor coordination protocol](file:///home/binoui/Documents/projects/sloparena-workspace/docs/unity-editor-coordination.md). Wait for an independent lease; never inject work into an owner's batch. Runtime ownership status replaces historical Markdown ownership; `blocked` or unknown is not free.
 # SlopArena Animation Authoring
 
 Use this skill when creating or changing a character animation clip. It owns presentation assets and catalog bindings only. It does **not** change gameplay timing, damage, hitboxes, input, server simulation, or VFX behavior.
@@ -126,21 +128,18 @@ animation catalogs and roster pins.
 For content intended to ship, run the supported Unity CLI flow from the repository root:
 
 ```bash
-unity pipeline list --format json
-unity command --project-path client/Unity recompile --format json
-unity command --project-path client/Unity recompile_status --format json
-unity command --project-path client/Unity get_console_logs --severity error --limit 20 --format json
-unity command --project-path client/Unity \
-  sloparena.character.inspect --target <package> --format json
-unity command --project-path client/Unity \
-  sloparena.character.cook --target <package> --format json
-unity command --project-path client/Unity \
-  sloparena.character.inspect --target <package> --format json
+bun /home/binoui/Documents/projects/sloparena-workspace/scripts/unity-editor-gateway.ts status --project-path /home/binoui/Documents/projects/SlopArena/client/Unity
+bun /home/binoui/Documents/projects/sloparena-workspace/scripts/unity-editor-gateway.ts --project-path /home/binoui/Documents/projects/SlopArena/client/Unity -- recompile
+bun /home/binoui/Documents/projects/sloparena-workspace/scripts/unity-editor-gateway.ts --project-path /home/binoui/Documents/projects/SlopArena/client/Unity -- recompile_status
+bun /home/binoui/Documents/projects/sloparena-workspace/scripts/unity-editor-gateway.ts --project-path /home/binoui/Documents/projects/SlopArena/client/Unity -- get_console_logs --severity error --limit 20
+bun /home/binoui/Documents/projects/sloparena-workspace/scripts/unity-editor-gateway.ts --project-path /home/binoui/Documents/projects/SlopArena/client/Unity -- sloparena.character.inspect --target <package>
+bun /home/binoui/Documents/projects/sloparena-workspace/scripts/unity-editor-gateway.ts --project-path /home/binoui/Documents/projects/SlopArena/client/Unity -- sloparena.character.cook --target <package>
+bun /home/binoui/Documents/projects/sloparena-workspace/scripts/unity-editor-gateway.ts --project-path /home/binoui/Documents/projects/SlopArena/client/Unity -- sloparena.character.inspect --target <package>
 ```
 
 Require all of the following for an accepted package:
 
-- Unity Pipeline reachable;
+- Status is observational: on `held`/`releasing`, invoke a gateway command and let it wait for an independent lease; stop on `blocked`/unknown. `free`, settled, and zero active operations are availability observations only;
 - recompile reports no failure/errors when code or the Shared plugin changed;
 - current Unity error console is empty;
 - final package inspect reports `status: valid` and `dirtyOrStale: false`;

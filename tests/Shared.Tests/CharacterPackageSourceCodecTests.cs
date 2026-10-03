@@ -48,6 +48,28 @@ public sealed class CharacterPackageSourceCodecTests
     }
 
     [Fact]
+    public void HitPresentationId_RoundTripsThroughSourceEditAndRejectsNonString()
+    {
+        var json = JsonNode.Parse(Fixture("character.json"))!.AsObject();
+        json["presentationIds"]!.AsArray().Add("presentation.test.hit");
+        var slot = json["slots"]!.AsArray().Single(x => x!["id"]!.GetValue<string>() == "ground.A")!.AsObject();
+        slot["hitPresentationId"] = "presentation.test.hit";
+        var loaded = CharacterPackageSourceCodec.Load(Fixture("package.json"), json.ToJsonString());
+        Assert.True(loaded.IsValid, string.Join("\n", loaded.Diagnostics));
+        var edited = CharacterPackageSourceCodec.ReplaceSlot(loaded.Source!, 4, loaded.Source!.Character.Slots[4] with { Name = "Edited" });
+        Assert.True(edited.IsValid);
+        var rewritten = CharacterPackageSourceCodec.SerializeCharacter(edited.Source!.Character);
+        var roundTrip = CharacterPackageSourceCodec.Load(Fixture("package.json"), rewritten);
+        Assert.True(roundTrip.IsValid, string.Join("\n", roundTrip.Diagnostics));
+        Assert.Equal("presentation.test.hit", roundTrip.Source!.Character.Slots.Single(x => x.Id == "ground.A").HitPresentationId);
+
+        slot["hitPresentationId"] = 7;
+        var malformed = CharacterPackageSourceCodec.Load(Fixture("package.json"), json.ToJsonString());
+        Assert.Contains(malformed.Diagnostics, diagnostic => diagnostic.Path.EndsWith(".hitPresentationId", StringComparison.Ordinal)
+            && diagnostic.Code == "value.out-of-range");
+    }
+
+    [Fact]
     public void FightGuy_RoundTripsDeterministically()
     {
         var first = CharacterPackageSourceCodec.Load(Fixture("package.json"), Fixture("character.json"));

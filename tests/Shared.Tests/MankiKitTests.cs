@@ -227,27 +227,17 @@ public class MankiKitTests
             sim.Tick(new() { { 1, input } });
         }
     }
-    // ══════════════════════════════════════════════════════════════════
-    //  AIR LMB (slot 0 airborne, activeSlot=1)
-    // ══════════════════════════════════════════════════════════════════
-
-
-    // ══════════════════════════════════════════════════════════════════
-    //  RETIRED RMB (activeSlot=2) — target-lock toggle, no attack
-    //  ADR-0021/0018: AbilityFactory never dispatches slot 1 (RMB is the
-    //  lock toggle). An RMB attack press must be a no-op, not an attack —
-    //  pins the contract so retired RMB tests don't silently resurrect.
-    //  ══════════════════════════════════════════════════════════════════
+    // Reserved wire selector 2 toggles targeting and cannot start a move.
 
     [Fact]
-    public void RMB_AttackSlot_IsRetired_NeverDispatches()
+    public void ReservedSecondWireSelector_DoesNotStartAttack()
     {
         var sim = TestHelpers.MakeSim();
         var state = TestHelpers.PlayerState();
         state.PY = Gpy;
         TestHelpers.RegisterPlayer(sim, Def, state);
 
-        // RMB attack press + follow-up ticks: nothing may start an attack.
+        // The reserved selector must not dispatch an attack.
         sim.Tick(new() { { 1, new InputState { ActiveSlot = 2 } } });
         for (int i = 0; i < 10; i++)
             sim.Tick(new() { { 1, default } });

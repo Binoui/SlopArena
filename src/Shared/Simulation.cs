@@ -108,8 +108,7 @@ namespace SlopArena.Shared
         /// <summary>
         /// Tolerance for snapping to platform surfaces (units).
         /// Characters must be within this window above the surface to snap.
-        /// Public because abilities that write position directly must agree with ground
-        /// resolution on what counts as a traversable step (see NilusRiftwalk).
+        /// resolution on what counts as a traversable step for movement abilities.
         /// </summary>
         public const float PlatformSnapTolerance = 0.5f;
         /// <summary>
@@ -147,42 +146,18 @@ namespace SlopArena.Shared
         /// </summary>
         internal static bool IsIasaUnlocked(CharacterState state, CharacterDefinition def)
         {
-            if (state.State != ActionState.Attacking || state.AttackSlot == 0) return false;
+            if (state.State != ActionState.Attacking || state.AttackSlot == AbilitySlots.None)
+                return false;
             var cooked = def.GetCookedSlotAbility(state.AttackSlot, !state.IsGrounded);
-            if (cooked != null)
-            {
-                var stageIndex = Math.Min(state.ComboStage, (byte)(cooked.Timeline.Stages.Count - 1));
-                var stage = cooked.Timeline.Stages[stageIndex];
-                if (stage.IasaTicks == 0) return false;
-                var elapsed = state.AttackElapsedTicks;
-                for (var i = 0; i < stageIndex; i++) elapsed -= cooked.Timeline.Stages[i].DurationTicks;
-                return elapsed >= stage.IasaTicks;
-            }
-            var spec = def.GetSlotAbility(state.AttackSlot - 1, !state.IsGrounded);
-            if (spec?.Stages is not { Length: > 0 }) return false;
-            var legacyStage = ResolveStage(spec, state);
-            if (legacyStage.IasaTicks == 0) return false;
-            return ElapsedInStage(state, spec) >= legacyStage.IasaTicks;
+            if (cooked == null) return false;
+            var stageIndex = Math.Min(state.ComboStage, (byte)(cooked.Timeline.Stages.Count - 1));
+            var stage = cooked.Timeline.Stages[stageIndex];
+            if (stage.IasaTicks == 0) return false;
+            var elapsed = state.AttackElapsedTicks;
+            for (var i = 0; i < stageIndex; i++) elapsed -= cooked.Timeline.Stages[i].DurationTicks;
+            return elapsed >= stage.IasaTicks;
         }
 
-        /// <summary>
-        /// Current stage's elapsed ticks for an attacking entity. AttackElapsedTicks counts
-        /// ticks since the last stage reset; stage-driven moves (StageChainAbility) never
-        /// reset it mid-attack, so subtracting prior stages' durations yields the current
-        /// stage's elapsed. Hold-to-aim abilities reset it at their mid-attack stage
-        /// transition, which underflows the subtraction — fall back to the raw clock
-        /// (elapsed since the transition). Shared by the IASA check and the landing-lag
-        /// auto-cancel windows.
-        /// </summary>
-        internal static int ElapsedInStage(CharacterState state, AbilitySpec? spec)
-        {
-            if (spec?.Stages is not { Length: > 0 }) return 0;
-            int stageIdx = Math.Min(state.ComboStage, spec.Stages.Length - 1);
-            int elapsed = state.AttackElapsedTicks;
-            for (int i = 0; i < stageIdx; i++)
-                elapsed -= spec.Stages[i].DurationTicks;
-            return elapsed < 0 ? state.AttackElapsedTicks : elapsed;
-        }
 
         // ── MAIN ENTRY POINT ──
 
@@ -252,7 +227,7 @@ namespace SlopArena.Shared
                         s.BlockHitstopKind = (byte)DefenseBlockHitstopKind.None;
                     return;
                 }
-                if (input.MoveX != 0f || input.MoveY != 0f)
+                if (!s.QueuedArmorHitstop && (input.MoveX != 0f || input.MoveY != 0f))
                 {
                     if (!s.SdiApplied)
                     {
@@ -296,37 +271,40 @@ namespace SlopArena.Shared
                         s.StateTicks = 0;
                         s.WasAirborneDuringKnockback = !s.IsGrounded;
                         s.InPostHitstunFlight = false;
+                        ApplyFixedHitstun(ref s, s.QueuedKBFixedHitstunTicks, s.QueuedKBStunGate);
                     }
                     else if (s.QueuedKBResolvedForce)
                     {
                         ApplyKnockbackForce(ref s, s.QueuedKBDirX, s.QueuedKBDirZ,
                             s.QueuedKBAngle, s.QueuedKBForce, s.QueuedKBStun);
+                        ApplyFixedHitstun(ref s, s.QueuedKBFixedHitstunTicks, s.QueuedKBStunGate);
                     }
                     else if (!s.QueuedKBZero && (s.QueuedKBBase != 0f || s.QueuedKBGrowth != 0f || s.QueuedKBDamage != 0f || s.QueuedKBStun > 0))
                     {
                         ApplyKnockback(ref s, s.QueuedKBDirX, s.QueuedKBDirZ, s.QueuedKBAngle,
                             s.QueuedKBBase, s.QueuedKBGrowth, s.QueuedKBDamage,
                             s.QueuedKBStun, def.Weight);
+                        ApplyFixedHitstun(ref s, s.QueuedKBFixedHitstunTicks, s.QueuedKBStunGate);
                         ApplyCrouchBrace(ref s, queuedCrouchBrace, tuning.CrouchLaunchMultiplier);
                     }
-                    else
+                    else if (!s.QueuedArmorHitstop)
                     {
-                        // Zero-launch queue = the ATTACKER frozen by their own connecting hit
-                        // (they're not launched). Do NOT force Idle here — that cancelled the
-                        // attacker's remaining attack at freeze expiry, so the client's attack
-                        // animation stopped after hitstop. Leave the state untouched so the move
-                        // resumes when the freeze pops. (Prediction tracks with an unresolved hit
-                        // land here too; the next authoritative packet corrects them.)
+                        // Zero-launch queue = the ATTACKER frozen by their own connecting hit.
+                        // Leave state and movement untouched when an armored hit added only freeze.
                         s.KVX = 0f; s.KVY = 0f; s.KVZ = 0f;
                         s.HitstunTicks = 0;
                     }
-                    ApplyDirectionalInfluence(ref s);
+                    if (!s.QueuedArmorHitstop)
+                        ApplyDirectionalInfluence(ref s);
                     s.SdiApplied = false;
                     s.QueuedKVOverride = false;
                     s.QueuedKBZero = false;
                     s.QueuedCrouchBrace = false;
                     s.QueuedKVX = 0f; s.QueuedKVY = 0f; s.QueuedKVZ = 0f;
                     s.QueuedKBDirX = 0f; s.QueuedKBDirZ = 0f; s.QueuedKBAngle = 0;
+                    s.QueuedKBFixedHitstunTicks = 0;
+                    s.QueuedKBStunGate = 0;
+                    s.QueuedArmorHitstop = false;
                     s.QueuedKBBase = 0f; s.QueuedKBGrowth = 0f; s.QueuedKBDamage = 0f; s.QueuedKBForce = 0f; s.QueuedKBResolvedForce = false; s.QueuedKBStun = 0;
                     s.BlockHitstopKind = (byte)DefenseBlockHitstopKind.None;
                 }
@@ -476,10 +454,8 @@ namespace SlopArena.Shared
                 && !input.Jump && !input.ShieldHeld && !input.GrabPressed)
             {
                 byte slot = s.BufferedSlot;
-                // Issue #117: grounded-only moves (no air spec) buffered while airborne must
-                // NOT consume into a stuck Attacking placeholder — drop the buffer instead.
-                // The ServerAbility path re-resolves the spec on the next PreTickAbilities.
-                if (def.GetSlotAbility(slot - 1, !s.IsGrounded) == null)
+                // Drop a buffered slot unavailable in the current cooked air/ground state.
+                if (def.GetCookedSlotAbility(slot, !s.IsGrounded) == null)
                 {
                     s.BufferedSlot = 0;
                 }
@@ -1939,6 +1915,14 @@ namespace SlopArena.Shared
             s.KVX *= multiplier;
             s.KVY *= multiplier;
             s.KVZ *= multiplier;
+        }
+
+        internal static void ApplyFixedHitstun(ref CharacterState s, ushort fixedTicks, ushort stunGate)
+        {
+            if (fixedTicks == 0 || stunGate == 0 || s.HitstunTicks == 0) return;
+            s.HitstunTicks = Math.Min(fixedTicks, (ushort)240);
+            s.HitstunLevel = s.HitstunTicks <= 30 ? (byte)0 :
+                s.HitstunTicks <= 50 ? (byte)1 : (byte)2;
         }
 
 

@@ -56,4 +56,4 @@ When an intentional damage or timing change breaks an existing meaningful golden
 ## Reference material
 
 - `docs/plans/server-testing-implementation.md` — the original design rationale for this harness (why golden over hand-asserted, what's excluded from snapshots and why).
-- `docs/plans/2026-07-28-nilus-implementation.md`, Task "Write the regression scenarios" (search `NilusKitRegressionTests`) — a full worked example of adding golden coverage for a brand-new character, step by step, including the exact commands and expected output at each step.
+- Existing roster `KitScenario` tests under `tests/Shared.Tests/` are the current examples. Nilus's implementation plan is historical; its runtime and tests have been removed.

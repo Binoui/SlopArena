@@ -4,6 +4,8 @@ description: "Interactive human+agent DESIGN phase for SlopArena PVP stages: vis
 category: game-dev
 ---
 
+Before gateway examples, set `ORCA_TERMINAL_HANDLE` to your own runtime-issued terminal handle; the gateway verifies its incarnation and fails closed if it is missing or mismatched. Use the canonical gateway in [`docs/contributing/unity-cli.md`](../../../docs/contributing/unity-cli.md) and the [shared Editor coordination protocol](file:///home/binoui/Documents/projects/sloparena-workspace/docs/unity-editor-coordination.md). Wait for an independent lease; never inject work into an owner's batch. Runtime ownership status replaces historical Markdown ownership; `blocked` or unknown is not free.
+
 # SlopArena Stage Design
 
 ## 1. Purpose and boundary
@@ -31,7 +33,7 @@ Early layout talk should prefer terminal-ASCII wireframes. They are throwaway th
 
 Iterate visual massing with throwaway scripts, then capture with the typed design-capture command:
 
-1. Write a throwaway C# script to `/tmp/<name>.cs` with NO `using` directives and NO class/method declarations — the `unity command eval_file` Roslyn wrapper compiles the file as the body of a generated `Execute()` method (so a trailing `return` supplies its result), and all `UnityEditor`/`UnityEngine` types must be fully qualified. Pattern:
+1. Write a throwaway C# script to `/tmp/<name>.cs` with NO `using` directives and NO class/method declarations — invoke `eval_file` through the gateway; its Roslyn wrapper compiles the file as the body of a generated `Execute()` method (so a trailing `return` supplies its result), and all `UnityEditor`/`UnityEngine` types must be fully qualified. Pattern:
 
    ```csharp
    string prefabPath = "Assets/Resources/Stages/<key>.prefab";
@@ -65,12 +67,8 @@ Iterate visual massing with throwaway scripts, then capture with the typed desig
 2. Render five supporting deterministic edit-mode views:
 
    ```bash
-   unity command --project-path client/Unity \
-     sloparena.stage.design-capture --stage <key> --format json
+   bun /home/binoui/Documents/projects/sloparena-workspace/scripts/unity-editor-gateway.ts --project-path /home/binoui/Documents/projects/SlopArena/client/Unity -- sloparena.stage.design-capture --stage <key>
    ```
-
-   This writes four yaw quarter-turns (`design-north/east/south/west.png`) plus an orthographic `design-top.png`. The top view exposes routes, bridge line, and busy/empty zoning; the yaw views expose all-direction massing. The JSON result also reports the derived kill planes (`minX/maxX/minZ/maxZ/killHeight/killTop`) for numeric background-clearance checks, and the yaw views draw translucent red kill-plane walls so clearance is visible, not just computed. This is an edit-mode render of the prefab as it exists on disk.
-
 3. **After every meaningful composition change, the human reviewer enters Play Mode and reviews the stage through the real in-game camera.** Move, jump, and rotate freely from the main floor, every accessible platform, and the recovery/death-space views. Check that the world reads as a 3D place; that nearby façades, windows, and ramps have believable depth; and that background geometry neither masquerades as a route nor visibly intercepts an ejected fighter. The agent records the observations and iterates the gray box. Optional in-game screenshots may be kept in `.stage-authoring-cache/<key>/design/` as discussion evidence.
    Ask these questions in that review; they turn vague impressions into decisions:
 
@@ -83,7 +81,7 @@ Iterate visual massing with throwaway scripts, then capture with the typed desig
 
    This is a visual-design review, not the production workflow's external 2–4-player PVP acceptance. It establishes presentation readability before LOCK; it does not prove final gameplay usability.
 
-4. After `eval_file` creates or edits assets, the pipeline server can drop for ~10 seconds. Wait and retry with `unity status` rather than retrying the capture — observed behavior, not a workflow failure.
+4. Asset edits may cause a reload/connection gap. Keep dependent operations in the same bounded gateway batch and let it reconcile known work before release. Observe ownership through gateway `status`; blocked or uncertain completion requires reconciliation, not replaying `eval_file`, capture, or another mutation to obtain an acknowledgment.
 
 5. Saving into the real cosmetic prefab `client/Unity/Assets/Resources/Stages/<key>.prefab` is expected and safe mid-design: the production session replaces it wholesale, and the lock capture is the durable artifact.
 

@@ -11,7 +11,7 @@ namespace SlopArena.Shared.Tests;
 /// IasaTicks = 0 (default) preserves the full-lock behavior — no existing ability
 /// changes until a stage authors the field.
 /// </summary>
-public class IasaTests : KitScenarioTests
+public class IasaTests
 {
     // Slot1: 21-tick lock, unlocks at tick 16 (5 early). Lunge 3.
     private const ushort Slot1Duration = 21;
@@ -64,31 +64,30 @@ public class IasaTests : KitScenarioTests
                 forwardSpeed))
             .ToArray();
 
-    /// <summary>
-    /// Wibou movement/body data with cooked Slot1 (IASA at 16) and Slot2 timelines.
-    /// The synthetic cooked fixtures exercise the engine gate without legacy factory behavior.
-    /// </summary>
+    /// <summary>Fresh engine movement/body with synthetic cooked timelines.</summary>
     private static CharacterDefinition MakeIasaDef(bool iasa)
     {
-        var def = TestHelpers.CloneDef(TestHelpers.WibouDef);
-        var slots = TestHelpers.WibouDef.CookedSlots!.ToArray();
+        var def = TestHelpers.EngineDef;
+        var slots = def.CookedSlots!.ToArray();
         slots[0] = TestSlot(0, "ground.1", Slot1Duration, iasa ? Slot1Iasa : (ushort)0, VelocityOperations(Slot1Lunge));
         slots[1] = TestSlot(1, "ground.2", Slot2Duration, 0, VelocityOperations(Slot2Lunge));
         def.CookedSlots = slots;
         return def;
     }
+
     private static CharacterDefinition MakeGroundRecoveryDef()
     {
-        var def = TestHelpers.CloneDef(TestHelpers.WibouDef);
-        var slots = TestHelpers.WibouDef.CookedSlots!.ToArray();
+        var def = TestHelpers.EngineDef;
+        var slots = def.CookedSlots!.ToArray();
         slots[0] = TestSlot(0, "ground.1", Slot1Duration, 0);
         def.CookedSlots = slots;
         return def;
     }
+
     private static CharacterDefinition MakeIasaHitboxDef()
     {
-        var def = TestHelpers.CloneDef(TestHelpers.WibouDef);
-        var slots = TestHelpers.WibouDef.CookedSlots!.ToArray();
+        var def = TestHelpers.EngineDef;
+        var slots = def.CookedSlots!.ToArray();
         slots[0] = TestSlot(
             0,
             "ground.1",
@@ -163,6 +162,26 @@ public class IasaTests : KitScenarioTests
         Assert.Equal(ActionState.Run, states[Slot1Duration].State);
         TestHelpers.AssertNear(def.Movement.RunSpeed, states[Slot1Duration].VZ, 0.1f);
     }
+    [Fact]
+    public void IasaUnlock_RequiresAttackingStateAndActiveSlot()
+    {
+        var state = new CharacterState
+        {
+            State = ActionState.Attacking,
+            AttackSlot = AbilitySlots.Slot1,
+            AttackElapsedTicks = Slot1Iasa,
+            IsGrounded = true,
+        };
+        Assert.True(Simulation.IsIasaUnlocked(state, Def));
+
+        state.State = ActionState.Hitstun;
+        state.AnimLockTicks = Slot1Duration;
+        Assert.False(Simulation.IsIasaUnlocked(state, Def));
+
+        state.State = ActionState.Attacking;
+        state.AttackSlot = AbilitySlots.None;
+        Assert.False(Simulation.IsIasaUnlocked(state, Def));
+    }
 
 
     private static float Gpy => TestHelpers.GroundPY(Def);
@@ -174,16 +193,17 @@ public class IasaTests : KitScenarioTests
     [Fact]
     public void Iasa_ActAtUnlock_InterruptsIntoSlot2()
     {
-        AssertGoldenScenario(new KitScenario
-        {
-            Name = "IASA Act At Unlock Interrupts Into Slot2",
-            Def = Def,
-            Setup = () => TestHelpers.PlayerState() with { PY = Gpy },
-            Inputs = new InputSequence().Press(0, AbilitySlots.Slot1).Press(16, AbilitySlots.Slot2),
-            Assert = _ => { },
-            SnapshotTick = 18,   // mid Slot2 attack — lunge 5, AttackSlot 7
-            TotalTicks = 60,     // Slot2 (30t, started t16) ends t46; final Idle
-        });
+        var sim = TestHelpers.MakeSim();
+        sim.RegisterEntity(1, Def, TestHelpers.PlayerState() with { PY = Gpy });
+        TestHelpers.TickN(sim, TestHelpers.Input(AbilitySlots.Slot1), 1);
+        TestHelpers.TickDefault(sim, Slot1Iasa - 1);
+        var interrupted = TestHelpers.TickN(sim, TestHelpers.Input(AbilitySlots.Slot2), 1);
+        Assert.Equal(ActionState.Attacking, interrupted.State);
+        Assert.Equal(AbilitySlots.Slot2, interrupted.AttackSlot);
+        Assert.Equal((byte)2, interrupted.AttackSequence);
+        TestHelpers.AssertNear(Slot2Lunge, interrupted.VZ, 0.001f);
+        TestHelpers.TickDefault(sim, Slot2Duration);
+        Assert.Equal(ActionState.Idle, sim.GetState(1).State);
     }
 
     [Fact]
@@ -218,16 +238,19 @@ public class IasaTests : KitScenarioTests
     [Fact]
     public void Iasa_LockedBeforeUnlock_SameAttackContinues()
     {
-        AssertGoldenScenario(new KitScenario
-        {
-            Name = "IASA Locked Before Unlock Attack Continues",
-            Def = Def,
-            Setup = () => TestHelpers.PlayerState() with { PY = Gpy },
-            Inputs = new InputSequence().Press(0, AbilitySlots.Slot1).Press(14, AbilitySlots.Slot2),
-            Assert = _ => { },
-            SnapshotTick = 18,   // still Slot1 — lunge 3, AttackSlot 3, press dropped
-            TotalTicks = 60,     // Slot1 ends t21; final Idle (no second attack)
-        });
+        var sim = TestHelpers.MakeSim();
+        sim.RegisterEntity(1, Def, TestHelpers.PlayerState() with { PY = Gpy });
+        for (int tick = 0; tick < Slot1Iasa; tick++)
+            sim.Tick(new Dictionary<ulong, InputState>
+            {
+                [1] = tick == 0 ? TestHelpers.Input(AbilitySlots.Slot1)
+                    : tick == Slot1Iasa - 2 ? TestHelpers.Input(AbilitySlots.Slot2)
+                    : default,
+            });
+        Assert.Equal(AbilitySlots.Slot1, sim.GetState(1).AttackSlot);
+        TestHelpers.TickDefault(sim, Slot1Duration - Slot1Iasa);
+        Assert.Equal(ActionState.Idle, sim.GetState(1).State);
+        Assert.Equal((byte)1, sim.GetState(1).AttackSequence);
     }
 
     /// <summary>
@@ -237,16 +260,14 @@ public class IasaTests : KitScenarioTests
     [Fact]
     public void Iasa_NoInput_MoveCompletesAtFullDuration()
     {
-        AssertGoldenScenario(new KitScenario
-        {
-            Name = "IASA No Input Attack Completes At Full Duration",
-            Def = Def,
-            Setup = () => TestHelpers.PlayerState() with { PY = Gpy },
-            Inputs = new InputSequence().Press(0, AbilitySlots.Slot1),
-            Assert = _ => { },
-            SnapshotTick = 19,   // last live tick — unlock never cut the animation
-            TotalTicks = 60,
-        });
+        var sim = TestHelpers.MakeSim();
+        sim.RegisterEntity(1, Def, TestHelpers.PlayerState() with { PY = Gpy });
+        TestHelpers.TickN(sim, TestHelpers.Input(AbilitySlots.Slot1), 1);
+        TestHelpers.TickDefault(sim, Slot1Duration - 2);
+        Assert.Equal(ActionState.Attacking, sim.GetState(1).State);
+        Assert.Equal(AbilitySlots.Slot1, sim.GetState(1).AttackSlot);
+        TestHelpers.TickDefault(sim, 1);
+        Assert.Equal(ActionState.Idle, sim.GetState(1).State);
     }
 
     /// <summary>
@@ -258,8 +279,8 @@ public class IasaTests : KitScenarioTests
     [Fact]
     public void Iasa_DoesNotInterruptDuringAttackerHitstop_ButDoesAfterFreeze()
     {
-        var def = TestHelpers.CloneDef(TestHelpers.WibouDef);
-        var slots = TestHelpers.WibouDef.CookedSlots!.ToArray();
+        var def = TestHelpers.EngineDef;
+        var slots = def.CookedSlots!.ToArray();
         slots[0] = TestSlot(
             0,
             "ground.1",
@@ -292,8 +313,9 @@ public class IasaTests : KitScenarioTests
 
         var sim = TestHelpers.MakeSim(TestHelpers.TestArena());
         sim.RegisterEntity(1, def, TestHelpers.PlayerState() with { PY = TestHelpers.GroundPY(def) });
-        sim.RegisterEntity(100, TestHelpers.CombatDef,
-            TestHelpers.NpcState() with { PX = 0, PZ = 1.2f, PY = TestHelpers.CombatGroundPY });
+        var target = TestHelpers.EngineDef;
+        sim.RegisterEntity(100, target,
+            TestHelpers.NpcState() with { PX = 0, PZ = 1.2f, PY = TestHelpers.GroundPY(target) });
 
         // Slot1 at t0; Slot2 press at t14: past the IASA unlock (elapsed 10 >= 4) but
         // the attacker is still frozen by its own connecting hit (freeze t10..t17).
@@ -495,12 +517,13 @@ public class IasaTests : KitScenarioTests
         var def = MakeIasaHitboxDef();
         var sim = TestHelpers.MakeSim(TestHelpers.TestArena());
         sim.RegisterEntity(1, def, TestHelpers.PlayerState() with { PY = TestHelpers.GroundPY(def) });
-        sim.RegisterEntity(100, TestHelpers.CombatDef,
+        var targetDef = TestHelpers.EngineDef;
+        sim.RegisterEntity(100, targetDef,
             TestHelpers.NpcState() with
             {
                 PX = 0f,
                 PZ = 6f,
-                PY = TestHelpers.CombatGroundPY,
+                PY = TestHelpers.GroundPY(targetDef),
             });
 
         for (int tick = 0; tick <= Slot1Iasa; tick++)

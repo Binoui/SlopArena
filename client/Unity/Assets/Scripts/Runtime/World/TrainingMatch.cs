@@ -83,16 +83,68 @@ namespace SlopArena.Client.World
         private ushort _lastSoloNpcDeaths;
         private bool _soloResultsShown;
 
-        // Presentation-only input seam used by VisualBaselineCaptureController. The
-        // normal training path leaves this null and continues to consume player input.
+        // Presentation-only input seam used by VisualBaselineCaptureController and
+        // bounded Editor sequences. The normal training path leaves this null.
         private InputState? _captureInputOverride;
+        private object _captureInputSequenceOwner;
+
+        public event Action<uint> CaptureSimulationTickCompleted;
+        public uint CaptureTick => _tick;
+        public bool CaptureInputOverrideActive => _captureInputOverride.HasValue;
+        public bool CaptureSequenceReady
+        {
+            get
+            {
+                if (_bridge == null || _playerRenderer == null || _playerDef == null
+                    || MatchConfig.Mode != GameMode.Training || IsPaused || Time.timeScale <= 0f
+                    || _npcs.Count == 0 || _bridge.InternalSim.GetDefinition(PlayerEntityId) == null
+                    || _bridge.GetState(PlayerEntityId).EntityId != PlayerEntityId)
+                    return false;
+                return _npcs.All(npc => npc != null && npc.Def != null
+                    && _bridge.InternalSim.GetDefinition(npc.Id) != null
+                    && _bridge.GetState(npc.Id).EntityId == npc.Id);
+            }
+        }
+        public IReadOnlyList<SpellResolver.HitResult> CaptureLastTickHits =>
+            _bridge != null ? _bridge.LastTickHits : Array.Empty<SpellResolver.HitResult>();
+        public IReadOnlyList<TimelinePresentationEvent> CaptureLastTickPresentationEvents =>
+            _bridge != null ? _bridge.LastTickPresentationEvents : Array.Empty<TimelinePresentationEvent>();
 
         public CharacterState GetCaptureState(ulong entityId) => _bridge.GetState(entityId);
         public void SetCaptureState(ulong entityId, CharacterState state) =>
             _bridge.InternalSim.SetState(entityId, state);
-        public IReadOnlyList<SpellResolver.HitResult> CaptureLastTickHits => _bridge.LastTickHits;
-        public void SetCaptureInput(InputState input) => _captureInputOverride = input;
-        public void ClearCaptureInput() => _captureInputOverride = null;
+        public void SetCaptureInput(InputState input)
+        {
+            if (_captureInputSequenceOwner != null)
+                throw new InvalidOperationException("Capture input is owned by a Training command sequence.");
+            _captureInputOverride = input;
+        }
+        public void ClearCaptureInput()
+        {
+            if (_captureInputSequenceOwner != null)
+                throw new InvalidOperationException("Capture input is owned by a Training command sequence.");
+            _captureInputOverride = null;
+        }
+        public bool TryAcquireCaptureInputSequence(object owner)
+        {
+            if (owner == null || _captureInputSequenceOwner != null || _captureInputOverride.HasValue)
+                return false;
+            _captureInputSequenceOwner = owner;
+            return true;
+        }
+        public void SetCaptureSequenceInput(object owner, InputState input)
+        {
+            if (!ReferenceEquals(_captureInputSequenceOwner, owner))
+                throw new InvalidOperationException("The caller does not own Training capture input.");
+            _captureInputOverride = input;
+        }
+        public void ReleaseCaptureInputSequence(object owner)
+        {
+            if (!ReferenceEquals(_captureInputSequenceOwner, owner))
+                return;
+            _captureInputOverride = null;
+            _captureInputSequenceOwner = null;
+        }
         // ── Training settings panel (issue #187): Training-mode-only public surface ──
 
         public int NpcCount => _npcs.Count;
@@ -195,6 +247,8 @@ namespace SlopArena.Client.World
             SlopArena.Shared.Simulation.OnDebugLog = msg => Debug.Log(msg);
             _arenaDef = arena;
             bool solo = MatchConfig.Mode == GameMode.Solo;
+            if (solo)
+                _npcAiMode = NpcAiMode.Heuristic;
             _npcDifficulty = BotDifficultyProfile.Normalize(MatchConfig.SoloCpuDifficulty);
             _soloCountdownTicks = solo ? (ushort)300 : (ushort)0;
             _bridge = new LocalSimulationBridge(
@@ -486,6 +540,7 @@ namespace SlopArena.Client.World
                     BuildSoloResults(outcome);
                 }
             }
+            CaptureSimulationTickCompleted?.Invoke(_tick);
         }
 
         private void BuildSoloResults(MatchOutcome outcome)

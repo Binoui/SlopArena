@@ -12,11 +12,11 @@ public class BurstTests
     {
         var sim = TestHelpers.MakeSim(TestHelpers.TestArena());
         var state = TestHelpers.PlayerState();
-        state.PY = TestHelpers.CombatGroundPY;
+        state.PY = TestHelpers.GroundPY(TestHelpers.EngineDef);
         state.State = ActionState.Hitstun;
         state.HitstunTicks = 10;
         state.KVX = 3f;
-        TestHelpers.RegisterPlayer(sim, TestHelpers.CombatDef, state);
+        TestHelpers.RegisterPlayer(sim, TestHelpers.EngineDef, state);
 
         sim.Tick(new Dictionary<ulong, InputState> { { 1, BurstInput() } });
 
@@ -35,14 +35,14 @@ public class BurstTests
     {
         var sim = TestHelpers.MakeSim(TestHelpers.TestArena());
         var state = TestHelpers.PlayerState();
-        state.PY = TestHelpers.CombatGroundPY;
+        state.PY = TestHelpers.GroundPY(TestHelpers.EngineDef);
         state.HitstopTicks = 3;
         state.QueuedKBDirX = 1f;
         state.QueuedKBAngle = 20;
         state.QueuedKBBase = 10f;
         state.QueuedKBGrowth = 5f;
         state.QueuedKBStun = 20;
-        TestHelpers.RegisterPlayer(sim, TestHelpers.CombatDef, state);
+        TestHelpers.RegisterPlayer(sim, TestHelpers.EngineDef, state);
 
         sim.Tick(new Dictionary<ulong, InputState> { { 1, BurstInput() } });
 
@@ -61,10 +61,10 @@ public class BurstTests
     {
         var sim = TestHelpers.MakeSim(TestHelpers.TestArena());
         var state = TestHelpers.PlayerState();
-        state.PY = TestHelpers.CombatGroundPY;
+        state.PY = TestHelpers.GroundPY(TestHelpers.EngineDef);
         state.BurstCooldownTicks = 100;
         state.BurstRecoveryTicks = 100;
-        TestHelpers.RegisterPlayer(sim, TestHelpers.CombatDef, state);
+        TestHelpers.RegisterPlayer(sim, TestHelpers.EngineDef, state);
 
         sim.Tick(new Dictionary<ulong, InputState>
         {
@@ -80,11 +80,11 @@ public class BurstTests
     {
         var sim = TestHelpers.MakeSim(TestHelpers.TestArena());
         var state = TestHelpers.PlayerState();
-        state.PY = TestHelpers.CombatGroundPY;
+        state.PY = TestHelpers.GroundPY(TestHelpers.EngineDef);
         state.State = ActionState.Attacking;
         state.AttackSlot = AbilitySlots.Slot1;
         state.AnimLockTicks = 10;
-        TestHelpers.RegisterPlayer(sim, TestHelpers.CombatDef, state);
+        TestHelpers.RegisterPlayer(sim, TestHelpers.EngineDef, state);
 
         sim.Tick(new Dictionary<ulong, InputState> { { 1, BurstInput() } });
 

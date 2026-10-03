@@ -7,10 +7,10 @@ public sealed class PushboxCollisionTests
     [Fact]
     public void MovingFightersAreSeparatedAtBodyContact()
     {
-        var def = TestHelpers.CombatDef;
+        var def = TestHelpers.EngineDef;
         var sim = TestHelpers.MakeSim();
-        var first = TestHelpers.PlayerState(-0.2f, 0f) with { PY = TestHelpers.CombatGroundPY, VX = 1f };
-        var second = TestHelpers.NpcState(0.2f, 0f) with { PY = TestHelpers.CombatGroundPY, VX = -1f };
+        var first = TestHelpers.PlayerState(-0.2f, 0f) with { PY = TestHelpers.GroundPY(def), VX = 1f };
+        var second = TestHelpers.NpcState(0.2f, 0f) with { PY = TestHelpers.GroundPY(def), VX = -1f };
         sim.RegisterEntity(1, def, first);
         sim.RegisterEntity(100, def, second);
 
@@ -25,16 +25,16 @@ public sealed class PushboxCollisionTests
     [Fact]
     public void RunningIntoStationaryFighterDoesNotTransferHorizontalVelocity()
     {
-        var def = TestHelpers.CombatDef;
+        var def = TestHelpers.EngineDef;
         var sim = TestHelpers.MakeSim();
         var attacker = TestHelpers.PlayerState(-0.2f, 0f) with
         {
-            PY = TestHelpers.CombatGroundPY,
+            PY = TestHelpers.GroundPY(def),
             VX = 1f
         };
         var defender = TestHelpers.NpcState(0.2f, 0f) with
         {
-            PY = TestHelpers.CombatGroundPY,
+            PY = TestHelpers.GroundPY(def),
             VX = 0f
         };
         sim.RegisterEntity(1, def, attacker);
@@ -50,11 +50,11 @@ public sealed class PushboxCollisionTests
     [Fact]
     public void VerticallySeparatedFightersDoNotPushEachOther()
     {
-        var def = TestHelpers.CombatDef;
+        var def = TestHelpers.EngineDef;
         var pairSim = TestHelpers.MakeSim();
         var singleSim = TestHelpers.MakeSim();
-        var first = TestHelpers.PlayerState(0f, 0f) with { PY = TestHelpers.CombatGroundPY, VX = 1f };
-        var second = TestHelpers.NpcState(0.2f, 0f) with { PY = TestHelpers.CombatGroundPY + 10f, VX = -1f, IsGrounded = false };
+        var first = TestHelpers.PlayerState(0f, 0f) with { PY = TestHelpers.GroundPY(def), VX = 1f };
+        var second = TestHelpers.NpcState(0.2f, 0f) with { PY = TestHelpers.GroundPY(def) + 10f, VX = -1f, IsGrounded = false };
         pairSim.RegisterEntity(1, def, first);
         pairSim.RegisterEntity(100, def, second);
         singleSim.RegisterEntity(1, def, first);

@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Collections.Generic;
 using System.Text;
 using Xunit;
@@ -40,26 +41,37 @@ public class HitboxGeometryTests
         return bytes.ToArray();
     }
 
-    /// <summary>Minimal def: 2 bones, scale 1.0, 60-tick LMB stage named "attack".</summary>
-    private static CharacterDefinition BoneDef()
+    /// <summary>Fixed engine body and synthetic normal timelines for pose projection tests.</summary>
+    private static CharacterDefinition BoneDef(ushort groundDuration = 60, ushort airDuration = 60)
     {
-        return new CharacterDefinition
+        var def = TestHelpers.EngineDef;
+        def.HipHeight = 0.5f;
+        var slots = def.CookedSlots!.ToArray();
+        slots[0] = NormalSlot(0, "ground.1", false, groundDuration);
+        slots[8] = NormalSlot(8, "air.1", true, airDuration);
+        def.CookedSlots = slots;
+        def.Slot1 = new AbilitySpec
         {
-            CapsuleHeight = 1.5f,
-            HipHeight = 0.5f,
-            HurtboxBoneScale = 1.0f,
-            HurtboxBoneDefs = new[]
-            {
-                new HurtboxBoneDef("mixamorig:Head", 0, 0, 0, 0.22f),
-                new HurtboxBoneDef("mixamorig:Hips", 0, 0, 0, 0.26f),
-            },
-            LMB = new AbilitySpec
-            {
-                Stages = new[] { new AttackStage { DurationTicks = 60 } },
-                AnimationNames = new[] { "attack" },
-            },
+            Stages = new[] { new AttackStage { DurationTicks = groundDuration } },
+            AnimationNames = new[] { "attack" },
         };
+        def.AirSlot1 = new AbilitySpec
+        {
+            Stages = new[] { new AttackStage { DurationTicks = airDuration } },
+            AnimationNames = new[] { "attack" },
+        };
+        def.HurtboxBoneScale = 1f;
+        return def;
     }
+
+    private static CookedSlotDefinition NormalSlot(int ordinal, string id, bool air, ushort duration)
+        => new(ordinal, id, air, "Geometry test", "", "", AuthoringAbilityBehavior.MeleeCombo,
+            AuthoringAimMode.None, 0, false, false,
+            new CookedTimeline(new[]
+            {
+                new CookedStage(duration, 0, 0, 0, 0, new[] { "attack" },
+                    Array.Empty<CookedTimelineOperation>()),
+            }));
 
     [Fact]
     public void EntityRelative_FacingZero_OffZIsFront()
@@ -312,20 +324,12 @@ public class HitboxGeometryTests
             new[] { ("attack", 60) },
             (f, bone, axis) => (bone, axis) switch { (0, 1) => 0.9f + f * 0.01f, (1, 1) => 0.4f, _ => 0f }));
 
-        var def = BoneDef(); // ground LMB: 60-tick stage
-        // Air slot 0 (AirLMB): 30-tick stage, same "attack" animation. With the ground
-        // (60-tick) duration, tick 15 projects to frame 15 (Head Y 1.05 → world 1.55);
-        // with the air (30-tick) duration it projects to frame 30 (Head Y 1.20 → world 1.7).
-        def.AirLMB = new AbilitySpec
-        {
-            Stages = new[] { new AttackStage { DurationTicks = 30 } },
-            AnimationNames = new[] { "attack" },
-        };
+        var def = BoneDef(groundDuration: 60, airDuration: 30);
 
         var s = new CharacterState { PX = 0f, PY = 0.75f, PZ = 0f, FacingYaw = 0f, AttackElapsedTicks = 15 };
         var evt = new HitboxEvent { BoneName = "mixamorig:Head" };
 
-        HitboxGeometry.ResolvePositions(s, evt, baked, def, new[] { "attack" }, 0, 0, airborne: true,
+        HitboxGeometry.ResolvePositions(s, evt, baked, def, new[] { "attack" }, 0, 2, airborne: true,
             out float wx, out float wy, out float wz, out _, out _, out _);
 
         // bakedFrame = min(15 * 60 / 30, 59) = 30 → Head Y = 0.9 + 0.3 = 1.2

@@ -34,6 +34,21 @@ public sealed class AbilityLabPackageWorkspace
     private const int MaxUndoDepth = 50;
     private readonly Stack<WorkspaceSnapshot> _undo = new();
     private readonly Stack<WorkspaceSnapshot> _redo = new();
+    public bool HasAttachmentDraft => _attachmentDraft != null;
+    public bool AttachmentDraftDirty => _attachmentDraft != null && _attachmentDraft.Value != _attachmentDraft.Saved;
+    public int AttachmentDraftEntryIndex => _attachmentDraft?.EntryIndex ?? -1;
+    public WeaponAttachConfig AttachmentDraftSourceConfig => _attachmentDraft?.Config;
+    public string AttachmentDraftError { get; private set; } = "";
+    public Vector3 AttachmentPositionOffset => _attachmentDraft?.Value.PositionOffset ?? Vector3.zero;
+    public Vector3 AttachmentRotationOffset => _attachmentDraft?.Value.RotationOffset ?? Vector3.zero;
+    public bool AttachmentHasFirePhaseOverride => _attachmentDraft?.Value.HasFirePhaseOverride ?? false;
+    public Vector3 AttachmentFirePositionOffset => _attachmentDraft?.Value.FirePositionOffset ?? Vector3.zero;
+    public Vector3 AttachmentFireRotationOffset => _attachmentDraft?.Value.FireRotationOffset ?? Vector3.zero;
+    public bool CanUndoAttachmentDraft => _attachmentDraft != null && _attachmentUndo.Count > 0;
+    public bool CanRedoAttachmentDraft => _attachmentDraft != null && _attachmentRedo.Count > 0;
+    private AttachmentDraftState _attachmentDraft;
+    private readonly Stack<AttachmentValues> _attachmentUndo = new();
+    private readonly Stack<AttachmentValues> _attachmentRedo = new();
 
     private readonly List<CharacterDiagnostic> _diagnostics = new();
     public event Action? StatusChanged;
@@ -43,6 +58,8 @@ public sealed class AbilityLabPackageWorkspace
 
     public bool NewPackage(string packageId, string displayName, string creator = "Binoui", string license = "MIT", string attribution = "SlopArena")
     {
+        if (AttachmentDraftDirty)
+            return SetAttachmentDraftError("Save or revert the attachment draft before creating another package.");
         var service = new CharacterPackageAuthoringService(UnityCharacterAssetCooker.ProjectRoot());
         CharacterPackageCreateResult result = service.NewPackage(packageId, displayName, creator, license, attribution);
         if (!result.Success)
@@ -58,6 +75,10 @@ public sealed class AbilityLabPackageWorkspace
     }
     public bool OpenPackage(string packageRoot)
     {
+        if (AttachmentDraftDirty)
+            return SamePackage(PackageRoot, packageRoot)
+                ? true
+                : SetAttachmentDraftError("Save or revert the attachment draft before opening another package.");
         var inspection = new CharacterPackageAuthoringService(UnityCharacterAssetCooker.ProjectRoot()).Inspect(packageRoot);
         if (!inspection.Success || inspection.Source == null || inspection.Catalog == null)
         {
@@ -71,7 +92,15 @@ public sealed class AbilityLabPackageWorkspace
     {
         if (inspection == null || !inspection.Success || inspection.Source == null || inspection.Catalog == null)
             return false;
+        if (AttachmentDraftDirty)
+            return SamePackage(PackageRoot, inspection.SourcePath)
+                ? true
+                : SetAttachmentDraftError("Save or revert the attachment draft before opening another package.");
 
+        _attachmentDraft = null;
+        _attachmentUndo.Clear();
+        _attachmentRedo.Clear();
+        AttachmentDraftError = "";
         LiveDraftPackage = null;
         LiveDraftInvalid = false;
         PackageRoot = inspection.SourcePath;
@@ -211,6 +240,186 @@ public sealed class AbilityLabPackageWorkspace
             SetDiagnosticsWithoutNotify(new[] { new CharacterDiagnostic(CharacterDiagnosticSeverity.Error, "rename.failed", "catalog", ex.Message) }, "Failed");
             return false;
         }
+    }
+
+    public bool BeginAttachmentDraft(int entryIndex)
+    {
+        if (AttachmentDraftDirty && AttachmentDraftEntryIndex != entryIndex)
+            return SetAttachmentDraftError("Save or revert the current attachment draft before selecting another entry.");
+        var config = Catalog?.WeaponConfig;
+        if (config?.Entries == null || entryIndex < 0 || entryIndex >= config.Entries.Length || config.Entries[entryIndex] == null)
+            return SetAttachmentDraftError("The selected weapon attachment entry is unavailable.");
+        if (_attachmentDraft != null && _attachmentDraft.Config == config && _attachmentDraft.EntryIndex == entryIndex)
+            return true;
+        _attachmentDraft = new AttachmentDraftState(config, entryIndex, CaptureAttachmentValues(config.Entries[entryIndex]));
+        _attachmentUndo.Clear();
+        _attachmentRedo.Clear();
+        AttachmentDraftError = "";
+        return true;
+    }
+
+    public bool SetAttachmentPositionOffset(Vector3 value) =>
+        ChangeAttachmentDraft(x => { x.PositionOffset = value; return x; });
+    public bool SetAttachmentRotationOffset(Vector3 value) =>
+        ChangeAttachmentDraft(x => { x.RotationOffset = value; return x; });
+    public bool SetAttachmentFirePhaseOverride(bool value) => ChangeAttachmentDraft(x =>
+    {
+        if (value && !x.HasFirePhaseOverride)
+        {
+            x.FirePositionOffset = x.PositionOffset;
+            x.FireRotationOffset = x.RotationOffset;
+        }
+        x.HasFirePhaseOverride = value;
+        return x;
+    });
+    public bool SetAttachmentFirePositionOffset(Vector3 value) =>
+        ChangeAttachmentDraft(x => { x.FirePositionOffset = value; return x; });
+    public bool SetAttachmentFireRotationOffset(Vector3 value) =>
+        ChangeAttachmentDraft(x => { x.FireRotationOffset = value; return x; });
+
+    public bool UndoAttachmentDraft()
+    {
+        if (!CanUndoAttachmentDraft) return false;
+        _attachmentRedo.Push(_attachmentDraft.Value);
+        _attachmentDraft.Value = _attachmentUndo.Pop();
+        AttachmentDraftError = "";
+        SceneView.RepaintAll();
+        return true;
+    }
+
+    public bool RedoAttachmentDraft()
+    {
+        if (!CanRedoAttachmentDraft) return false;
+        _attachmentUndo.Push(_attachmentDraft.Value);
+        _attachmentDraft.Value = _attachmentRedo.Pop();
+        AttachmentDraftError = "";
+        SceneView.RepaintAll();
+        return true;
+    }
+
+    public bool RevertAttachmentDraft()
+    {
+        if (_attachmentDraft == null) return false;
+        _attachmentDraft = null;
+        _attachmentUndo.Clear();
+        _attachmentRedo.Clear();
+        AttachmentDraftError = "";
+        SceneView.RepaintAll();
+        return true;
+    }
+
+    public bool SaveAttachmentDraft()
+    {
+        if (_attachmentDraft == null) return SetAttachmentDraftError("No attachment draft is selected.");
+        var draft = _attachmentDraft;
+        if (draft.Config == null || draft.Config.Entries == null || draft.EntryIndex < 0
+            || draft.EntryIndex >= draft.Config.Entries.Length || draft.Config.Entries[draft.EntryIndex] == null)
+            return SetAttachmentDraftError("The attachment source entry no longer exists.");
+        var entry = draft.Config.Entries[draft.EntryIndex];
+        if (CaptureAttachmentValues(entry) != draft.Saved)
+            return SetAttachmentDraftError("Attachment source changed externally; revert and reload before saving.");
+        if (!AttachmentDraftDirty)
+        {
+            AttachmentDraftError = "";
+            return true;
+        }
+        try
+        {
+            UnityEditor.Undo.RecordObject(draft.Config, "Save Ability Lab attachment placement");
+            ApplyAttachmentValues(entry, draft.Value);
+            EditorUtility.SetDirty(draft.Config);
+            AssetDatabase.SaveAssetIfDirty(draft.Config);
+        }
+        catch (Exception ex)
+        {
+            ApplyAttachmentValues(entry, draft.Saved);
+            EditorUtility.SetDirty(draft.Config);
+            return SetAttachmentDraftError("Could not save attachment source: " + ex.Message);
+        }
+        draft.Saved = draft.Value;
+        IsDirty = true;
+        Status = "Stale";
+        AttachmentDraftError = "";
+        StatusChanged?.Invoke();
+        SceneView.RepaintAll();
+        return true;
+    }
+
+    public WeaponAttachConfig CreateAttachmentPreviewConfig()
+    {
+        var source = _attachmentDraft?.Config ?? Catalog?.WeaponConfig;
+        if (source == null) return null;
+        var preview = ScriptableObject.CreateInstance<WeaponAttachConfig>();
+        preview.hideFlags = HideFlags.HideAndDontSave;
+        preview.Entries = (source.Entries ?? Array.Empty<WeaponEntry>())
+            .Select(CloneWeaponEntry).ToArray();
+        if (_attachmentDraft != null && _attachmentDraft.EntryIndex >= 0
+            && _attachmentDraft.EntryIndex < preview.Entries.Length && preview.Entries[_attachmentDraft.EntryIndex] != null)
+            ApplyAttachmentValues(preview.Entries[_attachmentDraft.EntryIndex], _attachmentDraft.Value);
+        return preview;
+    }
+    private static WeaponEntry CloneWeaponEntry(WeaponEntry entry) => entry == null ? null : new WeaponEntry
+    {
+        AttackSlot = entry.AttackSlot,
+        BoneName = entry.BoneName,
+        Prefab = entry.Prefab,
+        PositionOffset = entry.PositionOffset,
+        RotationOffset = entry.RotationOffset,
+        HasFirePhaseOverride = entry.HasFirePhaseOverride,
+        FirePositionOffset = entry.FirePositionOffset,
+        FireRotationOffset = entry.FireRotationOffset,
+        HideAfterTicks = entry.HideAfterTicks,
+        TrailStylePrefab = entry.TrailStylePrefab,
+        HitboxMotionTime = entry.HitboxMotionTime,
+        TrailBladeWidth = entry.TrailBladeWidth,
+        TrailHiltAnchor = entry.TrailHiltAnchor,
+        TrailTipAnchor = entry.TrailTipAnchor,
+    };
+
+    private bool ChangeAttachmentDraft(Func<AttachmentValues, AttachmentValues> change)
+    {
+        if (_attachmentDraft == null) return SetAttachmentDraftError("Select a weapon attachment before editing.");
+        var next = change(_attachmentDraft.Value);
+        if (!next.HasFiniteOffsets) return SetAttachmentDraftError("Attachment offsets must be finite numbers.");
+        if (next == _attachmentDraft.Value) return false;
+        _attachmentUndo.Push(_attachmentDraft.Value);
+        if (_attachmentUndo.Count > MaxUndoDepth) TrimOldest(_attachmentUndo);
+        _attachmentRedo.Clear();
+        _attachmentDraft.Value = next;
+        AttachmentDraftError = "";
+        SceneView.RepaintAll();
+        return true;
+    }
+
+    private static void TrimOldest<T>(Stack<T> stack)
+    {
+        var retained = stack.Take(MaxUndoDepth).Reverse().ToArray();
+        stack.Clear();
+        foreach (var item in retained) stack.Push(item);
+    }
+
+    private bool SetAttachmentDraftError(string message)
+    {
+        AttachmentDraftError = message;
+        return false;
+    }
+
+    private static AttachmentValues CaptureAttachmentValues(WeaponEntry entry) => new()
+    {
+        PositionOffset = entry.PositionOffset,
+        RotationOffset = entry.RotationOffset,
+        HasFirePhaseOverride = entry.HasFirePhaseOverride,
+        FirePositionOffset = entry.FirePositionOffset,
+        FireRotationOffset = entry.FireRotationOffset,
+    };
+
+    private static void ApplyAttachmentValues(WeaponEntry entry, AttachmentValues values)
+    {
+        entry.PositionOffset = values.PositionOffset;
+        entry.RotationOffset = values.RotationOffset;
+        entry.HasFirePhaseOverride = values.HasFirePhaseOverride;
+        entry.FirePositionOffset = values.FirePositionOffset;
+        entry.FireRotationOffset = values.FireRotationOffset;
     }
 
     public bool ReplaceTrailBladeWidth(int entryIndex, float width)
@@ -518,6 +727,44 @@ public sealed class AbilityLabPackageWorkspace
             new GravityWindowOperationSource(0, AuthoringUnit.Normalized, 0.5f, duration));
     }
 
+    public bool AddTargetedLeap(string canonicalSlotId, int stageIndex)
+    {
+        if (!HasPackage) return Fail("workspace.missing", "workspace", "No package is open.");
+        if (!TryResolveCanonicalSlot(canonicalSlotId, out int slotIndex, out var sourceSlot))
+            return Fail("edit.slot.unresolved", canonicalSlotId, "Canonical slot does not resolve to an explicit source slot.");
+        if (stageIndex < 0 || stageIndex >= sourceSlot.Timeline.Stages.Count)
+            return Fail("edit.index.out-of-range", $"character.slots[{slotIndex}].timeline.stages[{stageIndex}]", "Stage index is out of range.");
+        if (sourceSlot.Timeline.Stages.SelectMany(stage => stage.Operations)
+            .OfType<StartCapabilityOperationSource>()
+            .Any(operation => operation.CapabilityId == CharacterPackageCompiler.TargetedLeapCapabilityId))
+            return Fail("edit.operation.duplicate", canonicalSlotId, "This move already has a targeted leap.");
+
+        var requirements = Draft.CapabilityRequirements.ToList();
+        if (requirements.Any(item => item.CapabilityId == CharacterPackageCompiler.TargetedLeapCapabilityId &&
+            item.CapabilityVersion != CharacterPackageCompiler.TargetedLeapCapabilityVersion))
+            return Fail("edit.capability.version", canonicalSlotId, "Targeted leap requires a different capability version.");
+        if (!requirements.Any(item => item.CapabilityId == CharacterPackageCompiler.TargetedLeapCapabilityId))
+            requirements.Add(new CapabilityRequirementSource(
+                CharacterPackageCompiler.TargetedLeapCapabilityId,
+                CharacterPackageCompiler.TargetedLeapCapabilityVersion));
+
+        ushort duration = sourceSlot.Timeline.Stages[stageIndex].DurationTicks;
+        ushort recoveryTicks = (ushort)Math.Max(1, Math.Min(20, (int)duration));
+        var hitbox = new HitboxSource(
+            AuthoringHitboxShape.Sphere, 0.5f,
+            0f, 0f, 0f, 0f, 0f, 0f,
+            "bone.hips", null,
+            1f, 45f, 5f, 80f, 8, (ushort)Math.Min(6, (int)recoveryTicks), true, 0);
+        var parameters = new TargetedLeapCapabilityParameters(
+            0, 120, 1f, 12f, 10f, 0, recoveryTicks, hitbox);
+        var source = new CharacterPackageSource(Manifest,
+            Draft with { CapabilityRequirements = requirements });
+        return ApplyEdit(CharacterPackageSourceCodec.AddOperation(source, slotIndex, stageIndex,
+            new StartCapabilityOperationSource(0, AuthoringUnit.Ticks,
+                CharacterPackageCompiler.TargetedLeapCapabilityId,
+                CharacterPackageCompiler.TargetedLeapCapabilityVersion, parameters)));
+    }
+
 
     public bool ReplaceStage(int slotIndex, int stageIndex, CharacterStageSource stage)
     {
@@ -701,6 +948,58 @@ public sealed class AbilityLabPackageWorkspace
                 Prefab = x.Prefab,
             }).ToArray();
 
+
+    private static bool SamePackage(string left, string right)
+    {
+        if (string.IsNullOrEmpty(left) || string.IsNullOrEmpty(right)) return false;
+        try
+        {
+            string root = UnityCharacterAssetCooker.ProjectRoot();
+            string a = Path.GetFullPath(Path.IsPathRooted(left) ? left : Path.Combine(root, left));
+            string b = Path.GetFullPath(Path.IsPathRooted(right) ? right : Path.Combine(root, right));
+            return string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
+        }
+        catch { return false; }
+    }
+
+    private sealed class AttachmentDraftState
+    {
+        public AttachmentDraftState(WeaponAttachConfig config, int entryIndex, AttachmentValues values)
+        {
+            Config = config;
+            EntryIndex = entryIndex;
+            Value = values;
+            Saved = values;
+        }
+
+        public WeaponAttachConfig Config { get; }
+        public int EntryIndex { get; }
+        public AttachmentValues Value { get; set; }
+        public AttachmentValues Saved { get; set; }
+    }
+
+    private struct AttachmentValues : IEquatable<AttachmentValues>
+    {
+        public Vector3 PositionOffset;
+        public Vector3 RotationOffset;
+        public bool HasFirePhaseOverride;
+        public Vector3 FirePositionOffset;
+        public Vector3 FireRotationOffset;
+        public bool HasFiniteOffsets =>
+            Finite(PositionOffset) && Finite(RotationOffset) && Finite(FirePositionOffset) && Finite(FireRotationOffset);
+
+        public bool Equals(AttachmentValues other) =>
+            PositionOffset.Equals(other.PositionOffset) && RotationOffset.Equals(other.RotationOffset) &&
+            HasFirePhaseOverride == other.HasFirePhaseOverride &&
+            FirePositionOffset.Equals(other.FirePositionOffset) && FireRotationOffset.Equals(other.FireRotationOffset);
+        public override bool Equals(object obj) => obj is AttachmentValues other && Equals(other);
+        public override int GetHashCode() => PositionOffset.GetHashCode();
+        public static bool operator ==(AttachmentValues left, AttachmentValues right) => left.Equals(right);
+        public static bool operator !=(AttachmentValues left, AttachmentValues right) => !left.Equals(right);
+        private static bool Finite(Vector3 value) =>
+            Finite(value.x) && Finite(value.y) && Finite(value.z);
+        private static bool Finite(float value) => !float.IsNaN(value) && !float.IsInfinity(value);
+    }
 
     private sealed class WorkspaceSnapshot
     {

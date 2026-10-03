@@ -82,6 +82,7 @@ public sealed class CookedTimelineAbility : ServerAbility
         _forwardLungeTicksRemaining = 0;
         _forwardLungeActive = false;
         _gravityWindowTicksRemaining = 0;
+        ClearArmorWindow();
         _gravityWindowScale = 1f;
         s.State = ActionState.Attacking;
         s.ComboStage = 0;
@@ -113,15 +114,16 @@ public sealed class CookedTimelineAbility : ServerAbility
         for (var i = 0; i < _capabilities.Count; i++)
             _capabilities[i].Tick(ref s, ref input, def);
 
-        // Bonk's zero MaxAimTicks is an explicit unlimited hold sentinel. Do not
-        // let the authored action-stage timeout terminate that hold; restart stage
-        // time when the capability transitions into its release/action phase.
+        // Aim-hold capabilities freeze stage time during aiming; reset the clock on release.
         if (wasAiming && s.State != ActionState.Aiming)
             _stageTick = 0;
         if (wasAiming)
             return;
 
-        if (_stageTick >= CurrentStage.DurationTicks)
+        // Landing-continuation capabilities own their end: landing re-seeks animation time,
+        // and impact plus recovery may outlast the authored stage duration.
+        // Unrelated capabilities retain the ordinary stage clock.
+        if (_stageTick >= CurrentStage.DurationTicks && !ContinuesThroughLanding)
         {
             if (_stageIndex + 1 >= _slot.Timeline.Stages.Count)
             {
@@ -145,6 +147,7 @@ public sealed class CookedTimelineAbility : ServerAbility
         s.SlideAttackCarryActive = false;
         _gravityWindowTicksRemaining = 0;
         _gravityWindowScale = 1f;
+        ClearArmorWindow();
     }
 
     public override void OnCancel(ref CharacterState s)
@@ -156,6 +159,7 @@ public sealed class CookedTimelineAbility : ServerAbility
         _gravityWindowTicksRemaining = 0;
         _gravityWindowScale = 1f;
         _forwardLungeTicksRemaining = 0;
+        ClearArmorWindow();
     }
     public override void OnHitEntity(ref CharacterState attacker, ref CharacterState target,
         CharacterDefinition attackerDef, CharacterDefinition targetDef, ref float damage, ref float knockbackForce)
@@ -202,6 +206,9 @@ public sealed class CookedTimelineAbility : ServerAbility
                 case CookedGravityWindowOperation gravity:
                     _gravityWindowScale = gravity.GravityScale;
                     _gravityWindowTicksRemaining = gravity.DurationTicks;
+                    break;
+                case CookedArmorWindowOperation armor:
+                    StartArmorWindow(armor.DurationTicks);
                     break;
                 case CookedSpawnHitboxOperation hitbox:
                     SpawnCookedHitbox(ref s, hitbox.Hitbox);
@@ -284,6 +291,7 @@ public sealed class CookedTimelineAbility : ServerAbility
                 KnockbackGrowth = cooked.KnockbackGrowth,
             },
             StunTicks = cooked.StunTicks,
+            FixedHitstunTicks = cooked.FixedHitstunTicks,
             Interruptible = cooked.Interruptible,
             HitGroup = cooked.HitGroup,
             KnockbackDirection = cooked.KnockbackDirection,
@@ -382,7 +390,7 @@ public sealed class CookedTimelineAbility : ServerAbility
         }
         _capabilities.Clear();
     }
-    private static string? RuntimeBoneId(string? value)
+    internal static string? RuntimeBoneId(string? value)
         => value switch
         {
             "bone.head" => "mixamorig:Head",

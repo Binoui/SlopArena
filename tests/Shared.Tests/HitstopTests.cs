@@ -26,7 +26,7 @@ namespace SlopArena.Shared.Tests;
 /// </summary>
 public class HitstopTests
 {
-    private static readonly float Gpy = TestHelpers.CombatGroundPY;
+    private static readonly float Gpy = TestHelpers.GroundPY(TestHelpers.EngineDef);
 
 
 
@@ -43,7 +43,7 @@ public class HitstopTests
         // Integration: a RehitIntervalTicks zone rehits the still-frozen victim —
         // the second pulse applies a full fresh freeze.
         var sim = TestHelpers.MakeSim(TestHelpers.TestArena());
-        var def = TestHelpers.CombatDef;
+        var def = TestHelpers.EngineDef;
         var npc = TestHelpers.NpcState(0f, 2.2f);
         npc.PY = Gpy;
         sim.RegisterEntity(100, def, npc);
@@ -75,15 +75,16 @@ public class HitstopTests
         // Manki Q (Round Bomb) — projectile + explosion both receiver-only.
         var arena = TestHelpers.TestArena();
         var sim = TestHelpers.MakeSim(arena);
-        var def = TestHelpers.CombatDef;
+        // Manki Q is the authored projectile under test; the receiver is a synthetic target.
+        var def = TestHelpers.MankiDef;
 
         var player = TestHelpers.PlayerState();
-        player.PY = Gpy;
+        player.PY = TestHelpers.GroundPY(def);
         sim.RegisterEntity(1, def, player);
 
         var npc = TestHelpers.NpcState(0f, 3.5f);
         npc.PY = Gpy;
-        sim.RegisterEntity(100, def, npc);
+        sim.RegisterEntity(100, TestHelpers.EngineDef, npc);
 
         var aimInput = TestHelpers.Input(activeSlot: AbilitySlots.A, aiming: true, aimDistance: 500);
         var releaseInput = new InputState { ActiveSlot = AbilitySlots.A, AimDistance = 500, IsAiming = false };

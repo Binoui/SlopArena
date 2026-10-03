@@ -11,6 +11,87 @@ runs, so the numbers are what the game produces — not a reimplementation.
 Primary use: attack duration, active frames, frame advantage, and knockback shape/range at a glance. The
 combo matrix/probes are experimental diagnostics, deliberately separated from the core report.
 
+## Explicit-input route measurements
+
+`--route-search` searches **FightGuy versus FightGuy** using admitted cooked content
+and real baked poses. `--route-replay` executes a retained witness without a chase
+policy. Neither command modifies gameplay, authoring, cooked packages or roster pins.
+
+```bash
+dotnet run --project tools/MoveDataReport -- --route-search \
+  --budget 3000 --measure-budget 1000 --horizon 240 \
+  --out artifacts/combo-routes/fightguy-search.json
+
+# Omit --witness for the first result, or add --witness <id> from the report.
+dotnet run --no-build --project tools/MoveDataReport -- \
+  --route-replay artifacts/combo-routes/fightguy-search.json \
+  --out artifacts/combo-routes/fightguy-replay.json
+```
+
+Route commands emit JSON through `--out`; they do not compose with the normal
+report's `--truecombos`, `--di`, `--json`, `--html` or `--kbm` options.
+
+| Search option | Default / bound |
+|---|---|
+| `--budget` | 3000; 1–100000 discovery simulations, including preparations/observations |
+| `--measure-budget` | 1000; 1–100000 timing/DI simulations, separate from discovery |
+| `--horizon` | 240; 30–600 simulation ticks per candidate |
+| `--keep` | 6; 1–32 ranked witnesses, plus exported per-DI bests not already retained |
+| `--prefix-width` | 8; 1–32 selected prefixes per DI direction |
+| `--timing-radius` | 4; 0–20 ticks either side of a selected press |
+| `--pcts` / `--distances` | `0,30,60` pre-hit percent / `0.8,1.2,1.6` metres |
+| `--di` | `neutral,in,away,left,right`; up to nine distinct declared directions |
+
+The finite grammar is grounded starter → grounded normal → explicit short/full
+jump → aerial normal, with fresh Down/fast-fall and landing-ground continuations.
+Prescribed neutral/forward/oblique movement is input, not a target-distance controller.
+Successful and partial prefixes are diversified by intended slot path. All requests
+still pass through Shared admission, timing, collision, gravity and interruption.
+Search phases reserve budget; prefix pruning and integer timing grids are declared
+limitations, not exhaustive route discovery. Inspect `grammarAttempts`,
+`conditionAttempts`, `failureCounts` and the budget flags before interpreting results.
+
+Each witness contains:
+
+- Exact initial states, a compact **uniform flat arena** definition, package identity
+  hashes, Shared/tool build hashes, effective knockback tuning and both complete input
+  streams. Editor-only uncooked changes are not included.
+- Requested versus actually accepted activation IDs and canonical ground/air variants.
+  Contacts carry resolver activation provenance; a starter's later hit cannot count as
+  a rejected follow-up. Multi-hit contacts remain distinct from connected activations.
+- Damage, contact/activation counts, conversion ticks, longest no-ordinary-action
+  interval, action-gap ticks, final positions and observed deaths. Tick indices are
+  zero-based; contact `matchTick` is Shared's corresponding tick. A contact tick's
+  ordinary defender opportunity is not discarded.
+- Measured press-time intervals: only the selected attack edge moves; all other
+  attacker and defender inputs remain fixed. Success requires the entire intended
+  route to retain accepted, correctly attributed contacts. Bounds and incomplete
+  measurements are explicit; touching a sampled boundary is not a proven full window.
+
+`fixedRouteDi` preserves the same attacker stream and regenerates each declared DI
+hold during observed defender Hitstop/Hitstun, otherwise neutral movement.
+`in`/`away` are initial −Z/+Z; left/right are world −X/+X. Diagonals are
+`in-left`, `in-right`, `away-left`, `away-right`. The resulting complete defender
+stream is retained. `diConditionedBest` instead selects direction-specific successful
+discovery witnesses; its IDs resolve to exported witnesses. These are sampled
+DI-informed adaptations, not a universally guaranteed or human-reactable route.
+
+Fast-fall ticks are observed **post-tick latch transitions**, not a second admission
+rule. A latch that starts and ends on the same landing tick is not proven by this
+observer; such a candidate is conservatively excluded from fast-fall witnesses.
+
+Replay verifies content/build/tuning identity and the retained outcome hash before
+writing output. `matchesExpected: true` confirms that observations reproduced; an
+unreferenced standalone input replay has `matchesExpected: null`. Changed content,
+malformed input, unknown/duplicate options and divergent observations fail rather than
+substituting defaults or stale content. Replay JSON includes detailed per-tick states.
+
+**Interpretation:** an executed witness proves that sequence works under its declared
+conditions. `true` means no recorded ordinary-action gap between the observed contacts;
+`pressure` means a gap existed. Neither label proves counterplay quality or enjoyment.
+Best-found payoff is not a ceiling, and failure to find a route is not impossibility.
+Use the payoff and DI/timing surface to choose playtest questions, not automatic tuning.
+
 ## Aerial experiments
 
 Two opt-in headless tools measure the existing cooked gameplay without changing default
@@ -119,8 +200,7 @@ scripts/move-data.sh fightguy --example --pcts 0,60,120 \
   --json docs/generated/fightguy-move-data.example.json
 ```
 
-- `<char>`: `fightguy` (default) | `wibou`. `manki`/`nilus` resolve but produce empty reports until their
-  kits are Melee-converted to Custom-knockback normals.
+- `<char>`: `fightguy` (default) | `manki` | `wibou` | `bonk`, resolved through the cooked roster.
 - Default markdown output: `docs/generated/<char>-move-data.md`.
 - `--example` limits JSON/HTML collection to the representative grounded g2 first hit. Use it only for a
   small committed schema fixture; normal reports still collect every normal hit.
@@ -188,26 +268,20 @@ e.g. Kistu g3 Up Slash apex = 43% of the way to top blast.
 
 ## True-combo reachability (`--truecombos`)
 
-Freeform true-combo graph — no scripted strings, pure reachability. For every normal × hit state
-(grounded / airborne victim) × victim %, the tool runs the **real sim**: the starter connects through the
-actual hitbox path (auto-calibrated placement), then a greedy chase presses each follow-up at the earliest
-legal frame (the sim's IASA early-out, plus in-reach prediction). An edge is **true** iff the follow-up's
-damage lands while the victim is still in hitstun; `false` = it landed after stun expired (opponent
-actionable); `-` = never connected within 2400 ticks.
+This older opt-in graph runs real contacts under a greedy chase against a passive
+defender. Its fixed speed/range gates, sampled starter placement and variant selection
+are **policy restrictions**, not an exhaustive search of player inputs. The new
+explicit-input route commands above do not use that chase or its damage-delta classifier.
 
-- **Window tightness** per edge per %: `sim stun − (recovery + landing lag + jump squat + follow-up
-  trigger)`. Positive = frame-true on paper; travel + hitstop make reality ≤ paper.
-- **Combo density**: total true links per character per % (all starters × follow-ups × hit states) — the
-  tuning target for "too many true combos" vs "too few".
-- **Hitstun reality (important):** the sim derives hitstun from launch speed — `0.5 ×` the unscaled KB
-  magnitude (`Simulation.ApplyKnockback`); the authored `StunTicks` is a zero/nonzero gate only. With
-  `KbScaleFactor = 0.14`, any launch that stuns past the attacker's recovery+startup carries the victim
-  beyond hitbox reach (~1.3 m) before a follow-up can activate. **Finding (2026-08-17): both FightGuy and
-  Kistu currently have zero true combos at 0–150%** — the only paper-true edge (g1 → g1, +1 at 0%) is
-  killed by travel. This is the current tuning's answer to "are there too many true combos?": none are
-  structurally possible; combos are reads/movement, by construction.
-- The greedy chase is a heuristic — `false` vs `-` granularity can miss a human's chase, but a `true`
-  verdict is solid (it requires a real in-stun connect).
+- `true`/`false`/`never` are the old policy's verdicts, not proof of universal combo
+  reliability, defender response or impossibility. Do not use their density as a
+  gameplay balance target.
+- “Tightness” is authored timing-budget arithmetic, not a measured successful press
+  interval. The explicit route timing measurements perturb actual input edges instead.
+- Historical zero-link output from 2026-08-17 used older content/tuning and this
+  heuristic. It does not establish that current kits cannot combo.
+- The old `--di` trajectories are separate from its combo graph; composing flags
+  does not test each follow-up against defensive DI.
 
 Output: JSON/HTML sections (per-starter reachability tables + density summary), plus a markdown section on
 the default path. Flags compose with `--json`/`--html`.
@@ -320,7 +394,6 @@ tests were green.
 - **Multi-hit parity false positive** — a 2-hit starter (e.g. Kistu g2 Double Slash) re-launches the victim
   with hit 2 in the pipeline run, inflating pipeline apex vs the single-hit direct row → `DIVERGE`. Matching
   KV/stun is the signal it's an artifact.
-- **Manki / Nilus → empty reports** until Melee-converted. Correct, not broken.
 - **Per-character combo routes** — only FightGuy has authored routes (`DefaultRoutes` in `Program.cs`). Add
   a character's designed links to `RoutesFor` to get its combo matrix.
 - Hitstop reported but not simulated (flight starts at launch).

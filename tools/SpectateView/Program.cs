@@ -15,7 +15,7 @@ namespace SlopArena.SpectateView;
 /// SelfPlayMatch — deterministic bots, seeded RNG) and renders a top-down XZ view
 /// in the terminal with ANSI colors. No Unity, no network.
 ///
-/// Usage: dotnet run --project tools/SpectateView -- [--char fightguy|wibou|manki|bonk|nilus]
+/// Usage: dotnet run --project tools/SpectateView -- [--char fightguy|wibou|manki|bonk]
 ///        [--seed N] [--speed N] [--stocks N] [--max-ticks N]
 ///   --speed N   ticks per rendered frame (1 = realtime 60fps, 4 = 4x at 15fps). 0 = headless
 ///               (no render, just the final result — useful for determinism checks).
@@ -45,7 +45,6 @@ internal static class Program
             "fightguy" or "fg" => CharacterClass.FightGuy,
             "wibou" => CharacterClass.Wibou,
             "manki" => CharacterClass.Manki,
-            "nilus" => CharacterClass.Nilus,
             "bonk" => CharacterClass.Bonk,
             _ => CharacterClass.None,
         };
@@ -65,7 +64,7 @@ internal static class Program
         Console.WriteLine($"Difficulty: {BotDifficultyProfile.DisplayName(difficulty)}  Seed: {seed}");
 
         var arena = BuildKillArena();
-        var baked = LoadBakedData(entry);
+        var baked = entry.BakedAnimation;
 
         var rule = new StockMatchRule((byte)stocks);
         var sim = new ServerSimulation(arena, rule);
@@ -350,19 +349,6 @@ internal static class Program
         sim.SetRespawnPosition(id, x, py, 0f, state.FacingYaw);
     }
 
-    private static BakedAnimationData? LoadBakedData(MatchContentEntry entry)
-    {
-        if (entry.CookedCharacterPackage != null)
-            return entry.BakedAnimation;
-
-        var def = entry.Definition;
-        if (string.IsNullOrEmpty(def.BakedDataPath)) return null;
-        string relative = def.BakedDataPath.Replace("res://", "");
-        string path = Path.Combine("data", relative);
-        if (!File.Exists(path)) return null;
-        try { return BakedAnimationData.LoadFromBin(File.ReadAllBytes(path)); }
-        catch { return null; }
-    }
 
     // ── CLI helpers ─────────────────────────────────────────────────────────
 

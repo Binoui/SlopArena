@@ -111,6 +111,26 @@ public sealed class AbilityLabTimelineProjectionTests
     }
 
     [Fact]
+    public void ArmorWindowProjectsDurationAndRetimesThroughTheGenericOperationEditor()
+    {
+        var armor = new ArmorWindowOperationSource(3, AuthoringUnit.Ticks, 4);
+        var source = WithSlot(Slot(new CharacterStageSource(
+            10, 0, 0, 0, 0, Array.Empty<string>(), new CharacterTimelineOperationSource[] { armor })));
+
+        var operation = Assert.Single(AbilityLabTimelineProjection.Build(source.Character.Slots[0])
+            .Stages[0].Operations);
+        Assert.Equal((CookedOperationKind.ArmorWindow, "Armor window", 3, 7),
+            (operation.Kind, operation.Summary, operation.StartTick, operation.EndTick));
+
+        var moved = CharacterPackageSourceCodec.ReplaceOperationTick(source, 0, 0, 0, 5);
+        Assert.True(moved.IsValid);
+        var retimed = Assert.IsType<ArmorWindowOperationSource>(
+            moved.Source!.Character.Slots[0].Timeline.Stages[0].Operations[0]);
+        Assert.Equal((ushort)5, retimed.Tick);
+        Assert.Equal((AuthoringUnit.Ticks, (ushort)4), (retimed.Unit, retimed.DurationTicks));
+    }
+
+    [Fact]
     public void EmptyAndNullTimelinesAreHandledExplicitly()
     {
         var projection = AbilityLabTimelineProjection.Build(Slot(new CharacterStageSource(

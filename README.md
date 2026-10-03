@@ -6,7 +6,7 @@ SlopArena takes the platform-fighter fundamentals of movement, damage percent, r
 
 The goal is a game that is readable and competitive without taking itself too seriously: strong character identities, generous 3D hitboxes, expressive movement, and plenty of room for stupid things to happen.
 
-> **Current state:** SlopArena is preparing a playable friends demo with four admitted cooked demo-roster packages: FightGuy, Manki, Wibou, and Bonk. Package admission does not prove kit completeness or player acceptance. Nilus remains a legacy compatibility implementation, not part of the four-character demo roster. See the [playable friends demo reset](docs/plans/2026-09-05-playable-demo-reset.md) for current product work.
+> **Current state:** SlopArena is preparing a playable friends demo with four admitted cooked demo-roster packages: FightGuy, Manki, Wibou, and Bonk. Package admission does not prove kit completeness or player acceptance. Character execution is cooked-only; Nilus and the old LMB combo compatibility path were retired on 2026-10-02. See the [playable friends demo reset](docs/plans/2026-09-05-playable-demo-reset.md) for current product work.
 
 ## The game
 
@@ -18,6 +18,8 @@ SlopArena combines:
 - a server-authoritative GameServer for online matches and a local Shared simulation for prediction and training.
 
 Each kit has a canonical **16-entry grid**: grounded and aerial variants for normals `1`, `2`, `3`, `4` and specials `A`, `E`, `R`, `F`. `LMB` and `RMB` are not persisted move identities; physical controls map to the canonical slots through the client input layer.
+
+Solo always uses the heuristic CPU at the selected difficulty; Training starts with an idle dummy and exposes its AI mode in the pause-menu training settings.
 
 ### Gamepad controls
 
@@ -31,7 +33,6 @@ Left Stick moves; Right Stick controls the camera and ability aim. Face buttons 
 | [**Manki**](docs/characters/manki.md) | Explosive all-rounder / jetpack-bazooka skirmisher with bombs and aerosol area denial | Admitted cooked package |
 | [**Wibou**](docs/characters/wibou.md) | Mid-range kitsune sword-spacing duelist focused on launches and air juggles | Admitted cooked package |
 | [**Bonk**](docs/characters/bonk.md) | Greatsword fighter with sword-reach normals, targeted jump-slam recovery, and Blade Storm | Admitted cooked package; avatar visual/pose review pending |
-| [**Nilus**](docs/characters/nilus.md) | Legacy compatibility implementation | Not part of the four-character demo roster |
 
 Package admission identifies content accepted by the cooked roster manifest; it does not by itself establish kit completeness or player acceptance.
 

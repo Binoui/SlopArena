@@ -8,6 +8,7 @@ using UnityEngine;
 using SlopArena.Shared;
 using SlopArena.Client.Animation;
 using SlopArena.Client.UI;
+using SlopArena.Client.Combat;
 
 namespace SlopArena.Client.Entities
 {
@@ -29,6 +30,8 @@ namespace SlopArena.Client.Entities
         private CharacterAnimationCatalog _animationCatalog;
         private AnimationClip _grabClip;
         private AnimationClip _throwClip;
+        private ProjectileVFXManager _projectileVFX;
+        private Transform _kiShotHand;
 
         [Header("Thresholds")]
         [SerializeField] private float _runSpeedThreshold = 0.1f;
@@ -264,6 +267,8 @@ namespace SlopArena.Client.Entities
         private void ReplaceModel(GameObject prefab, string modelName, float visualScale)
         {
             HideShield();
+            _projectileVFX?.ClearHeldVisual(_entityId);
+            _kiShotHand = null;
             for (int i = transform.childCount - 1; i >= 0; i--)
             {
                 var child = transform.GetChild(i).gameObject;
@@ -350,6 +355,56 @@ namespace SlopArena.Client.Entities
         public byte CurrentAttackSlot => _lastAttackSlot;
         /// <summary>Ticks since the current attack began (0 when not attacking). Read by weapon attach components.</summary>
         public int CurrentAttackElapsedTicks => _lastState.AttackElapsedTicks;
+        /// <summary>Resolve the actual charge or release clip and its preview envelope.</summary>
+        public bool TryGetAbilityPhaseAnimation(
+            byte attackSlot,
+            bool airborne,
+            int comboStage,
+            bool charge,
+            out string clipName,
+            out AnimationClip clip,
+            out int durationTicks,
+            out float playbackSpeed)
+        {
+            clipName = null;
+            clip = null;
+            durationTicks = 0;
+            playbackSpeed = 1f;
+            if (_charDef == null || attackSlot == 0)
+                return false;
+            var spec = _charDef.GetSlotAbility(attackSlot - 1, airborne);
+            if (spec?.AnimationNames is not { Length: > 0 } || spec.Stages is not { Length: > 0 })
+                return false;
+            int animationIndex = comboStage % spec.AnimationNames.Length;
+            if (charge)
+            {
+                clipName = spec.AimAnimationId;
+                if (string.IsNullOrEmpty(clipName) || !TryGetAnimation(clipName, out clip, out _))
+                    return false;
+                // Do not add a duplicate loop-end tick for float-rounded clip lengths.
+                durationTicks = Mathf.Max(1, Mathf.CeilToInt(clip.length * 60f - 0.0001f));
+                return true;
+            }
+
+            clipName = spec.AnimationNames[animationIndex];
+            if (!TryGetAnimation(clipName, out clip, out _))
+                return false;
+            playbackSpeed = GetAbilityAnimationSpeed(spec, comboStage, clipName);
+            if (spec.AnimSpeed > 0f)
+                durationTicks = Mathf.Max(1, Mathf.CeilToInt(clip.length / spec.AnimSpeed * 60f - 0.0001f));
+            else
+            {
+                int bakedIndex = _bakedData != null ? _bakedData.FindAnimIndex(clipName) : -1;
+                durationTicks = bakedIndex >= 0 && animationIndex < spec.Stages.Length
+                    ? spec.Stages[animationIndex].DurationTicks
+                    : Mathf.CeilToInt(clip.length * 60f - 0.0001f);
+                if (comboStage > 0 && bakedIndex >= 0 && animationIndex < spec.Stages.Length)
+                    durationTicks = Mathf.Min(durationTicks, _bakedData.Animations[bakedIndex].FrameCount);
+            }
+            durationTicks = Mathf.Max(1, durationTicks);
+            return true;
+        }
+
 
         private bool _currentAttackAirborne;
 
@@ -429,21 +484,24 @@ namespace SlopArena.Client.Entities
                 && _weaponTipBoneIndex * 3 + 2 < pose.Length;
         }
 
-        public bool IsSwordWindowTick(CharacterState state, bool airborne)
+        public bool IsSwordTrailTick(CharacterState state, bool airborne)
         {
             if (state.State != ActionState.Attacking || state.AttackSlot == 0 || _charDef == null)
                 return false;
             var spec = _charDef.GetSlotAbility((byte)(state.AttackSlot - 1), airborne);
             if (spec?.Stages is not { Length: > 0 })
                 return false;
-            var events = spec.Stages[Math.Min(state.ComboStage, spec.Stages.Length - 1)].HitboxEvents;
+            var stage = spec.Stages[Math.Min(state.ComboStage, spec.Stages.Length - 1)];
+            if (state.AttackElapsedTicks >= stage.DurationTicks)
+                return false;
+            var events = stage.HitboxEvents;
             if (events == null)
                 return false;
             foreach (var hitbox in events)
                 if (hitbox.BoneName == "_weapon_hilt"
                     && hitbox.EndBoneName == "_weapon_tip"
-                    && state.AttackElapsedTicks >= hitbox.TriggerTick
-                    && state.AttackElapsedTicks < hitbox.TriggerTick + hitbox.DurationTicks)
+                    // The blade's visual follow-through outlives its damage window.
+                    && state.AttackElapsedTicks >= hitbox.TriggerTick)
                     return true;
             return false;
         }
@@ -461,12 +519,13 @@ namespace SlopArena.Client.Entities
 
         private void CaptureAttackAirborneIdentity(CharacterState state)
         {
+            // AttackSequence is the restart edge; an elapsed seek (Bonk E landing sync)
+            // keeps the airborne identity captured at activation.
             if (state.State == ActionState.Attacking
                 && (_lastState.State != ActionState.Attacking
                     || state.AttackSequence != _lastState.AttackSequence
                     || state.AttackSlot != _lastState.AttackSlot
-                    || state.ComboStage != _lastState.ComboStage
-                    || state.AttackElapsedTicks < _lastState.AttackElapsedTicks))
+                    || state.ComboStage != _lastState.ComboStage))
                 _currentAttackAirborne = !state.IsGrounded;
         }
 
@@ -570,11 +629,9 @@ namespace SlopArena.Client.Entities
         }
 
         /// <summary>
-        /// Play a clip at a fixed normalized time with zero speed — Ability Lab frame
-        /// scrubbing (spec #119). Normalized time matches the game's playback mapping
-        /// (clip progress = tick / stage duration, speed = frameCount / DurationTicks),
-        /// so the scrubbed pose is exactly the in-game pose at that tick. A missing
-        /// clip is a no-op (the previous pose stays).
+        /// Sample an explicitly selected clip at normalized time with zero speed.
+        /// State-driven package previews use PlayScrubbedState to follow runtime
+        /// animation phases and playback speed. A missing clip preserves the prior pose.
         /// </summary>
         public void PlayScrubbed(string clipName, float normalizedTime)
         {
@@ -583,7 +640,24 @@ namespace SlopArena.Client.Entities
             var state = _animancer.Play(clip, 0f);
             state.Time = clip.length > 0f ? normalizedTime * clip.length : 0f;
             state.Speed = 0f;
-            _animancer.Evaluate(0f);
+            EvaluateScrubbedPose();
+        }
+
+        private void EvaluateScrubbedPose()
+        {
+            var animator = _animancer.Animator;
+            var cullingMode = animator.cullingMode;
+            if (cullingMode == AnimatorCullingMode.AlwaysAnimate)
+            {
+                _animancer.Evaluate(0f);
+                return;
+            }
+
+            // Explicit seeks must write bones even before any camera has seen
+            // this model. Keep ordinary runtime visibility culling unchanged.
+            animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
+            try { _animancer.Evaluate(0f); }
+            finally { animator.cullingMode = cullingMode; }
         }
 
         private void LoadSharedAnimations()
@@ -614,19 +688,19 @@ namespace SlopArena.Client.Entities
             else
             {
                 string id;
-                int duration = 0;
+                float speed = 1f;
                 int elapsed = poseTicks;
                 if (snapshot.State is ActionState.Attacking or ActionState.Aiming && snapshot.AttackSlot > 0)
                 {
                     var spec = _charDef.GetSlotAbility(snapshot.AttackSlot - 1, airborne);
                     if (spec?.AnimationNames is not { Length: > 0 } || spec.Stages is not { Length: > 0 })
                         return false;
-                    int stage = Math.Min(snapshot.ComboStage, spec.Stages.Length - 1);
+                    int animationIndex = snapshot.ComboStage % spec.AnimationNames.Length;
                     id = snapshot.State == ActionState.Aiming && !string.IsNullOrEmpty(spec.AimAnimationId)
-                        ? spec.AimAnimationId : spec.AnimationNames[stage % spec.AnimationNames.Length];
+                        ? spec.AimAnimationId : spec.AnimationNames[animationIndex];
                     if (snapshot.State == ActionState.Attacking)
                     {
-                        duration = spec.Stages[stage].DurationTicks;
+                        speed = GetAbilityAnimationSpeed(spec, snapshot.ComboStage, id);
                         elapsed = snapshot.AttackElapsedTicks;
                     }
                 }
@@ -649,16 +723,7 @@ namespace SlopArena.Client.Entities
                 else id = snapshot.VX * snapshot.VX + snapshot.VZ * snapshot.VZ > _runSpeedThreshold * _runSpeedThreshold
                     ? _charDef.RunAnim : _charDef.IdleAnim;
                 if (!TryGetAnimation(id, out clip, out _)) return false;
-                time = elapsed / 60f;
-                if (duration > 0 && _bakedData != null)
-                {
-                    int index = _bakedData.FindAnimIndex(id);
-                    if (index >= 0)
-                    {
-                        int count = _bakedData.Animations[index].FrameCount;
-                        time = Math.Min(elapsed * count / duration, Math.Max(0, count - 1)) / 60f;
-                    }
-                }
+                time = elapsed / 60f * speed;
             }
             return true;
         }
@@ -687,7 +752,7 @@ namespace SlopArena.Client.Entities
             _wasAttacking = snapshot.State == ActionState.Attacking;
             _wasGrounded = snapshot.IsGrounded;
             UpdateShield(snapshot);
-            _animancer.Evaluate(0f);
+            EvaluateScrubbedPose();
             return true;
         }
 
@@ -719,6 +784,7 @@ namespace SlopArena.Client.Entities
         private void OnDisable()
         {
             HideShield();
+            _projectileVFX?.ClearHeldVisual(_entityId);
             if (_airDodgeTrail != null)
             {
                 _airDodgeTrail.EndDashTrail();
@@ -852,6 +918,7 @@ namespace SlopArena.Client.Entities
 
             UpdateShield(state);
             CaptureWeaponTrailState(state);
+            UpdateKiShotVisual(state);
             _lastState = state;
             _hasAppliedState = true;
             if (!_hasPresentedDeaths)
@@ -859,6 +926,21 @@ namespace SlopArena.Client.Entities
                 _lastPresentedDeaths = state.Deaths;
                 _hasPresentedDeaths = true;
             }
+        }
+
+        private void UpdateKiShotVisual(CharacterState state)
+        {
+            if (_charDef?.Class != CharacterClass.FightGuy)
+            {
+                _projectileVFX?.ClearHeldVisual(_entityId);
+                return;
+            }
+            if (_projectileVFX == null && state.State == ActionState.Aiming)
+                _projectileVFX = FindFirstObjectByType<ProjectileVFXManager>();
+            if (_projectileVFX == null) return;
+            if (_kiShotHand == null && state.State == ActionState.Aiming)
+                _kiShotHand = ResolvePresentationBone("bone.right-hand");
+            _projectileVFX.UpdateHeldVisual(_entityId, state, _kiShotHand);
         }
 
         private void PresentStockTransition(
@@ -905,7 +987,6 @@ namespace SlopArena.Client.Entities
             CharacterClass.FightGuy => new Color(0.28f, 0.72f, 1f, 0.95f),
             CharacterClass.Wibou => new Color(0.76f, 0.9f, 1f, 0.95f),
             CharacterClass.Bonk => new Color(0.96f, 0.58f, 0.18f, 0.95f),
-            CharacterClass.Nilus => new Color(0.72f, 0.36f, 1f, 0.95f),
         };
 
         private void UpdateAirDodgeFeedback(CharacterState state, Vector3 position)
@@ -1022,6 +1103,21 @@ namespace SlopArena.Client.Entities
             return true;
         }
 
+        private float GetAbilityAnimationSpeed(AbilitySpec spec, int comboStage, string animationName)
+        {
+            if (spec.AnimSpeed > 0f) return spec.AnimSpeed;
+            int animationIndex = comboStage % spec.AnimationNames.Length;
+            if (_bakedData == null || spec.Stages == null || animationIndex >= spec.Stages.Length)
+                return 1f;
+            int bakedIndex = _bakedData.FindAnimIndex(animationName);
+            if (bakedIndex < 0) return 1f;
+            int frameCount = _bakedData.Animations[bakedIndex].FrameCount;
+            int durationTicks = spec.Stages[animationIndex].DurationTicks;
+            if (comboStage > 0 && durationTicks > frameCount)
+                durationTicks = frameCount;
+            return durationTicks > 0 ? (float)frameCount / durationTicks : 1f;
+        }
+
 
         /// <summary>
         /// Play the ability clip for a combo stage with baked-frame speed and
@@ -1041,26 +1137,7 @@ namespace SlopArena.Client.Entities
                 // wraps; using the wrapped index keeps the baked-duration lookup consistent.
                 int stageIdx = comboStage % spec.AnimationNames.Length;
                 animName = spec.AnimationNames[stageIdx];
-                if (_bakedData != null && spec.Stages != null && stageIdx < spec.Stages.Length)
-                {
-                    int bakedIdx = _bakedData.FindAnimIndex(animName);
-                    if (bakedIdx >= 0)
-                    {
-                        int frameCount = _bakedData.Animations[bakedIdx].FrameCount;
-                        int durationTicks = spec.Stages[stageIdx].DurationTicks;
-                        // Attack phases never play slower than the clip's authored
-                        // length. A single-stage aim-hold package (Manki A/E/R) carries
-                        // the attack clip in the hold stage (600 ticks), which would
-                        // otherwise stretch a ~50-frame attack over 10 s and read as
-                        // "stuck on the aim loop".
-                        if (comboStage > 0 && durationTicks > frameCount)
-                            durationTicks = frameCount;
-                        if (durationTicks > 0)
-                            animSpeed = (float)frameCount / durationTicks;
-                    }
-                }
-                if (spec.AnimSpeed > 0f)
-                    animSpeed = spec.AnimSpeed;
+                animSpeed = GetAbilityAnimationSpeed(spec, comboStage, animName);
             }
 
             if (!TryGetAnimation(animName, out var clip, out var extrapolation))
@@ -1523,10 +1600,9 @@ namespace SlopArena.Client.Entities
                 || (state.State == ActionState.Attacking && (
                     state.AttackSlot != _lastAttackSlot
                     || state.ComboStage != _lastComboStage
-                    || state.AttackSequence != _lastState.AttackSequence
-                    // Keep the local full-fidelity fallback for states produced
-                    // before the sequence marker reaches the client.
-                    || state.AttackElapsedTicks < _lastState.AttackElapsedTicks));
+                    // AttackSequence is the restart edge, including same-slot IASA
+                    // restarts. Elapsed seeks (Bonk E landing sync) must not replay.
+                    || state.AttackSequence != _lastState.AttackSequence));
 
             if (isCombat && stateChanged)
             {
@@ -1628,7 +1704,7 @@ namespace SlopArena.Client.Entities
             bool attackStarted = isAttacking
                 && (_lastState.State != ActionState.Attacking
                     || slotChanged
-                    || state.AttackElapsedTicks < _lastState.AttackElapsedTicks);
+                    || state.AttackSequence != _lastState.AttackSequence);
             if (attackStarted)
                 _attackStartedGrounded = state.IsGrounded;
 

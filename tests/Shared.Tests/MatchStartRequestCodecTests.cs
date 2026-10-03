@@ -80,7 +80,7 @@ public class MatchStartRequestCodecTests
         var json = """
         {"matchId":"m","arenaName":"split","players":[
             {"steamId":42,"characterClass":"Wibou","entityId":1},
-            {"steamId":7,"characterClass":"Nilus","entityId":2},
+            {"steamId":7,"characterClass":"Bonk","entityId":2},
             {"steamId":9,"characterClass":"Manki","entityId":3}
         ]}
         """;
@@ -93,7 +93,7 @@ public class MatchStartRequestCodecTests
         Assert.Equal(2, req.Players[1].EntityId);
         Assert.Equal(3, req.Players[2].EntityId);
         Assert.Equal(CharacterClass.Wibou, req.Players[0].CharacterClass);
-        Assert.Equal(CharacterClass.Nilus, req.Players[1].CharacterClass);
+        Assert.Equal(CharacterClass.Bonk, req.Players[1].CharacterClass);
         Assert.Equal(CharacterClass.Manki, req.Players[2].CharacterClass);
     }
 
@@ -137,6 +137,20 @@ public class MatchStartRequestCodecTests
         var json = """
         {"matchId":"m","arenaName":"split","players":[
             {"steamId":1,"characterClass":"Manky","entityId":1},
+            {"steamId":2,"characterClass":"FightGuy","entityId":2}
+        ]}
+        """;
+
+        Assert.Null(MatchStartRequestCodec.TryParse(Parse(json)));
+    }
+    [Theory]
+    [InlineData("Nilus")]
+    [InlineData("5")]
+    public void TryParse_RetiredCharacterClass_ReturnsNull(string characterClass)
+    {
+        var json = $$"""
+        {"matchId":"m","arenaName":"split","players":[
+            {"steamId":1,"characterClass":"{{characterClass}}","entityId":1},
             {"steamId":2,"characterClass":"FightGuy","entityId":2}
         ]}
         """;
@@ -193,7 +207,7 @@ public class MatchStartRequestCodecTests
         {"matchId":"m","arenaName":"split","players":[
             {"steamId":1,"characterClass":"Manki","entityId":1},
             {"steamId":2,"characterClass":"Wibou","entityId":2},
-            {"steamId":3,"characterClass":"Nilus","entityId":3},
+            {"steamId":3,"characterClass":"Bonk","entityId":3},
             {"steamId":4,"characterClass":"FightGuy","entityId":4},
             {"steamId":5,"characterClass":"Manki","entityId":5}
         ]}

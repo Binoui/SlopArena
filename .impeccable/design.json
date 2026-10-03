@@ -3,6 +3,42 @@
   "generatedAt": "2026-09-15T00:00:00Z",
   "title": "Design System: SlopArena",
   "extensions": {
+    "characterPalettes": {
+      "fightguy": {
+        "status": "Approved direction 2026-10-03; icons installed and Training HUD verified; VFX unchanged",
+        "kiBlue": "#39A9FF",
+        "kiLight": "#A8DEFF",
+        "kiCore": "#F0FAFF",
+        "kiEdge": "#1764D9",
+        "grammar": "Physical strikes first, ki amplifying them. Compressed, directional, punchy energy; dense rounded projectile head with a short swept-back tail, compact limb arcs, brief pressure bursts or flattened impact rings.",
+        "constraints": "Keep blue visible. Small hot cores; no ice, frost, crystalline shards, lingering clouds or lightning branches. Flat icons use kiBlue; glow belongs to VFX. Global UI, HUD category frames and damage colors remain unchanged.",
+        "specials": {
+          "E": "Rising Dragon / rise: blue-white fist accent leads ascent; tapered upward streak trails below the fist along actual motion. Optional subordinate takeoff accent. Compact burst on contact only; no lifting beam or full-body glow.",
+          "R": "Cyclone Kick / rotate: two or three broken ki ribbons circle lower torso and kicking leg; strongest streak follows kicking foot. Readable gaps, compact vortex traveling with fighter, clearing when spin ends. No solid tornado cone or lingering cloud.",
+          "F": "Fist of Fury / strike: alternating short energy wraps and dense trails on six punches; compact bursts on actual connections only. Heavier right-foot finisher accent and one decisive contact burst. No surrounding aura or long ribbons."
+        },
+        "iconSubjects": "Uppercut, rotating kick, empowered strike; distinct silhouettes rather than glow.",
+        "assetTrials": {
+          "status": "Agreed starting points 2026-10-03; not implemented or preview-verified. Placement, scale and timing first; no blanket recolor upfront.",
+          "Q": "Keep current projectile unchanged; add CFXR4 Plasma Shoot (Blue) at the hands along shot direction once when release animation starts, not during aim or on the traveling projectile.",
+          "F": "Trial CFXR3 Hit Ice A (Air) on actual contacts: smaller repeated punch bursts, stronger final-kick burst. No contact bursts on misses. Keep existing look initially; reduce obscuring layers only if necessary.",
+          "R": "Trial CFXR4 Sword Trail ICE (180 Thin Spiral) around kicking-leg region, aligned to spin with readable gaps; clear when spin ends. No custom tornado unless this proves insufficient.",
+          "E": "Fist-led upward trail accepted; source effect unselected."
+        },
+        "iconReview": "Workspace _bmad-output/fightguy-ability-icons/specials-review/: revised circular-kick R and multistrike F accepted as good enough; accepted PNGs installed in Resources/Icons/FightGuy.",
+        "authority": "DESIGN.md"
+      },
+      "bonk": {
+        "status": "Approved direction 2026-10-03; ground/air icons installed and Training jump/land verified; model and VFX unchanged",
+        "steel": "#B8B2A8",
+        "impact": "#EEE8DD",
+        "iron": "#67635D",
+        "grammar": "Weight, metal and physical impact. Broad short blade sweeps, dust and chipped-metal fragments rather than orange energy trails.",
+        "constraints": "Flat icons use warm steel, not dark iron. Existing orange model accents may remain small details without becoming Bonk's identity. Global UI, HUD category frames and damage-tier colors remain unchanged.",
+        "iconReview": "Workspace _bmad-output/bonk-ability-icons/normals-review/: eight ground/air normals accepted as good; mesh-derived greatsword plus dominant cutting-phase arrows, not full trajectory or knockback tracing. Accepted specials-review/: Q shoulder bash, E leap slam, R charging double slash, F blade storm. Blade echoes indicate repeated strikes, not extra weapons or guaranteed contacts. All twelve PNGs installed in Resources/Icons/Bonk; four aerial normals use the Air subfolder. All 70 px review previews inspected.",
+        "authority": "DESIGN.md"
+      }
+    },
     "colorMeta": {
       "ink": {
         "role": "neutral",
@@ -72,7 +108,7 @@
     "breakpoints": [],
     "narrative": {
       "northStar": "Low-poly underground toy-fight-club, with DIY internet-game energy",
-      "overview": "Scavenged low-poly fight-club forms and curated asset-pack collage. Cool first, joke second; slightly crappy on purpose, extremely readable. Frontend pages are paper-led using the user-authored FrontendPaperBackground.png, continuing behind the transparent top bar with readable control-local paper backing and ink borders. Separate ink foreground/dark-field roles remain. Home has left modes, a larger aspect-fitted framed poster at center, and right announcements. Chat is an absolute user-sized bottom-left overlay with paper frame/tabs and grouped Hide/Resize, no maximize; dimensions never rebalance underlying layout. Fighter/stage participants and Player/CPU controls sit bottom middle/right, leaving bottom-left clear by default. Settings uses paper outer framing/categories and calm dark utility fields. Match overlays/HUD retain restrained neutral fields and independent functional colors. No 3D arena, gameplay, transport, creator/Ability Lab, or website redesign; connected-room acceptance remains unverified.",
+      "overview": "Scavenged low-poly fight-club forms and curated asset-pack collage. Cool first, joke second; slightly crappy on purpose, extremely readable. Frontend pages are paper-led using the user-authored FrontendPaperBackground.png, continuing behind the transparent top bar with readable control-local paper backing and ink borders. Separate ink foreground/dark-field roles remain. Home has left modes, a larger aspect-fitted framed poster at center, and right announcements. Chat is an absolute user-sized bottom-left overlay with paper frame/tabs and grouped Hide/Resize, no maximize; dimensions never rebalance underlying layout. Fighter/stage participants and Player/CPU controls sit bottom middle/right, leaving bottom-left clear by default. Settings uses paper outer framing/categories and calm dark utility fields. Gameplay HUD uses portrait-led fight cards with explicit lives, clipped-square slots inside the orange/blue diamonds, printed keyboard tabs, and a bracket/pointer target marker independent of its optional overhead percentage. Percentages share the existing damage tiers; identity and target accents remain functional. No 3D arena, gameplay, transport, creator/Ability Lab, or website redesign; connected-room acceptance remains unverified.",
       "keyCharacteristics": [
         "Underground fight-club energy with DIY internet-game construction.",
         "Chunky low-poly silhouettes and curated asset-pack collage, harmonized through scale, lighting, material response, palette/value hierarchy, and composition rather than a universal shader.",

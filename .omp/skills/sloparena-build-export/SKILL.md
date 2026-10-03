@@ -3,6 +3,8 @@ name: sloparena-build-export
 description: Build/export SlopArena distributables, publish or deploy servers, and operate releases when explicitly requested. Not the general Shared test or Unity compilation workflow.
 ---
 
+Unity operation rule: for live Editor operations, set `ORCA_TERMINAL_HANDLE` to your own runtime-issued terminal handle before using the canonical gateway; the gateway verifies its incarnation and fails closed if missing or mismatched. Follow [`docs/contributing/unity-cli.md`](../../../docs/contributing/unity-cli.md) and the [shared Editor coordination protocol](file:///home/binoui/Documents/projects/sloparena-workspace/docs/unity-editor-coordination.md): wait for an independent lease; never inject requests into an owner's batch. Runtime ownership status replaces historical Markdown ownership; blocked/unknown is not free. Standalone offline builds require separate authorization and a confirmed closed project; never close someone else's Editor.
+
 # SlopArena Build, Export & Release
 
 ## When to use
@@ -115,6 +117,8 @@ ssh alfred 'cd /root/homelab/sloparena && docker compose restart master server-1
 
 ## Unity Player Build (manual, not scripted)
 
+When explicitly authorized, the existing standalone player build is an offline operation: confirm the shared project is closed without closing another owner's Editor, then run the installed Unity Editor directly. Do not route legacy batchmode player-build flags through the gateway.
+
 ```bash
 "$UNITY_EDITOR" -batchmode -quit -projectPath client/Unity \
   -buildLinux64Player build/linux/SlopArena.x86_64
@@ -122,13 +126,10 @@ ssh alfred 'cd /root/homelab/sloparena && docker compose restart master server-1
 ```
 
 `$UNITY_EDITOR` = `/home/binoui/Unity/Hub/Editor/6000.0.78f1/Editor/Unity`.
-**Linux editors need the Windows Build Support (Mono) module** to build
-Windows players — install via
-`/opt/unityhub/unityhub-bin -- --headless install-modules --version 6000.0.78f1 -m windows-mono`.
 Player builds fail on editor-only API in runtime scripts
 (`UnityEditor.*` — grep `Assets/Scripts/Runtime/`); `dotnet build` does NOT
-compile Unity scripts, so validate with a Unity batchmode import
-(`-batchmode -quit -nographics`) before claiming compile-clean.
+compile Unity scripts. Validate through the authorized offline player build
+before claiming compile-clean.
 
 ## CI Status (as of 2026-08)
 
@@ -167,5 +168,5 @@ days. See `docs/systems/production-hosting.md` (runbook) and
 - **UFW drops game ports** — "Join hangs" = client log shows the join line then silence; fix is `ufw allow 7777/tcp + 7777:7791/udp` on alfred.
 - **rsync `--delete-excluded` deletes excluded files** — it wiped `appsettings.Production.json` once. Never use `--delete*` on the master or server deploys.
 - **Version-stamp drift after failed build** — `build-release.sh` aborts leave `bundleVersion` stamped + `StreamingAssets/` staged + PipelineAsset/URP re-serialized. Restore: `git checkout -- client/Unity/ProjectSettings/ProjectSettings.asset client/Unity/Assets/Settings client/Unity/Assets/UniversalRenderPipelineGlobalSettings.asset`, `rm -rf client/Unity/Assets/StreamingAssets/... client/Unity/Assets/packages-merged-link*`.
-- **Editor lock** — a running Unity Editor on the project aborts batch builds; close it first.
+- **Editor lock** — a running Unity Editor prevents standalone batch builds; use a separately authorized confirmed-closed-project window, never close another owner's Editor to clear the lock.
 - **`data/arenas/` stubs** — 4 of 7 files (cross/pit/sanctum/split) are <500B placeholders that fail `[ArenaRegistry] Failed to load`; expected, not a deploy bug. Playable: training, colosseum, Island_arena.

@@ -3,26 +3,26 @@
   "displayName": "Manki",
   "weight": 100,
   "movement": {
-    "runSpeed": 13.5,
+    "runSpeed": 11.5,
     "runAccelerationA": 20,
     "runAccelerationB": 12,
     "dashSpeed": 20,
     "airDodgeSpeed": 11,
-    "airSpeedMax": 8,
-    "airAccelStick": 16,
-    "airAccelBase": 3.2,
-    "jumpForce": 11.5,
-    "shortHopForce": 7.2,
+    "airSpeedMax": 9,
+    "airAccelStick": 20,
+    "airAccelBase": 4,
+    "jumpForce": 10.4,
+    "shortHopForce": 6.6,
     "airJumpVMultiplier": 0.8,
     "airJumpHMultiplier": 0.85,
-    "gravity": 35,
+    "gravity": 24,
     "airFloatGravity": 0,
     "dashDurationTicks": 18,
     "dashCooldownTicks": 48,
     "groundFriction": 8,
     "airFriction": 6,
-    "maxFallSpeed": 13.5,
-    "fastFallSpeed": 21,
+    "maxFallSpeed": 11,
+    "fastFallSpeed": 18,
     "maxJumps": 2,
     "jumpSquatTicks": 4,
     "floatWindowTicks": 30,
@@ -58,8 +58,16 @@
     "width": 0.58,
     "height": 0.98,
     "offsetY": 0.49,
-    "attackerAnchor": { "x": 0, "y": 0.49, "z": 0.21 },
-    "victimAnchor": { "x": 0, "y": 0.49, "z": 0.33 }
+    "attackerAnchor": {
+      "x": 0,
+      "y": 0.49,
+      "z": 0.21
+    },
+    "victimAnchor": {
+      "x": 0,
+      "y": 0.49,
+      "z": 0.33
+    }
   },
   "hurtboxCapsules": [
     {
@@ -193,11 +201,9 @@
       "capabilityVersion": "1"
     }
   ],
-
   "slots": [
     {
       "id": "ground.1",
-      "allowSlideCarry": true,
       "name": "Monkey Punch",
       "description": "Right punch with a target-locking lunge",
       "iconId": "icon.1",
@@ -207,11 +213,12 @@
       "cooldownTicks": 0,
       "isRecoveryMove": false,
       "preserveMomentumOnStart": false,
+      "allowSlideCarry": true,
       "timeline": {
         "stages": [
           {
-            "durationTicks": 30,
-            "iasaTicks": 13,
+            "durationTicks": 35,
+            "iasaTicks": 18,
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
             "autoCancelAfterTicks": 0,
@@ -226,7 +233,7 @@
             "operations": [
               {
                 "kind": "spawnHitbox",
-                "tick": 8,
+                "tick": 9,
                 "unit": "meters",
                 "hitbox": {
                   "shape": "sphere",
@@ -244,7 +251,7 @@
                   "baseKnockback": 4,
                   "knockbackGrowth": 20,
                   "stunTicks": 14,
-                  "durationTicks": 5,
+                  "durationTicks": 6,
                   "interruptible": true,
                   "hitGroup": 0,
                   "knockbackDirection": "awayFromOwner"
@@ -266,14 +273,15 @@
       "cooldownTicks": 0,
       "isRecoveryMove": false,
       "preserveMomentumOnStart": false,
+      "allowSlideCarry": false,
       "timeline": {
         "stages": [
           {
-            "durationTicks": 33,
-            "iasaTicks": 29,
+            "durationTicks": 38,
+            "iasaTicks": 33,
             "landingLagTicks": 9,
-            "autoCancelBeforeTicks": 5,
-            "autoCancelAfterTicks": 23,
+            "autoCancelBeforeTicks": 6,
+            "autoCancelAfterTicks": 26,
             "attackRange": 1.75,
             "warpRange": 0,
             "useTargetLock": true,
@@ -285,7 +293,7 @@
             "operations": [
               {
                 "kind": "spawnHitbox",
-                "tick": 6,
+                "tick": 7,
                 "unit": "meters",
                 "hitbox": {
                   "shape": "sphere",
@@ -303,7 +311,7 @@
                   "baseKnockback": 5,
                   "knockbackGrowth": 24,
                   "stunTicks": 12,
-                  "durationTicks": 5,
+                  "durationTicks": 6,
                   "interruptible": true,
                   "hitGroup": 0,
                   "knockbackDirection": "awayFromOwner"
@@ -311,7 +319,7 @@
               },
               {
                 "kind": "spawnHitbox",
-                "tick": 16,
+                "tick": 18,
                 "unit": "meters",
                 "hitbox": {
                   "shape": "sphere",
@@ -329,7 +337,7 @@
                   "baseKnockback": 7,
                   "knockbackGrowth": 30,
                   "stunTicks": 16,
-                  "durationTicks": 5,
+                  "durationTicks": 6,
                   "interruptible": true,
                   "hitGroup": 0,
                   "knockbackDirection": "awayFromOwner"
@@ -342,7 +350,6 @@
     },
     {
       "id": "ground.2",
-      "allowSlideCarry": true,
       "name": "Straight Punch",
       "description": "Straight Punch",
       "iconId": "icon.2",
@@ -352,11 +359,12 @@
       "cooldownTicks": 0,
       "isRecoveryMove": false,
       "preserveMomentumOnStart": false,
+      "allowSlideCarry": true,
       "timeline": {
         "stages": [
           {
-            "durationTicks": 50,
-            "iasaTicks": 22,
+            "durationTicks": 58,
+            "iasaTicks": 26,
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
             "autoCancelAfterTicks": 0,
@@ -371,7 +379,7 @@
             "operations": [
               {
                 "kind": "spawnHitbox",
-                "tick": 8,
+                "tick": 9,
                 "unit": "meters",
                 "hitbox": {
                   "shape": "sphere",
@@ -389,7 +397,7 @@
                   "baseKnockback": 5,
                   "knockbackGrowth": 26,
                   "stunTicks": 18,
-                  "durationTicks": 5,
+                  "durationTicks": 6,
                   "interruptible": true,
                   "hitGroup": 0,
                   "knockbackDirection": "awayFromOwner"
@@ -411,14 +419,15 @@
       "cooldownTicks": 0,
       "isRecoveryMove": false,
       "preserveMomentumOnStart": false,
+      "allowSlideCarry": false,
       "timeline": {
         "stages": [
           {
-            "durationTicks": 42,
-            "iasaTicks": 36,
+            "durationTicks": 48,
+            "iasaTicks": 41,
             "landingLagTicks": 9,
-            "autoCancelBeforeTicks": 5,
-            "autoCancelAfterTicks": 29,
+            "autoCancelBeforeTicks": 6,
+            "autoCancelAfterTicks": 33,
             "attackRange": 0,
             "warpRange": 0,
             "useTargetLock": true,
@@ -430,7 +439,7 @@
             "operations": [
               {
                 "kind": "spawnHitbox",
-                "tick": 7,
+                "tick": 8,
                 "unit": "meters",
                 "hitbox": {
                   "shape": "capsule",
@@ -448,7 +457,7 @@
                   "baseKnockback": 5,
                   "knockbackGrowth": 26,
                   "stunTicks": 18,
-                  "durationTicks": 5,
+                  "durationTicks": 6,
                   "interruptible": true,
                   "hitGroup": 1,
                   "knockbackDirection": "awayFromOwner"
@@ -456,7 +465,7 @@
               },
               {
                 "kind": "spawnHitbox",
-                "tick": 12,
+                "tick": 14,
                 "unit": "meters",
                 "hitbox": {
                   "shape": "capsule",
@@ -474,7 +483,7 @@
                   "baseKnockback": 3,
                   "knockbackGrowth": 16,
                   "stunTicks": 12,
-                  "durationTicks": 20,
+                  "durationTicks": 23,
                   "interruptible": true,
                   "hitGroup": 1,
                   "knockbackDirection": "awayFromOwner"
@@ -487,7 +496,6 @@
     },
     {
       "id": "ground.3",
-      "allowSlideCarry": true,
       "name": "Sweeping Kick",
       "description": "Sweeping Kick",
       "iconId": "icon.3",
@@ -497,11 +505,12 @@
       "cooldownTicks": 0,
       "isRecoveryMove": false,
       "preserveMomentumOnStart": false,
+      "allowSlideCarry": true,
       "timeline": {
         "stages": [
           {
-            "durationTicks": 38,
-            "iasaTicks": 25,
+            "durationTicks": 44,
+            "iasaTicks": 29,
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
             "autoCancelAfterTicks": 0,
@@ -516,7 +525,7 @@
             "operations": [
               {
                 "kind": "spawnHitbox",
-                "tick": 8,
+                "tick": 9,
                 "unit": "meters",
                 "hitbox": {
                   "shape": "sphere",
@@ -534,7 +543,7 @@
                   "baseKnockback": 5,
                   "knockbackGrowth": 26,
                   "stunTicks": 18,
-                  "durationTicks": 10,
+                  "durationTicks": 12,
                   "interruptible": true,
                   "hitGroup": 0,
                   "knockbackDirection": "awayFromOwner"
@@ -556,14 +565,15 @@
       "cooldownTicks": 0,
       "isRecoveryMove": false,
       "preserveMomentumOnStart": false,
+      "allowSlideCarry": false,
       "timeline": {
         "stages": [
           {
-            "durationTicks": 44,
-            "iasaTicks": 41,
+            "durationTicks": 51,
+            "iasaTicks": 48,
             "landingLagTicks": 9,
-            "autoCancelBeforeTicks": 5,
-            "autoCancelAfterTicks": 30,
+            "autoCancelBeforeTicks": 6,
+            "autoCancelAfterTicks": 35,
             "attackRange": 0,
             "warpRange": 0,
             "useTargetLock": true,
@@ -575,7 +585,7 @@
             "operations": [
               {
                 "kind": "spawnHitbox",
-                "tick": 14,
+                "tick": 16,
                 "unit": "meters",
                 "hitbox": {
                   "shape": "sphere",
@@ -593,7 +603,7 @@
                   "baseKnockback": 5,
                   "knockbackGrowth": 26,
                   "stunTicks": 20,
-                  "durationTicks": 6,
+                  "durationTicks": 7,
                   "interruptible": true,
                   "hitGroup": 0,
                   "knockbackDirection": "awayFromOwner"
@@ -606,7 +616,6 @@
     },
     {
       "id": "ground.4",
-      "allowSlideCarry": true,
       "name": "Double Kick",
       "description": "Double Kick",
       "iconId": "icon.4",
@@ -616,11 +625,12 @@
       "cooldownTicks": 0,
       "isRecoveryMove": false,
       "preserveMomentumOnStart": false,
+      "allowSlideCarry": true,
       "timeline": {
         "stages": [
           {
-            "durationTicks": 60,
-            "iasaTicks": 56,
+            "durationTicks": 69,
+            "iasaTicks": 64,
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
             "autoCancelAfterTicks": 0,
@@ -635,7 +645,7 @@
             "operations": [
               {
                 "kind": "spawnHitbox",
-                "tick": 10,
+                "tick": 12,
                 "unit": "meters",
                 "hitbox": {
                   "shape": "capsule",
@@ -653,7 +663,7 @@
                   "baseKnockback": 9,
                   "knockbackGrowth": 42,
                   "stunTicks": 26,
-                  "durationTicks": 7,
+                  "durationTicks": 8,
                   "interruptible": true,
                   "hitGroup": 0,
                   "knockbackDirection": "awayFromOwner"
@@ -675,14 +685,15 @@
       "cooldownTicks": 0,
       "isRecoveryMove": false,
       "preserveMomentumOnStart": false,
+      "allowSlideCarry": false,
       "timeline": {
         "stages": [
           {
-            "durationTicks": 54,
-            "iasaTicks": 50,
+            "durationTicks": 62,
+            "iasaTicks": 57,
             "landingLagTicks": 12,
-            "autoCancelBeforeTicks": 5,
-            "autoCancelAfterTicks": 38,
+            "autoCancelBeforeTicks": 6,
+            "autoCancelAfterTicks": 44,
             "attackRange": 0,
             "warpRange": 0,
             "useTargetLock": true,
@@ -694,7 +705,7 @@
             "operations": [
               {
                 "kind": "spawnHitbox",
-                "tick": 20,
+                "tick": 23,
                 "unit": "meters",
                 "hitbox": {
                   "shape": "sphere",
@@ -712,7 +723,7 @@
                   "baseKnockback": 8,
                   "knockbackGrowth": 42,
                   "stunTicks": 26,
-                  "durationTicks": 7,
+                  "durationTicks": 8,
                   "interruptible": true,
                   "hitGroup": 0,
                   "knockbackDirection": "awayFromOwner"
@@ -732,9 +743,10 @@
       "aimMode": "groundCursor",
       "aimMovement": "mobile",
       "aimAnimationId": "anim.manki.ga-loop",
-      "cooldownTicks": 300,
+      "cooldownTicks": 240,
       "isRecoveryMove": false,
       "preserveMomentumOnStart": false,
+      "allowSlideCarry": false,
       "timeline": {
         "stages": [
           {
@@ -794,6 +806,7 @@
       "cooldownTicks": 210,
       "isRecoveryMove": true,
       "preserveMomentumOnStart": false,
+      "allowSlideCarry": false,
       "timeline": {
         "stages": [
           {
@@ -847,6 +860,7 @@
       "cooldownTicks": 240,
       "isRecoveryMove": false,
       "preserveMomentumOnStart": false,
+      "allowSlideCarry": false,
       "timeline": {
         "stages": [
           {
@@ -907,6 +921,7 @@
       "cooldownTicks": 600,
       "isRecoveryMove": false,
       "preserveMomentumOnStart": false,
+      "allowSlideCarry": false,
       "timeline": {
         "stages": [
           {
@@ -921,7 +936,6 @@
             "rotateTowardTarget": false,
             "trackingStrength": 0,
             "animationIds": [
-              "anim.manki.gf-loop",
               "anim.manki.gf-atk"
             ],
             "operations": [
@@ -955,9 +969,9 @@
                 "placement": {
                   "attachmentMode": "bone",
                   "boneId": "bone.right-hand",
-                  "localPositionX": 0,
+                  "localPositionX": 0.42,
                   "localPositionY": 0,
-                  "localPositionZ": 0,
+                  "localPositionZ": 0.66,
                   "localRotationX": 90,
                   "localRotationY": 0,
                   "localRotationZ": 0,

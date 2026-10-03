@@ -214,7 +214,11 @@ namespace SlopArena.Shared.Rollback
         }
 
         private void Publish(IReadOnlyList<TimelinePresentationEvent> values)
-            => IngestPresentationEvents(values);
+        {
+            foreach (var value in values)
+                if (value.Source != PresentationEventSource.HitContact)
+                    IngestPresentationEvent(value);
+        }
 
         public SpellResolver? Resolver => _local.Resolver;
         public IReadOnlyList<SpellResolver.HitResult> LastTickHits => _local.LastTickHits;

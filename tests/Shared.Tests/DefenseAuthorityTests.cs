@@ -26,7 +26,7 @@ public class DefenseAuthorityTests
     public void ConfirmedCaptureInterruptsComplexLocalAttackAndWaitsForTerminal()
     {
         var sim = Match();
-        sim.Tick(new Dictionary<ulong, InputState> { [Self] = new InputState { ActiveSlot = 1 } });
+        sim.Tick(new Dictionary<ulong, InputState> { [Self] = new InputState { ActiveSlot = AbilitySlots.Slot1 } });
         var captured = TestHelpers.PlayerState();
         captured.State = ActionState.Grabbed;
         captured.InteractionId = 17;
@@ -36,7 +36,7 @@ public class DefenseAuthorityTests
         Assert.Equal(ActionState.Grabbed, sim.GetState(Self).State);
 
         for (int i = 0; i < 3; i++)
-            sim.Tick(new Dictionary<ulong, InputState> { [Self] = new InputState { Jump = true, ActiveSlot = 1 } });
+            sim.Tick(new Dictionary<ulong, InputState> { [Self] = new InputState { Jump = true, ActiveSlot = AbilitySlots.Slot1 } });
         Assert.Equal(ActionState.Grabbed, sim.GetState(Self).State);
         var partner = TestHelpers.PlayerState(x: 2);
         partner.State = ActionState.Throwing;
@@ -88,7 +88,7 @@ public class DefenseAuthorityTests
     public void TerminalWithoutCaptureCorrectsComplexHistoryOnce()
     {
         var sim = Match();
-        sim.Tick(new Dictionary<ulong, InputState> { [Self] = new InputState { ActiveSlot = 1 } });
+        sim.Tick(new Dictionary<ulong, InputState> { [Self] = new InputState { ActiveSlot = AbilitySlots.Slot1 } });
         var terminal = TestHelpers.PlayerState();
         terminal.LastTerminalInteractionId = 52;
         terminal.InteractionTerminalTick = 1;
@@ -107,7 +107,7 @@ public class DefenseAuthorityTests
     public void ReorderedTerminalEndsCaptureAndRepeatedUpdatesDoNotReapplyIt()
     {
         var sim = Match();
-        sim.Tick(new Dictionary<ulong, InputState> { [Self] = new InputState { ActiveSlot = 1 } });
+        sim.Tick(new Dictionary<ulong, InputState> { [Self] = new InputState { ActiveSlot = AbilitySlots.Slot1 } });
         var captured = TestHelpers.PlayerState();
         captured.State = ActionState.Grabbed;
         captured.InteractionId = 53;
@@ -186,7 +186,7 @@ public class DefenseAuthorityTests
     public void LateBlockStunOverridesComplexAttackWithoutReplayingAttack()
     {
         var sim = Match();
-        sim.Tick(new Dictionary<ulong, InputState> { [Self] = new InputState { ActiveSlot = 1 } });
+        sim.Tick(new Dictionary<ulong, InputState> { [Self] = new InputState { ActiveSlot = AbilitySlots.Slot1 } });
         var blocked = TestHelpers.PlayerState();
         blocked.State = ActionState.Shielding;
         blocked.BlockStunTicks = 6;

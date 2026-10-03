@@ -7,6 +7,10 @@ public class LocalTrackTests
 {
     private const ulong SelfId = 1;
     private const ulong OpponentId = 2;
+    private static readonly CharacterDefinition Def = TestHelpers.EngineDef;
+
+    private static CharacterState GroundState(float x = 0f, float z = 0f)
+        => TestHelpers.PlayerState(x, z) with { PY = TestHelpers.GroundPY(Def) };
 
     [Fact]
     public void Tick_AdvancesLikeServerSimulation_ForIdleMovement()
@@ -14,12 +18,13 @@ public class LocalTrackTests
         // A LocalTrack ticked with a rightward-move input should move exactly like a
         // plain ServerSimulation given the same input — no divergence for a fresh sim.
         var arena = TestHelpers.TestArena();
-        var def = TestHelpers.MankiDef;
+        var def = Def;
+        var initial = GroundState();
         var track = new SlopArena.Shared.Rollback.LocalTrack(arena, SelfId);
-        track.RegisterEntity(def, TestHelpers.PlayerState());
+        track.RegisterEntity(def, initial);
 
         var reference = TestHelpers.MakeSim(arena);
-        TestHelpers.RegisterPlayer(reference, def, TestHelpers.PlayerState());
+        TestHelpers.RegisterPlayer(reference, def, initial);
 
         var input = TestHelpers.Input(moveX: 1f);
         CharacterState localResult = default;
@@ -41,7 +46,7 @@ public class LocalTrackTests
     public void AirDodgeSelfCorrectionReplaysCapturedDirectionAndRecovery()
     {
         var arena = TestHelpers.TestArena();
-        var def = TestHelpers.MankiDef;
+        var def = Def;
         var initial = TestHelpers.PlayerState() with
         {
             PX = 10f, PY = 20f, PZ = 10f, IsGrounded = false,
@@ -95,8 +100,8 @@ public class LocalTrackTests
     public void ReconcileWithServer_ReplaysDownFlowFromCorrectedHistory(string scenario, int ticks)
     {
         var arena = TestHelpers.TestArena();
-        var def = TestHelpers.MankiDef;
-        var initial = TestHelpers.PlayerState() with
+        var def = Def;
+        var initial = GroundState() with
         {
             PY = TestHelpers.GroundPY(def),
             VX = def.Movement.RunSpeed,
@@ -172,9 +177,9 @@ public class LocalTrackTests
     public void ReconcileWithServer_SnapsPositionWhenServerDisagrees_DuringPredictableWindow()
     {
         var arena = TestHelpers.TestArena();
-        var def = TestHelpers.MankiDef;
+        var def = Def;
         var track = new SlopArena.Shared.Rollback.LocalTrack(arena, SelfId);
-        track.RegisterEntity(def, TestHelpers.PlayerState());
+        track.RegisterEntity(def, GroundState());
 
         // Advance 5 ticks of pure idle (Predictable) — matches the ring's recorded ticks 1..5.
         CharacterState state = default;
@@ -200,8 +205,7 @@ public class LocalTrackTests
     public void ReconcileWithServer_SkipsCorrection_WhenPacketTickOutsideWindow()
     {
         var track = new SlopArena.Shared.Rollback.LocalTrack(TestHelpers.TestArena(), SelfId);
-        track.RegisterEntity(TestHelpers.MankiDef, TestHelpers.PlayerState());
-        for (int i = 0; i < 3; i++) track.Tick(default);
+        track.RegisterEntity(Def, GroundState());
 
         // Tick 999 was never in this LocalTrack's history — must be a no-op, not a crash.
         track.ReconcileWithServer(new ServerEntityPacket { EntityId = SelfId, Tick = 999, State = default });
@@ -213,7 +217,7 @@ public class LocalTrackTests
     public void ReconcileWithServer_SkipsAuthoritativeHitstopSnapshot()
     {
         var track = new SlopArena.Shared.Rollback.LocalTrack(TestHelpers.TestArena(), SelfId);
-        track.RegisterEntity(TestHelpers.MankiDef, TestHelpers.PlayerState());
+        track.RegisterEntity(Def, GroundState());
         var before = track.GetState();
         var packetState = CharacterStatePacket.FromState(before, 0);
         packetState.HitstopTicks = 1;
@@ -233,13 +237,13 @@ public class LocalTrackTests
     [Fact]
     public void ReconcileWithServer_SkipsReplaySuffixContainingHitstop()
     {
-        var initial = TestHelpers.PlayerState();
+        var initial = GroundState();
         initial.HitstopTicks = 2;
         var track = new SlopArena.Shared.Rollback.LocalTrack(TestHelpers.TestArena(), SelfId);
-        track.RegisterEntity(TestHelpers.MankiDef, initial);
+        track.RegisterEntity(Def, initial);
         track.Tick(default);
 
-        var packetState = CharacterStatePacket.FromState(TestHelpers.PlayerState(), 0);
+        var packetState = CharacterStatePacket.FromState(GroundState(), 0);
         packetState.PositionX = 99f;
         track.ReconcileWithServer(new ServerEntityPacket
         {
@@ -261,8 +265,8 @@ public class LocalTrackTests
         // must not crash when the player has an opponent soft-locked on screen.
         var arena = TestHelpers.TestArena();
         var track = new SlopArena.Shared.Rollback.LocalTrack(arena, SelfId);
-        track.RegisterEntity(TestHelpers.MankiDef, TestHelpers.PlayerState());
-        track.SyncOpponentMirror(OpponentId, TestHelpers.MankiDef, TestHelpers.PlayerState(x: 5f));
+        track.RegisterEntity(Def, GroundState());
+        track.SyncOpponentMirror(OpponentId, Def, GroundState(x: 5f));
 
         var input = new InputState { TargetEntityId = (byte)OpponentId };
         var ex = Record.Exception(() => { track.Tick(input); });
@@ -274,13 +278,13 @@ public class LocalTrackTests
     public void SyncOpponentMirror_CoupledStateDoesNotAuthoritativelyLinkSelf()
     {
         var track = new SlopArena.Shared.Rollback.LocalTrack(TestHelpers.TestArena(), SelfId);
-        track.RegisterEntity(TestHelpers.MankiDef, TestHelpers.PlayerState());
-        var opponent = TestHelpers.PlayerState(x: 5f);
+        track.RegisterEntity(Def, GroundState());
+        var opponent = GroundState(x: 5f);
         opponent.State = ActionState.Throwing;
         opponent.InteractionId = 72;
         opponent.InteractionPartnerId = SelfId;
         opponent.InteractionTick = 1;
-        track.SyncOpponentMirror(OpponentId, TestHelpers.MankiDef, opponent);
+        track.SyncOpponentMirror(OpponentId, Def, opponent);
 
         track.Tick(default);
 

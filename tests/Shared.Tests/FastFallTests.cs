@@ -11,9 +11,9 @@ public class FastFallTests
 
     private static CharacterDefinition CreateClassicDef()
     {
-        var mov = TestHelpers.MankiDef.Movement;
-        mov.FloatWindowTicks = 0;
-        return TestHelpers.CloneDef(TestHelpers.MankiDef, mov);
+        var def = TestHelpers.EngineDef;
+        def.Movement = def.Movement with { FloatWindowTicks = 0 };
+        return def;
     }
 
     private static ServerSimulation SimFalling(float py = 15f, float vy = -5f)

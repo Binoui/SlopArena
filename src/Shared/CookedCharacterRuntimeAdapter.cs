@@ -39,7 +39,7 @@ public static class CookedCharacterRuntimeAdapter
     {
         foreach (var slot in slots)
         {
-            var ability = new AbilitySpec { Name = slot.Name, Description = slot.Description, IconName = slot.IconId, CooldownTicks = slot.CooldownTicks, IsRecoveryMove = slot.IsRecoveryMove, PreserveMomentumOnStart = slot.PreserveMomentumOnStart, Behavior = (AbilityBehavior)slot.Behavior, AimMode = (AimMode)slot.AimMode, AimMovement = slot.AimMovement == AuthoringAimMovementMode.Mobile ? AimMovementMode.Mobile : AimMovementMode.Fixed, AimAnimationId = slot.AimAnimationId, AnimationNames = slot.Timeline.Stages.SelectMany(x => x.AnimationIds).ToArray(), Stages = slot.Timeline.Stages.Select(ToAttackStage).ToArray() };
+            var ability = new AbilitySpec { Name = slot.Name, Description = slot.Description, IconName = slot.IconId, CooldownTicks = slot.CooldownTicks, IsRecoveryMove = slot.IsRecoveryMove, PreserveMomentumOnStart = slot.PreserveMomentumOnStart, Behavior = (AbilityBehavior)slot.Behavior, AimMode = (AimMode)slot.AimMode, AimMovement = slot.AimMovement == AuthoringAimMovementMode.Mobile ? AimMovementMode.Mobile : AimMovementMode.Fixed, AimAnimationId = slot.AimAnimationId, HitPresentationId = slot.HitPresentationId, AnimationNames = slot.Timeline.Stages.SelectMany(x => x.AnimationIds).ToArray(), Stages = slot.Timeline.Stages.Select(ToAttackStage).ToArray() };
             if (!slot.IsAir) SetGroundAbility(def, slot.Ordinal, ability); else SetAirAbility(def, slot.Ordinal - 8, ability);
         }
     }
@@ -53,7 +53,7 @@ public static class CookedCharacterRuntimeAdapter
         foreach (var operation in stage.Operations)
             if (operation is CookedSpawnHitboxOperation hit)
             {
-                var h=hit.Hitbox; events.Add(new HitboxEvent { TriggerTick=hit.Tick, DurationTicks=h.DurationTicks, Shape=(HitboxShape)h.Shape, Radius=h.Radius, OffX=h.OffsetX, OffY=h.OffsetY, OffZ=h.OffsetZ, EndOffX=h.EndOffsetX, EndOffY=h.EndOffsetY, EndOffZ=h.EndOffsetZ, BoneName=RuntimeBoneId(h.StartBoneId), EndBoneName=RuntimeBoneId(h.EndBoneId), Damage=h.Damage, Knockback=new KnockbackData { Profile=KnockbackProfile.Custom, Angle=(sbyte)Math.Clamp(h.Angle,-90,90), BaseKnockback=h.BaseKnockback, KnockbackGrowth=h.KnockbackGrowth }, KnockbackDirection=h.KnockbackDirection, StunTicks=h.StunTicks, Interruptible=h.Interruptible, HitGroup=h.HitGroup });
+                var h=hit.Hitbox; events.Add(new HitboxEvent { TriggerTick=hit.Tick, DurationTicks=h.DurationTicks, Shape=(HitboxShape)h.Shape, Radius=h.Radius, OffX=h.OffsetX, OffY=h.OffsetY, OffZ=h.OffsetZ, EndOffX=h.EndOffsetX, EndOffY=h.EndOffsetY, EndOffZ=h.EndOffsetZ, BoneName=RuntimeBoneId(h.StartBoneId), EndBoneName=RuntimeBoneId(h.EndBoneId), Damage=h.Damage, Knockback=new KnockbackData { Profile=KnockbackProfile.Custom, Angle=(sbyte)Math.Clamp(h.Angle,-90,90), BaseKnockback=h.BaseKnockback, KnockbackGrowth=h.KnockbackGrowth }, KnockbackDirection=h.KnockbackDirection, StunTicks=h.StunTicks, FixedHitstunTicks=h.FixedHitstunTicks, Interruptible=h.Interruptible, HitGroup=h.HitGroup });
             }
             else if (operation is CookedSetVelocityOperation velocity) { result.MoveX=velocity.X; result.MoveY=velocity.Y; result.MoveZ=velocity.Z; }
         result.HitboxEvents=events.ToArray(); return result;

@@ -253,6 +253,12 @@ namespace SlopArena.Client.UI
             vertical.RegisterValueChangedCallback(evt => settings.SetInvertCameraVertical(evt.newValue));
             root.Add(vertical);
             AddSlider(root, "Target Indicator Opacity", settings.TargetOpacity * 100f, 20f, 100f, settings.SetTargetOpacity);
+            var overheadDamage = new Toggle("Show overhead damage") { value = settings.ShowOverheadDamage };
+            overheadDamage.RegisterValueChangedCallback(evt => settings.SetShowOverheadDamage(evt.newValue));
+            root.Add(overheadDamage);
+            var overheadDamageNote = new Label("This hides only the target-lock damage percentage. Player panel percentages and the targeting marker remain visible.");
+            overheadDamageNote.AddToClassList("sa-settings-note");
+            root.Add(overheadDamageNote);
             var statsChoices = new List<string> { "Off", "Ping", "Detailed" };
             var stats = new DropdownField("Network Stats", statsChoices, statsChoices[settings.NetworkStats]);
             stats.RegisterValueChangedCallback(evt => settings.SetNetworkStats(statsChoices.IndexOf(evt.newValue)));

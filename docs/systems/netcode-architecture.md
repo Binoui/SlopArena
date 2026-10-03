@@ -357,15 +357,15 @@ The gameplay path is:
 InputState.ActiveSlot
   → canonical ground/air slot
   → admitted character definition
-  → cooked timeline or existing trusted/legacy lifecycle
+  → cooked timeline and admitted trusted capabilities
   → Shared simulation state and presentation events
   → bridge-selected presentation
 ```
 
 Physical controls are input adapters. They select the canonical slot; they are not a
 second persisted move mapping. The admitted definition comes from the immutable Match
-Content Catalog. New package content executes through cooked timelines; trusted temporary
-capabilities and legacy Nilus implementations retain their existing lifecycle seam.
+Content Catalog. Character content executes through cooked timelines; trusted temporary
+capabilities use the shared ability lifecycle. There is no legacy character execution fallback.
 
 The Shared simulation owns timing, hitbox/projectile resolution, damage, Knockback,
 Hitstun, interruption, and emitted events. Unity does not resolve collisions or decide

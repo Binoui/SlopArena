@@ -25,35 +25,6 @@ public class Kit117SlotSemanticsTests
         return s;
     }
 
-    // ── GetSlotAbility air resolution (unit) ──
-
-    [Fact(Skip = "Phase 7: legacy shared-slot alias identity is not part of cooked content.")]
-    public void GetSlotAbility_NormalsHaveDistinctAirSpecs()
-    {
-        // Normals 1-4 (slot indices 2, 6, 7, 8) each declare a DISTINCT air spec —
-        // AirSlot1-4 are separate objects, not aliases of the ground spec.
-        Assert.NotNull(Def.GetSlotAbility(2, true));   // Low Kick → Double Punch
-        Assert.NotNull(Def.GetSlotAbility(6, true));   // Straight Punch → Floating Kick
-        Assert.NotNull(Def.GetSlotAbility(7, true));   // Sweeping Kick → High Kick
-        Assert.NotNull(Def.GetSlotAbility(8, true));   // Double Kick → Air Smash
-        Assert.NotSame(Def.GetSlotAbility(2, false), Def.GetSlotAbility(2, true));
-        Assert.NotSame(Def.GetSlotAbility(6, false), Def.GetSlotAbility(6, true));
-        Assert.NotSame(Def.GetSlotAbility(7, false), Def.GetSlotAbility(7, true));
-        Assert.NotSame(Def.GetSlotAbility(8, false), Def.GetSlotAbility(8, true));
-        Assert.Same(Def.F, Def.GetSlotAbility(5, true));        // Fist of Fury — airborne
-        Assert.NotNull(Def.GetSlotAbility(2, false));
-    }
-
-    [Fact(Skip = "Phase 7: legacy shared-slot alias identity is not part of cooked content.")]
-    public void GetSlotAbility_SharedAbilitySlots_ResolveInAir()
-    {
-        // Rising Dragon / Cyclone / Fist of Fury / Ki Shot share their specs across states.
-        Assert.Same(Def.E, Def.GetSlotAbility(3, true));
-        Assert.Same(Def.R, Def.GetSlotAbility(4, true));
-        Assert.Same(Def.F, Def.GetSlotAbility(5, true));
-        Assert.Same(Def.A, Def.GetSlotAbility(10, true));
-        Assert.Same(Def.E, Def.GetSlotAbility(3, false));
-    }
 
     // ── Grounded-only gating (behavior) ──
 

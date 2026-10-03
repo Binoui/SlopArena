@@ -93,8 +93,10 @@ registers it and the middleware uses `context.RequestServices`.
   6000.0.78f1 -m windows-mono`
 - `error CS0234: UnityEditor...` in a runtime script → editor-only API leaked
   into player build; guard with `#if UNITY_EDITOR`.
-- `dotnet build` does NOT compile Unity scripts — validate with Unity
-  batchmode import (`-batchmode -quit -nographics`) or the player build.
+- `dotnet build` does NOT compile Unity scripts — validate through the separately
+  authorized offline player-build path in `sloparena-build-export`. Confirm the
+  shared project is closed; never close another owner's Editor or route standalone
+  batchmode flags through a live gateway command.
 
 ### Version stamp / PipelineAsset drift after a failed release build
 `build-release.sh` stamps `bundleVersion` pre-build, reverts post-build; a

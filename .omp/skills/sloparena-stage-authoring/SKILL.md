@@ -4,6 +4,8 @@ description: "Author and maintain SlopArena PVP stages through separate authorit
 category: game-dev
 ---
 
+Before gateway examples, set `ORCA_TERMINAL_HANDLE` to your own runtime-issued terminal handle; the gateway verifies its incarnation and fails closed if it is missing or mismatched. Use the canonical gateway in [`docs/contributing/unity-cli.md`](../../../docs/contributing/unity-cli.md) and the [shared Editor coordination protocol](file:///home/binoui/Documents/projects/sloparena-workspace/docs/unity-editor-coordination.md). Wait for an independent lease; never inject work into an owner's batch. Runtime ownership status replaces historical Markdown ownership; `blocked` or unknown is not free.
+
 # SlopArena Stage Authoring
 
 Use this skill for a new PVP stage or a gameplay change to an existing PVP stage. It is an implementation workflow, not a concept-design guide.
@@ -57,18 +59,15 @@ Cosmetic-only maintenance that does not change composition (for example, replaci
 - `hazard`, `moving-geometry`, and special-mode variants must be declared explicitly in the stage brief, name their required authoritative capability, and fail closed until that Shared/server capability exists. Never approximate them with Unity-only scripts or decorative animation.
 - The normal human PVP review is external to the repository. Agents must not drive it or claim that it passed.
 
-## Required tool prerequisite
+Observe runtime ownership status: `held`/`releasing` means invoke a gateway command and let it wait for an independent lease; `blocked`/unknown means stop. A `free`, settled status with zero active operations is only an availability observation. The gateway still claims atomically for each command. For Shared builds that copy the plugin to Unity, coordinate saved-source writers and use your own bounded gateway hold around the separate shell build; wait for imports/compile settlement before ending that hold, and do not nest a gateway claim.
 
 The repository provides the typed bake and inspect commands below. Use them instead of the legacy `Tools/SlopArena/Bake Arena...` editor menu:
 
 ```bash
-unity command --project-path client/Unity \
-  sloparena.stage.bake --stage <key> --format json
+bun /home/binoui/Documents/projects/sloparena-workspace/scripts/unity-editor-gateway.ts status --project-path /home/binoui/Documents/projects/SlopArena/client/Unity
+bun /home/binoui/Documents/projects/sloparena-workspace/scripts/unity-editor-gateway.ts --project-path /home/binoui/Documents/projects/SlopArena/client/Unity -- sloparena.stage.bake --stage <key>
 
-unity command --project-path client/Unity \
-  sloparena.stage.inspect --stage <key> \
-  --output .stage-authoring-cache/<key>/inspection.json \
-  --format json
+bun /home/binoui/Documents/projects/sloparena-workspace/scripts/unity-editor-gateway.ts --project-path /home/binoui/Documents/projects/SlopArena/client/Unity -- sloparena.stage.inspect --stage <key> --output .stage-authoring-cache/<key>/inspection.json
 ```
 
 `sloparena.stage.bake` is a deliberate mutation: it opens the fixed authoring scene, validates its collision-source topology, and writes `data/arenas/<key>.arena` after source validation. It must not inspect or mutate cosmetic content.
@@ -219,13 +218,9 @@ Do not make collision geometry from the cosmetic prefab, copy arbitrary vendor m
 After the typed tools exist, run the explicit sequence:
 
 ```bash
-unity command --project-path client/Unity \
-  sloparena.stage.bake --stage <key> --format json
+bun /home/binoui/Documents/projects/sloparena-workspace/scripts/unity-editor-gateway.ts --project-path /home/binoui/Documents/projects/SlopArena/client/Unity -- sloparena.stage.bake --stage <key>
 
-unity command --project-path client/Unity \
-  sloparena.stage.inspect --stage <key> \
-  --output .stage-authoring-cache/<key>/inspection.json \
-  --format json
+bun /home/binoui/Documents/projects/sloparena-workspace/scripts/unity-editor-gateway.ts --project-path /home/binoui/Documents/projects/SlopArena/client/Unity -- sloparena.stage.inspect --stage <key> --output .stage-authoring-cache/<key>/inspection.json
 ```
 
 Inspection must reject or fail the report for:
@@ -251,10 +246,9 @@ dotnet build src/Shared/ --nologo
 dotnet test tests/Shared.Tests/ --nologo --filter FullyQualifiedName~ArenaShipping
 dotnet build src/Server/ --nologo
 
-unity pipeline list --format json
-unity command --project-path client/Unity recompile --format json
-unity command --project-path client/Unity \
-  get_console_logs --severity error --limit 20 --format json
+bun /home/binoui/Documents/projects/sloparena-workspace/scripts/unity-editor-gateway.ts status --project-path /home/binoui/Documents/projects/SlopArena/client/Unity
+bun /home/binoui/Documents/projects/sloparena-workspace/scripts/unity-editor-gateway.ts --project-path /home/binoui/Documents/projects/SlopArena/client/Unity -- recompile
+bun /home/binoui/Documents/projects/sloparena-workspace/scripts/unity-editor-gateway.ts --project-path /home/binoui/Documents/projects/SlopArena/client/Unity -- get_console_logs --severity error --limit 20
 ```
 
 Also run the typed bake and inspect commands above. Review the six captures and the inspection report. The preflight must prove the source/baked/prefab relationship, but it does not prove human playability.

@@ -11,11 +11,11 @@ public class ShieldTimingTests
     public void FirstActionableTickDistinguishesCloseUnsafeAndLateAerialSafe(
         ushort attackerRecovery, ushort landingLag, float incomingDamage, bool attackerFirst)
     {
-        var def = TestHelpers.CombatDef;
+        var def = TestHelpers.EngineDef;
         var sim = TestHelpers.MakeSim(TestHelpers.TestArena());
         var attacker = TestHelpers.PlayerState(x: 10f) with
         {
-            PY = TestHelpers.CombatGroundPY,
+            PY = TestHelpers.GroundPY(def),
             State = ActionState.Attacking,
             AttackSlot = AbilitySlots.Slot1,
             StateTicks = attackerRecovery,
@@ -25,7 +25,7 @@ public class ShieldTimingTests
         var defender = TestHelpers.PlayerState(x: 11f) with
         {
             EntityId = 100,
-            PY = TestHelpers.CombatGroundPY,
+            PY = TestHelpers.GroundPY(def),
             State = ActionState.Shielding,
         };
         sim.RegisterEntity(1, def, attacker);

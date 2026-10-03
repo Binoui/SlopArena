@@ -166,13 +166,14 @@ namespace SlopArena.Client.Entities
         public float VisibleLifetime { get; }
         public GameObject StylePrefab { get; }
 
-        public SwordSweepTrail(Transform weapon, GameObject stylePrefab, float lifetime, float bladeWidth)
+        public SwordSweepTrail(Transform owner, GameObject stylePrefab, float lifetime, float bladeWidth)
         {
             StylePrefab = stylePrefab;
             _lifetime = Mathf.Max(0.02f, lifetime);
             VisibleLifetime = _lifetime;
             _visual = new GameObject("TECH blade sweep");
-            _visual.transform.SetParent(weapon, false);
+            // A hidden attack-only weapon must not hide its still-fading tail.
+            _visual.transform.SetParent(owner, false);
             if (!Application.isPlaying) _visual.hideFlags = HideFlags.DontSave;
             _visualTransform = _visual.transform;
 

@@ -1414,9 +1414,9 @@ public static class CharacterPackageAssetOwnershipRegistry
     private static readonly IReadOnlyDictionary<string, IReadOnlyList<string>> PackageOwnedRoots =
         new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal)
         {
-            ["fightguy"] = new[] { "Assets/Art/Characters/fightguy/", "Assets/Resources/Characters/FightGuy.prefab" },
-            ["wibou"] = new[] { "Assets/Art/Characters/wibou/", "Assets/Resources/Characters/Wibou.prefab" },
-            ["bonk"] = new[] { "Assets/Art/Characters/bonk/", "Assets/Resources/Characters/bonk.prefab" },
+            ["fightguy"] = new[] { "Assets/Art/Characters/fightguy/", "Assets/CharacterPackages/fightguy/", "Assets/Resources/Characters/FightGuy.prefab" },
+            ["wibou"] = new[] { "Assets/Art/Characters/wibou/", "Assets/CharacterPackages/wibou/", "Assets/Resources/Characters/Wibou.prefab" },
+            ["bonk"] = new[] { "Assets/Art/Characters/bonk/", "Assets/CharacterPackages/bonk/", "Assets/Resources/Characters/bonk.prefab" },
             ["manki"] = new[] { "Assets/Art/Characters/manki/", "Assets/CharacterPackages/manki/", "Assets/Resources/Characters/Manki.prefab", "Assets/Resources/WeaponConfigs/Manki.asset" },
         };
 

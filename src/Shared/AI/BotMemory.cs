@@ -17,7 +17,7 @@ public readonly struct CpuObservation
     public readonly ushort DamagePercent;
     public readonly ushort AttackElapsedTicks;
     public readonly byte AttackSlot, ComboStage;
-    public readonly ushort ComboTimerTicks, AnimLockTicks, LandingLagTicks, ChargeTicks;
+    public readonly ushort AnimLockTicks, LandingLagTicks, ChargeTicks;
     public readonly ushort HitstunTicks, HitstopTicks;
 
     private CpuObservation(int observationTick, in CharacterState state)
@@ -36,7 +36,6 @@ public readonly struct CpuObservation
         AttackElapsedTicks = state.AttackElapsedTicks;
         AttackSlot = state.AttackSlot;
         ComboStage = state.ComboStage;
-        ComboTimerTicks = state.ComboTimerTicks;
         AnimLockTicks = state.AnimLockTicks;
         LandingLagTicks = state.LandingLagTicks;
         ChargeTicks = state.ChargeTicks;

@@ -98,6 +98,29 @@ recovery designation, positive warp range, SetVelocity, ForwardLunge, SetAimStat
 StartCapability operations. Conflicts fail compilation with
 `slot.slide-carry.motion-conflict`; aliases inherit the resolved target value.
 
+### Optional attack hit VFX
+
+Add an optional slot field such as:
+
+```json
+{"hitPresentationId": "presentation.fightguy.ki-shot.hit"}
+```
+
+Declare the ID in the document's `presentationIds` and bind it to an owned prefab
+in `CharacterAssetCatalog.asset`. Ground/air aliases inherit the resolved target's
+hit ID; explicit slots may use different IDs. Omit the field to retain the shared
+light/medium/heavy/launch graphics. These are prefab bindings, not animation IDs
+or pose tracks; the compiler and package admission require declared, bound IDs.
+
+An override replaces only the hit visual. Shared accepted contacts supply the
+captured slot/air identity and world contact position; shields, invincibility,
+counters and misses do not emit custom hit events. PvP displays the confirmed
+server event once, not predicted contact effects. Sounds, Hitstop and controller
+feedback retain their existing behavior. Hit one-shots use the dispatcher's
+150-tick cleanup limit; tune particle size/color on the owned prefab and keep its
+emission finite.
+
+
 ## 4. Inspect before cook
 
 Inspection is read-only and must happen before cooking:
@@ -166,4 +189,4 @@ source-only probe with invented values.
 
 Do not add `Build<Name>`, registry factories, legacy adapter branches, raw runtime JSON
 loaders, manual animation configs, standalone skeleton ownership, or a second persisted
-Nilus remains behind `LegacyCharacterCatalogAdapter` until its migration; its legacy files are modification-only compatibility, not templates for new packages.
+move mapping. Nilus compatibility and character/slot factory dispatch have been removed.

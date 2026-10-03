@@ -4,6 +4,8 @@ description: "Prepare verified Unity environment assets from a stage concept: de
 category: game-dev
 ---
 
+Before gateway examples, set `ORCA_TERMINAL_HANDLE` to your own runtime-issued terminal handle; the gateway verifies its incarnation and fails closed if it is missing or mismatched. Use the canonical gateway in [`docs/contributing/unity-cli.md`](../../../docs/contributing/unity-cli.md) and the [shared Editor coordination protocol](file:///home/binoui/Documents/projects/sloparena-workspace/docs/unity-editor-coordination.md). Wait for an independent lease; never inject work into an owner's batch. Runtime ownership status replaces historical Markdown ownership; `blocked` or unknown is not free.
+
 # SlopArena Asset Selection
 
 Use this skill when a stage concept needs environment assets selected and verified before scene composition. This skill prepares an inspected workset; it does not author a stage scene.
@@ -200,22 +202,17 @@ Never add an overwrite flag or manually copy vendor files around a conflict. Res
 
 ## 4. Inspect imported prefabs in Unity
 
-First recompile the main Unity project and ensure the editor is reachable:
+Observe runtime ownership status: `held`/`releasing` means invoke a gateway command and let it wait for an independent lease; `blocked`/unknown means stop. A `free`, settled status with zero active operations is only an availability observation; then recompile via its own gateway command.
 
 ```bash
-unity pipeline list --format json
-unity command --project-path client/Unity recompile --format json
+bun /home/binoui/Documents/projects/sloparena-workspace/scripts/unity-editor-gateway.ts status --project-path /home/binoui/Documents/projects/SlopArena/client/Unity
+bun /home/binoui/Documents/projects/sloparena-workspace/scripts/unity-editor-gateway.ts --project-path /home/binoui/Documents/projects/SlopArena/client/Unity -- recompile
 ```
 
 The inspection command is Editor-only and must run against the main checkout:
 
 ```bash
-unity command --project-path client/Unity \
-  sloparena.assets.inspect \
-  --workset .asset-catalog-cache/<concept>/workset.json \
-  --output .asset-catalog-cache/<concept>/inspection.json \
-  --render-thumbnails --compact \
-  --format json
+bun /home/binoui/Documents/projects/sloparena-workspace/scripts/unity-editor-gateway.ts --project-path /home/binoui/Documents/projects/SlopArena/client/Unity -- sloparena.assets.inspect --workset .asset-catalog-cache/<concept>/workset.json --output .asset-catalog-cache/<concept>/inspection.json --render-thumbnails --compact
 ```
 
 Inspection exposes three independent contracts:

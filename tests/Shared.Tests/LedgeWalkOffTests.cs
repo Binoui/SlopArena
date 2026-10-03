@@ -42,7 +42,6 @@ public class LedgeWalkOffTests
     [InlineData(CharacterClass.Manki)]
     [InlineData(CharacterClass.Wibou)]
     [InlineData(CharacterClass.Bonk)]
-    [InlineData(CharacterClass.Nilus)]
     public void RunOffPlatform_FallsImmediately_NoHover_NoSelfGrab(CharacterClass cls)
     {
         const float platformY = 6f;
@@ -116,7 +115,6 @@ public class LedgeWalkOffTests
     [InlineData(CharacterClass.Manki)]
     [InlineData(CharacterClass.Wibou)]
     [InlineData(CharacterClass.Bonk)]
-    [InlineData(CharacterClass.Nilus)]
     public void RunOffPlatform_FastFallWorksImmediately(CharacterClass cls)
     {
         const float platformY = 6f;

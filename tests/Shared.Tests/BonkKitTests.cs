@@ -11,7 +11,7 @@ namespace SlopArena.Shared.Tests;
 
 public sealed class BonkKitTests
 {
-    private const string CapabilityId = "slop.internal.bonk.targeted-jump-slam.v1";
+    private const string CapabilityId = CharacterPackageCompiler.TargetedLeapCapabilityId;
 
     [Fact]
     public void Bonk_TrustedPackage_CooksCanonicalKit()
@@ -41,55 +41,27 @@ public sealed class BonkKitTests
 
 
     [Fact]
-    public void BonkCookedArtifact_LoadsTypedCapabilityParameters()
+    public void BonkTargetedLeap_CompilesBothVariantsWithTypedParameters()
     {
-        var root = Path.GetDirectoryName(RepoFile("content-cooked/bonk/manifest.json"))!;
-        var files = new Dictionary<string, byte[]>(StringComparer.Ordinal)
+        var package = CompileBonk().CookedPackage!;
+        foreach (string slotId in new[] { "ground.E", "air.E" })
         {
-            [CharacterPackageAssembler.ManifestPath] = File.ReadAllBytes(Path.Combine(root, "manifest.json")),
-            [CharacterPackageAssembler.RuntimePath] = File.ReadAllBytes(Path.Combine(root, "character.runtime.json")),
-            [CharacterPackageAssembler.PosePath] = File.ReadAllBytes(Path.Combine(root, "poses.bin")),
-            [CharacterPackageAssembler.BindingPath] = File.ReadAllBytes(Path.Combine(root, "client.bindings")),
-        };
-        var roster = BuiltInRosterManifestCodec.Load(RepoFile("content-cooked/roster/manifest.json"));
-        var rosterEntry = roster.Resolve(CharacterClass.Bonk);
-        Assert.NotNull(rosterEntry);
-        Assert.Equal("bonk", rosterEntry!.PackageId);
-        var loaded = CookedCharacterPackageLoader.LoadFiles(files, rosterEntry.Requirement);
-        Assert.True(loaded.IsValid, string.Join("; ", loaded.Diagnostics.Select(x => x.Message)));
-        var stale = CookedCharacterPackageLoader.LoadFiles(
-            files,
-            rosterEntry.Requirement with { PackageHash = new string('0', 64) });
-        Assert.False(stale.IsValid);
-        Assert.Contains(stale.Diagnostics, x => x.Code == "package.identity.mismatch");
-        var operation = Assert.IsType<CookedStartCapabilityOperation>(
-            Assert.Single(loaded.Package!.Definition.Slots.Single(x => x.Id == "ground.E").Timeline.Stages.Single().Operations.OfType<CookedStartCapabilityOperation>()));
-        var parameters = Assert.IsType<CookedBonkTargetedJumpSlamCapabilityParameters>(operation.Parameters);
-        Assert.Equal((ushort)0, parameters.MaxAimTicks);
-        Assert.Equal((ushort)72, parameters.MaxFlightTicks);
-        Assert.Equal(1f, parameters.MinRange);
-        Assert.Equal(12f, parameters.MaxRange);
-        Assert.Equal(16f, parameters.LaunchVerticalSpeed);
-        Assert.Equal(.42f, parameters.SlamRadius);
-        Assert.Equal(13f, parameters.SlamDamage);
-        Assert.Equal(55f, parameters.SlamAngle);
-        Assert.Equal(9f, parameters.SlamBaseKnockback);
-        Assert.Equal(32f, parameters.SlamKnockbackGrowth);
-        Assert.Equal((ushort)20, parameters.SlamStunTicks);
-        Assert.Equal((ushort)6, parameters.SlamDurationTicks);
-        var lunges = loaded.Package.Definition.Slots.Single(x => x.Id == "ground.A")
-            .Timeline.Stages.Single().Operations.OfType<CookedForwardLungeOperation>()
-            .OrderBy(x => x.Tick).ToArray();
-        Assert.Collection(lunges,
-            lunge => Assert.Equal((15f, (ushort)12, (ushort)12), (lunge.Speed, lunge.DurationTicks, lunge.Tick)),
-            lunge => Assert.Equal((5f, (ushort)5, (ushort)30), (lunge.Speed, lunge.DurationTicks, lunge.Tick)));
-        foreach (string id in new[] { "air.A", "air.R" })
-        {
-            var gravity = Assert.Single(loaded.Package.Definition.Slots.Single(x => x.Id == id)
-                .Timeline.Stages.Single().Operations.OfType<CookedGravityWindowOperation>());
-            Assert.Equal((ushort)0, gravity.Tick);
-            Assert.Equal(0.5f, gravity.GravityScale);
-            Assert.Equal((ushort)30, gravity.DurationTicks);
+            var operation = Assert.Single(package.Definition.Slots.Single(x => x.Id == slotId)
+                .Timeline.Stages.Single().Operations.OfType<CookedStartCapabilityOperation>());
+            Assert.Equal(CapabilityId, operation.CapabilityId);
+            var parameters = Assert.IsType<CookedTargetedLeapCapabilityParameters>(operation.Parameters);
+            Assert.Equal((ushort)0, parameters.MaxAimTicks);
+            Assert.Equal((ushort)96, parameters.MaxFlightTicks);
+            Assert.Equal((1f, 12f, 16f, (ushort)56, (ushort)52),
+                (parameters.MinRange, parameters.MaxRange, parameters.LaunchVerticalSpeed,
+                    parameters.LandingSeekTick, parameters.RecoveryTicks));
+            Assert.Equal((AuthoringHitboxShape.Capsule, .42f, 13f, 55f, 9f, 32f, (ushort)20, (ushort)6),
+                (parameters.Hitbox.Shape, parameters.Hitbox.Radius, parameters.Hitbox.Damage,
+                    parameters.Hitbox.Angle, parameters.Hitbox.BaseKnockback,
+                    parameters.Hitbox.KnockbackGrowth, parameters.Hitbox.StunTicks,
+                    parameters.Hitbox.DurationTicks));
+            Assert.Equal(("_weapon_hilt", "_weapon_tip"),
+                (parameters.Hitbox.StartBoneId, parameters.Hitbox.EndBoneId));
         }
 
     }
@@ -140,7 +112,7 @@ public sealed class BonkKitTests
 
         var missing = JsonNode.Parse(File.ReadAllText(RepoFile("client/Unity/Assets/CharacterPackages/bonk/character.json")))!.AsObject();
         var missingParameters = (JsonObject)missing["slots"]![5]!["timeline"]!["stages"]![0]!["operations"]![0]!["parameters"]!;
-        missingParameters.Remove("slamDamage");
+        missingParameters.Remove("hitbox");
         var missingResult = CharacterPackageCompiler.Compile(
             File.ReadAllText(RepoFile("client/Unity/Assets/CharacterPackages/bonk/package.json")),
             missing.ToJsonString(),
@@ -150,16 +122,84 @@ public sealed class BonkKitTests
     }
 
     [Fact]
-    public void BonkCapabilityRegistryRequiresExactVersionAndType()
+    public void TargetedLeap_PublicCapabilityIsWorkshopAdmittedAndVersioned()
     {
-        Assert.True(InternalCapabilityRegistry.TryCreate(
-            CapabilityId,
-            "1",
-            new CookedBonkTargetedJumpSlamCapabilityParameters(120, 72, 1, 12, 16, .42f, 13, 55, 9, 32, 20, 6),
-            out var capability));
-        Assert.IsType<BonkTargetedJumpSlam>(capability);
-        Assert.False(InternalCapabilityRegistry.TryCreate(CapabilityId, "2", new CookedBonkTargetedJumpSlamCapabilityParameters(120, 72, 1, 12, 16, .42f, 13, 55, 9, 32, 20, 6), out _));
-        Assert.False(InternalCapabilityRegistry.TryCreate(CapabilityId, "1", new CookedRisingDragonCapabilityParameters(1, 1, 1), out _));
+        string packageJson = File.ReadAllText(RepoFile("client/Unity/Assets/CharacterPackages/bonk/package.json"));
+        string characterJson = File.ReadAllText(RepoFile("client/Unity/Assets/CharacterPackages/bonk/character.json"));
+        var workshop = CharacterPackageCompiler.Compile(packageJson, characterJson, CharacterCookProfile.Workshop);
+        Assert.NotNull(workshop.CookedPackage);
+
+        var versionMismatch = JsonNode.Parse(characterJson)!.AsObject();
+        versionMismatch["capabilityRequirements"]![0]!["capabilityVersion"] = "2";
+        foreach (int slotIndex in new[] { 5, 13 })
+            versionMismatch["slots"]![slotIndex]!["timeline"]!["stages"]![0]!["operations"]![0]!["capabilityVersion"] = "2";
+        var rejected = CharacterPackageCompiler.Compile(
+            packageJson, versionMismatch.ToJsonString(), CharacterCookProfile.Workshop);
+        Assert.Null(rejected.CookedPackage);
+        Assert.Contains(rejected.Diagnostics, x => x.Code == "capability.version-mismatch");
+    }
+    [Fact]
+    public void TargetedLeapNumericAndBoneReferencesAreValidatedInBothCookProfiles()
+    {
+        string packageJson = File.ReadAllText(RepoFile("client/Unity/Assets/CharacterPackages/bonk/package.json"));
+        string characterJson = File.ReadAllText(RepoFile("client/Unity/Assets/CharacterPackages/bonk/character.json"));
+        foreach (var profile in new[] { CharacterCookProfile.Workshop, CharacterCookProfile.TrustedBuiltIn })
+        {
+            var badRange = JsonNode.Parse(characterJson)!.AsObject();
+            badRange["slots"]![5]!["timeline"]!["stages"]![0]!["operations"]![0]!["parameters"]!["maxRange"] = 0;
+            var rangeResult = CharacterPackageCompiler.Compile(packageJson, badRange.ToJsonString(), profile);
+            Assert.Null(rangeResult.CookedPackage);
+            Assert.Contains(rangeResult.Diagnostics, x => x.Code == "value.out-of-range");
+
+            var badBone = JsonNode.Parse(characterJson)!.AsObject();
+            badBone["slots"]![5]!["timeline"]!["stages"]![0]!["operations"]![0]!["parameters"]!["hitbox"]!["startBoneId"] = "_not_declared";
+            var boneResult = CharacterPackageCompiler.Compile(packageJson, badBone.ToJsonString(), profile);
+            Assert.Null(boneResult.CookedPackage);
+            Assert.Contains(boneResult.Diagnostics, x => x.Code == "reference.unresolved");
+        }
+    }
+    [Fact]
+    public void TargetedLeapCompilerRejectsMultipleLifecycleOwnersInOneSlot()
+    {
+        string packageJson = File.ReadAllText(RepoFile("client/Unity/Assets/CharacterPackages/bonk/package.json"));
+        var character = JsonNode.Parse(File.ReadAllText(RepoFile("client/Unity/Assets/CharacterPackages/bonk/character.json")))!.AsObject();
+        var operations = (JsonArray)character["slots"]![5]!["timeline"]!["stages"]![0]!["operations"]!;
+        operations.Add(operations[0]!.DeepClone());
+        var result = CharacterPackageCompiler.Compile(
+            packageJson, character.ToJsonString(), CharacterCookProfile.Workshop);
+        Assert.Null(result.CookedPackage);
+        Assert.Contains(result.Diagnostics, x => x.Code == "capability.ambiguous");
+    }
+
+
+
+    [Fact]
+    public void RetiredBonkCapabilityIsRejectedDuringSourceAdmission()
+    {
+        const string retiredId = "slop.internal.bonk.targeted-jump-slam.v1";
+        string packageJson = File.ReadAllText(RepoFile("client/Unity/Assets/CharacterPackages/bonk/package.json"));
+        var character = JsonNode.Parse(File.ReadAllText(RepoFile("client/Unity/Assets/CharacterPackages/bonk/character.json")))!.AsObject();
+        character["capabilityRequirements"]![0]!["capabilityId"] = retiredId;
+        foreach (int slotIndex in new[] { 5, 13 })
+            character["slots"]![slotIndex]!["timeline"]!["stages"]![0]!["operations"]![0]!["capabilityId"] = retiredId;
+        var result = CharacterPackageCompiler.Compile(
+            packageJson, character.ToJsonString(), CharacterCookProfile.TrustedBuiltIn);
+        Assert.Null(result.CookedPackage);
+        Assert.Contains(result.Diagnostics, x => x.Code == "capability.retired");
+    }
+
+    [Fact]
+    public void TargetedLeapRegistryRequiresExactVersionAndType()
+    {
+        var package = CompileBonk().CookedPackage!;
+        var operation = Assert.Single(package.Definition.Slots.Single(x => x.Id == "ground.E")
+            .Timeline.Stages.Single().Operations.OfType<CookedStartCapabilityOperation>());
+        var parameters = Assert.IsType<CookedTargetedLeapCapabilityParameters>(operation.Parameters);
+        Assert.True(InternalCapabilityRegistry.TryCreate(CapabilityId, "1", parameters, out var capability));
+        Assert.IsType<TargetedLeapAbility>(capability);
+        Assert.False(InternalCapabilityRegistry.TryCreate(CapabilityId, "2", parameters, out _));
+        Assert.False(InternalCapabilityRegistry.TryCreate(
+            CapabilityId, "1", new CookedRisingDragonCapabilityParameters(1, 1, 1), out _));
     }
 
     [Fact]
@@ -173,6 +213,99 @@ public sealed class BonkKitTests
         var opposite = RunE(-9000, grounded: true, out var oppositeHitbox);
         Assert.True(oppositeHitbox);
         Assert.True(opposite.PX < 20f, "opposite yaw must travel in the opposite world-space direction");
+    }
+
+    [Fact]
+    public void BonkE_Ground_SlamSeeksFrame28_AndRunsFullRecovery()
+    {
+        var def = BonkDefinition();
+        var sim = TestHelpers.MakeSim();
+        var state = TestHelpers.PlayerState(x: 20f, z: 10f);
+        state.PY = TestHelpers.GroundPY(def);
+        sim.RegisterEntity(1, def, state);
+
+        sim.Tick(new Dictionary<ulong, InputState> { [1] = AimInput(9000, 600, 4, true) });
+        for (var i = 0; i < 9; i++)
+            sim.Tick(new Dictionary<ulong, InputState> { [1] = AimInput(9000, 600, 0, true) });
+        sim.Tick(new Dictionary<ulong, InputState> { [1] = AimInput(-9000, 600, 0, false) });
+
+        int impactTick = -1, windowEdges = 0, endTick = -1, landedTick = -1, abilityEndTick = -1;
+        ushort impactElapsed = 0;
+        int slamDuration = -1;
+        bool wasActive = false;
+        for (var i = 0; i < 200; i++)
+        {
+            sim.Tick(new Dictionary<ulong, InputState> { [1] = default });
+            var st = sim.GetState(1);
+            if (landedTick < 0 && i > 0 && st.IsGrounded) landedTick = i;
+            if (abilityEndTick < 0 && sim.GetActiveAbility(1) == null) abilityEndTick = i;
+            bool active = sim.Resolver.GetActiveHitboxes().Any(x => x.OwnerId == 1 && x.Damage == 13f);
+            if (active && !wasActive)
+            {
+                windowEdges++;
+                if (impactTick < 0)
+                {
+                    impactTick = i;
+                    impactElapsed = st.AttackElapsedTicks;
+                    slamDuration = sim.Resolver.GetActiveHitboxes()
+                        .First(x => x.OwnerId == 1 && x.Damage == 13f).DurationTicks;
+                }
+            }
+            wasActive = active;
+            if (impactTick >= 0 && endTick < 0 && st.State != ActionState.Attacking)
+                endTick = i;
+        }
+
+        Assert.True(impactTick >= 0,
+            $"landing must spawn the slam window; landedTick={landedTick} abilityEndTick={abilityEndTick} "
+            + $"endTick={endTick} state={sim.GetState(1).State} "
+            + $"grounded={sim.GetState(1).IsGrounded} active={sim.Resolver.GetActiveHitboxes().Count}");
+        Assert.Equal((ushort)56, impactElapsed); // authoritative pose enters frame 28 at impact
+        Assert.Equal(1, windowEdges);            // exactly one damage window opens
+        Assert.Equal(6, slamDuration);           // authored six-tick slam window, independent of recovery
+        Assert.True(endTick >= 0, "recovery must complete into locomotion");
+        Assert.Equal(52, endTick - impactTick);  // frame 28 -> frame 54 follow-through
+    }
+
+    [Fact]
+    public void BonkE_RecoveryPausesDuringHitstop()
+    {
+        var def = BonkDefinition();
+        var sim = TestHelpers.MakeSim();
+        var state = TestHelpers.PlayerState(x: 20f, z: 10f);
+        state.PY = TestHelpers.GroundPY(def);
+        sim.RegisterEntity(1, def, state);
+
+        sim.Tick(new Dictionary<ulong, InputState> { [1] = AimInput(0, 600, 4, true) });
+        for (var i = 0; i < 9; i++)
+            sim.Tick(new Dictionary<ulong, InputState> { [1] = AimInput(0, 600, 0, true) });
+        sim.Tick(new Dictionary<ulong, InputState> { [1] = AimInput(0, 600, 0, false) });
+
+        bool impactSeen = false;
+        for (var i = 0; i < 100; i++)
+        {
+            sim.Tick(new Dictionary<ulong, InputState> { [1] = default });
+            if (sim.Resolver.GetActiveHitboxes().Any(x => x.OwnerId == 1 && x.Damage == 13f))
+            {
+                impactSeen = true;
+                break;
+            }
+        }
+        Assert.True(impactSeen, "landing must spawn the authored hitbox before recovery is frozen");
+
+        sim.SetState(1, sim.GetState(1) with { HitstopTicks = 3 });
+        ushort frozenElapsed = sim.GetState(1).AttackElapsedTicks;
+        while (sim.GetState(1).HitstopTicks > 0)
+        {
+            sim.Tick(new Dictionary<ulong, InputState> { [1] = default });
+            Assert.NotNull(sim.GetActiveAbility(1));
+            Assert.Equal(frozenElapsed, sim.GetState(1).AttackElapsedTicks);
+        }
+        for (var i = 0; i < 51; i++)
+            sim.Tick(new Dictionary<ulong, InputState> { [1] = default });
+        Assert.NotNull(sim.GetActiveAbility(1));
+        sim.Tick(new Dictionary<ulong, InputState> { [1] = default });
+        Assert.Null(sim.GetActiveAbility(1));
     }
 
     [Fact]
@@ -261,9 +394,43 @@ public sealed class BonkKitTests
         sim.Tick(new Dictionary<ulong, InputState> { [1] = held });
         for (var i = 0; i < 9; i++) sim.Tick(new Dictionary<ulong, InputState> { [1] = AimInput(9000, 600, 0, true) });
         sim.Tick(new Dictionary<ulong, InputState> { [1] = AimInput(9000, 600, 0, false) });
-        for (var i = 0; i < 80; i++) sim.Tick(new Dictionary<ulong, InputState> { [1] = default });
+        // maxFlightTicks 96 (human-approved) plus release debounce; the ability must
+        // terminate in the air without ever opening the slam window.
+        for (var i = 0; i < 120; i++) sim.Tick(new Dictionary<ulong, InputState> { [1] = default });
         Assert.Null(sim.GetActiveAbility(1));
         Assert.DoesNotContain(sim.Resolver.GetActiveHitboxes(), x => x.OwnerId == 1 && x.Damage == 13f);
+    }
+
+    [Fact]
+    public void BonkE_Interrupted_NoStaleSlamOrLock()
+    {
+        var def = BonkDefinition();
+        var sim = TestHelpers.MakeSim();
+        var state = TestHelpers.PlayerState(x: 20f, z: 10f);
+        state.PY = TestHelpers.GroundPY(def);
+        sim.RegisterEntity(1, def, state);
+
+        sim.Tick(new Dictionary<ulong, InputState> { [1] = AimInput(9000, 600, 4, true) });
+        for (var i = 0; i < 9; i++)
+            sim.Tick(new Dictionary<ulong, InputState> { [1] = AimInput(9000, 600, 0, true) });
+        sim.Tick(new Dictionary<ulong, InputState> { [1] = AimInput(-9000, 600, 0, false) });
+        for (var i = 0; i < 20; i++) sim.Tick(new Dictionary<ulong, InputState> { [1] = default });
+        Assert.NotNull(sim.GetActiveAbility(1)); // mid-flight when the interruption lands
+
+        // Mirror the post-hit state the real hit pipeline writes: State leaves
+        // Attacking, which is the generic TickAbilities cancellation seam.
+        sim.SetState(1, sim.GetState(1) with { HitstunTicks = 30, HitstunLevel = 0, State = ActionState.Hitstun });
+
+        for (var i = 0; i < 120; i++)
+        {
+            sim.Tick(new Dictionary<ulong, InputState> { [1] = default });
+            Assert.DoesNotContain(sim.Resolver.GetActiveHitboxes(),
+                x => x.OwnerId == 1 && x.Damage == 13f);
+        }
+        var end = sim.GetState(1);
+        Assert.Null(sim.GetActiveAbility(1));
+        Assert.Equal((byte)0, end.AttackSlot);
+        Assert.Equal((ushort)0, end.AnimLockTicks);
     }
 
     [Fact]

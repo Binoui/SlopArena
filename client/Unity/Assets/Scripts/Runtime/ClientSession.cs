@@ -486,7 +486,6 @@ namespace SlopArena.Client
                 var packages = new System.Collections.Generic.Dictionary<string, Shared.CookedCharacterPackageLoadResult>();
                 foreach (var rosterEntry in rosterResolution.Roster.Entries)
                 {
-                    if (rosterEntry.Requirement.Version == "legacy-1") continue;
                     var packageResolution = resolver.ResolveCookedPackage(rosterEntry.PackageId);
                     if (!packageResolution.Success || packageResolution.Requirement == null)
                     {
@@ -500,8 +499,7 @@ namespace SlopArena.Client
                 }
                 var built = new Shared.MatchContentCatalogBuilder().Build(
                     rosterResolution.Roster,
-                    packages,
-                    new Shared.LegacyCharacterCatalogAdapter());
+                    packages);
                 if (!built.IsValid || built.Catalog == null)
                 {
                     failure = FormatDiagnostics(built.Diagnostics);

@@ -38,7 +38,7 @@ public class HurtboxPoseTests
         return bytes.ToArray();
     }
 
-    /// <summary>The 7 shared Mixamorig bones, in bake order (must match MixamorigBoneDefs).</summary>
+    /// <summary>The seven Mixamorig fixture bones, in deterministic bake order.</summary>
     private static readonly string[] BoneNames =
     {
         "mixamorig:Head", "mixamorig:Spine2", "mixamorig:Hips",
@@ -167,7 +167,7 @@ public class HurtboxPoseTests
     {
         var def = new CharacterDefinition
         {
-            Movement = TestHelpers.MankiDef.Movement,
+            Movement = TestHelpers.EngineDef.Movement,
             CapsuleHeight = 1.5f,
             HipHeight = 0.5f,
             HurtboxBoneScale = 1f,
@@ -260,7 +260,7 @@ public class HurtboxPoseTests
             CapsuleHeight = 1.5f,
             HipHeight = 0.5f,
             HurtboxBoneScale = 1.0f,
-            Movement = TestHelpers.MankiDef.Movement,
+            Movement = TestHelpers.EngineDef.Movement,
             HurtboxBoneDefs = new[] { new HurtboxBoneDef("mixamorig:Hips", 0, 0, 0, 0.26f) },
         };
         var overridden = HurtboxOverride.Apply(baseDef, new[]

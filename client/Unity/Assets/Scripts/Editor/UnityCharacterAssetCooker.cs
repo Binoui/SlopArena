@@ -451,7 +451,14 @@ public static class UnityCharacterAssetCooker
         List<CharacterDiagnostic> diagnostics)
     {
         if (catalog.Presentations == null || catalog.Presentations.Length == 0)
+        {
+            foreach (var slot in package.Definition.Slots)
+                if (!string.IsNullOrEmpty(slot.HitPresentationId))
+                    diagnostics.Add(Error("reference.presentation.unresolved",
+                        $"character.slots[{slot.Ordinal}].hitPresentationId",
+                        $"Hit presentation '{slot.HitPresentationId}' is not bound by the catalog."));
             return;
+        }
         var required = new HashSet<string>(package.Definition.PresentationIds ?? Array.Empty<string>(), StringComparer.Ordinal);
         var seen = new HashSet<string>(StringComparer.Ordinal);
         foreach (var binding in catalog.Presentations)

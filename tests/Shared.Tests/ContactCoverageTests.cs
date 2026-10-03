@@ -11,19 +11,17 @@ public sealed class ContactCoverageTests
 {
     private static readonly ArenaDefinition Arena = Program.NoRespawn(Program.BuildArena());
 
-    [Theory]
-    [InlineData(CharacterClass.FightGuy)]
-    [InlineData(CharacterClass.Wibou)]
-    public void GroundOne_ReportsRealContactAndDistantMiss(CharacterClass character)
+    [Fact]
+    public void GroundOne_ReportsSyntheticContactAndDistantMiss()
     {
-        var entry = BuiltInContentResolver.Resolve(character);
+        var entry = EngineEntry();
         Assert.True(CanonicalSlotProjection.TryGet("ground.1", out var slot));
-        var context = ContactCoverageReport.PrepareContext(entry, BuiltInContentResolver.Resolve(CharacterClass.FightGuy), 1f, Arena);
+        var context = ContactCoverageReport.PrepareContext(entry, entry, 1f, Arena);
 
         var hit = ContactCoverageReport.RunSample(context, slot, new("passive-low", 0f, 0f, 0));
         var miss = ContactCoverageReport.RunSample(context, slot, new("passive-low", 4f, 6f, 0));
-        var oracleHit = RunOracle(entry, BuiltInContentResolver.Resolve(CharacterClass.FightGuy), 0f, 0f, slot);
-        var oracleMiss = RunOracle(entry, BuiltInContentResolver.Resolve(CharacterClass.FightGuy), 4f, 6f, slot);
+        var oracleHit = RunOracle(entry, entry, 0f, 0f, slot);
+        var oracleMiss = RunOracle(entry, entry, 4f, 6f, slot);
 
         Assert.Equal("hit", hit.Outcome);
         Assert.NotNull(hit.FirstContact);
@@ -34,12 +32,37 @@ public sealed class ContactCoverageTests
         Assert.Equal(-1, oracleMiss.Tick);
     }
 
+    [Theory]
+    [InlineData(CharacterClass.FightGuy)]
+    [InlineData(CharacterClass.Wibou)]
+    public void AuthoredGroundOne_ReportMatchesSimulationWithoutPinningTuning(CharacterClass character)
+    {
+        var entry = BuiltInContentResolver.Resolve(character);
+        var victim = BuiltInContentResolver.Resolve(CharacterClass.FightGuy);
+        Assert.True(CanonicalSlotProjection.TryGet("ground.1", out var slot));
+        var context = ContactCoverageReport.PrepareContext(entry, victim, 1f, Arena);
+        foreach (var (x, z) in new[] { (0f, 0f), (4f, 6f) })
+        {
+            var sample = ContactCoverageReport.RunSample(context, slot, new("passive-low", x, z, 0));
+            var oracle = RunOracle(entry, victim, x, z, slot);
+            Assert.Equal(oracle.Tick < 0 ? "miss" : "hit", sample.Outcome);
+            if (oracle.Tick < 0)
+                Assert.Null(sample.FirstContact);
+            else
+            {
+                Assert.NotNull(sample.FirstContact);
+                Assert.Equal(oracle.Tick, sample.FirstContact!.Tick);
+                Assert.Equal(oracle.Damage, sample.FirstContact.Damage);
+            }
+        }
+    }
+
     [Fact]
     public void AirOne_DoesNotSubstituteGroundMoveAfterLanding()
     {
-        var entry = BuiltInContentResolver.Resolve(CharacterClass.FightGuy);
+        var entry = EngineEntry();
         Assert.True(CanonicalSlotProjection.TryGet("air.1", out var slot));
-        var context = ContactCoverageReport.PrepareContext(entry, BuiltInContentResolver.Resolve(CharacterClass.FightGuy), 1f, Arena);
+        var context = ContactCoverageReport.PrepareContext(entry, entry, 1f, Arena);
         var accepted = ContactCoverageReport.RunSample(context, slot, new("passive-low", 0f, 0f, 0));
         var delayed = ContactCoverageReport.RunSample(context, slot, new("attacker-drift", 4f, 6f, 60));
 
@@ -52,7 +75,7 @@ public sealed class ContactCoverageTests
     [Fact]
     public void CandidateOverride_IsolatedAndScaleOneIsExactControl()
     {
-        var entry = BuiltInContentResolver.Resolve(CharacterClass.FightGuy);
+        var entry = EngineEntry();
         Assert.True(CanonicalSlotProjection.TryGet("air.1", out var slot));
         var baseline = ContactCoverageReport.PrepareContext(entry, entry, 1f, Arena);
         var candidate = ContactCoverageReport.PrepareContext(entry, entry, .8f, Arena);
@@ -87,7 +110,7 @@ public sealed class ContactCoverageTests
     [Fact]
     public void Normals_GroundedHitAndWhiffUseRealActivationEvidence()
     {
-        var entry = BuiltInContentResolver.Resolve(CharacterClass.FightGuy);
+        var entry = EngineEntry();
         Assert.True(CanonicalSlotProjection.TryGet("ground.1", out var slot));
         var report = ContactCoverageReport.BuildNormals(entry, entry, new ContactCoverageReport.NormalCoverageOptions
         {
@@ -111,7 +134,7 @@ public sealed class ContactCoverageTests
     [Fact]
     public void Normals_MeasureRealJumpStylesAndMatchedReferences()
     {
-        var entry = BuiltInContentResolver.Resolve(CharacterClass.FightGuy);
+        var entry = EngineEntry();
         Assert.True(CanonicalSlotProjection.TryGet("air.1", out var slot));
         var report = ContactCoverageReport.BuildNormals(entry, entry, new ContactCoverageReport.NormalCoverageOptions
         {
@@ -147,7 +170,7 @@ public sealed class ContactCoverageTests
     public void Normals_EmptyAirSlotRemainsUnavailableInCompleteMatrix()
     {
         var attacker = EmptyAirSlotEntry();
-        var victim = BuiltInContentResolver.Resolve(CharacterClass.FightGuy);
+        var victim = EngineEntry();
         Assert.True(CanonicalSlotProjection.TryGet("ground.1", out var ground));
         Assert.True(CanonicalSlotProjection.TryGet("air.2", out var air));
         var report = ContactCoverageReport.BuildNormals(attacker, victim, new ContactCoverageReport.NormalCoverageOptions
@@ -171,7 +194,7 @@ public sealed class ContactCoverageTests
     [Fact]
     public void Normals_MaxTickBudgetDistinguishesTruncatedAndCompletedSlices()
     {
-        var entry = BuiltInContentResolver.Resolve(CharacterClass.FightGuy);
+        var entry = EngineEntry();
         Assert.True(CanonicalSlotProjection.TryGet("ground.1", out var slot));
         var shortReport = ContactCoverageReport.BuildNormals(entry, entry, new ContactCoverageReport.NormalCoverageOptions
         {
@@ -191,7 +214,7 @@ public sealed class ContactCoverageTests
     [Fact]
     public void Normals_PostLandingPressIsRejectedWithoutGroundSubstitution()
     {
-        var entry = BuiltInContentResolver.Resolve(CharacterClass.FightGuy);
+        var entry = EngineEntry();
         Assert.True(CanonicalSlotProjection.TryGet("air.1", out var slot));
         var reference = ContactCoverageReport.MeasureNormalJump(entry, Arena, "neutral");
         var sample = ContactCoverageReport.RunNormalSample(entry, entry, Arena, slot,
@@ -207,7 +230,7 @@ public sealed class ContactCoverageTests
     [Fact]
     public void Normals_RepeatedSerializationIsDeterministic()
     {
-        var entry = BuiltInContentResolver.Resolve(CharacterClass.FightGuy);
+        var entry = EngineEntry();
         Assert.True(CanonicalSlotProjection.TryGet("ground.1", out var slot));
         ContactCoverageReport.NormalCoverageReportData Build() => ContactCoverageReport.BuildNormals(entry, entry,
             new ContactCoverageReport.NormalCoverageOptions
@@ -221,7 +244,7 @@ public sealed class ContactCoverageTests
     public void Normals_MixedSlotsKeepIndependentLifecycleDenominators()
     {
         var attacker = EmptyAirSlotEntry();
-        var victim = BuiltInContentResolver.Resolve(CharacterClass.FightGuy);
+        var victim = EngineEntry();
         Assert.True(CanonicalSlotProjection.TryGet("ground.1", out var ground1));
         Assert.True(CanonicalSlotProjection.TryGet("ground.2", out var ground2));
         Assert.True(CanonicalSlotProjection.TryGet("air.2", out var air2));
@@ -266,12 +289,54 @@ public sealed class ContactCoverageTests
     }
 
 
-    private static MatchContentEntry EmptyAirSlotEntry()
+    private static MatchContentEntry EmptyAirSlotEntry() => EngineEntry();
+
+    private static MatchContentEntry EngineEntry()
     {
-        var source = BuiltInContentResolver.Resolve(CharacterClass.Bonk);
-        var definition = TestHelpers.WithEmptyAirSlot2(source.Definition);
+        var source = BuiltInContentResolver.Resolve(CharacterClass.FightGuy);
+        var definition = TestHelpers.EngineDef;
+        definition.Class = source.Definition.Class;
+        var slots = definition.CookedSlots!.ToArray();
+        slots[0] = NormalSlot(0, "ground.1", 30);
+        slots[1] = NormalSlot(1, "ground.2", 120);
+        slots[8] = NormalSlot(8, "air.1", 30);
+        definition.CookedSlots = slots;
         return new MatchContentEntry(source.Handle, source.LegacySelector, source.Identity,
-            source.DisplayName, definition, source.BakedAnimation, source.CookedCharacterPackage);
+            "engine report fixture", definition, SyntheticBake(), source.CookedCharacterPackage);
+    }
+
+    private static CookedSlotDefinition NormalSlot(int ordinal, string id, ushort duration)
+    {
+        var hitbox = new CookedHitbox(AuthoringHitboxShape.Sphere, 3f, 0f, 0f, 0.5f, 0f, 0f, 0f,
+            null, null, 5f, 0f, 0f, 0f, 20, 1, true, 0);
+        return new CookedSlotDefinition(ordinal, id, ordinal >= 8, "Engine report fixture", "", "",
+            AuthoringAbilityBehavior.MeleeCombo, AuthoringAimMode.None, 0, false, false,
+            new CookedTimeline(new[]
+            {
+                new CookedStage(duration, 0, 0, 0, 0, Array.Empty<string>(),
+                    new CookedTimelineOperation[]
+                    {
+                        new CookedSpawnHitboxOperation(0, AuthoringUnit.Meters, hitbox),
+                    }),
+            }));
+    }
+    private static BakedAnimationData SyntheticBake()
+    {
+        var bytes = new List<byte>(System.Text.Encoding.ASCII.GetBytes("SKEL"));
+        bytes.AddRange(BitConverter.GetBytes(1u));
+        bytes.AddRange(BitConverter.GetBytes(1u));
+        bytes.AddRange(BitConverter.GetBytes(1u));
+        byte[] bone = System.Text.Encoding.UTF8.GetBytes("fixture");
+        bytes.AddRange(BitConverter.GetBytes((uint)bone.Length));
+        bytes.AddRange(bone);
+        byte[] animation = System.Text.Encoding.UTF8.GetBytes("fixture");
+        bytes.AddRange(BitConverter.GetBytes((uint)animation.Length));
+        bytes.AddRange(animation);
+        bytes.AddRange(BitConverter.GetBytes(1u));
+        bytes.AddRange(BitConverter.GetBytes(0f));
+        bytes.AddRange(BitConverter.GetBytes(0f));
+        bytes.AddRange(BitConverter.GetBytes(0f));
+        return BakedAnimationData.LoadFromBin(bytes.ToArray());
     }
 
     private static (int Tick, float Damage) RunOracle(MatchContentEntry attacker, MatchContentEntry victim, float x, float z, SlotAddress slot)
@@ -282,7 +347,7 @@ public sealed class ContactCoverageTests
         sim.RegisterEntity(1, attacker.Definition, a, attacker.BakedAnimation);
         sim.RegisterEntity(100, victim.Definition, v, victim.BakedAnimation);
         var input = new Dictionary<ulong, InputState> { [1] = new() { ActiveSlot = Program.SlotByte(int.Parse(slot.InputLabel)) }, [100] = default };
-        for (int tick = 0; tick < 100; tick++)
+        for (int tick = 0; tick < Program.MaxTicks; tick++)
         {
             if (tick > 0) input[1] = default;
             sim.Tick(input);

@@ -49,6 +49,8 @@ namespace SlopArena.Shared
         /// <summary>Horizontal launch direction relative to the hitbox owner.</summary>
         public AuthoringKnockbackDirection KnockbackDirection;
         public ushort StunTicks;
+        /// <summary>Optional fixed hitstun override; zero uses the launch formula.</summary>
+        public ushort FixedHitstunTicks;
         public ulong OwnerId;
 
         /// <summary>Unique server-local ability activation that spawned this hitbox.</summary>
@@ -107,7 +109,7 @@ namespace SlopArena.Shared
         /// If true this hitbox never scans bodies: no HitResult, no damage, no knockback, and
         /// crucially no <c>Active = false</c> on contact, so it keeps travelling and still
         /// reaches <see cref="SpellResolver.CheckGroundCollision"/>. For a projectile whose
-        /// payload is its <see cref="Explosion"/> rather than its impact (Nilus' Q seed), the
+        /// payload is its <see cref="Explosion"/> rather than its impact, the
         /// default one-hit behaviour would otherwise strand the explosion at the pre-move
         /// mid-air position and hand the clipped entity a free ability-cancel via
         /// <c>ApplyKnockback</c>'s zero-magnitude else branch.
