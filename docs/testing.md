@@ -446,3 +446,30 @@ Do not claim a live runtime result from a build or static inspection alone.
 - Receipts and private VPS operator evidence retain the observed release,
   image/source identities, backups, recovery, and registration. A packaged
   two-account match/rematch remains unverified; no player was launched.
+
+### Steam Playtest rollout — 0.2.0-playtest.5
+
+- Windows candidate built from game checkpoint `fe98065`: **1,679 warnings,
+  zero errors**. All sixteen cooked payloads and the roster matched the source
+  bytes; the packaged Shared assembly and compiled VPS endpoint were verified.
+  The real Shared loader admitted the packaged four-character catalog.
+- Shared suite: **1,189 passed, 2 existing skips**; Server suite: **26 passed**.
+  Both image workflows passed their actual runtime smoke gates. Source CI passed
+  after documentation-only link repair `42d9bff`; the history secret scan passed.
+- VPS release **`steam-playtest-20261004-5`** runs the immutable GameHost,
+  Master and migration images recorded under ignored
+  `build/playtest/0.2.0-playtest.5/`. Game source is `fe98065`; Master remains
+  `f016616`. A fresh off-host backup succeeded and zero active matches were
+  observed immediately before replacement. No schema migration was needed.
+- Both services' liveness/readiness and external HTTPS Master readiness passed.
+  Fresh registration confirms **protocol 4** and catalog
+  `b38f85081bc7a33a284b533576fea8a10c5c2c949aa7216375929bdbda677a0d`.
+  Only the private Master catalog admission pin changed; credentials were
+  preserved. Unauthenticated server discovery returned 401 and guest
+  authentication POST returned 404.
+- Authenticated Steamworks and the activation banner confirm
+  **default → BuildID 25702912**, depot **5325921**, manifest
+  **4539020397009519851**, after mobile confirmation. The separate `test`
+  branch remains unchanged at **25547241**.
+- Local staging was restored. No player was launched; packaged two-account
+  match/rematch and a new isolated backup restore were not exercised.
