@@ -64,6 +64,15 @@ character's current damage, startup, body offset, weapon pose, or complete state
 when the test only needs an engine rule. Keep deliberately kit-specific behavior separate;
 ordinary numerical tuning does not require golden regeneration.
 
+Exact damage assertions belong in synthetic engine fixtures when damage application,
+scaling, or duplicate-hit prevention is the contract. Roster contact/recovery checks
+should observe accepted hit identity, victim Hitstop/Hitstun, and attacker recovery.
+Do not sum every authored hitbox as expected damage: later hits can miss, and
+sweet/sour phases can share hit history. A guaranteed multi-hit combo needs its own
+explicit kit requirement and setup. Normal targeting tests must respect authored
+acquisition range, bounded turn, and startup cutoff rather than require every move
+to snap immediately toward any selected target.
+
 Kit contact scenarios must run through their authored active windows, not a fixed
 short tick budget. Check apex release on the observed ascent-to-descent transition.
 Cross-up whiffs must pass the opponent's actual position with nonzero momentum

@@ -218,89 +218,59 @@ public sealed class MankiKitScenarioTests : KitScenarioTests
         var emit = Assert.IsType<CookedEmitPresentationOperation>(aerosol.Timeline.Stages.Single().Operations[1]);
         Assert.Equal("presentation.manki.aerosol-inferno.start", emit.PresentationId);
     }
-    [Fact]
-    public void G1_MonkeyPunch_DealsAuthoredDamage()
+    [Theory]
+    [InlineData(AbilitySlots.Slot1, false, 1f, 80)]
+    [InlineData(AbilitySlots.Slot2, false, 1f, 80)]
+    [InlineData(AbilitySlots.Slot4, false, 0.8f, 100)]
+    [InlineData(AbilitySlots.Slot1, true, 0f, 90)]
+    [InlineData(AbilitySlots.Slot4, true, 0f, 120)]
+    public void NormalContact_TriggersVictimReaction_AndAttackerRecovers(
+        byte slot, bool airborne, float distance, int totalTicks)
     {
-        AssertScenario(new KitScenario
-        {
-            Name = "Manki G1 Monkey Punch Hit Confirm",
-            Def = Def,
-            Setup = GroundedPlayer,
-            Inputs = new InputSequence().Press(0, AbilitySlots.Slot1),
-            Assert = player => Assert.Equal((byte)0, player.AttackSlot),
-            NpcSetup = () => TestHelpers.NpcState(0f, 1f) with { PY = GroundPy },
-            NpcDef = Def,
-            NpcAssert = npc => Assert.Equal(NormalDamage(AbilitySlots.Slot1, false), (float)npc.DamagePercent),
-            TotalTicks = 80,
-        });
-    }
+        var sim = TestHelpers.MakeSim();
+        var player = airborne ? AirbornePlayer() : GroundedPlayer();
+        var npc = airborne
+            ? AirborneNpc(distance) with { PY = player.PY }
+            : TestHelpers.NpcState(0f, distance) with { PY = GroundPy };
+        var baked = TestHelpers.LoadBakedData(Def);
+        sim.RegisterEntity(1, Def, player, baked);
+        sim.RegisterEntity(100, Def, npc, baked);
 
-    [Fact]
-    public void G2_StraightPunch_DealsAuthoredDamage()
-    {
-        AssertScenario(new KitScenario
+        bool contacted = false;
+        bool victimHitstop = false;
+        bool victimHitstun = false;
+        for (int tick = 0; tick < totalTicks; tick++)
         {
-            Name = "Manki G2 Straight Punch Hit Confirm",
-            Def = Def,
-            Setup = GroundedPlayer,
-            Inputs = new InputSequence().Press(0, AbilitySlots.Slot2),
-            Assert = player => Assert.Equal((byte)0, player.AttackSlot),
-            NpcSetup = () => TestHelpers.NpcState(0f, 1f) with { PY = GroundPy },
-            NpcDef = Def,
-            NpcAssert = npc => Assert.Equal(NormalDamage(AbilitySlots.Slot2, false), (float)npc.DamagePercent),
-            TotalTicks = 80,
-        });
-    }
+            sim.Tick(new Dictionary<ulong, InputState>
+            {
+                [1] = tick == 0 ? new InputState { ActiveSlot = slot } : default,
+                [100] = default,
+            });
+            if (tick == 0)
+            {
+                Assert.Equal(ActionState.Attacking, sim.GetState(1).State);
+                Assert.Equal(slot, sim.GetState(1).AttackSlot);
+            }
+            foreach (var hit in sim.LastTickHits)
+            {
+                if (hit.OwnerEntityId != 1 || hit.TargetEntityId != 100 || hit.Blocked)
+                    continue;
+                Assert.Equal(slot, hit.AttackSlot);
+                Assert.Equal(airborne, hit.Airborne);
+                contacted = true;
+            }
+            var victim = sim.GetState(100);
+            victimHitstop |= contacted && victim.HitstopTicks > 0;
+            victimHitstun |= victimHitstop && victim.State == ActionState.Hitstun;
+        }
 
-    [Fact]
-    public void G4_DoubleKick_DealsAuthoredDamage()
-    {
-        AssertScenario(new KitScenario
-        {
-            Name = "Manki G4 Double Kick Hit Confirm",
-            Def = Def,
-            Setup = GroundedPlayer,
-            Inputs = new InputSequence().Press(0, AbilitySlots.Slot4),
-            Assert = player => Assert.Equal((byte)0, player.AttackSlot),
-            NpcSetup = () => TestHelpers.NpcState(0f, 0.8f) with { PY = GroundPy },
-            NpcDef = Def,
-            NpcAssert = npc => Assert.Equal(NormalDamage(AbilitySlots.Slot4, false), (float)npc.DamagePercent),
-            TotalTicks = 100,
-        });
-    }
-
-    [Fact]
-    public void A1_AirKick_DealsAuthoredDamage()
-    {
-        AssertScenario(new KitScenario
-        {
-            Name = "Manki A1 Air Kick Hit Confirm",
-            Def = Def,
-            Setup = AirbornePlayer,
-            Inputs = new InputSequence().Press(0, AbilitySlots.Slot1),
-            Assert = player => Assert.Equal((byte)0, player.AttackSlot),
-            NpcSetup = () => AirborneNpc(0f) with { PY = 2f },
-            NpcDef = Def,
-            NpcAssert = npc => Assert.Equal(NormalDamage(AbilitySlots.Slot1, true), (float)npc.DamagePercent),
-            TotalTicks = 90,
-        });
-    }
-
-    [Fact]
-    public void A4_AirSmash_DealsAuthoredDamage()
-    {
-        AssertScenario(new KitScenario
-        {
-            Name = "Manki A4 Air Smash Hit Confirm",
-            Def = Def,
-            Setup = AirbornePlayer,
-            Inputs = new InputSequence().Press(0, AbilitySlots.Slot4),
-            Assert = player => Assert.Equal((byte)0, player.AttackSlot),
-            NpcSetup = () => AirborneNpc(0f) with { PY = 2f },
-            NpcDef = Def,
-            NpcAssert = npc => Assert.Equal(NormalDamage(AbilitySlots.Slot4, true), (float)npc.DamagePercent),
-            TotalTicks = 120,
-        });
+        Assert.True(contacted, "The normal must accept contact with the nearby opponent.");
+        Assert.True(victimHitstop, "Accepted contact must freeze the victim before launch.");
+        Assert.True(victimHitstun, "The victim must enter Hitstun after contact.");
+        var recovered = sim.GetState(1);
+        Assert.Equal((byte)0, recovered.AttackSlot);
+        Assert.Equal((ushort)0, recovered.AnimLockTicks);
+        Assert.NotEqual(ActionState.Attacking, recovered.State);
     }
 
     // ── Golden scenarios: specials ──
@@ -436,15 +406,6 @@ public sealed class MankiKitScenarioTests : KitScenarioTests
         for (var tick = 0; tick <= 19; tick++) sequence.Set(tick, held);
         sequence.Set(20, new InputState { IsAiming = false, AimPitch = aimPitch });
         return sequence;
-    }
-
-    private static float NormalDamage(byte slot, bool airborne)
-    {
-        var damage = Def.GetCookedSlotAbility(slot, airborne)!.Timeline.Stages
-            .SelectMany(stage => stage.Operations).OfType<CookedSpawnHitboxOperation>()
-            .Sum(operation => operation.Hitbox.Damage);
-        Assert.True(damage > 0f, "Hit-confirm scenarios require a damaging authored normal.");
-        return damage;
     }
 
     private static CharacterCompileResult CompileManki()

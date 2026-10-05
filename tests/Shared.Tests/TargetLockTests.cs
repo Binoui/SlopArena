@@ -1,5 +1,4 @@
 using System;
-using System.IO;
 using Xunit;
 
 namespace SlopArena.Shared.Tests;
@@ -298,23 +297,6 @@ public class TargetLockTests : KitScenarioTests
         TestHelpers.AssertNear(MathF.PI / 2f, state.FacingYaw, 1e-3f);
     }
 
-    [Theory]
-    [InlineData(false, false)]
-    [InlineData(false, true)]
-    [InlineData(true, false)]
-    [InlineData(true, true)]
-    public void RosterNormals_GroundAndAir_FaceTarget(bool airborne, bool locked)
-    {
-        string root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../"));
-        var roster = BuiltInRosterManifestCodec.Load(Path.Combine(root, "content-cooked/roster/manifest.json"));
-        foreach (var entry in roster.Entries)
-        {
-            var def = TestHelpers.ResolveDef(entry.Selector);
-            foreach (byte slot in new[] { AbilitySlots.Slot1, AbilitySlots.Slot2, AbilitySlots.Slot3, AbilitySlots.Slot4 })
-                AssertNormalAttackFaces(def, slot, airborne, locked);
-        }
-    }
-
     [Fact]
     public void FightGuy_NonTargetEnabledSpecials_DoNotAutoFace()
     {
@@ -322,46 +304,6 @@ public class TargetLockTests : KitScenarioTests
         AssertLockedAttackDoesNotFace(def, AbilitySlots.E, 18000);
         AssertLockedAttackDoesNotFace(def, AbilitySlots.R);
         AssertLockedAttackDoesNotFace(def, AbilitySlots.F);
-    }
-
-    private static void AssertNormalAttackFaces(CharacterDefinition def, byte activeSlot, bool airborne, bool locked)
-    {
-        var sim = TestHelpers.MakeSim();
-        float gpy = TestHelpers.GroundPY(def);
-        var player = TestHelpers.PlayerState() with
-        {
-            PY = airborne ? 3f : gpy,
-            IsGrounded = !airborne,
-            JumpsLeft = (byte)(airborne ? 0 : 2),
-            FacingYaw = MathF.PI,
-        };
-        sim.RegisterEntity(1, def, player);
-        // Outside normal hit/attack range, behind the initial facing: target rotation
-        // must not depend on connecting a hit or an enemy already being in front.
-        sim.RegisterEntity(100, def, TestHelpers.NpcState(0f, 5f) with { PY = gpy });
-        sim.Tick(new() { { 1, new InputState { ToggleLock = locked } } });
-        sim.Tick(new() { { 1, new InputState { ActiveSlot = activeSlot } } });
-
-        var state = sim.GetState(1);
-        string context = $"{def.DisplayName} {(airborne ? "air" : "ground")} slot {activeSlot}, locked={locked}";
-        Assert.True(state.State == ActionState.Attacking, $"{context}: attack did not start.");
-        Assert.Equal(activeSlot, state.AttackSlot);
-        Assert.Equal(locked, state.LockOn);
-        Assert.Equal(100UL, state.TargetEntityId);
-        if (airborne) Assert.False(state.IsGrounded);
-        if (locked)
-        {
-            Assert.True(MathF.Abs(state.FacingYaw) <= 1e-3f, $"{context}: did not snap, yaw={state.FacingYaw}.");
-        }
-        else
-        {
-            // Strong tracking corrects most of the angle on the FIRST tick, not
-            // after dozens of ticks. Multiplying the fraction by TickDt fails this.
-            Assert.True(MathF.Abs(state.FacingYaw) <= MathF.PI * 0.25f,
-                $"{context}: tracking too weak, yaw={state.FacingYaw}.");
-            float strength = def.GetCookedSlotAbility(activeSlot, airborne)!.Timeline.Stages[0].TrackingStrength;
-            TestHelpers.AssertNear(MathF.PI * (1f - strength), state.FacingYaw, 1e-3f);
-        }
     }
 
     private static void AssertLockedAttackDoesNotFace(CharacterDefinition def, byte activeSlot, short aimYaw = 0)
