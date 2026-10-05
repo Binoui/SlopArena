@@ -1,19 +1,25 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="True">
   <ui:VisualElement name="ability-lab-root" class="ability-lab-root">
     <ui:VisualElement name="ability-lab-toolbar" class="toolbar">
-      <ui:Label name="package-label" text="Package:" class="toolbar-label" />
-      <ui:DropdownField name="package-selector" class="package-selector" />
-      <ui:Button name="package-status-toggle" text="No package" class="package-status-toggle" />
+      <ui:Label name="editor-brand" text="Slop Editor" class="editor-brand" />
+      <ui:VisualElement class="toolbar-package">
+        <ui:Label name="package-label" text="Package:" class="toolbar-label" />
+        <ui:DropdownField name="package-selector" class="package-selector" />
+        <ui:Button name="package-status-toggle" text="No package" class="package-status-toggle" />
+      </ui:VisualElement>
       <ui:Button name="create-lab-rig" text="Create Lab Rig" />
+      <ui:VisualElement class="toolbar-spacer" />
       <ui:Button name="toolbar-undo" text="Undo" />
       <ui:Button name="toolbar-redo" text="Redo" />
-      <ui:Button name="toolbar-save" text="SAVE + COOK" class="save-button" />
+      <ui:Button name="toolbar-save" text="Save + Cook" class="save-button" />
     </ui:VisualElement>
     <ui:VisualElement name="ability-lab-tabs" class="tabs">
-      <ui:Button name="tab-moves" text="Moves" class="tab-button" />
       <ui:Button name="tab-character" text="Character" class="tab-button" />
+      <ui:Button name="tab-moves" text="Moves" class="tab-button tab-button-selected" />
       <ui:Button name="tab-assets" text="Assets" class="tab-button" />
       <ui:Button name="tab-advanced" text="Advanced" class="tab-button" />
+      <ui:VisualElement class="tabs-spacer" />
+      <ui:Button name="diagnostics-toggle" text="Diagnostics" class="diagnostics-toggle" />
     </ui:VisualElement>
     <ui:ScrollView name="diagnostics-panel" class="diagnostics-panel" />
     <ui:VisualElement name="moves-page" class="page moves-page">
@@ -24,49 +30,64 @@
         </ui:VisualElement>
         <ui:VisualElement name="move-list" class="move-list" />
       </ui:VisualElement>
-      <ui:VisualElement name="moves-content" class="moves-content">
-        <ui:Foldout name="scenario-controls" text="Shared scenario" value="false" class="scenario-controls">
-          <ui:Label name="scenario-action" text="Action: —" />
-          <ui:FloatField name="scenario-distance" label="Opponent distance (m)" value="2.5" />
-          <ui:FloatField name="scenario-facing" label="Opponent relative facing (°)" value="180" />
-          <ui:IntegerField name="scenario-damage" label="Opponent starting damage (%)" value="0" />
-          <ui:DropdownField name="scenario-opponent" label="Opponent behavior" />
-          <ui:IntegerField name="scenario-horizon" label="Last frame" value="60" />
-          <ui:VisualElement name="scenario-buttons" class="scenario-buttons">
-            <ui:Button name="scenario-run" text="Run scenario" />
-            <ui:Button name="scenario-exit" text="Exit to authoring" />
+      <ui:TwoPaneSplitView name="moves-split" orientation="Horizontal" fixed-pane-index="1" fixed-pane-initial-dimension="340" class="moves-split">
+        <ui:ScrollView name="move-scene-column" class="move-scene-column">
+          <ui:VisualElement name="scene-toolbar" class="scene-toolbar">
+            <ui:Label text="Scene preview" class="scene-heading" />
+            <ui:VisualElement class="scene-tools">
+              <ui:Label name="scene-status" text="Preview unavailable" class="scene-status" />
+              <ui:Toggle name="scene-hitboxes" label="Hitboxes" class="scene-toggle" />
+              <ui:Toggle name="scene-hurtboxes" label="Hurtboxes" class="scene-toggle" />
+              <ui:Toggle name="scene-motion" label="Motion" class="scene-toggle" />
+            </ui:VisualElement>
           </ui:VisualElement>
-          <ui:Label name="scenario-outcomes" text="No scenario run." class="scenario-outcomes" />
-        </ui:Foldout>
-        <ui:DropdownField name="authoring-phase" label="Preview" />
-        <ui:Label name="authoring-phase-clip" text="Timeline preview" />
-
-        <ui:VisualElement class="fields-toolbar">
-          <ui:Label text="Moves fields" class="toolbar-label" />
-          <ui:Button name="detach-fields" text="Detach fields" />
-        </ui:VisualElement>
-        <ui:VisualElement name="fields-inline-host" class="fields-host">
-          <ui:ScrollView name="inspector" class="inspector">
-            <ui:DropdownField name="stage-selector" label="Inspect stage" />
-          </ui:ScrollView>
-        </ui:VisualElement>
-        <ui:VisualElement name="move-timeline" class="move-timeline">
-          <ui:VisualElement name="timeline-controls" class="timeline-controls">
-            <ui:Label name="timeline-tick" text="Tick 0" />
-            <ui:Button name="timeline-play" text="Play" />
-            <ui:Button name="timeline-step-back" text="−1" />
-            <ui:Button name="timeline-step-forward" text="+1" />
-            <ui:SliderInt name="timeline-slider" low-value="0" high-value="1" value="0" />
-            <ui:IntegerField name="timeline-seek" label="Seek tick" value="0" is-delayed="true" class="timeline-seek" />
-            <ui:Label name="timeline-duration" text="Duration —" />
-            <ui:Slider name="timeline-zoom" low-value="0.5" high-value="4" value="1" label="Zoom" />
+          <ui:IMGUIContainer name="move-scene-viewport" class="move-scene-viewport" />
+          <ui:VisualElement name="move-timeline" class="move-timeline">
+            <ui:VisualElement name="timeline-controls" class="timeline-controls">
+              <ui:Button name="timeline-play" text="Play" />
+              <ui:Button name="timeline-step-back" text="−1 frame" />
+              <ui:Button name="timeline-step-forward" text="+1 frame" />
+              <ui:Label name="timeline-tick" text="Tick 0" class="timeline-tick" />
+              <ui:SliderInt name="timeline-slider" low-value="0" high-value="1" value="0" />
+              <ui:IntegerField name="timeline-seek" label="Seek" value="0" is-delayed="true" class="timeline-seek" />
+              <ui:Label name="timeline-duration" text="Duration —" />
+              <ui:Slider name="timeline-zoom" low-value="0.5" high-value="4" value="1" label="Zoom" />
+            </ui:VisualElement>
+            <ui:Label name="timeline-notice" class="timeline-notice" />
+            <ui:ScrollView name="timeline-scroll" mode="Horizontal" class="timeline-scroll">
+              <ui:VisualElement name="timeline-track" class="timeline-track" />
+            </ui:ScrollView>
           </ui:VisualElement>
-          <ui:Label name="timeline-notice" class="timeline-notice" />
-          <ui:ScrollView name="timeline-scroll" mode="Horizontal" class="timeline-scroll">
-            <ui:VisualElement name="timeline-track" class="timeline-track" />
-          </ui:ScrollView>
+          <ui:Foldout name="scenario-controls" text="Scenario preview" value="false" class="scenario-controls">
+            <ui:Label name="scenario-action" text="Action: —" />
+            <ui:FloatField name="scenario-distance" label="Opponent distance (m)" value="2.5" />
+            <ui:FloatField name="scenario-facing" label="Opponent relative facing (°)" value="180" />
+            <ui:IntegerField name="scenario-damage" label="Opponent starting damage (%)" value="0" />
+            <ui:DropdownField name="scenario-opponent" label="Opponent behavior" />
+            <ui:IntegerField name="scenario-horizon" label="Last frame" value="60" />
+            <ui:VisualElement name="scenario-buttons" class="scenario-buttons">
+              <ui:Button name="scenario-run" text="Run scenario" />
+              <ui:Button name="scenario-exit" text="Exit to authoring" />
+            </ui:VisualElement>
+            <ui:Label name="scenario-outcomes" text="No scenario run." class="scenario-outcomes" />
+          </ui:Foldout>
+          <ui:Foldout name="phase-controls" text="Preview phase" value="false" class="phase-controls">
+            <ui:DropdownField name="authoring-phase" label="Preview" />
+            <ui:Label name="authoring-phase-clip" text="Timeline preview" />
+          </ui:Foldout>
+        </ui:ScrollView>
+        <ui:VisualElement name="fields-rail" class="fields-rail">
+          <ui:VisualElement name="fields-toolbar" class="fields-toolbar">
+            <ui:Label text="Move fields" class="fields-title" />
+            <ui:Button name="detach-fields" text="Detach" />
+          </ui:VisualElement>
+          <ui:VisualElement name="fields-inline-host" class="fields-host">
+            <ui:ScrollView name="inspector" class="inspector">
+              <ui:DropdownField name="stage-selector" label="Inspect stage" />
+            </ui:ScrollView>
+          </ui:VisualElement>
         </ui:VisualElement>
-      </ui:VisualElement>
+      </ui:TwoPaneSplitView>
     </ui:VisualElement>
     <ui:ScrollView name="character-page" class="page character-page">
       <ui:Label text="Character" class="page-title" />

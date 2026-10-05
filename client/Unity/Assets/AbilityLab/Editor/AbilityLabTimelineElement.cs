@@ -39,6 +39,8 @@ public sealed class AbilityLabTimelineElement : VisualElement
     private const float MinimumHeight = 84f;
     private readonly List<(AbilityLabOperationProjection Operation, Rect Rect)> _hitRects = new();
     private readonly VisualElement _rowLabels = new();
+    private readonly Label[] _tickLabels = new Label[11];
+    private int _rulerDuration = -1;
     private AbilityLabTimelineProjection _projection = null!;
     private int _currentTick;
     private AbilityLabOperationProjection? _selectedOperation;
@@ -63,6 +65,7 @@ public sealed class AbilityLabTimelineElement : VisualElement
             _projection = value;
             UpdateGeometry();
             RebuildRowLabels();
+            UpdateRulerLabels();
             ResolveSelectedOperation();
             MarkDirtyRepaint();
         }
@@ -97,6 +100,14 @@ public sealed class AbilityLabTimelineElement : VisualElement
         _rowLabels.AddToClassList("timeline-row-labels");
         _rowLabels.pickingMode = PickingMode.Ignore;
         Add(_rowLabels);
+        for (int i = 0; i < _tickLabels.Length; i++)
+        {
+            var label = new Label { pickingMode = PickingMode.Ignore };
+            label.AddToClassList("timeline-axis-label");
+            _tickLabels[i] = label;
+            Add(label);
+        }
+        RegisterCallback<GeometryChangedEvent>(_ => UpdateRulerLabels());
         generateVisualContent += GenerateVisualContent;
         RegisterCallback<PointerDownEvent>(OnPointerDown);
         RegisterCallback<PointerMoveEvent>(OnPointerMove);
@@ -251,6 +262,25 @@ public sealed class AbilityLabTimelineElement : VisualElement
     }
     private float PlotWidth => Mathf.Max(0f, contentRect.width - LabelColumnWidth);
 
+    private void UpdateRulerLabels()
+    {
+        int duration = _projection?.DurationTicks ?? 0;
+        int previous = -1;
+        for (int i = 0; i < _tickLabels.Length; i++)
+        {
+            int tick = Mathf.RoundToInt(duration * i / (float)(_tickLabels.Length - 1));
+            var label = _tickLabels[i];
+            label.style.display = duration > 0 && tick != previous ? DisplayStyle.Flex : DisplayStyle.None;
+            if (_rulerDuration != duration) label.text = tick.ToString();
+            bool last = i == _tickLabels.Length - 1;
+            label.style.left = last ? Mathf.Max(LabelColumnWidth - 16f, contentRect.width - 32f)
+                : LabelColumnWidth + (duration > 0 ? tick / (float)duration * PlotWidth : 0f) - 16f;
+            label.style.unityTextAlign = last ? TextAnchor.MiddleRight : TextAnchor.MiddleCenter;
+            previous = tick;
+        }
+        _rulerDuration = duration;
+    }
+
     private bool IsHitboxEndHandle(AbilityLabOperationProjection operation, float x)
     {
         if (operation.Source is not SpawnHitboxOperationSource) return false;
@@ -354,6 +384,15 @@ public sealed class AbilityLabTimelineElement : VisualElement
         }
         float currentX = LabelColumnWidth + _currentTick / (float)_projection.DurationTicks * width;
         DrawLine(painter, new Vector2(currentX, 0), new Vector2(currentX, contentRect.height), new Color(1f, 1f, 0.35f));
+        int previousRulerTick = -1;
+        for (int i = 0; i < _tickLabels.Length; i++)
+        {
+            int tick = Mathf.RoundToInt(_projection.DurationTicks * i / (float)(_tickLabels.Length - 1));
+            if (tick == previousRulerTick) continue;
+            previousRulerTick = tick;
+            float x = LabelColumnWidth + tick / (float)_projection.DurationTicks * width;
+            DrawLine(painter, new Vector2(x, AxisHeight), new Vector2(x, contentRect.height), new Color(0.22f, 0.22f, 0.25f));
+        }
 
         int row = 0;
         foreach (var stage in _projection.Stages)

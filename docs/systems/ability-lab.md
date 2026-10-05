@@ -194,8 +194,16 @@ no scene rig, valid rig, and unavailable package preview.
 
 ## Moves interaction
 
-Moves fields are grouped into a move overview, an all-source-stage effect inventory, and
-selected-effect details. Selecting an effect or inspected stage changes the authoring
+The Moves workspace has a live Unity camera viewport, tick ruler/transport directly beneath,
+and a resizable fields rail. The scene uses the existing Lab camera and renderer/overlays;
+one reusable render target isolates camera clearing from native Editor controls. It is
+released on UI rebuild/owner disable and does not create another actor or simulation.
+Hitboxes, Hurtboxes and Motion control the existing Lab overlay flags. Missing package,
+rig/camera and invalid-draft states are explicit rather than showing a stale current preview.
+
+`Move overview` exposes authored timing/animation; selecting an inventory effect switches to
+`Selected effect` with source-addressed detail. The inventory stays available in either mode.
+Selecting an effect or inspected stage changes the authoring
 context without seeking the preview. `Seek tick` uses cumulative move ticks; `Seek to
 selected effect` explicitly seeks its source-stage start. Field bounds and edits use the
 inspected source stage, not the preview stage. Commits and Undo retain the cumulative cursor
@@ -205,8 +213,11 @@ or conditional windows remain labelled as such; unavailable editors are not pres
 `Detach fields` moves the same fields subtree into a native Editor pane, sharing the owner's
 draft and Undo history. Dock panes and SceneView manually. Closing the fields pane or using
 `Return fields inline` restores the fields inline without saving; other authoring tabs hide
-detached Moves controls. Fields scroll independently of transport, adapt to narrow panes,
-and keep native text-input shortcuts. There is no embedded renderer or automatic window layout.
+detached Moves controls. Detaching reclaims the rail's scene space; returning restores it.
+Fields scroll independently of transport, adapt to narrow panes, and keep native text-input
+shortcuts. Narrow owners stack the panes; the scene column has native scrolling so expanded
+scenario/phase controls remain reachable in short surfaces. There is no automatic window
+layout or Training handoff; users still control docking and SceneView authoring handles.
 
 The Moves timeline supports snapped marker/body drags and hitbox endpoint resizing. Each
 release applies one immutable source edit and one workspace Undo snapshot; canceled or

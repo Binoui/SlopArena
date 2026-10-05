@@ -80,6 +80,25 @@ public static class AbilityLabFrontendSelfTest
             InvokeButton(fields.Q<Button>("effect-1-0"));
             if (lab.StageIndex != 0 || lab.Tick != 3 || lab.SelectedHitboxEventIndex != -1)
                 throw new InvalidOperationException("Inspecting a second-stage hitbox sought the preview or highlighted a first-stage hitbox.");
+            var inspectedDraft = workspace.Draft;
+            InvokeButton(fields.Q<Button>("fields-mode-overview"));
+            if (lab.StageIndex != 0 || lab.Tick != 3 || !ReferenceEquals(inspectedDraft, workspace.Draft))
+                throw new InvalidOperationException("Switching to move overview changed the inspected source or preview cursor.");
+            if (fields.Q<Foldout>("move-overview").style.display == DisplayStyle.None ||
+                fields.Q<Foldout>("selected-effect-fields").style.display != DisplayStyle.None ||
+                fields.Q<Button>("seek-selected-effect").style.display != DisplayStyle.None)
+                throw new InvalidOperationException("Move overview did not expose timing/animation and hide selected-effect controls.");
+            InvokeButton(fields.Q<Button>("fields-mode-effect"));
+            if (fields.Q<Foldout>("selected-effect-fields").style.display == DisplayStyle.None ||
+                fields.Q<Foldout>("move-overview").style.display != DisplayStyle.None ||
+                fields.Q<Button>("seek-selected-effect").style.display == DisplayStyle.None)
+                throw new InvalidOperationException("Selected-effect mode did not expose editable detail and its explicit seek.");
+            fields.Q<FloatField>("Shape/Radius").value = hitbox.Hitbox.Radius + 0.04f;
+            if (Math.Abs(workspace.Draft.Slots.First(value => value.Id == slot.Id).Timeline.Stages[1]
+                    .Operations.OfType<SpawnHitboxOperationSource>().Single().Hitbox.Radius - hitbox.Hitbox.Radius - 0.04f) > 0.0001f ||
+                lab.StageIndex != 0 || lab.Tick != 3)
+                throw new InvalidOperationException("Mode switching lost the inspected-stage edit target or sought the preview.");
+            workspace.Undo();
             InvokeButton(fields.Q<Button>("seek-selected-effect"));
             if (lab.StageIndex != 1 || lab.Tick != 1 || lab.SelectedHitboxEventIndex != 0)
                 throw new InvalidOperationException("Explicit selected-effect seek did not reach its source stage.");

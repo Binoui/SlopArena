@@ -82,6 +82,9 @@ public sealed partial class AbilityLabWindow : EditorWindow
     private VisualElement _fieldsInlineHost = null!;
     private Button _detachFields = null!;
     [SerializeField] private AbilityLabInspectorWindow? _fieldsWindow;
+    private TwoPaneSplitView _movesSplit = null!;
+    private bool _movesFieldsCollapsed;
+    private bool _showSelectedEffectFields;
     private readonly Dictionary<string, VisualElement> _pages = new(StringComparer.Ordinal);
     private bool _airborneSelector;
     private bool _grabSelected;
@@ -263,6 +266,7 @@ public sealed partial class AbilityLabWindow : EditorWindow
     private void OnDisable()
     {
         SceneView.duringSceneGui -= OnSceneGUI;
+        ReleaseMovesViewport();
         DisposeAttachmentPreview();
         if (_grabSelected && _lab != null) _lab.ShowHitboxes = _grabPriorShowHitboxes;
         _workspace.StatusChanged -= RefreshAll;
@@ -286,12 +290,14 @@ public sealed partial class AbilityLabWindow : EditorWindow
         tree.CloneTree(_root);
         var stylesheet = AssetDatabase.LoadAssetAtPath<StyleSheet>("Assets/AbilityLab/Editor/AbilityLabWindow.uss");
         if (stylesheet != null) _root.styleSheets.Add(stylesheet);
+        foreach (var child in _root.Children()) child.style.flexGrow = 1;
 
         BindElements();
         DiscoverPackages();
         BindTabs();
         BindToolbar();
         BindMovesPage();
+        BindMovesViewport();
         BindCharacterPage();
         BindAssetsPage();
         BindPhaseAuthoring();
@@ -342,7 +348,7 @@ public sealed partial class AbilityLabWindow : EditorWindow
         _detachFields = Required<Button>("detach-fields");
         _detachFields.clicked += DetachInspectorFields;
         _inspector.RegisterCallback<GeometryChangedEvent>(evt =>
-            _inspector.EnableInClassList("fields-narrow", evt.newRect.width < 420));
+            _inspector.EnableInClassList("fields-narrow", evt.newRect.width < 280));
         _timelineZoom = Required<Slider>("timeline-zoom");
         _timelineScroll = Required<ScrollView>("timeline-scroll");
         _scenarioAction = Required<Label>("scenario-action");
@@ -429,6 +435,8 @@ public sealed partial class AbilityLabWindow : EditorWindow
         _activePage = pageName;
         foreach (var page in _pages)
             page.Value.style.display = page.Key == pageName ? DisplayStyle.Flex : DisplayStyle.None;
+        foreach (string tab in new[] { "moves", "character", "assets", "advanced" })
+            Required<Button>($"tab-{tab}").EnableInClassList("tab-button-selected", pageName == $"{tab}-page");
         _fieldsWindow?.RefreshAvailability();
     }
 
@@ -452,6 +460,7 @@ public sealed partial class AbilityLabWindow : EditorWindow
         host.Add(_inspector);
         _fieldsInlineHost.style.display = DisplayStyle.None;
         _detachFields.text = "Fields detached";
+        UpdateMovesLayout();
         window.RefreshAvailability();
         RestoreFocus(focusedName);
     }
@@ -467,6 +476,7 @@ public sealed partial class AbilityLabWindow : EditorWindow
             _fieldsInlineHost.style.display = DisplayStyle.Flex;
             _detachFields.text = "Detach fields";
         }
+        UpdateMovesLayout();
         window.RefreshAvailability();
         RestoreFocus(focusedName);
     }
@@ -479,19 +489,33 @@ public sealed partial class AbilityLabWindow : EditorWindow
             if (_updatingControls || !_packagesByDisplay.TryGetValue(evt.newValue, out var option)) return;
             OpenPackage(option.PackageId);
         });
-        _packageStatusToggle.clicked += () =>
-        {
-            if (_diagnosticsPanel.childCount == 0) return;
-            _diagnosticsPanel.style.display = _diagnosticsPanel.style.display == DisplayStyle.None ? DisplayStyle.Flex : DisplayStyle.None;
-        };
+        _packageStatusToggle.clicked += ToggleDiagnostics;
+        Required<Button>("diagnostics-toggle").clicked += ToggleDiagnostics;
         Required<Button>("toolbar-undo").clicked += () => { _workspace.Undo(); RefreshAll(); };
         Required<Button>("toolbar-redo").clicked += () => { _workspace.Redo(); RefreshAll(); };
         Required<Button>("toolbar-save").clicked += () => { _workspace.SavePackage(); RefreshAll(); };
         _createLabRig.clicked += CreateOrSelectLabRig;
     }
 
+    private void ToggleDiagnostics()
+    {
+        if (_diagnosticsPanel.childCount == 0) return;
+        _diagnosticsPanel.style.display = _diagnosticsPanel.style.display == DisplayStyle.None
+            ? DisplayStyle.Flex : DisplayStyle.None;
+    }
+
     private void BindMovesPage()
     {
+        _movesSplit = Required<TwoPaneSplitView>("moves-split");
+        _movesFieldsCollapsed = false;
+        Required<VisualElement>("ability-lab-root").RegisterCallback<GeometryChangedEvent>(_ => UpdateMovesLayout());
+        var sceneColumn = Required<ScrollView>("move-scene-column");
+        sceneColumn.RegisterCallback<GeometryChangedEvent>(evt =>
+        {
+            sceneColumn.EnableInClassList("scene-narrow", evt.newRect.width < 760);
+            sceneColumn.contentContainer.style.minHeight = Mathf.Max(330f, evt.newRect.height);
+        });
+        UpdateMovesLayout();
         _scenarioOpponent.choices = new List<string> { "Idle", "Shield" };
         _scenarioOpponent.SetValueWithoutNotify("Idle");
         _scenarioRun.clicked += RunScenarioFromControls;
@@ -535,6 +559,25 @@ public sealed partial class AbilityLabWindow : EditorWindow
                 RefreshInspector();
             }
         });
+    }
+
+    private void UpdateMovesLayout()
+    {
+        if (_movesSplit == null) return;
+        float width = _root.resolvedStyle.width;
+        bool narrow = width > 0 && width < 760;
+        Required<VisualElement>("ability-lab-root").EnableInClassList("workspace-narrow", narrow);
+        var orientation = narrow ? TwoPaneSplitViewOrientation.Vertical : TwoPaneSplitViewOrientation.Horizontal;
+        if (_movesSplit.orientation != orientation)
+        {
+            _movesSplit.orientation = orientation;
+            _movesSplit.fixedPaneInitialDimension = narrow ? 300 : 340;
+        }
+        bool detached = _fieldsWindow != null;
+        if (detached == _movesFieldsCollapsed) return;
+        _movesFieldsCollapsed = detached;
+        if (detached) _movesSplit.CollapseChild(1);
+        else _movesSplit.UnCollapse();
     }
     private string CurrentSharedAction()
         => _lab == null ? "" : (_lab.Scenario?.Options.Action ?? (_grabSelected ? "grab" : _lab.SelectedAction));
@@ -1221,6 +1264,7 @@ public sealed partial class AbilityLabWindow : EditorWindow
         }
         RefreshScenarioControls();
         RefreshInspector();
+        RefreshMovesViewport();
         RestoreFocus(focusedName);
     }
 
@@ -1343,6 +1387,7 @@ public sealed partial class AbilityLabWindow : EditorWindow
                 userData = address,
             };
             button.name = address.Id == "ground.1" ? "selected-ground-1" : address.Id;
+            button.AddToClassList("move-slot");
             if (!_grabSelected && _lab?.SelectedSlotId == address.Id)
             {
                 button.AddToClassList("move-slot-selected");
@@ -1373,6 +1418,7 @@ public sealed partial class AbilityLabWindow : EditorWindow
                 name = "selected-grab",
                 text = "Grab",
             };
+            grab.AddToClassList("move-slot");
             grab.SetEnabled(_lab?.CanPreviewGrab == true);
             if (_grabSelected) grab.AddToClassList("move-slot-selected");
             _moveList.Add(grab);
@@ -1696,6 +1742,7 @@ public sealed partial class AbilityLabWindow : EditorWindow
             .GroupBy(x => $"{x.Severity}|{x.Code}|{x.Path}|{x.Message}", StringComparer.Ordinal)
             .Select(group => group.First())
             .ToList();
+        Required<Button>("diagnostics-toggle").SetEnabled(unique.Count > 0);
         foreach (var diagnostic in unique)
             _diagnosticsPanel.Add(new Label($"{diagnostic.Code} · {diagnostic.Path}\n{diagnostic.Message}"));
         _diagnosticsPanel.style.display = unique.Count > 0
@@ -1711,6 +1758,7 @@ public sealed partial class AbilityLabWindow : EditorWindow
     }
     private void UpdateTimelineControls()
     {
+        RefreshMovesViewport();
         RefreshPhaseControls();
         if (UpdatePhaseTimeline())
         {
@@ -2000,6 +2048,7 @@ public sealed partial class AbilityLabWindow : EditorWindow
         if (_lab?.IsScenarioPreview == true || _lab == null) return;
         _selectedOperation = operation;
         _inspectedStageIndex = operation.SourceStageIndex;
+        _showSelectedEffectFields = true;
         _sceneRadiusEditing = false;
         _scenePresentationEditing = false;
         CacheSelectedHitbox();
@@ -2170,8 +2219,33 @@ public sealed partial class AbilityLabWindow : EditorWindow
 
         int stageIndex = _inspectedStageIndex;
         var stage = slot.Timeline.Stages[stageIndex];
-        var moveGroup = new Foldout { name = "move-overview", text = $"Move overview · {slot.Name} · Stage {stageIndex + 1}", value = true };
-        moveGroup.Add(new Label($"Duration {stage.DurationTicks} · IASA {stage.IasaTicks} · Landing lag {stage.LandingLagTicks}"));
+        bool effectMode = _showSelectedEffectFields && _selectedOperation != null;
+        var header = new VisualElement();
+        header.AddToClassList("fields-header");
+        var title = new Label(slot.Name);
+        title.AddToClassList("fields-title");
+        header.Add(title);
+        var context = new Label($"Stage {stageIndex + 1} · {stage.DurationTicks} ticks · IASA {stage.IasaTicks} · Landing lag {stage.LandingLagTicks}");
+        context.AddToClassList("fields-description");
+        header.Add(context);
+        var modes = new VisualElement { name = "fields-mode-switch" };
+        modes.AddToClassList("fields-mode-switch");
+        var overviewMode = new Button(() => { _showSelectedEffectFields = false; RefreshInspector(); })
+            { name = "fields-mode-overview", text = "Move overview" };
+        var selectedMode = new Button(() => { _showSelectedEffectFields = true; RefreshInspector(); })
+            { name = "fields-mode-effect", text = "Selected effect" };
+        overviewMode.AddToClassList("fields-mode-button");
+        selectedMode.AddToClassList("fields-mode-button");
+        overviewMode.EnableInClassList("fields-mode-button-selected", !effectMode);
+        selectedMode.EnableInClassList("fields-mode-button-selected", effectMode);
+        selectedMode.SetEnabled(_selectedOperation != null);
+        modes.Add(overviewMode);
+        modes.Add(selectedMode);
+        header.Add(modes);
+        _inspector.Add(header);
+        var moveGroup = new Foldout { name = "move-overview", text = "Timing & animation", value = true };
+        moveGroup.AddToClassList("inspector-section");
+        moveGroup.style.display = effectMode ? DisplayStyle.None : DisplayStyle.Flex;
         var durationField = new IntegerField("Duration ticks") { name = "move-duration", value = stage.DurationTicks, isDelayed = true };
         durationField.RegisterValueChangedCallback(evt =>
         {
@@ -2319,10 +2393,13 @@ public sealed partial class AbilityLabWindow : EditorWindow
         moveGroup.Add(addPresentation);
         _inspector.Add(moveGroup);
         var inventory = new Foldout { name = "effect-inventory", text = "Effects · all source stages", value = true };
-        inventory.Add(new Label("Selecting an effect inspects its source; it does not seek the preview."));
+        inventory.AddToClassList("effect-inventory");
+        inventory.tooltip = "Select source fields without seeking. Use the explicit seek action to move the cursor.";
         foreach (var sourceStage in _timelineProjection!.Stages)
         {
-            inventory.Add(new Label($"Stage {sourceStage.SourceStageIndex + 1} · move ticks [{sourceStage.StartTick}, {sourceStage.EndTick})"));
+            var stageLabel = new Label($"Stage {sourceStage.SourceStageIndex + 1} · ticks {sourceStage.StartTick}–{sourceStage.EndTick}");
+            stageLabel.AddToClassList("effect-stage-label");
+            inventory.Add(stageLabel);
             foreach (var operation in sourceStage.Operations)
             {
                 bool selected = _selectedOperation?.SourceStageIndex == operation.SourceStageIndex &&
@@ -2330,10 +2407,17 @@ public sealed partial class AbilityLabWindow : EditorWindow
                 var button = new Button(() => SelectOperation(operation))
                 {
                     name = $"effect-{operation.SourceStageIndex}-{operation.SourceOperationIndex}",
-                    text = $"{(selected ? "Selected · " : "")}{operation.Summary} · {EffectTiming(operation, sourceStage.StartTick)}",
-                    tooltip = $"Source stage {operation.SourceStageIndex + 1}, operation {operation.SourceOperationIndex + 1}.",
+                    tooltip = $"{operation.Summary} · {EffectTiming(operation, sourceStage.StartTick)}. Select to inspect without seeking.",
                 };
                 button.AddToClassList("effect-inventory-row");
+                button.EnableInClassList("effect-selected", selected);
+                var name = new Label($"{(selected ? "● " : "")}{operation.Summary}");
+                name.AddToClassList("effect-name");
+                button.Add(name);
+                var timing = new Label(operation.EndTick > operation.StartTick + 1
+                    ? $"{operation.StartTick}–{operation.EndTick}" : $"{operation.StartTick}");
+                timing.AddToClassList("effect-range");
+                button.Add(timing);
                 inventory.Add(button);
             }
         }
@@ -2344,9 +2428,12 @@ public sealed partial class AbilityLabWindow : EditorWindow
             {
                 name = "seek-selected-effect", text = "Seek to selected effect",
             };
+            seek.style.display = effectMode ? DisplayStyle.Flex : DisplayStyle.None;
             _inspector.Add(seek);
             var detail = BuildOperationFoldout(_selectedOperation, true);
             detail.name = "selected-effect-fields";
+            detail.AddToClassList("inspector-section");
+            detail.style.display = effectMode ? DisplayStyle.Flex : DisplayStyle.None;
             _inspector.Add(detail);
         }
         else _inspector.Add(new Label("Select an effect for its fields."));
