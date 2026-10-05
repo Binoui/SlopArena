@@ -139,9 +139,9 @@ namespace SlopArena.Client.World
                 : local && _playerWeaponConfig != null
                     ? _playerWeaponConfig
                     : Resources.Load<WeaponAttachConfig>($"WeaponConfigs/{def.Class}");
-            var weapon = renderer.GetComponent<WeaponAttach>();
-            weapon?.Init(renderer, weaponConfig);
-            if (weapon != null) _weapons[entityId] = weapon;
+            var weapon = renderer.GetComponent<WeaponAttach>() ?? renderer.gameObject.AddComponent<WeaponAttach>();
+            weapon.Init(renderer, weaponConfig);
+            _weapons[entityId] = weapon;
             return true;
         }
         protected void PresentTimelineEvents()

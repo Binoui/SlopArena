@@ -152,6 +152,80 @@ namespace Unity.Pipeline.Tests.Editor
         }
 
         [Test]
+        public void ManualRecovery_FreesSettledLease_RevokesTokenAndPersistsAcrossReload()
+        {
+            var manager = new EditorCommandOwnership("manual-recovery-session");
+            Assert.IsTrue(manager.TryClaim("lost-gateway", "incarnation", "old-batch", out var oldToken, out _));
+            Assert.IsFalse(manager.TryClaim("next-gateway", "next-incarnation", "next-batch", out _, out _));
+            var confirmation = manager.GetRecoveryConfirmation();
+            Assert.IsTrue(confirmation.HasValue);
+            Assert.IsTrue(manager.TryRecoverSettledLease(confirmation.Value, out var recovered));
+            Assert.AreEqual("free", recovered.state);
+            Assert.IsTrue(recovered.settled);
+            Assert.IsNull(recovered.owner);
+
+            var reloaded = new EditorCommandOwnership("manual-recovery-session");
+            reloaded.Restore(manager.SnapshotForPersistence());
+            Assert.IsFalse(reloaded.TryAuthorizeAdmission(oldToken, out _));
+            Assert.IsFalse(reloaded.TryBeginOperation(oldToken, "stale-operation", "mutate", out _, out _));
+            Assert.IsFalse(reloaded.TryRelease(oldToken, out _));
+            Assert.IsTrue(reloaded.TryClaim("next-gateway", "next-incarnation", "next-batch", out var nextToken, out _));
+            Assert.AreNotEqual(oldToken, nextToken);
+            int mutations = 0;
+            Assert.IsFalse(reloaded.TryAuthorizeAndRun(oldToken, () => mutations++, out _));
+            Assert.IsTrue(reloaded.TryAuthorizeAndRun(nextToken, () => mutations++, out _));
+            Assert.AreEqual(1, mutations);
+        }
+
+        [TestCase("command")]
+        [TestCase("host")]
+        [TestCase("blocked")]
+        public void ManualRecovery_RejectsActiveOrUnknownWork(string busyKind)
+        {
+            var manager = new EditorCommandOwnership("busy-recovery-session");
+            Assert.IsTrue(manager.TryClaim("gateway", "incarnation", "batch", out var token, out _));
+            var confirmation = manager.GetRecoveryConfirmation().Value;
+            if (busyKind == "blocked")
+                manager.Block("Completion is unknown.");
+            else
+            {
+                Assert.IsTrue(manager.TryBeginOperation(token, "operation", "recompile", out var operation, out _));
+                if (busyKind == "host")
+                {
+                    Assert.IsTrue(manager.BeginHostActivity(operation, "compile"));
+                    manager.CompleteOperation(operation.OperationId);
+                }
+            }
+            Assert.IsNull(manager.GetRecoveryConfirmation());
+            Assert.IsFalse(manager.TryRecoverSettledLease(confirmation, out var rejected));
+            Assert.AreEqual(busyKind == "blocked" ? "blocked" : "held", rejected.state);
+            Assert.AreEqual(busyKind == "blocked" ? 0 : 1, rejected.activeOperations);
+            Assert.IsFalse(rejected.settled);
+        }
+
+        [Test]
+        public void ManualRecovery_RejectsStaleConfirmationEvenAfterWorkSettles()
+        {
+            var manager = new EditorCommandOwnership("revision-recovery-session");
+            Assert.IsTrue(manager.TryClaim("gateway", "incarnation", "batch", out var token, out _));
+            var confirmation = manager.GetRecoveryConfirmation().Value;
+            Assert.IsTrue(manager.TryBeginOperation(token, "operation", "mutate", out _, out _));
+            manager.CompleteOperation("operation");
+            Assert.IsTrue(manager.GetStatus().settled);
+            Assert.IsFalse(manager.TryRecoverSettledLease(confirmation, out _));
+            Assert.IsTrue(manager.TryAuthorizeAdmission(token, out _));
+
+            var otherSession = new EditorCommandOwnership("other-session");
+            Assert.IsTrue(otherSession.TryClaim("gateway", "incarnation", "batch", out _, out _));
+            Assert.IsFalse(otherSession.TryRecoverSettledLease(confirmation, out _));
+
+            Assert.IsTrue(manager.TryRelease(token, out _));
+            Assert.IsTrue(manager.TryClaim("other-gateway", "other-incarnation", "other-batch", out var nextToken, out _));
+            Assert.IsFalse(manager.TryRecoverSettledLease(confirmation, out _));
+            Assert.IsTrue(manager.TryAuthorizeAdmission(nextToken, out _));
+        }
+
+        [Test]
         public async Task ExecWithoutLease_IsRejectedBeforeMutation_AndStatusNeverLeaksToken()
         {
             var rejected = await PostAsync("/api/exec", new

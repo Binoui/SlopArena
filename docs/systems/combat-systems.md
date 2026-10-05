@@ -178,9 +178,9 @@ SlopArena uses damage percent rather than a conventional health pool. A hit appl
 - **Shield drop** lasts 7 vulnerable ticks after release; release during block stun starts the full drop only when the stun expires.
 - **Clash** resolves simultaneous Interruptible hitboxes as mutual pushback and short stun instead of an arbitrary trade.
 - **Armor** is an authored activation window, not invulnerability: incoming
-  damage/contact feedback and Hitstop remain, but ordinary launch, Hitstun and
-  SDI do not apply. The contact snapshots protection before Hitstop; no deferred
-  launch appears when the window expires. Grabs bypass armor.
+damage/contact feedback and Hitstop remain, but ordinary launch, Hitstun and
+SDI do not apply. The contact snapshots protection before Hitstop; no deferred
+launch appears when the window expires. Grabs bypass armor.
 - Ordinary Hitstun is derived from launch magnitude; `stunTicks` is a gate.
   An opt-in hitbox `fixedHitstunTicks` gives a bounded linking duration without
   increasing displacement. It does not bypass armor or a zero stun gate.
@@ -219,7 +219,11 @@ No Unity physics query or client-only trajectory determines gameplay.
 
 ## Targeting and aiming
 
-The client may provide camera-derived aim and target intent. The Shared simulation validates targetability and range and owns the selected target. Target lock is passive while moving: it does not steer facing outside attacks. Supported attacks snap toward the locked target; without lock, `TrackingStrength` closes that fraction of the shortest yaw difference per 60 Hz tick. Hitstop pauses attack tracking. Unity renders the resulting authoritative facing and lock indicator.
+The client may provide camera-derived aim and target intent. The Shared simulation validates targetability and range and owns the selected target. Target lock is passive while moving: it does not steer facing outside attacks. Ordinary stages do not continuously track targets. `startupAimCorrection` is an explicit cooked timeline operation available to any slot, including future specials; it is enabled on the current 32 normals only, and current specials remain unchanged. When opted in, the simulation captures one eligible target at activation, even if the operation's correction tick is later. It prefers the currently selected/locked target when valid in the acquisition envelope; otherwise it picks the nearest eligible enemy, breaking distance ties by entity ID. RetargetPressed keeps its existing nearest-valid-enemy semantics; correction never switches target after capture.
+
+Current normal tuning uses 4 m acquisition range and full-circle acquisition (`acquisitionHalfAngleDegrees: 180`, no forward-cone restriction), at most 45° yaw at 360°/s, and pitch up to 15° at 180°/s only for air.1/air.2 except Bonk air.2; grounded normals and other aerial normals have zero pitch. Selected/locked opponents beside or behind the fighter can be acquired, but the attack still turns only within its existing startup time and 45° cap. The hip world pivot is the simulation hip-height pivot (`BoneYToWorldY(PY, 0)`), shared by model, collision and trails. Target reference is the opponent torso at `PY + 0.25 × targetCapsuleHeight`. Pitch changes rendered pose geometry, not physics capsule or trajectories.
+
+Each operation has stage-relative `tick`, `unit: "ticks"`, exclusive `endTick`, `acquisitionRange`, `acquisitionHalfAngleDegrees`, `maxYawDegrees`, `maxPitchDegrees`, `yawDegreesPerSecond`, and `pitchDegreesPerSecond`. The range/cone acquire once; per-tick rates and total-angle caps bound yaw from initial facing and pitch from the neutral attack pose, independently of raw camera aim. `endTick` must be later than the operation tick and within its stage. The window must end no later than the earliest hitbox, projectile, forward-lunge or horizontal SetVelocity commitment; it may close earlier. No correction runs on the exclusive cutoff tick, during active contact or recovery, or after target invalidation. Hitstop freezes both correction and attack clock. There is no late acquisition, target switching, physics pull, or movement-trajectory change.
 
 The Gameplay target-lock setting has three modes: **Always auto-lock** (default) acquires an enemy automatically; **Never auto-lock** requires manual activation; **Auto-lock on hit** activates when the fighter deals or receives a damaging hit. An active lock keeps its target while valid within 20 m rather than switching as the camera moves. Retarget selects the nearest valid enemy within 20 m; the lock toggle explicitly disables or reenables automatic locking. If a target leaves range, automatic modes may reacquire when one returns, but explicit lock-off remains off until reenabling. Manual camera-facing snap does not disable lock.
 

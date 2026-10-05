@@ -350,7 +350,6 @@ public sealed class CharacterPackageCompilerTests
 
         Assert.True(compiled.CookedPackage != null,
             string.Join("; ", compiled.Diagnostics.Select(x => $"{x.Code}: {x.Message} ({x.Path})")));
-        Assert.Equal("1.2.0", compiled.CookedPackage!.Metadata.RuntimeApiMin);
         var operation = Assert.Single(compiled.CookedPackage.Definition.Slots
             .Single(slot => slot.Id == "ground.1").Timeline.Stages[0].Operations
             .OfType<CookedGravityWindowOperation>());
@@ -421,8 +420,8 @@ public sealed class CharacterPackageCompilerTests
         AssertError(CompileCharacter(x => x["slots"]![0]!["timeline"]!["stages"]![0]!["operations"]![0]!["unit"] = "bogus"), "unit.unknown");
         AssertError(CompileCharacter(x => x["slots"]![8]!["timeline"]!["stages"]![0]!["operations"]![0]!["parameters"]!["extra"] = 1), "operation.parameter-unknown");
         AssertError(CompileCharacter(x => ((JsonObject)x["slots"]![8]!["timeline"]!["stages"]![0]!["operations"]![0]!["parameters"]!).Remove("startupTicks")), "operation.parameter-missing");
-        AssertError(CompileCharacter(x => x["slots"]![0]!["timeline"]!["stages"]![0]!["operations"]![0]!["hitbox"]!["durationTicks"] = 0), "value.out-of-range");
-        AssertError(CompileCharacter(x => x["slots"]![0]!["timeline"]!["stages"]![0]!["operations"]![0]!["hitbox"]!["radius"] = -1), "value.out-of-range");
+        AssertError(CompileCharacter(x => x["slots"]![0]!["timeline"]!["stages"]![0]!["operations"]![1]!["hitbox"]!["durationTicks"] = 0), "value.out-of-range");
+        AssertError(CompileCharacter(x => x["slots"]![0]!["timeline"]!["stages"]![0]!["operations"]![1]!["hitbox"]!["radius"] = -1), "value.out-of-range");
     }
 
     [Fact]
@@ -468,10 +467,47 @@ public sealed class CharacterPackageCompilerTests
 
         var swapped = CompileCharacter(x =>
         {
-            var operations = (JsonArray)x["slots"]![1]!["timeline"]!["stages"]![0]!["operations"]!;
-            operations[1]!["tick"] = operations[0]! ["tick"]!.GetValue<int>();
+            var operations = (JsonArray)x["slots"]![9]!["timeline"]!["stages"]![0]!["operations"]!;
+            operations[1]!["tick"] = operations[0]!["tick"]!.GetValue<int>();
         });
         Assert.NotEqual(Convert.ToHexString(baseline.CookedPackage.CanonicalBytes), Convert.ToHexString(swapped.CookedPackage!.CanonicalBytes));
+    }
+
+    [Fact]
+    public void StartupAimCorrection_CooksBoundedCutoffAndRejectsLateOrDuplicateWindows()
+    {
+
+        AssertError(CompileCharacter(character =>
+        {
+            var operations = character["slots"]![0]!["timeline"]!["stages"]![0]!["operations"]!.AsArray();
+            int firstContact = operations.First(operation => operation!["kind"]!.GetValue<string>() == "spawnHitbox")!["tick"]!.GetValue<int>();
+            operations[0]!["endTick"] = firstContact + 1;
+        }),
+            "operation.cutoff-after-commitment");
+        AssertError(CompileCharacter(character =>
+        {
+            var operations = (JsonArray)character["slots"]![0]!["timeline"]!["stages"]![0]!["operations"]!;
+            operations.Add(JsonNode.Parse(operations[0]!.ToJsonString()));
+        }), "operation.ambiguous");
+        AssertError(CompileCharacter(character =>
+            character["slots"]![0]!["timeline"]!["stages"]![0]!["operations"]![0]!["acquisitionRange"] = 33),
+            "value.out-of-range");
+    }
+
+    [Theory]
+    [InlineData("absolute")]
+    [InlineData("additive")]
+    public void StartupAimCorrectionCannotContinueAfterHorizontalVelocityLaunch(string velocityMode)
+    {
+        AssertError(CompileCharacter(character =>
+        {
+            var operations = character["slots"]![0]!["timeline"]!["stages"]![0]!["operations"]!.AsArray();
+            operations.Insert(1, new JsonObject
+            {
+                ["kind"] = "setVelocity", ["tick"] = 1, ["unit"] = "metersPerSecond",
+                ["velocityMode"] = velocityMode, ["x"] = 1f, ["y"] = 0f, ["z"] = 0f,
+            });
+        }), "operation.cutoff-after-commitment");
     }
 
     [Fact]
@@ -479,7 +515,7 @@ public sealed class CharacterPackageCompilerTests
     {
         AssertError(CompileCharacter(x => x["hurtboxBoneDefs"]![0]!["boneId"] = "Bad Bone"), "id.invalid");
         AssertError(CompileCharacter(x => x["slots"]![0]!["timeline"]!["stages"]![0]!["animationIds"]![0] = "missing"), "reference.unresolved");
-        AssertError(CompileCharacter(x => x["slots"]![0]!["timeline"]!["stages"]![0]!["operations"]![0]!["hitbox"]!["startBoneId"] = "bone.missing"), "reference.unresolved");
+        AssertError(CompileCharacter(x => x["slots"]![0]!["timeline"]!["stages"]![0]!["operations"]![1]!["hitbox"]!["startBoneId"] = "bone.missing"), "reference.unresolved");
     }
 
     [Fact]

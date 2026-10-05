@@ -192,13 +192,22 @@
             "autoCancelAfterTicks": 0,
             "attackRange": 0,
             "warpRange": 0,
-            "useTargetLock": true,
-            "rotateTowardTarget": true,
-            "trackingStrength": 0.85,
             "animationIds": [
               "anim.bonk.g1"
             ],
             "operations": [
+              {
+                "kind": "startupAimCorrection",
+                "tick": 0,
+                "unit": "ticks",
+                "endTick": 11,
+                "acquisitionRange": 4,
+                "acquisitionHalfAngleDegrees": 180,
+                "maxYawDegrees": 45,
+                "maxPitchDegrees": 0,
+                "yawDegreesPerSecond": 360,
+                "pitchDegreesPerSecond": 0
+              },
               {
                 "kind": "spawnHitbox",
                 "tick": 11,
@@ -252,13 +261,22 @@
             "autoCancelAfterTicks": 0,
             "attackRange": 0,
             "warpRange": 0,
-            "useTargetLock": true,
-            "rotateTowardTarget": true,
-            "trackingStrength": 0.85,
             "animationIds": [
               "anim.bonk.g2"
             ],
             "operations": [
+              {
+                "kind": "startupAimCorrection",
+                "tick": 0,
+                "unit": "ticks",
+                "endTick": 20,
+                "acquisitionRange": 4,
+                "acquisitionHalfAngleDegrees": 180,
+                "maxYawDegrees": 45,
+                "maxPitchDegrees": 0,
+                "yawDegreesPerSecond": 360,
+                "pitchDegreesPerSecond": 0
+              },
               {
                 "kind": "spawnHitbox",
                 "tick": 20,
@@ -312,13 +330,22 @@
             "autoCancelAfterTicks": 0,
             "attackRange": 0,
             "warpRange": 0,
-            "useTargetLock": true,
-            "rotateTowardTarget": true,
-            "trackingStrength": 0.85,
             "animationIds": [
               "anim.bonk.g3"
             ],
             "operations": [
+              {
+                "kind": "startupAimCorrection",
+                "tick": 0,
+                "unit": "ticks",
+                "endTick": 21,
+                "acquisitionRange": 4,
+                "acquisitionHalfAngleDegrees": 180,
+                "maxYawDegrees": 45,
+                "maxPitchDegrees": 0,
+                "yawDegreesPerSecond": 360,
+                "pitchDegreesPerSecond": 0
+              },
               {
                 "kind": "spawnHitbox",
                 "tick": 21,
@@ -372,13 +399,22 @@
             "autoCancelAfterTicks": 0,
             "attackRange": 0,
             "warpRange": 0,
-            "useTargetLock": true,
-            "rotateTowardTarget": true,
-            "trackingStrength": 0.85,
             "animationIds": [
               "anim.bonk.g4"
             ],
             "operations": [
+              {
+                "kind": "startupAimCorrection",
+                "tick": 0,
+                "unit": "ticks",
+                "endTick": 48,
+                "acquisitionRange": 4,
+                "acquisitionHalfAngleDegrees": 180,
+                "maxYawDegrees": 45,
+                "maxPitchDegrees": 0,
+                "yawDegreesPerSecond": 360,
+                "pitchDegreesPerSecond": 0
+              },
               {
                 "kind": "spawnHitbox",
                 "tick": 48,
@@ -413,7 +449,7 @@
     {
       "id": "ground.A",
       "name": "Shoulder Bash",
-      "description": "Drive forward shoulder-first, then slam the opponent with Bonk\u0027s head.",
+      "description": "Drive forward shoulder-first, then slam the opponent with Bonk's head.",
       "iconId": "icon.a",
       "behavior": "meleeCombo",
       "aimMode": "none",
@@ -623,11 +659,11 @@
                   "baseKnockback": 2,
                   "knockbackGrowth": 0,
                   "stunTicks": 8,
-                  "fixedHitstunTicks": 24,
                   "durationTicks": 7,
                   "interruptible": false,
                   "hitGroup": 0,
-                  "knockbackDirection": "awayFromOwner"
+                  "knockbackDirection": "awayFromOwner",
+                  "fixedHitstunTicks": 24
                 }
               },
               {
@@ -860,13 +896,22 @@
             "autoCancelAfterTicks": 43,
             "attackRange": 0,
             "warpRange": 0,
-            "useTargetLock": true,
-            "rotateTowardTarget": true,
-            "trackingStrength": 0.8,
             "animationIds": [
               "anim.bonk.a1"
             ],
             "operations": [
+              {
+                "kind": "startupAimCorrection",
+                "tick": 0,
+                "unit": "ticks",
+                "endTick": 19,
+                "acquisitionRange": 4,
+                "acquisitionHalfAngleDegrees": 180,
+                "maxYawDegrees": 45,
+                "maxPitchDegrees": 15,
+                "yawDegreesPerSecond": 360,
+                "pitchDegreesPerSecond": 180
+              },
               {
                 "kind": "spawnHitbox",
                 "tick": 19,
@@ -920,13 +965,22 @@
             "autoCancelAfterTicks": 45,
             "attackRange": 0,
             "warpRange": 0,
-            "useTargetLock": true,
-            "rotateTowardTarget": true,
-            "trackingStrength": 0.8,
             "animationIds": [
               "anim.bonk.a2"
             ],
             "operations": [
+              {
+                "kind": "startupAimCorrection",
+                "tick": 0,
+                "unit": "ticks",
+                "endTick": 15,
+                "acquisitionRange": 4,
+                "acquisitionHalfAngleDegrees": 180,
+                "maxYawDegrees": 45,
+                "maxPitchDegrees": 0,
+                "yawDegreesPerSecond": 360,
+                "pitchDegreesPerSecond": 0
+              },
               {
                 "kind": "spawnHitbox",
                 "tick": 15,
@@ -973,23 +1027,32 @@
       "timeline": {
         "stages": [
           {
-            "durationTicks": 100,
-            "iasaTicks": 60,
+            "durationTicks": 50,
+            "iasaTicks": 0,
             "landingLagTicks": 22,
             "autoCancelBeforeTicks": 20,
             "autoCancelAfterTicks": 50,
             "attackRange": 0,
             "warpRange": 0,
-            "useTargetLock": true,
-            "rotateTowardTarget": true,
-            "trackingStrength": 0.8,
             "animationIds": [
               "anim.bonk.a3"
             ],
             "operations": [
               {
+                "kind": "startupAimCorrection",
+                "tick": 0,
+                "unit": "ticks",
+                "endTick": 21,
+                "acquisitionRange": 4,
+                "acquisitionHalfAngleDegrees": 180,
+                "maxYawDegrees": 45,
+                "maxPitchDegrees": 0,
+                "yawDegreesPerSecond": 360,
+                "pitchDegreesPerSecond": 0
+              },
+              {
                 "kind": "spawnHitbox",
-                "tick": 19,
+                "tick": 21,
                 "unit": "meters",
                 "hitbox": {
                   "shape": "capsule",
@@ -1040,13 +1103,22 @@
             "autoCancelAfterTicks": 62,
             "attackRange": 0,
             "warpRange": 0,
-            "useTargetLock": true,
-            "rotateTowardTarget": true,
-            "trackingStrength": 0.8,
             "animationIds": [
               "anim.bonk.a4"
             ],
             "operations": [
+              {
+                "kind": "startupAimCorrection",
+                "tick": 0,
+                "unit": "ticks",
+                "endTick": 37,
+                "acquisitionRange": 4,
+                "acquisitionHalfAngleDegrees": 180,
+                "maxYawDegrees": 45,
+                "maxPitchDegrees": 0,
+                "yawDegreesPerSecond": 360,
+                "pitchDegreesPerSecond": 0
+              },
               {
                 "kind": "spawnHitbox",
                 "tick": 37,
@@ -1081,7 +1153,7 @@
     {
       "id": "air.A",
       "name": "Shoulder Bash",
-      "description": "Drive forward shoulder-first, then slam the opponent with Bonk\u0027s head.",
+      "description": "Drive forward shoulder-first, then slam the opponent with Bonk's head.",
       "iconId": "icon.a",
       "behavior": "meleeCombo",
       "aimMode": "none",
@@ -1305,11 +1377,11 @@
                   "baseKnockback": 2,
                   "knockbackGrowth": 0,
                   "stunTicks": 8,
-                  "fixedHitstunTicks": 24,
                   "durationTicks": 7,
                   "interruptible": false,
                   "hitGroup": 0,
-                  "knockbackDirection": "awayFromOwner"
+                  "knockbackDirection": "awayFromOwner",
+                  "fixedHitstunTicks": 24
                 }
               },
               {

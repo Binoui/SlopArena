@@ -47,6 +47,28 @@ namespace SlopArena.Client.Network
         private readonly byte[] _steamReceiveFrame = new byte[MaxSteamFrameBytes];
         private readonly byte[] _steamInputFrame = new byte[1 + 8 + 4 + InputState.Size];
         private string _connectionFailure = string.Empty;
+        private readonly byte[] _steamControlFrame = new byte[1 + NetplayControlPacket.Size];
+        private readonly byte[] _udpControlFrame = new byte[NetplayControlPacket.Size];
+        private long _nextBootstrapAt;
+        private readonly byte[] _udpInputFrame = new byte[8 + 4 + InputState.Size];
+        private uint _latestServerStartTick;
+        private int _readyGeneration = -1;
+        private long _nextReadyAt;
+        private volatile bool _clockReceived;
+        private readonly ConcurrentQueue<ControlFrame> _controlQueue = new();
+        public readonly struct ControlFrame
+        {
+            public ControlFrame(NetplayControlPacket Packet, double ReceivedAtSeconds, double RoundTripMilliseconds)
+            {
+                this.Packet = Packet;
+                this.ReceivedAtSeconds = ReceivedAtSeconds;
+                this.RoundTripMilliseconds = RoundTripMilliseconds;
+            }
+
+            public NetplayControlPacket Packet { get; }
+            public double ReceivedAtSeconds { get; }
+            public double RoundTripMilliseconds { get; }
+        }
 
         private volatile UdpClient? _udp;
         private IPEndPoint _serverEp = new(IPAddress.Loopback, 9876);
@@ -77,6 +99,7 @@ namespace SlopArena.Client.Network
                     : null;
             }
         }
+        public int ConnectionGeneration { get; private set; }
         public uint LastPingServerTick => unchecked((uint)Interlocked.Read(ref _lastPingTick));
         public string ServerEndpoint => _steamDescriptor != null
             ? $"Steam P2P {_steamDescriptor.ServerSteamId}"
@@ -86,6 +109,7 @@ namespace SlopArena.Client.Network
         public ulong EntityId { get => _entityId; set => _entityId = value; }
         public bool IsServerConnected => _connected;
         public uint LastServerTick { get; private set; }
+        public static double MonotonicSeconds => Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
         private static double ElapsedSeconds(long start, long end)
             => (end - start) / (double)Stopwatch.Frequency;
         private static double ElapsedMilliseconds(long start, long end)
@@ -207,6 +231,8 @@ namespace SlopArena.Client.Network
             Interlocked.Exchange(ref _lastPingReceivedAt, 0);
             Interlocked.Exchange(ref _lastPingRequestAt, 0);
             Interlocked.Exchange(ref _lastServerPacketAt, 0);
+            ConnectionGeneration++;
+            ResetServerClockState();
             Interlocked.Exchange(ref _lastPingSentAt, 0);
             _serverIp = ip;
             _serverPort = port;
@@ -214,6 +240,9 @@ namespace SlopArena.Client.Network
             CreateSocket();
             StartReceiveThread();
             _activeMatch = this;
+            _clockReceived = false;
+            _nextBootstrapAt = 0;
+            SendControl(new NetplayControlPacket(NetplayControlKind.Bootstrap, _entityId, 0, 0));
 
         }
 
@@ -229,7 +258,7 @@ namespace SlopArena.Client.Network
             StopSteamTransport();
             StopUdpTransport();
             ClearReceiveQueues();
-            _transport = UI.MatchTransport.SteamP2P;
+            ResetServerClockState();
             _steamDescriptor = descriptor;
             _steamFailureReported = false;
             _steamEverAdmitted = false;
@@ -251,6 +280,8 @@ namespace SlopArena.Client.Network
             {
                 FailSteamTransport($"Steam networking initialization failed: {exception.Message}");
             }
+            _clockReceived = false;
+            _nextBootstrapAt = 0;
         }
 
         // ── Send / Receive ──
@@ -270,14 +301,12 @@ namespace SlopArena.Client.Network
             }
             if (_transport != UI.MatchTransport.DevelopmentUdp || _udp == null) return;
 
-            int bufSize = 8 + 4 + InputState.Size;
-            byte[] buf = new byte[bufSize];
-            BinaryPrimitives.WriteUInt64LittleEndian(buf.AsSpan(0, 8), _entityId);
-            BinaryPrimitives.WriteUInt32LittleEndian(buf.AsSpan(8, 4), tick);
-            input.Write(buf.AsSpan(12));
+            BinaryPrimitives.WriteUInt64LittleEndian(_udpInputFrame.AsSpan(0, 8), _entityId);
+            BinaryPrimitives.WriteUInt32LittleEndian(_udpInputFrame.AsSpan(8, 4), tick);
+            input.Write(_udpInputFrame.AsSpan(12));
             try
             {
-                _udp.Send(buf, buf.Length, _serverEp);
+                _udp.Send(_udpInputFrame, _udpInputFrame.Length, _serverEp);
             }
             catch (Exception ex)
             {
@@ -289,6 +318,71 @@ namespace SlopArena.Client.Network
                 Interlocked.Exchange(ref _lastPingReceivedAt, 0);
             }
         }
+
+        public void ReceiveControlPackets(List<ControlFrame> destination)
+        {
+            if (destination == null) throw new ArgumentNullException(nameof(destination));
+            destination.Clear();
+            while (_controlQueue.TryDequeue(out var frame))
+            {
+                if (frame.Packet.EntityId == _entityId && frame.Packet.Tick >= LastServerTick)
+                {
+                    LastServerTick = frame.Packet.Tick;
+                    _latestServerStartTick = frame.Packet.StartTick;
+                }
+                destination.Add(frame);
+            }
+        }
+        public void SendReady()
+        {
+            if (_readyGeneration != ConnectionGeneration)
+            {
+                _readyGeneration = ConnectionGeneration;
+                _nextReadyAt = 0;
+            }
+            long now = Stopwatch.GetTimestamp();
+            if (now < _nextReadyAt) return;
+            _nextReadyAt = now + Stopwatch.Frequency / 2;
+            SendControl(new NetplayControlPacket(
+                NetplayControlKind.Ready, _entityId, LastServerTick, _latestServerStartTick));
+        }
+
+        private void ResetServerClockState()
+        {
+            LastServerTick = 0;
+            _latestServerStartTick = 0;
+            _readyGeneration = -1;
+            _nextReadyAt = 0;
+        }
+
+        private void SendControl(NetplayControlPacket packet)
+        {
+            if (!packet.IsValid) return;
+            if (_transport == UI.MatchTransport.SteamP2P)
+            {
+                if (!_steamAdmitted || !_hasSteamConnection || _steamResultReceived) return;
+                _steamControlFrame[0] = SteamGameplayWire.Control;
+                packet.Serialize(_steamControlFrame.AsSpan(1));
+                SendSteamFrame(_steamControlFrame, _steamControlFrame.Length, Constants.k_nSteamNetworkingSend_Reliable);
+                return;
+            }
+            if (_transport != UI.MatchTransport.DevelopmentUdp || _udp == null) return;
+            packet.Serialize(_udpControlFrame);
+            try { _udp.Send(_udpControlFrame, _udpControlFrame.Length, _serverEp); }
+            catch (SocketException) { _connected = false; }
+        }
+
+
+        private void EnqueueControl(ReadOnlySpan<byte> payload)
+        {
+            if (!NetplayControlPacket.TryDeserialize(payload, out var packet)) return;
+            double now = MonotonicSeconds;
+            double rtt = LastPingMilliseconds ?? 0;
+            _controlQueue.Enqueue(new ControlFrame(packet, now, rtt));
+            if (packet.Kind == NetplayControlKind.Clock && packet.EntityId == _entityId)
+                _clockReceived = true;
+        }
+
 
         private bool SendSteamFrame(byte[] frame, int length, int sendFlags)
         {
@@ -321,7 +415,7 @@ namespace SlopArena.Client.Network
             while (_receivedQueue.TryDequeue(out var entry))
             {
                 result.Add(entry);
-                LastServerTick = entry.Tick;
+                if (entry.Tick > LastServerTick) LastServerTick = entry.Tick;
             }
             return result;
         }
@@ -412,8 +506,11 @@ namespace SlopArena.Client.Network
                         continue;
                     }
 
-                    // State envelopes are a strict protocol cutover. Ignore malformed,
-                    // truncated, or unsupported-version datagrams without killing receive.
+                    if (buf.Length == NetplayControlPacket.Size)
+                    {
+                        EnqueueControl(buf);
+                        continue;
+                    }
                     if (buf.Length != ServerEntityPacket.NoInputSize &&
                         buf.Length != ServerEntityPacket.MaxSize)
                         continue;
@@ -423,15 +520,9 @@ namespace SlopArena.Client.Network
                         Interlocked.Exchange(ref _lastServerPacketAt, Stopwatch.GetTimestamp());
                         _connected = true;
                     }
-                    catch (ArgumentException)
-                    {
-                        continue;
+                    catch (ArgumentException) { continue; }
+                    catch (InvalidDataException) { continue; }
                     }
-                    catch (InvalidDataException)
-                    {
-                        continue;
-                    }
-                }
                 catch
                 {
                     if (_running) break;
@@ -583,6 +674,7 @@ namespace SlopArena.Client.Network
             }
             if (count < 0)
             {
+
                 HandleSteamConnectionLoss($"Steam receive failed ({count}).");
                 return;
             }
@@ -625,6 +717,7 @@ namespace SlopArena.Client.Network
                     FailSteamTransport($"GameHost acknowledged entity {entityId}, expected {_entityId}.");
                     return;
                 }
+                ConnectionGeneration++;
                 _steamAdmitted = true;
                 _steamEverAdmitted = true;
                 _steamReconnectDelaySeconds = 1;
@@ -639,9 +732,15 @@ namespace SlopArena.Client.Network
             }
             if (!_steamAdmitted || frame.Length <= 1)
                 return;
-
             var payload = frame.Slice(1);
+            if (frame[0] == SteamGameplayWire.Control)
+            {
+                if (payload.Length == NetplayControlPacket.Size)
+                    EnqueueControl(payload);
+                return;
+            }
             switch (frame[0])
+
             {
                 case SteamGameplayWire.State:
                     if (payload.Length != ServerEntityPacket.NoInputSize &&
@@ -707,6 +806,8 @@ namespace SlopArena.Client.Network
             _steamRemoteVerified = false;
             _connected = false;
             Interlocked.Exchange(ref _lastPingReceivedAt, 0);
+            _clockReceived = false;
+            _nextBootstrapAt = 0;
             ClearTransientReceiveQueues();
             if (_steamResultReceived)
                 return;
@@ -739,6 +840,7 @@ namespace SlopArena.Client.Network
             while (_projectileVisualQueue.TryDequeue(out _)) { }
             while (_matchResultQueue.TryDequeue(out _)) { }
             while (_swordTrailQueue.TryDequeue(out _)) { }
+            while (_controlQueue.TryDequeue(out _)) { }
         }
         private void ClearTransientReceiveQueues()
         {
@@ -746,6 +848,7 @@ namespace SlopArena.Client.Network
             while (_presentationEventQueue.TryDequeue(out _)) { }
             while (_projectileVisualQueue.TryDequeue(out _)) { }
             while (_swordTrailQueue.TryDequeue(out _)) { }
+            while (_controlQueue.TryDequeue(out _)) { }
         }
 
         // ── Socket retry ──
@@ -769,6 +872,12 @@ namespace SlopArena.Client.Network
         {
             if (_transport == UI.MatchTransport.SteamP2P)
             {
+                long steamNow = Stopwatch.GetTimestamp();
+                if (_steamAdmitted && !_clockReceived && steamNow >= _nextBootstrapAt)
+                {
+                    SendControl(new NetplayControlPacket(NetplayControlKind.Bootstrap, _entityId, 0, 0));
+                    _nextBootstrapAt = steamNow + Stopwatch.Frequency / 2;
+                }
                 UpdateSteam();
                 return;
             }
@@ -780,6 +889,11 @@ namespace SlopArena.Client.Network
                 StartReceiveThread();
             }
             long now = Stopwatch.GetTimestamp();
+            if (!_clockReceived && now >= _nextBootstrapAt)
+            {
+                SendControl(new NetplayControlPacket(NetplayControlKind.Bootstrap, _entityId, 0, 0));
+                _nextBootstrapAt = now + Stopwatch.Frequency / 2;
+            }
             long lastPingAt = Interlocked.Read(ref _lastPingReceivedAt);
             if (lastPingAt != 0 && ElapsedSeconds(lastPingAt, now) > 3)
             {

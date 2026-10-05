@@ -10,6 +10,32 @@ namespace SlopArena.Shared;
 /// </summary>
 public static class HitboxGeometry
 {
+    /// <summary>Rotate a yaw-resolved world point around the simulation hip pivot.</summary>
+    /// <remarks>Positive pitch raises points in front of the fighter; facing yaw selects forward.</remarks>
+    public static void ApplyAttackPosePitch(
+        in CharacterState state, CharacterDefinition def,
+        ref float worldX, ref float worldY, ref float worldZ)
+    {
+        float pitch = state.AttackPosePitch;
+        if (pitch == 0f) return;
+
+        float pivotY = def.BoneYToWorldY(state.PY, 0f);
+        float dx = worldX - state.PX;
+        float dy = worldY - pivotY;
+        float dz = worldZ - state.PZ;
+        float sinYaw = MathF.Sin(state.FacingYaw);
+        float cosYaw = MathF.Cos(state.FacingYaw);
+        float forward = dx * sinYaw + dz * cosYaw;
+        float right = dx * cosYaw - dz * sinYaw;
+        float sinPitch = MathF.Sin(pitch);
+        float cosPitch = MathF.Cos(pitch);
+        float pitchedForward = forward * cosPitch - dy * sinPitch;
+        float pitchedY = forward * sinPitch + dy * cosPitch;
+        worldX = state.PX + right * cosYaw + pitchedForward * sinYaw;
+        worldY = pivotY + pitchedY;
+        worldZ = state.PZ - right * sinYaw + pitchedForward * cosYaw;
+    }
+
     /// <summary>
     /// Resolve a hitbox's world-space start/end positions.
     /// When evt.BoneName is set and baked data is available, positions at the bone's
@@ -85,7 +111,12 @@ public static class HitboxGeometry
             wey = wy + evt.EndOffY;
             wez = wz + ((-evt.EndOffX * sin) + (evt.EndOffZ * cos));
         }
-    }
+        if (s.AttackPosePitch != 0f && def != null)
+        {
+            ApplyAttackPosePitch(in s, def, ref wx, ref wy, ref wz);
+            ApplyAttackPosePitch(in s, def, ref wex, ref wey, ref wez);
+        }
+        }
 
     /// <summary>
     /// Resolve a baked point's world position for a bone name: scan the bake's

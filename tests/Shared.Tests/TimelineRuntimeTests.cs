@@ -74,6 +74,42 @@ public sealed class TimelineRuntimeTests
     }
 
     [Fact]
+    public void AerialAuthoringSuspendsAmbientGravityButPreservesAuthoredVelocity()
+    {
+        var slot = new CookedSlotDefinition(8, "air.1", true, "Test", "Test", "icon.test",
+            AuthoringAbilityBehavior.MeleeCombo, AuthoringAimMode.None, 0, false, false,
+            new CookedTimeline(new[]
+            {
+                new CookedStage(100, 0, 0, 0, 0, Array.Empty<string>(), Array.Empty<CookedTimelineOperation>()),
+            }));
+        var initial = TestHelpers.PlayerState() with { PY = 20f, IsGrounded = false };
+        var (sim, def) = Create(slot, initial);
+        sim.NoGravityEntityId = 1;
+        sim.RegisterEntity(2, def, initial with { EntityId = 2, PX = 10f });
+        sim.ActivateAbility(1, new CookedTimelineAbility(slot, Array.Empty<string>()), 2, def);
+        var inputs = new Dictionary<ulong, InputState> { [1] = default, [2] = default };
+
+        for (int tick = 0; tick < 44; tick++)
+            sim.Tick(inputs);
+        TestHelpers.AssertNear(20f, sim.GetState(1).PY);
+        TestHelpers.AssertNear(0f, sim.GetState(1).VY);
+        Assert.True(sim.GetState(2).PY < 20f);
+        Assert.True(sim.GetState(2).VY < 0f);
+
+        var launch = Slot(4,
+            new CookedSetVelocityOperation(0, AuthoringUnit.MetersPerSecond, AuthoringVelocityMode.Absolute, 0f, 3f, 0f));
+        sim.ActivateAbility(1, new CookedTimelineAbility(launch, Array.Empty<string>()), 2, def);
+        for (int tick = 0; tick < 5; tick++)
+            sim.Tick(inputs);
+        TestHelpers.AssertNear(3f, sim.GetState(1).VY);
+        Assert.True(sim.GetState(1).PY > 20f);
+
+        sim.NoGravityEntityId = null;
+        sim.Tick(inputs);
+        Assert.True(sim.GetState(1).VY < 3f);
+    }
+
+    [Fact]
     public void GravityWindowScalesAirGravityForItsDurationThenRestoresIt()
     {
         var slot = Slot(6, new CookedGravityWindowOperation(0, AuthoringUnit.Normalized, 0.5f, 2));
@@ -482,6 +518,274 @@ public sealed class TimelineRuntimeTests
     }
 
 
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void StartupCorrectionUsesCurrentSelectionAndLockNeverBypassesRate(bool locked)
+    {
+        var slot = CorrectionSlot(6);
+        var initial = TestHelpers.PlayerState() with
+        {
+            PY = TestHelpers.EngineDef.CapsuleHeight * .5f,
+            LockOn = locked,
+            TargetEntityId = 100,
+        };
+        var (sim, def) = Create(slot, initial);
+        sim.RegisterEntity(100, def, initial with { EntityId = 100, PX = -1.5f, PZ = 2.5f, LockOn = false });
+        sim.RegisterEntity(101, def, initial with { EntityId = 101, PX = 1.5f, PZ = 2.5f, LockOn = false });
+        sim.Tick(new() { [1] = new InputState { ActiveSlot = AbilitySlots.Slot1, TargetEntityId = 101 } });
+        var state = sim.GetState(1);
+        Assert.Equal(locked ? 100UL : 101UL, state.AttackCorrectionTargetId);
+        TestHelpers.AssertNear((locked ? -1f : 1f) * MathF.PI / 30f, state.FacingYaw, 1e-5f);
+        Assert.True(state.AttackCorrectionActive);
+    }
+
+    [Theory]
+    [InlineData("fightguy", false)]
+    [InlineData("fightguy", true)]
+    [InlineData("manki", false)]
+    [InlineData("manki", true)]
+    [InlineData("bonk", false)]
+    [InlineData("bonk", true)]
+    [InlineData("wibou", false)]
+    [InlineData("wibou", true)]
+    public void AuthoredNormalsHonorSideAndRearTargetsWithoutExceedingStartupTurn(string package, bool locked)
+    {
+        string directory = RepoFile($"client/Unity/Assets/CharacterPackages/{package}");
+        var compiled = CharacterPackageCompiler.Compile(
+            File.ReadAllText(Path.Combine(directory, "package.json")),
+            File.ReadAllText(Path.Combine(directory, "character.json")),
+            CharacterCookProfile.TrustedBuiltIn);
+        Assert.NotNull(compiled.CookedPackage);
+        var def = CookedCharacterRuntimeAdapter.ToCharacterDefinition(compiled.CookedPackage!);
+        var directions = new[] { (X: 2.5f, Z: 0f), (X: -2.5f, Z: 0f), (X: 0f, Z: -2.5f) };
+        foreach (var slot in def.CookedSlots!.Where(slot => slot.Ordinal % 8 < 4))
+        foreach (var direction in directions)
+        {
+            var profile = slot.Timeline.Stages.SelectMany(stage => stage.Operations)
+                .OfType<CookedStartupAimCorrectionOperation>().Single();
+            var initial = TestHelpers.PlayerState() with
+            {
+                PX = 0f, PY = def.CapsuleHeight * .5f, PZ = 0f, FacingYaw = 0f,
+                IsGrounded = !slot.IsAir, LockOn = locked, TargetEntityId = locked ? 100UL : 0UL,
+            };
+            var sim = TestHelpers.MakeSim();
+            sim.RegisterEntity(1, def, initial);
+            sim.RegisterEntity(100, def, TestHelpers.NpcState(direction.X, direction.Z)
+                with { PY = initial.PY });
+            sim.RegisterEntity(101, def, TestHelpers.NpcState(0f, 1f) with { PY = initial.PY });
+            byte wireSlot = (byte)((slot.Ordinal % 8) switch { 0 => 3, 1 => 7, 2 => 8, _ => 9 });
+            sim.ActivateAbility(1, new CookedTimelineAbility(slot, Array.Empty<string>()), wireSlot, def,
+                activationInput: new InputState { TargetEntityId = locked ? (byte)101 : (byte)100 });
+            Assert.Equal(100UL, sim.GetState(1).AttackCorrectionTargetId);
+
+            float step = profile.YawDegreesPerSecond * MathF.PI / 180f / 60f;
+            float limit = profile.MaxYawDegrees * MathF.PI / 180f;
+            float previousYaw = 0f;
+            for (int tick = 1; tick < profile.EndTick; tick++)
+            {
+                sim.TickAbilities(new());
+                var state = sim.GetState(1);
+                Assert.Equal(100UL, state.AttackCorrectionTargetId);
+                Assert.InRange(MathF.Abs(state.FacingYaw - previousYaw), 0f, step + 1e-5f);
+                Assert.InRange(MathF.Abs(state.FacingYaw), 0f, limit + 1e-5f);
+                previousYaw = state.FacingYaw;
+            }
+            float expected = MathF.Min(limit, step * (profile.EndTick - 1));
+            TestHelpers.AssertNear(direction.X < 0f ? -expected : expected, previousYaw, 1e-5f);
+            sim.TickAbilities(new());
+            Assert.False(sim.GetState(1).AttackCorrectionActive);
+            Assert.Equal(previousYaw, sim.GetState(1).FacingYaw);
+        }
+    }
+
+    [Fact]
+    public void StartupCorrectionFiltersAcquisitionAndDoesNotAcquireAfterAnEmptyStart()
+    {
+        var slot = CorrectionSlot(6);
+        var (sim, def) = Create(slot);
+        sim.RegisterEntity(100, def, TestHelpers.NpcState(0f, -2f));
+        sim.RegisterEntity(101, def, TestHelpers.NpcState(3f, 0f));
+        sim.RegisterEntity(102, def, TestHelpers.NpcState(0f, 5f));
+        sim.ActivateAbility(1, new CookedTimelineAbility(slot, Array.Empty<string>()), 2, def,
+            activationInput: new InputState { TargetEntityId = 100 });
+        Assert.Equal(0UL, sim.GetState(1).AttackCorrectionTargetId);
+        sim.RegisterEntity(103, def, TestHelpers.NpcState(1f, 3f));
+        sim.TickAbilities(new());
+        Assert.Equal(0f, sim.GetState(1).FacingYaw);
+        Assert.False(sim.GetState(1).AttackCorrectionActive);
+    }
+
+    [Fact]
+    public void StartupCorrectionCommitsBeforeActiveAndDoesNotReopenBetweenHits()
+    {
+        var slot = CorrectionSlot(4);
+        var (sim, def) = Create(slot);
+        sim.RegisterEntity(100, def, TestHelpers.NpcState(1.5f, 2.5f));
+        sim.ActivateAbility(1, new CookedTimelineAbility(slot, Array.Empty<string>()), 2, def);
+        for (int i = 0; i < 3; i++) sim.TickAbilities(new());
+        var beforeActive = sim.GetState(1);
+        TestHelpers.AssertNear(MathF.PI / 10f, beforeActive.FacingYaw, 1e-5f);
+        var crossed = sim.GetState(100) with { PX = -1.5f };
+        sim.SetState(100, crossed);
+        sim.RegisterEntity(101, def, TestHelpers.NpcState(-.5f, 2f));
+        for (int i = 0; i < 5; i++)
+        {
+            sim.TickAbilities(new() { [1] = new InputState { TargetEntityId = 101, ToggleLock = true } });
+            Assert.Equal(beforeActive.FacingYaw, sim.GetState(1).FacingYaw);
+            Assert.Equal(100UL, sim.GetState(1).AttackCorrectionTargetId);
+            Assert.False(sim.GetState(1).AttackCorrectionActive);
+        }
+        Assert.Equal(2, sim.Resolver.GetActiveHitboxes().Count);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void StartupCorrectionInvalidationIsPermanentEvenIfTargetReturns(bool respawned)
+    {
+        var slot = CorrectionSlot(10);
+        var (sim, def) = Create(slot);
+        sim.RegisterEntity(100, def, TestHelpers.NpcState(1f, 3f));
+        sim.ActivateAbility(1, new CookedTimelineAbility(slot, Array.Empty<string>()), 2, def);
+        sim.TickAbilities(new());
+        float yaw = sim.GetState(1).FacingYaw;
+        var target = sim.GetState(100);
+        sim.SetState(100, target with { PX = respawned ? target.PX : 10f, Deaths = (byte)(respawned ? 1 : 0) });
+        sim.TickAbilities(new());
+        sim.SetState(100, target with { PX = -1f });
+        sim.TickAbilities(new());
+        Assert.False(sim.GetState(1).AttackCorrectionActive);
+        Assert.Equal(yaw, sim.GetState(1).FacingYaw);
+        Assert.Equal(100UL, sim.GetState(1).AttackCorrectionTargetId);
+    }
+
+    [Theory]
+    [InlineData(1f)]
+    [InlineData(2f)]
+    public void StartupCorrectionUsesSizeScaledTorsoRatherThanTargetHip(float targetHeight)
+    {
+        var slot = CorrectionSlot(8, pitch: 15f);
+        var initial = TestHelpers.PlayerState() with { IsGrounded = false, PY = 3f };
+        var (sim, def) = Create(slot, initial);
+        var targetDef = TestHelpers.EngineDef;
+        targetDef.CapsuleHeight = targetHeight;
+        targetDef.HipHeight = targetHeight / 2f;
+        sim.RegisterEntity(100, targetDef, initial with { EntityId = 100, PZ = 2.5f });
+        sim.ActivateAbility(1, new CookedTimelineAbility(slot, Array.Empty<string>()), 2, def);
+        for (int tick = 0; tick < 4; tick++) sim.TickAbilities(new());
+
+        TestHelpers.AssertNear(MathF.Atan2(targetHeight * .25f, 2.5f),
+            sim.GetState(1).AttackPosePitch, 1e-5f);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void DelayedCorrectionCapturesAtActivationAndCannotReacquireAfterInvalidation(bool leavesRange)
+    {
+        var slot = Slot(12,
+            new CookedStartupAimCorrectionOperation(3, AuthoringUnit.Ticks, 5, 4f, 60f, 45f, 0f, 360f, 0f),
+            new CookedSpawnHitboxOperation(5, AuthoringUnit.Meters, Hitbox(5, 1)));
+        var (sim, def) = Create(slot);
+        var target = TestHelpers.NpcState(1f, 2.5f);
+        sim.RegisterEntity(100, def, target);
+        sim.ActivateAbility(1, new CookedTimelineAbility(slot, Array.Empty<string>()), 2, def);
+        Assert.Equal(100UL, sim.GetState(1).AttackCorrectionTargetId);
+        Assert.True(sim.GetState(1).AttackCorrectionOwned);
+        sim.RegisterEntity(101, def, TestHelpers.NpcState(-1f, 2f));
+        sim.SetState(1, sim.GetState(1) with { LockOn = true, TargetEntityId = 101 });
+        if (leavesRange) sim.SetState(100, target with { PX = 10f });
+        sim.TickAbilities(new());
+        sim.SetState(100, target);
+        sim.TickAbilities(new());
+        Assert.Equal(0f, sim.GetState(1).FacingYaw);
+        sim.TickAbilities(new());
+        Assert.Equal(100UL, sim.GetState(1).AttackCorrectionTargetId);
+        TestHelpers.AssertNear(leavesRange ? 0f : MathF.PI / 30f, sim.GetState(1).FacingYaw, 1e-5f);
+        sim.TickAbilities(new());
+        float committed = sim.GetState(1).FacingYaw;
+        sim.TickAbilities(new());
+        Assert.False(sim.GetState(1).AttackCorrectionActive);
+        Assert.Equal(committed, sim.GetState(1).FacingYaw);
+    }
+
+    [Fact]
+    public void StartupCorrectionCapsDeflectionAndNeverSwitchesToACloserTarget()
+    {
+        var slot = CorrectionSlot(18);
+        var (sim, def) = Create(slot);
+        sim.RegisterEntity(100, def, TestHelpers.NpcState(1.5f, 2.5f));
+        sim.ActivateAbility(1, new CookedTimelineAbility(slot, Array.Empty<string>()), 2, def);
+        sim.SetState(100, sim.GetState(100) with { PX = 3f, PZ = .2f });
+        sim.RegisterEntity(101, def, TestHelpers.NpcState(-1f, 2f));
+        for (int i = 0; i < 12; i++) sim.TickAbilities(new() { [1] = new InputState { TargetEntityId = 101 } });
+        TestHelpers.AssertNear(MathF.PI / 4f, sim.GetState(1).FacingYaw, 1e-5f);
+        Assert.Equal(100UL, sim.GetState(1).AttackCorrectionTargetId);
+    }
+
+    [Fact]
+    public void StartupCorrectionFreezesWithHitstopAndClearsOnInterruptionAndRestart()
+    {
+        var slot = CorrectionSlot(8, pitch: 15f);
+        var initial = TestHelpers.PlayerState() with { IsGrounded = false, PY = 3f, VX = 2f, VY = 1f };
+        var (sim, def) = Create(slot, initial);
+        sim.RegisterEntity(100, def, initial with { EntityId = 100, PX = 1f, PY = 4f, PZ = 2.5f });
+        sim.ActivateAbility(1, new CookedTimelineAbility(slot, Array.Empty<string>()), 2, def);
+        sim.TickAbilities(new());
+        var corrected = sim.GetState(1);
+        TestHelpers.AssertNear(MathF.PI / 60f, corrected.AttackPosePitch, 1e-5f);
+        Assert.Equal(initial.VX, corrected.VX);
+        Assert.Equal(initial.VY, corrected.VY);
+        sim.SetState(1, corrected with { HitstopTicks = 2 });
+        sim.TickAbilities(new());
+        Assert.Equal(corrected.FacingYaw, sim.GetState(1).FacingYaw);
+        Assert.Equal(corrected.AttackPosePitch, sim.GetState(1).AttackPosePitch);
+        sim.SetState(1, sim.GetState(1) with { HitstopTicks = 0, State = ActionState.Hitstun });
+        sim.TickAbilities(new());
+        Assert.Equal(0f, sim.GetState(1).AttackPosePitch);
+        Assert.False(sim.GetState(1).AttackCorrectionOwned);
+        Assert.Equal(0UL, sim.GetState(1).AttackCorrectionTargetId);
+        sim.SetState(1, initial with { FacingYaw = 0f });
+        sim.SetState(100, sim.GetState(100) with { PX = -1f });
+        sim.ActivateAbility(1, new CookedTimelineAbility(slot, Array.Empty<string>()), 2, def);
+        sim.TickAbilities(new());
+        Assert.True(sim.GetState(1).FacingYaw < 0f);
+        Assert.Equal(100UL, sim.GetState(1).AttackCorrectionTargetId);
+    }
+
+    [Fact]
+    public void StartupCorrectionSupportsEarlierSpecialLaunchAndProjectileIgnoresLaterCameraAim()
+    {
+        var projectile = new CookedProjectile(0f, 1f, 0f, 30f, 0f, .2f, 3f, 20f, 2f, 4f, 5, 30);
+        var timeline = Slot(12,
+            new CookedStartupAimCorrectionOperation(0, AuthoringUnit.Ticks, 3, 4f, 60f, 45f, 0f, 360f, 0f),
+            new CookedForwardLungeOperation(3, AuthoringUnit.MetersPerSecond, 6f, 2),
+            new CookedSpawnProjectileOperation(5, AuthoringUnit.Meters, projectile));
+        var slot = new CookedSlotDefinition(4, "ground.A", false, "Launch", "Launch", "icon.test",
+            AuthoringAbilityBehavior.AimedProjectile, AuthoringAimMode.CameraForward3D, 0, false, false, timeline.Timeline);
+        var (sim, def) = Create(slot);
+        sim.RegisterEntity(100, def, TestHelpers.NpcState(1.5f, 2.5f));
+        sim.ActivateAbility(1, new CookedTimelineAbility(slot, Array.Empty<string>()), (byte)(AbilitySlots.A - 1), def);
+        for (int i = 0; i < 3; i++) sim.TickAbilities(new());
+        var launch = sim.GetState(1);
+        TestHelpers.AssertNear(MathF.PI / 15f, launch.FacingYaw, 1e-5f);
+        TestHelpers.AssertNear(6f * MathF.Sin(launch.FacingYaw), launch.VX, 1e-5f);
+        sim.SetState(1, launch with { AimYaw = -MathF.PI / 2f });
+        sim.SetState(100, sim.GetState(100) with { PX = -1.5f });
+        sim.TickAbilities(new());
+        sim.TickAbilities(new());
+        var fired = Assert.Single(sim.Resolver.GetActiveHitboxes());
+        TestHelpers.AssertNear(30f * MathF.Sin(launch.FacingYaw), fired.VX, 1e-5f);
+        TestHelpers.AssertNear(30f * MathF.Cos(launch.FacingYaw), fired.VZ, 1e-5f);
+    }
+
+    private static CookedSlotDefinition CorrectionSlot(ushort endTick, float pitch = 0f)
+        => Slot((ushort)(endTick + 10),
+            new CookedStartupAimCorrectionOperation(0, AuthoringUnit.Ticks, endTick, 4f, 60f, 45f, pitch, 360f, 180f),
+            new CookedSpawnHitboxOperation(endTick, AuthoringUnit.Meters, Hitbox(endTick, 1)),
+            new CookedSpawnHitboxOperation((ushort)(endTick + 3), AuthoringUnit.Meters, Hitbox((ushort)(endTick + 3), 1)));
 
     private static CookedSlotDefinition Slot(ushort duration, params CookedTimelineOperation[] operations)
         => new(0, "ground.1", false, "Test", "Test", "icon.test", AuthoringAbilityBehavior.MeleeCombo,

@@ -154,6 +154,16 @@ public sealed record CharacterStageSource(
     bool RotateTowardTarget = false,
     float TrackingStrength = 0f);
 
+public sealed record StartupAimCorrectionOperationSource(
+    ushort Tick,
+    AuthoringUnit Unit,
+    ushort EndTick,
+    float AcquisitionRange,
+    float AcquisitionHalfAngleDegrees,
+    float MaxYawDegrees,
+    float MaxPitchDegrees,
+    float YawDegreesPerSecond,
+    float PitchDegreesPerSecond) : CharacterTimelineOperationSource(Tick, Unit);
 public abstract record CharacterTimelineOperationSource(ushort Tick, AuthoringUnit Unit);
 
 public sealed record SetVelocityOperationSource(

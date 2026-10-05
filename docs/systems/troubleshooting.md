@@ -1,9 +1,10 @@
 # Troubleshooting — SlopArena Online (master + game server + client)
 
-Operational debugging guide for the self-hosted setup on `alfred`. Companion
-to `docs/systems/production-hosting.md` (runbook — the what/where/how) — this
-doc is the "it's broken, where do I look" playbook. Every entry below was hit
-for real (2026-08-02, first deploy + playtest).
+Operational debugging guide for the historical home setup on `alfred`. Companion
+to [Production Hosting](production-hosting.md). The current Steam Playtest uses
+the separate VPS: start with [Release Pipeline](release-pipeline.md) and the
+[VPS runbook](../../deploy/vps/README.md), not the home public-UDP recipes below.
+The historical failure entries originated in the 2026-08-02 home playtest.
 
 ## 0. Where the logs live
 
@@ -36,6 +37,21 @@ timeout 8 bash -c 'echo > /dev/tcp/<public-ip>/7777' && echo "public OK" # hairp
 # 5. Client log tail — the actual player experience
 tail -40 ~/.local/share/Steam/steamapps/compatdata/<appid>/pfx/drive_c/users/steamuser/AppData/LocalLow/SlopArena/SlopArena/Player.log
 ```
+
+## Projectile aim diverges after camera turns
+
+Yaw is a circular direction, not a value to saturate at the signed-short limit.
+Human input must normalize both facing and aim yaw before encoding signed
+centidegrees; resolve an active ability's aim override before that conversion.
+For example, camera yaw 450° must arrive as 90°, not 327.67°. Pitch retains its
+separate ±90° clamp, and the packet layout does not change.
+
+Run `Tools/SlopArena/Tests/Training Sequence Parser` in the Editor for the human
+input/wire regression. For visual acceptance, hold Manki R (controller LB+X /
+Square), turn the aim camera through full rotations in both directions, and
+release: the rocket should follow the camera, including vertical aim. Updating
+source does not update the installed Steam player; use the approved release
+pipeline before retesting the published build.
 
 ## 2. Failure catalog
 
@@ -92,17 +108,18 @@ do not restart it solely because Master restarted.
 1. Missing **Windows Build Support (Mono)** module on Linux editors: `ls Editor/Data/PlaybackEngines/` lacks `WindowsStandaloneSupport`. Fix: `/opt/unityhub/unityhub-bin -- --headless install-modules --version 6000.0.78f1 -m windows-mono`.
 2. Editor-only API in runtime scripts: `UnityEditor.Handles` in `OnDrawGizmos` (fixed with `#if UNITY_EDITOR`). Grep for `UnityEditor\.` in `Assets/Scripts/Runtime/` before release builds.
 
-**Note:** `dotnet build` does NOT compile Unity scripts — always validate with a Unity batchmode import (`-batchmode -quit -nographics`) or the player build itself.
+**Note:** `dotnet build` does not compile Unity scripts. Use the authorized native gateway build/compile path for an open Editor; standalone batchmode requires a separately authorized, confirmed-closed project. Never close another owner's Editor to clear a lock. See [Unity CLI](../contributing/unity-cli.md).
 
-### 2.7 Version stamp / PipelineAsset drift after a failed build
+### 2.7 Saved settings / staging after a failed release build
 
-`build-release.sh` stamps `bundleVersion` before the Unity build and reverts it after. If Unity fails, the tree is left dirty: `ProjectSettings.asset` stamped + `StreamingAssets/` staged + PipelineAsset/URP settings re-serialized. Clean with:
-```bash
-git checkout -- client/Unity/ProjectSettings/ProjectSettings.asset \
-  client/Unity/Assets/Settings client/Unity/Assets/UniversalRenderPipelineGlobalSettings.asset
-rm -rf client/Unity/Assets/StreamingAssets/Server client/Unity/Assets/StreamingAssets/arenas \
-  client/Unity/Assets/StreamingAssets.meta client/Unity/Assets/packages-merged-link*
-```
+`build-release.sh` saves the existing `ProjectSettings.asset` bytes and
+StreamingAssets directories before staging. Its EXIT trap restores those saved
+inputs on normal success or failure; it refuses unstaged settings edits and does
+not restore settings from Git. A forced termination can prevent the trap from
+running: first prove the process has stopped, then recover only that run's
+`build/.release-stage.*` backup. Unity may separately re-serialize assets outside
+the saved inputs. Compare against the pre-build snapshot and preserve unrelated
+changes; never blanket-reset settings or delete StreamingAssets/meta files.
 
 ### 2.8 `localhost:5000` leak in the release zip
 

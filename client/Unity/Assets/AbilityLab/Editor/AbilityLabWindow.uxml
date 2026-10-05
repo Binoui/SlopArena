@@ -25,7 +25,7 @@
         <ui:VisualElement name="move-list" class="move-list" />
       </ui:VisualElement>
       <ui:VisualElement name="moves-content" class="moves-content">
-        <ui:Foldout name="scenario-controls" text="Shared scenario" value="true" class="scenario-controls">
+        <ui:Foldout name="scenario-controls" text="Shared scenario" value="false" class="scenario-controls">
           <ui:Label name="scenario-action" text="Action: —" />
           <ui:FloatField name="scenario-distance" label="Opponent distance (m)" value="2.5" />
           <ui:FloatField name="scenario-facing" label="Opponent relative facing (°)" value="180" />
@@ -41,9 +41,15 @@
         <ui:DropdownField name="authoring-phase" label="Preview" />
         <ui:Label name="authoring-phase-clip" text="Timeline preview" />
 
-        <ui:ScrollView name="inspector" class="inspector">
-          <ui:DropdownField name="stage-selector" label="Stage" />
-        </ui:ScrollView>
+        <ui:VisualElement class="fields-toolbar">
+          <ui:Label text="Moves fields" class="toolbar-label" />
+          <ui:Button name="detach-fields" text="Detach fields" />
+        </ui:VisualElement>
+        <ui:VisualElement name="fields-inline-host" class="fields-host">
+          <ui:ScrollView name="inspector" class="inspector">
+            <ui:DropdownField name="stage-selector" label="Inspect stage" />
+          </ui:ScrollView>
+        </ui:VisualElement>
         <ui:VisualElement name="move-timeline" class="move-timeline">
           <ui:VisualElement name="timeline-controls" class="timeline-controls">
             <ui:Label name="timeline-tick" text="Tick 0" />
@@ -51,9 +57,11 @@
             <ui:Button name="timeline-step-back" text="−1" />
             <ui:Button name="timeline-step-forward" text="+1" />
             <ui:SliderInt name="timeline-slider" low-value="0" high-value="1" value="0" />
+            <ui:IntegerField name="timeline-seek" label="Seek tick" value="0" is-delayed="true" class="timeline-seek" />
             <ui:Label name="timeline-duration" text="Duration —" />
             <ui:Slider name="timeline-zoom" low-value="0.5" high-value="4" value="1" label="Zoom" />
           </ui:VisualElement>
+          <ui:Label name="timeline-notice" class="timeline-notice" />
           <ui:ScrollView name="timeline-scroll" mode="Horizontal" class="timeline-scroll">
             <ui:VisualElement name="timeline-track" class="timeline-track" />
           </ui:ScrollView>

@@ -16,6 +16,7 @@ public static class SteamGameplayWire
     public const byte Result = 0x13;
     public const byte Projectile = 0x14;
     public const byte SwordTrail = 0x15;
+    public const byte Control = 0x16;
     public const int JoinSize = 1 + 36 + 2 + 64;
     public const int AckSize = 1 + 8;
 

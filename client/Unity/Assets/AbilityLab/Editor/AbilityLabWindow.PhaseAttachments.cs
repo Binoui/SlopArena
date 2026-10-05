@@ -66,9 +66,7 @@ public sealed partial class AbilityLabWindow
         _moveTimeline.style.display = DisplayStyle.Flex;
         _stageSelector.style.display = DisplayStyle.None;
         _timelineTrack.style.display = DisplayStyle.None;
-        _timelineSlider.lowValue = 0;
-        _timelineSlider.highValue = Mathf.Max(0, _lab.PhaseDurationTicks - 1);
-        _timelineSlider.SetValueWithoutNotify(_lab.PhaseTick);
+        SetTimelineRange(Mathf.Max(0, _lab.PhaseDurationTicks - 1), _lab.PhaseTick);
         bool valid = _lab.PhaseDurationTicks > 0;
         _timelineSlider.SetEnabled(valid);
         _timelinePlay.SetEnabled(valid);

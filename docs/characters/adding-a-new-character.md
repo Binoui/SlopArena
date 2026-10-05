@@ -120,6 +120,31 @@ feedback retain their existing behavior. Hit one-shots use the dispatcher's
 150-tick cleanup limit; tune particle size/color on the owned prefab and keep its
 emission finite.
 
+### Startup aim correction
+
+`startupAimCorrection` is an optional cooked timeline operation, reusable by any slot;
+only the current 32 normals opt in, and existing specials are unchanged. Capture occurs
+at ability activation (not first correction tick), using a valid selected/locked opponent
+inside the acquisition range/cone or the nearest eligible opponent there; distance ties
+break by entity ID. One target is retained for the activation and never switched. No target
+means no correction. `RetargetPressed` still selects the nearest valid enemy under its
+existing rule, independently of this captured target.
+
+The operation has stage-relative fields `tick`, `unit: "ticks"`, exclusive `endTick`,
+`acquisitionRange`, `acquisitionHalfAngleDegrees`, `maxYawDegrees`, `maxPitchDegrees`,
+`yawDegreesPerSecond`, and `pitchDegreesPerSecond`. `endTick` is after `tick`, within that
+stage, and no later than the earliest hitbox/projectile contact, forward lunge, or horizontal
+SetVelocity launch commitment; an earlier cutoff is valid. It bounds correction to startup:
+never active/recovery, no late acquisition or target switching, no physics pulling or
+trajectory changes. Hitstop freezes correction with the attack clock; invalidation closes
+the window. Completion, interruption and landing cancellation clear its pose/state.
+
+Current normals use 4 m range, 60° forward half-cone, at most 45° yaw at 360°/s.
+Pitch is at most 15° at 180°/s only for air.1/air.2 except Bonk air.2; other slots have
+zero pitch. The pivot is the simulation hip-height world point (`BoneYToWorldY(PY, 0)`),
+shared by model/collision/trails; opponent torso reference is `PY + 0.25 × targetCapsuleHeight`.
+Pose pitch does not change the physics capsule. These are authored tuning values, not
+balance claims.
 
 ## 4. Inspect before cook
 
@@ -156,10 +181,14 @@ matching source, cooked-content, package, payload, and dependency hashes. A fail
 returns semantic `success: false` and preserves the last valid artifact, generated cache,
 and cook status. It must not promote invalid drafts.
 
-Generated packages require runtime API `1.2.0` (maximum `1.x`); schema version remains 1
-for additive fields. The loader admits known minima `1.0.0`, `1.1.0`, and `1.2.0`.
-Runtime API 1.2.0 adds the timed gravity-window timeline operation. Older runtimes must
-reject packages that require it.
+Cooked schema version remains 3 and runtime API maximum is `1.x`. The loader accepts
+known minima `1.0.0` through `1.4.0`; select the lowest feature floor the authored content
+requires. `1.0.0` is the baseline, timed gravity-window operations require `1.2.0`, armor
+windows and nonzero `fixedHitstunTicks` require `1.3.0`, and `startupAimCorrection` requires
+`1.4.0`. A package combining features uses the highest required minimum; older runtimes
+must reject features above their API level. New additive source fields do not themselves
+change the cooked schema.
+
 Semantic animation IDs and pose-track IDs are distinct namespaces: validated client
 bindings map loaded pose tracks to runtime semantic lookup IDs.
 

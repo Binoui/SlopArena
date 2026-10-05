@@ -331,15 +331,37 @@ public sealed class CharacterPackageAssemblerTests
         Assert.Equal((0.5f, (ushort)5), (operation.GravityScale, operation.DurationTicks));
     }
     [Theory]
-    [InlineData("1.0.0", true)]
-    [InlineData("1.1.0", true)]
-    [InlineData("1.2.0", true)]
-    [InlineData("1.3.0", true)]
-    [InlineData("1.4.0", false)]
-    [InlineData("2.0.0", false)]
-    public void Loader_AdmitsOnlyKnownRuntimeMinimums(string minimum, bool supported)
+    [InlineData("1.0.0", false, true)]
+    [InlineData("1.1.0", false, true)]
+    [InlineData("1.2.0", false, true)]
+    [InlineData("1.3.0", false, true)]
+    [InlineData("1.4.0", false, true)]
+    [InlineData("2.0.0", false, false)]
+    [InlineData("1.0.0", true, false)]
+    [InlineData("1.3.0", true, false)]
+    [InlineData("1.4.0", true, true)]
+    public void Loader_EnforcesRuntimeMinimumAgainstFeatures(string minimum, bool startupCorrection, bool supported)
     {
-        var package = Compile();
+        string root = FindRepoFile("client/Unity/Assets/CharacterPackages/fightguy");
+        var character = JsonNode.Parse(File.ReadAllText(Path.Combine(root, "character.json")))!;
+        foreach (var slot in character["slots"]!.AsArray())
+        foreach (var stage in slot!["timeline"]!["stages"]!.AsArray())
+        {
+            var operations = stage!["operations"]!.AsArray();
+            for (int index = operations.Count - 1; index >= 0; index--)
+            {
+                var operation = operations[index]!;
+                string? kind = operation["kind"]?.GetValue<string>();
+                if (kind == "armorWindow" || !startupCorrection && kind == "startupAimCorrection")
+                    operations.RemoveAt(index);
+                else if (operation["hitbox"]?["fixedHitstunTicks"] is not null)
+                    operation["hitbox"]!["fixedHitstunTicks"] = 0;
+            }
+        }
+        var compiled = CharacterPackageCompiler.Compile(File.ReadAllText(Path.Combine(root, "package.json")),
+            character.ToJsonString(), CharacterCookProfile.TrustedBuiltIn);
+        Assert.NotNull(compiled.CookedPackage);
+        var package = compiled.CookedPackage!;
         var input = BuildInput(package, Array.Empty<PackageDependencySource>(),
             Array.Empty<CookedCapabilityRequirement>(), Array.Empty<CharacterDiagnostic>());
         var runtime = JsonNode.Parse(input.RuntimeBytes)!.AsObject();

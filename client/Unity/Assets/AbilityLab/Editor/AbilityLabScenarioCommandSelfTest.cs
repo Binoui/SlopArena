@@ -193,6 +193,35 @@ public static class AbilityLabScenarioCommandSelfTest
             if (!renderer.PlayScrubbedState(last.Actor, address.IsAirborne, last.ActorPoseTicks))
                 throw new InvalidOperationException("Recorded final pose is unavailable.");
             AssertMoved(recordedPose, "Recorded-frame scrub");
+
+            // Visual root offsets must not move the shared simulation hip pivot.
+            renderer.ModelYOffset = .2f;
+            var unpitched = first.Actor with { FacingYaw = .7f, AttackPosePitch = 0f };
+            renderer.PlayScrubbedState(unpitched, address.IsAirborne, first.ActorPoseTicks);
+            var worldBefore = bones.Select(bone => animator.GetBoneTransform(bone).position).ToArray();
+            Vector3 rootBefore = renderer.transform.position;
+            var def = source.CharacterDef;
+            Vector3 pivot = new(unpitched.PX, def.BoneYToWorldY(unpitched.PY, 0f), unpitched.PZ);
+            Vector3 right = new(Mathf.Cos(unpitched.FacingYaw), 0f, -Mathf.Sin(unpitched.FacingYaw));
+            foreach (float pitch in new[] { -Mathf.PI / 12f, Mathf.PI / 12f })
+            {
+                renderer.PlayScrubbedState(unpitched with { AttackPosePitch = pitch },
+                    address.IsAirborne, first.ActorPoseTicks);
+                Quaternion rotation = Quaternion.AngleAxis(-pitch * Mathf.Rad2Deg, right);
+                for (int index = 0; index < bones.Length; index++)
+                {
+                    Vector3 expected = pivot + rotation * (worldBefore[index] - pivot);
+                    Vector3 actual = animator.GetBoneTransform(bones[index]).position;
+                    if ((expected - actual).sqrMagnitude > .000001f)
+                        throw new InvalidOperationException($"Pitched {bones[index]} diverged from the shared hip pivot.");
+                }
+                if ((renderer.transform.position - rootBefore).sqrMagnitude > .000001f)
+                    throw new InvalidOperationException("Pitch moved the authoritative entity root.");
+            }
+            renderer.PlayScrubbedState(unpitched, address.IsAirborne, first.ActorPoseTicks);
+            for (int index = 0; index < bones.Length; index++)
+                if ((animator.GetBoneTransform(bones[index]).position - worldBefore[index]).sqrMagnitude > .000001f)
+                    throw new InvalidOperationException($"Cleared pitch leaked into {bones[index]}.");
         }
         finally { UnityEngine.Object.DestroyImmediate(fixture); }
     }

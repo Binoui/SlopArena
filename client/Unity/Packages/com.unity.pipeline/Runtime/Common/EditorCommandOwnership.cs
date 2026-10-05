@@ -121,6 +121,40 @@ namespace Unity.Pipeline
             return true;
         }
 
+        internal RecoveryConfirmation? GetRecoveryConfirmation()
+        {
+            lock (m_Gate)
+            {
+                if (m_State != "held" || m_Operations.Count != 0 || m_HostActivities.Count != 0
+                    || m_Owner == null || string.IsNullOrEmpty(m_Token))
+                    return null;
+                return new RecoveryConfirmation(EditorSessionId, m_Revision, m_Owner, m_BatchId);
+            }
+        }
+
+        internal bool TryRecoverSettledLease(RecoveryConfirmation expected, out Status status)
+        {
+            PersistenceState changed;
+            lock (m_Gate)
+            {
+                if (m_State != "held" || m_Operations.Count != 0 || m_HostActivities.Count != 0
+                    || m_Owner == null || string.IsNullOrEmpty(m_Token)
+                    || expected.EditorSessionId != EditorSessionId || expected.Revision != m_Revision
+                    || expected.TerminalHandle != m_Owner.TerminalHandle
+                    || expected.IncarnationId != m_Owner.IncarnationId || expected.BatchId != m_BatchId)
+                {
+                    status = GetStatusLocked();
+                    return false;
+                }
+                m_State = "releasing";
+                FinishReleaseLocked();
+                changed = ChangedLocked();
+                status = GetStatusLocked();
+            }
+            Publish(changed);
+            return true;
+        }
+
         internal bool TryAuthorizeAdmission(string token, out Status status)
         {
             lock (m_Gate)
@@ -378,6 +412,24 @@ namespace Unity.Pipeline
             public int activeOperations;
             public bool settled;
             public string reason;
+        }
+
+        internal readonly struct RecoveryConfirmation
+        {
+            internal RecoveryConfirmation(string sessionId, long revision, Owner owner, string batchId)
+            {
+                EditorSessionId = sessionId;
+                Revision = revision;
+                TerminalHandle = owner.TerminalHandle;
+                IncarnationId = owner.IncarnationId;
+                BatchId = batchId;
+            }
+
+            internal string EditorSessionId { get; }
+            internal long Revision { get; }
+            internal string TerminalHandle { get; }
+            internal string IncarnationId { get; }
+            internal string BatchId { get; }
         }
 
         internal sealed class Owner

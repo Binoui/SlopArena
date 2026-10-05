@@ -1,5 +1,52 @@
 # SlopArena Netcode & Simulation Architecture
 
+## Startup-correction protocol cutover verification — 2026-10-04
+
+- Shared authoritative snapshots now carry the captured correction target, initial yaw, committed pose pitch, active/owned flags and captured target deaths; protocol 6 retains this state layout and packet sizing.
+- This verification recorded the protocol 5 Master cutover. It was superseded by the coordinated protocol 6 clock cutover described below; neither cutover supports mixed-version clients.
+- Protocol 6 focused clock/rollback checks passed; full Shared reported 1,231 passed,
+  2 skipped, and 5 failures (four Manki normal target-lock cases and one Manki airkick
+  scenario). Full GameServer tests passed 27/27 and MasterServer tests passed 158/158.
+  Unity compilation, a rendered two-client match, packaged join/rematch, live Steam
+  play and human-feel acceptance remain unverified; no release rollout is claimed.
+  An isolated real-bridge smoke also passed bounded stall catch-up, buffered lock-edge
+  consumption, reconnect-baseline reset, and stopping gameplay for outside-history
+  Ended/result-only delivery. Its injected transport queues do not prove native networking
+  or Unity presentation.
+
+
+## Authoritative PvP clock — protocol 6
+
+Protocol 6 coordinates the client, GameServer, and MasterServer; protocol 5 clients are
+incompatible. Both Steam and development UDP use the same Bootstrap/Ready/Clock control
+packet. Steam wraps it in the reliable control frame; UDP sends the packet as a control
+datagram and repeats bootstrap/Ready idempotently until the readiness barrier completes.
+
+The client requests bootstrap after joining, records the initial authoritative state for
+every roster entity, then sends Ready. The server starts the existing five-second
+countdown only after every currently bound connection is Ready. Loading time does not
+advance or establish gameplay time. Clock controls carry the server tick and gameplay
+start tick; the client freezes prediction/input until authoritative Playing and that
+start tick, then seeds its timeline from the server clock.
+
+During play, one `NetplayClock` estimate drives prediction, input target ticks, and
+reconciliation. On receipt it compensates for estimated one-way packet transit using
+half the measured RTT; the scheduling lead adds half-RTT ticks plus two safety ticks,
+bounded to 2–12. Clock samples that regress in server tick, start tick, or monotonic
+receive time are ignored. Future self snapshots are retained until the local timeline
+reaches them; stale packets cannot rewind that timeline.
+
+The server clock advances at 60 Hz through countdown and play. During play, it consumes
+input only at its exact target tick, accepts future targets no more than 30 ticks ahead, and ignores
+expired targets. Missing input holds the last state for at most six ticks with jump,
+facing/lock, defense/grab/retarget and slot press edges stripped, then becomes neutral.
+Movement, jump hold and shield hold are retained. The client sends input for the tick being
+stepped, never an expired preincrement tick. Catch-up is bounded to four steps per client
+update; buffered one-shot edges are consumed once, while earlier catch-up steps retain
+held controls without replaying presses. Match End/result handling is consumed independently
+of whether the packet's simulation tick remains in local rollback history. A replacement
+connection must receive the full roster baseline and Ready again.
+
 ## 1. Philosophy
 
 **Server-authoritative Shared simulation with client prediction and reconciliation.**
@@ -137,7 +184,7 @@ Tick():
   6. SendState() — broadcast to all connected clients
      → For each client:
        → For each entity (all rostered players):
-      → Packet: entityId(8) + tick(4) + CharacterStatePacket(164) + hasInput(1) + InputState(22) = up to 199B
+      → Packet: entityId(8) + tick(4) + CharacterStatePacket(182) + hasInput(1) + InputState(22) = up to 217B
          → tick = _serverTick (echoed back)
          → hasInput/InputState = the input the server consumed for that entity
            that tick, or the no-input marker (issue #80 — input relay)
@@ -172,7 +219,7 @@ Send packet: entityId(8) + tick(4) + InputState(22) = 34 bytes
 | 18     | byte    | TargetEntityId  | Client-selected target (0 = none)  |
 | 19     | byte    | flags2          | bit0: JumpHeld, bit1: FaceToCamera, bit2: ToggleLock, bit3: DownPressed, bit4: ShieldHeld, bit5: ShieldPressed, bit6: GrabPressed, bit7: RetargetPressed |
 | 20     | byte    | LockMode        | `0=Never`, `1=Always`, `2=OnHit` |
-| 21     | byte    | protocolVersion | `SimulationProtocol.Version = 4` |
+| 21     | byte    | protocolVersion | `SimulationProtocol.Version = 6` |
 
 `ShieldHeld` is the per-tick physical hold used for grounded shield. `ShieldPressed` is a
 fresh logical edge and the sole airborne dodge input; the simulation accepts it only while
@@ -186,20 +233,19 @@ not backward-compatible partial decoding.
 ### 4b. Server → Client (per entity)
 
 ```
-Receive packet per entity: entityId(8) + tick(4) + CharacterStatePacket(164) + hasInput(1) + InputState(22) = up to 199 bytes
+Receive packet per entity: entityId(8) + tick(4) + CharacterStatePacket(182) + hasInput(1) + InputState(22) = up to 217 bytes
 
 [0..7]      entityId          (ulong)
 [8..11]     tick              (uint)       ← echoes client's tick number
-[12..175]   CharacterStatePacket (164 bytes) — fixed state payload; see §4b table below
-[176]       hasInput          (byte)       ← exactly 0 or 1
-[177..198]  InputState       (22 bytes)   ← present iff hasInput == 1
-
+[12..193]   CharacterStatePacket (182 bytes) — fixed state payload; see §4b table below
+[194]       hasInput          (byte)       ← exactly 0 or 1
+[195..216]  InputState       (22 bytes)   ← present iff hasInput == 1
 
 **The relay section** carries the exact input consumed for that entity/tick. A missing
 exact server input may extend prior held input but clears one-shot `DownPressed`,
 `ShieldPressed`, and `GrabPressed`; `ShieldHeld` remains latched. `hasInput = 0` denotes
-no consumed input and is not a truncated relay. The envelope must be exactly 177 bytes
-for marker 0 or 199 bytes for marker 1; mismatches are rejected. The client discards
+no consumed input and is not a truncated relay. The envelope must be exactly 195 bytes
+for marker 0 or 217 bytes for marker 1; mismatches are rejected. The client discards
 malformed/incompatible state datagrams without ending its receive loop. Codec owner:
 `src/Shared/ServerEntityPacket.cs`.
 
@@ -209,7 +255,7 @@ InputState is 22 bytes. `Flags2` (byte 19) assigns bits `0x10=ShieldHeld`,
 versus airborne dodge from authoritative state; client-side chord binding emits
 `GrabPressed` and removes a competing defense edge without clearing the physical hold.
 
-**CharacterStatePacket layout (164 bytes):**
+**CharacterStatePacket layout (182 bytes):**
 | Offset | Type    | Field                       | Notes                              |
 |--------|---------|-----------------------------|------------------------------------|
 | 0-3    | uint    | TickNumber                  | Echoed client tick (for matching)  |
@@ -227,51 +273,55 @@ versus airborne dodge from authoritative state; client-side chord binding emits
 | 34-37  | float   | FacingYaw                   | Server-authoritative facing (radians) |
 | 38     | byte    | MatchState                  | Match lifecycle (Waiting/Countdown/Playing/Ended) |
 | 39     | byte    | AnimIndex                   | Animation index into ability's AnimationNames[] |
-| 40     | byte    | HitstunLevel                 | 0=small, 1=medium, 2=hard          |
+| 40     | byte    | HitstunLevel                | 0=small, 1=medium, 2=hard          |
 | 41-44  | float   | AimPitch                    | Server-authoritative aim pitch (radians) |
-| 45     | byte    | Deaths                       | Stock counter: stocks left = maxStocks - Deaths (issue #37) |
-| 46-47  | ushort  | DamagePercent                | Smash-style damage %, HUD display (issue #38) |
-| 48-69  | ushort×11| Cooldown0..10               | Per-slot cooldown ticks (ADR-0016: 11 slots), local HUD fills (issue #38) |
+| 45     | byte    | Deaths                      | Stock counter: stocks left = maxStocks - Deaths (issue #37) |
+| 46-47  | ushort  | DamagePercent               | Smash-style damage %, HUD display (issue #38) |
+| 48-69  | ushort×11| Cooldown0..10              | Per-slot cooldown ticks (ADR-0016: 11 slots), local HUD fills (issue #38) |
 | 70-71  | ushort  | AirTimeTicks                | FloatWindow gravity timer |
-| 72-73  | ushort  | DashDurationTicks            | Reserved legacy universal-dash timer; not the air-dodge phase timer |
+| 72-73  | ushort  | DashDurationTicks           | Reserved legacy universal-dash timer; not the air-dodge phase timer |
 | 74-77  | float   | DashDirX                    | AirDodgeMovement direction X, captured from facing |
 | 78-81  | float   | DashDirZ                    | AirDodgeMovement direction Z, captured from facing |
-| 82-83  | ushort  | DashCooldownTicks            | Reserved legacy universal-dash cooldown |
-| 84     | byte    | AirDodgesLeft                | Remaining air dodges (D10)         |
-| 85     | byte    | JumpsLeft                    | Remaining jumps (D10)              |
-| 86-87  | ushort  | InvincibilityTicks           | Air-dodge/respawn invincibility (D10) |
-| 88-89  | ushort  | RushTicks                    | Rush window remaining (ADR-0020)   |
+| 82-83  | ushort  | DashCooldownTicks           | Reserved legacy universal-dash cooldown |
+| 84     | byte    | AirDodgesLeft               | Remaining air dodges (D10)         |
+| 85     | byte    | JumpsLeft                   | Remaining jumps (D10)              |
+| 86-87  | ushort  | InvincibilityTicks          | Air-dodge/respawn invincibility (D10) |
+| 88-89  | ushort  | RushTicks                   | Rush window remaining (ADR-0020)   |
 | 90-93  | float   | LastDirX                    | Last input direction X (D10)       |
 | 94-97  | float   | LastDirZ                    | Last input direction Z (D10)       |
-| 98     | byte    | WasAirborneDuringKnockback   | Landing/tech context flag (D10)    |
-| 99-100 | ushort  | HitstopTicks                 | Remaining hitstop freeze ticks (ADR-0012) |
-| 101-102| ushort  | BurstCooldownTicks           | Reserved retired Burst field; no gameplay meaning |
-| 103-104| ushort  | BurstRecoveryTicks           | Reserved retired Burst field; never locks actions |
-| 105    | byte    | JumpHeldTicks                | Consecutive jump-held ticks — short-hop replay (ADR-0016) |
+| 98     | byte    | WasAirborneDuringKnockback  | Landing/tech context flag (D10)    |
+| 99-100 | ushort  | HitstopTicks                | Remaining hitstop freeze ticks (ADR-0012) |
+| 101-102| ushort  | BurstCooldownTicks          | Reserved retired Burst field; no gameplay meaning |
+| 103-104| ushort  | BurstRecoveryTicks          | Reserved retired Burst field; never locks actions |
+| 105    | byte    | JumpHeldTicks               | Consecutive jump-held ticks — short-hop replay (ADR-0016) |
 | 106    | byte    | LockOn                      | Persistent target-lock flag (ADR-0018) |
 | 107-108| ushort  | LedgeRegrabLockTicks         | Reserved field while automatic ledge grabs are disabled |
 | 109    | byte    | AttackSequence              | Changes for each ability activation |
 | 110-111| ushort  | LandingLagTicks             | Authoritative landing lock for reconciliation and presentation |
-| 112    | byte    | MovementFlags                | bit0: IsFastFalling; bit1: JumpFromSlide; bit2: SlideAttackCarryActive; bit3: CrouchSettled; bit4: QueuedCrouchBrace; bit5: InPostHitstunFlight; bit6: AutoLockSuppressed |
-| 113-114| ushort  | ShieldDropTicks              | Remaining vulnerable shield-drop recovery |
-| 115-116| ushort  | BlockStunTicks               | Remaining block stun |
-| 117    | byte    | BlockHitstopKind             | `0=none`, `1=shield contact` |
-| 118    | byte    | InteractionPhase             | `0=none`, `1=attempt`, `2=captured`, `3=throwing`, `4=terminal` |
-| 119-126| ulong   | InteractionId                | Stable active interaction identity; zero means no active interaction |
-| 127-134| ulong   | InteractionPartnerId         | Paired fighter entity ID; zero means no partner |
-| 135-142| ulong   | LastTerminalInteractionId    | Last completed/interrupted interaction; zero means none recorded |
-| 143-146| uint    | InteractionTick              | Authoritative capture tick |
-| 147-150| uint    | InteractionTerminalTick      | Authoritative terminal outcome tick |
+| 112    | byte    | MovementFlags               | bit0: IsFastFalling; bit1: JumpFromSlide; bit2: SlideAttackCarryActive; bit3: CrouchSettled; bit4: QueuedCrouchBrace; bit5: InPostHitstunFlight; bit6: AutoLockSuppressed |
+| 113-114| ushort  | ShieldDropTicks             | Remaining vulnerable shield-drop recovery |
+| 115-116| ushort  | BlockStunTicks              | Remaining block stun |
+| 117    | byte    | BlockHitstopKind            | `0=none`, `1=shield contact` |
+| 118    | byte    | InteractionPhase            | `0=none`, `1=attempt`, `2=captured`, `3=throwing`, `4=terminal` |
+| 119-126| ulong   | InteractionId               | Stable active interaction identity; zero means no active interaction |
+| 127-134| ulong   | InteractionPartnerId        | Paired fighter entity ID; zero means no partner |
+| 135-142| ulong   | LastTerminalInteractionId   | Last completed/interrupted interaction; zero means none recorded |
+| 143-146| uint    | InteractionTick             | Authoritative capture tick |
+| 147-150| uint    | InteractionTerminalTick     | Authoritative terminal outcome tick |
 | 151-152| short   | CapturedYaw                  | Grab facing snapshot, signed degrees × 100 |
-| 153-154| ushort  | AirDodgeRecoveryTicks         | Grounded commitment left after an air-dodge landing |
+| 153-154| ushort  | AirDodgeRecoveryTicks        | Grounded commitment left after an air-dodge landing |
 | 155-162| ulong   | TargetEntityId               | Sticky selected target for deterministic lock reconstruction |
-| 163    | byte    | ProtocolVersion              | `SimulationProtocol.Version = 4` |
+| 163    | byte    | ProtocolVersion              | `SimulationProtocol.Version = 6` |
+| 164-171| ulong   | AttackCorrectionTargetId     | Single target captured for this activation |
+| 172-175| float   | AttackCorrectionStartYaw     | Initial attack-facing yaw (radians) |
+| 176-179| float   | AttackPosePitch              | Authoritative startup correction pose pitch (radians) |
+| 180    | byte    | AttackCorrectionFlags        | bit0: correction active; bit1: correction owned by activation |
+| 181    | byte    | AttackCorrectionTargetDeaths | Captured target death count; invalidates a respawned target |
 
-**Packet sizes:** `CharacterStatePacket` is 164 bytes. `ServerEntityPacket` is 176 bytes
-before its mandatory relay marker, 177 bytes without input and 199 bytes with input.
-Input is 22 bytes. Non-v4 state/input payloads are rejected. Steam admission also
-uses protocol version 4; coordinate the Master server's `protocolVersion` with GameServer
-and clients for this cutover.
+**Packet sizes:** `CharacterStatePacket` is 182 bytes. `ServerEntityPacket` is 194 bytes
+before its mandatory relay marker, 195 bytes without input and 217 bytes with input.
+Input is 22 bytes. Non-v6 state/input payloads are rejected. Steam admission also
+uses protocol version 6; coordinate Master `protocolVersion` with GameServer and clients.
 
 **The server sends ALL states to every client.** Clients ignore the ones that don't concern them. No routing overhead.
 

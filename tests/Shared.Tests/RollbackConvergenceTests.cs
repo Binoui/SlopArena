@@ -97,6 +97,40 @@ public class RollbackConvergenceTests
     }
 
     [Fact]
+    public void IndependentOriginsWithAsymmetricDelayAndLoss_RecoverBothTracks()
+    {
+        var h = Harness(delayTicks: 8, dropEvery: 5);
+        Assert.True(h.SetTimeline(300));
+        float initialSelfX = h.ServerState(NetplayHarness.SelfId).PX;
+        float initialOpponentX = h.ServerState(NetplayHarness.OpponentId).PX;
+        const int selfUplinkDelay = 5;
+        const int opponentUplinkDelay = 7;
+
+        static InputState SelfTrace(int tick)
+            => tick >= 20 && tick < 120 ? TestHelpers.Input(moveX: 1f) : default;
+        static InputState OpponentTrace(int tick)
+            => tick >= 65 && tick < 155 ? TestHelpers.Input(moveX: -1f) : default;
+
+        for (int tick = 0; tick < 200; tick++)
+        {
+            var clientInput = SelfTrace(tick);
+            var serverInput = SelfTrace(tick - selfUplinkDelay);
+            var opponentInput = OpponentTrace(tick - opponentUplinkDelay);
+            h.Step(clientInput, serverInput, opponentInput);
+        }
+
+        h.SetDropsEnabled(false);
+        for (int tick = 0; tick < 40; tick++)
+            h.Step(default, default, default);
+
+        Assert.True(h.ServerState(NetplayHarness.SelfId).PX > initialSelfX);
+        Assert.True(h.ServerState(NetplayHarness.OpponentId).PX < initialOpponentX);
+        Assert.NotEqual(initialOpponentX, h.ClientState(NetplayHarness.OpponentId).PX);
+        NetplayHarness.AssertSelfConverged(h);
+        NetplayHarness.AssertOpponentConverged(h);
+    }
+
+    [Fact]
     public void OpponentAttack_RawTrackThenReRegistration_ConvergesAfterComplexEnds()
     {
         // Entity 2 attacks early while ~9.5m from entity 1 (no cross-hit): the client

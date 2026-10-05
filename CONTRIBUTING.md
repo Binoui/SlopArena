@@ -47,12 +47,15 @@ configuration and planning at the supplied workspace root. Implementation handof
 must include both roots and the absolute spec/ticket path; a workspace worktree does
 not isolate its symlinked game repository.
 
-The navigation-only [OMP solution](.omp/SlopArena.sln) includes Shared, Server, and
-their tests. `.omp/lsp.json` points the installed OmniSharp at that explicit solution
-to avoid recursively scanning Unity asset/cache trees. Adjust executable and checkout
-paths when moving machines. An enclosing workspace needs its own `.omp/lsp.json`;
-reload the LSP configuration after changes. Through a symlinked checkout, use canonical
-absolute file paths for LSP queries so they match MSBuild's document identities.
+The navigation-only [OMP solution](.omp/SlopArena.sln) includes Shared, Server,
+their tests, and the C# projects under `tools/`. `.omp/lsp.json` points the installed
+OmniSharp at that explicit solution to avoid recursively scanning Unity asset/cache
+trees. The enclosing workspace uses `.omp/SlopArena.Workspace.sln` to load those
+projects plus MasterServer and its tests; MasterServer also has a standalone
+`.omp/MasterServer.sln` and cwd-local LSP configuration. Adjust executable and
+checkout paths when moving machines, and reload LSP with `action: "reload",
+file: "*"` after configuration changes. Through a symlinked checkout, use canonical
+absolute file paths so queries match MSBuild's document identities.
 
 This solution does not supply Unity project metadata. Unity semantic navigation needs
 the Editor-generated projects; do not generate or refresh them while another agent owns

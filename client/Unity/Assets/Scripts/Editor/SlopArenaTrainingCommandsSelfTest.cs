@@ -17,6 +17,7 @@ namespace SlopArena.EditorTools
                 "Radian facing yaw was not encoded as signed degrees × 100.");
             Require(SlopArenaTrainingCommands.ToWireYaw(Mathf.PI * 1.5f) == -9000,
                 "Facing yaw was not canonicalized to the signed [-18000, 18000] wire range.");
+            CheckHumanYawEncoding();
             var slotMappings = new[]
             {
                 ("1", AbilitySlots.Slot1), ("2", AbilitySlots.Slot2),
@@ -88,6 +89,54 @@ namespace SlopArena.EditorTools
             ExpectInvalid("{\"ticks\":1}");
 
             Debug.Log("[SlopArenaTrainingCommandsSelfTest] Passed cooked slot/wire projection, radian yaw encoding, per-step edge/held boundaries, strict typed JSON fields, positive durations, 600-tick boundary and retired-control rejection.");
+        }
+
+        private static void CheckHumanYawEncoding()
+        {
+            var scene = UnityEditor.SceneManagement.EditorSceneManager.NewPreviewScene();
+            var obj = new GameObject("HumanYawEncodingSelfTest") { hideFlags = HideFlags.HideAndDontSave };
+            UnityEngine.SceneManagement.SceneManager.MoveGameObjectToScene(obj, scene);
+            obj.SetActive(false);
+            try
+            {
+                var controller = obj.AddComponent<SlopArena.Client.Input.InputController>();
+                var cases = new[]
+                {
+                    (body: 359.5f, aim: (float?)null, facing: -50, yaw: -50),
+                    (body: 360f, aim: (float?)null, facing: 0, yaw: 0),
+                    (body: 450f, aim: (float?)null, facing: 9000, yaw: 9000),
+                    (body: -450f, aim: (float?)null, facing: -9000, yaw: -9000),
+                    (body: 757f, aim: (float?)null, facing: 3700, yaw: 3700),
+                    (body: -757f, aim: (float?)null, facing: -3700, yaw: -3700),
+                    (body: -180f, aim: (float?)null, facing: 18000, yaw: 18000),
+                    (body: 180f, aim: (float?)null, facing: 18000, yaw: 18000),
+                    (body: 25f, aim: (float?)450f, facing: 2500, yaw: 9000),
+                    (body: 25f, aim: (float?)-360f, facing: 2500, yaw: 0),
+                };
+                foreach (var item in cases)
+                {
+                    var context = new SlopArena.Client.Camera.AimContext
+                    {
+                        AimYawRad = item.aim.HasValue ? item.aim.Value * Mathf.Deg2Rad : (float?)null,
+                        AimPitchRad = Mathf.PI / 6f,
+                    };
+                    var input = controller.BuildInputState(null, item.body, false, 0, context, null).input;
+                    var bytes = new byte[InputState.Size];
+                    input.Write(bytes);
+                    var received = InputState.Deserialize(bytes);
+                    Require(Math.Abs(received.FacingYaw - item.facing) <= 1
+                        && Math.Abs(received.AimYaw - item.yaw) <= 1,
+                        $"Human yaw lost direction at body={item.body}, aim={item.aim}: " +
+                        $"facing={received.FacingYaw}, aim={received.AimYaw}.");
+                    Require(Math.Abs(received.AimPitch - 3000) <= 1,
+                        "Yaw normalization changed the projectile's aim pitch.");
+                }
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(obj);
+                UnityEditor.SceneManagement.EditorSceneManager.ClosePreviewScene(scene);
+            }
         }
 
         private static void ExpectInvalid(string json)

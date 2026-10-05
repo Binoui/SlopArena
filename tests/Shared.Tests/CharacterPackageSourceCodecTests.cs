@@ -84,6 +84,38 @@ public sealed class CharacterPackageSourceCodecTests
     }
 
     [Fact]
+    public void StartupAimCorrection_StrictlyRoundTripsItsCutoffAndLimits()
+    {
+        var parsed = CharacterPackageSourceCodec.Load(Fixture("package.json"), Fixture("character.json"));
+        Assert.True(parsed.IsValid, string.Join("\n", parsed.Diagnostics));
+        var source = parsed.Source!.Character.Slots.Single(x => x.Id == "air.1")
+            .Timeline.Stages[0].Operations.OfType<StartupAimCorrectionOperationSource>().Single();
+        Assert.Equal((ushort)0, source.Tick);
+        Assert.Equal((ushort)7, source.EndTick);
+        Assert.Equal(15f, source.MaxPitchDegrees);
+        Assert.Equal(180f, source.PitchDegreesPerSecond);
+
+        string serialized = CharacterPackageSourceCodec.SerializeCharacter(parsed.Source.Character);
+        Assert.Contains("\"kind\": \"startupAimCorrection\"", serialized);
+        Assert.Contains("\"endTick\": 7", serialized);
+        var roundTrip = CharacterPackageSourceCodec.Load(Fixture("package.json"), serialized);
+        Assert.True(roundTrip.IsValid, string.Join("\n", roundTrip.Diagnostics));
+        var cooked = CharacterPackageCompiler.Compile(roundTrip.Source!, CharacterCookProfile.TrustedBuiltIn);
+        Assert.NotNull(cooked.CookedPackage);
+        var operation = Assert.IsType<CookedStartupAimCorrectionOperation>(
+            cooked.CookedPackage!.Definition.Slots.Single(x => x.Id == "air.1").Timeline.Stages[0].Operations[0]);
+        Assert.Equal((ushort)7, operation.EndTick);
+        Assert.Equal(15f, operation.MaxPitchDegrees);
+
+        var malformed = JsonNode.Parse(serialized)!.AsObject();
+        var normal = malformed["slots"]!.AsArray().Single(x => x!["id"]!.GetValue<string>() == "air.1")!;
+        normal["timeline"]!["stages"]![0]!["operations"]![0]!["speed"] = 1;
+        var rejected = CharacterPackageSourceCodec.Load(Fixture("package.json"), malformed.ToJsonString());
+        Assert.False(rejected.IsValid);
+        Assert.Contains(rejected.Diagnostics, x => x.Code == "operation.parameter-unknown");
+    }
+
+    [Fact]
     public void CaptureGeometryAndDefenseAnimationRoles_RoundTripThroughAuthoringSource()
     {
         var character = JsonNode.Parse(Fixture("character.json"))!.AsObject();
@@ -248,25 +280,6 @@ public sealed class CharacterPackageSourceCodecTests
         Assert.Equal("anim.tumble", renamedSlide.Source.Character.Presentation.Tumble);
     }
 
-    [Fact]
-    public void StageTargetingMetadata_RoundTripsAndSerializesExplicitly()
-    {
-        var parsed = CharacterPackageSourceCodec.Load(Fixture("package.json"), Fixture("character.json"));
-        Assert.True(parsed.IsValid, string.Join("\n", parsed.Diagnostics));
-        var stage = parsed.Source!.Character.Slots.Single(x => x.Id == "ground.1").Timeline.Stages.Single();
-        Assert.Equal(1.75f, stage.AttackRange);
-        Assert.Equal(0f, stage.WarpRange);
-        Assert.True(stage.UseTargetLock);
-        Assert.True(stage.RotateTowardTarget);
-        Assert.Equal(0.85f, stage.TrackingStrength);
-
-        string serialized = CharacterPackageSourceCodec.SerializeCharacter(parsed.Source.Character);
-        Assert.Contains("\"attackRange\": 1.75", serialized);
-        Assert.Contains("\"warpRange\": 0", serialized);
-        Assert.Contains("\"useTargetLock\": true", serialized);
-        Assert.Contains("\"rotateTowardTarget\": true", serialized);
-        Assert.Contains("\"trackingStrength\": 0.85", serialized);
-    }
 
     [Fact]
     public void StageTargetingMetadata_MissingDefaultsDisabledAndUnknownFieldsFail()

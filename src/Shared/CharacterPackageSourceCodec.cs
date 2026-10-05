@@ -421,6 +421,7 @@ public static class CharacterPackageSourceCodec
             StartCapabilityOperationSource x => x with { Parameters = CloneParameters(x.Parameters) },
             EmitPresentationOperationSource x => x with { },
             CompleteTimelineOperationSource x => x with { },
+            StartupAimCorrectionOperationSource x => x with { },
             _ => throw new InvalidDataException("Unknown operation.")
         };
 
@@ -603,6 +604,15 @@ public static class CharacterPackageSourceCodec
                 w.WriteString("presentationId", e.PresentationId);
                 WritePlacement(w, e.Placement);
                 break;
+            case StartupAimCorrectionOperationSource correction:
+                w.WriteNumber("endTick", correction.EndTick);
+                Number(w, "acquisitionRange", correction.AcquisitionRange);
+                Number(w, "acquisitionHalfAngleDegrees", correction.AcquisitionHalfAngleDegrees);
+                Number(w, "maxYawDegrees", correction.MaxYawDegrees);
+                Number(w, "maxPitchDegrees", correction.MaxPitchDegrees);
+                Number(w, "yawDegreesPerSecond", correction.YawDegreesPerSecond);
+                Number(w, "pitchDegreesPerSecond", correction.PitchDegreesPerSecond);
+                break;
         }
         w.WriteEndObject();
     }
@@ -683,7 +693,7 @@ public static class CharacterPackageSourceCodec
     private static string KnockbackDirectionText(AuthoringKnockbackDirection value)=>value switch { AuthoringKnockbackDirection.AwayFromOwner=>"awayFromOwner", AuthoringKnockbackDirection.TowardOwner=>"towardOwner", _=>throw new InvalidDataException("Unknown knockback direction.") };
     private static string VelocityText(AuthoringVelocityMode value)=>value switch { AuthoringVelocityMode.Absolute=>"absolute", AuthoringVelocityMode.Additive=>"additive", _=>throw new InvalidDataException("Unknown velocity mode.") };
     private static string UnitText(AuthoringUnit value)=>value switch { AuthoringUnit.Meters=>"meters", AuthoringUnit.MetersPerSecond=>"metersPerSecond", AuthoringUnit.MetersPerSecondSquared=>"metersPerSecondSquared", AuthoringUnit.Degrees=>"degrees", AuthoringUnit.Normalized=>"normalized", AuthoringUnit.Damage=>"damage", AuthoringUnit.Knockback=>"knockback", AuthoringUnit.Ticks=>"ticks", _=>throw new InvalidDataException("Unknown unit.") };
-    private static string OperationKind(CharacterTimelineOperationSource value)=>value switch { SetVelocityOperationSource=>"setVelocity", ForwardLungeOperationSource=>"forwardLunge", GravityWindowOperationSource=>"gravityWindow", ArmorWindowOperationSource=>"armorWindow", SpawnHitboxOperationSource=>"spawnHitbox", SpawnProjectileOperationSource=>"spawnProjectile", SetAimStateOperationSource=>"setAimState", StartCapabilityOperationSource=>"startCapability", EmitPresentationOperationSource=>"emitPresentation", CompleteTimelineOperationSource=>"completeTimeline", _=>throw new InvalidDataException("Unknown operation.") };
+    private static string OperationKind(CharacterTimelineOperationSource value)=>value switch { SetVelocityOperationSource=>"setVelocity", ForwardLungeOperationSource=>"forwardLunge", GravityWindowOperationSource=>"gravityWindow", ArmorWindowOperationSource=>"armorWindow", SpawnHitboxOperationSource=>"spawnHitbox", SpawnProjectileOperationSource=>"spawnProjectile", SetAimStateOperationSource=>"setAimState", StartCapabilityOperationSource=>"startCapability", EmitPresentationOperationSource=>"emitPresentation", CompleteTimelineOperationSource=>"completeTimeline", StartupAimCorrectionOperationSource=>"startupAimCorrection", _=>throw new InvalidDataException("Unknown operation.") };
 
     private static PackageManifestSource ParseManifest(JsonElement root, DiagnosticBag d)
     {
@@ -915,7 +925,7 @@ public static class CharacterPackageSourceCodec
         foreach (var e in a.EnumerateArray())
         {
             var opPath = path + ".operations[" + i + "]";
-            var p = ReadObject(e, opPath, d, "kind", "tick", "unit", "velocityMode", "x", "y", "z", "speed", "durationTicks", "gravityScale", "hitbox", "projectile", "aimState", "capabilityId", "capabilityVersion", "parameters", "presentationId", "placement");
+            var p = ReadObject(e, opPath, d, "kind", "tick", "unit", "velocityMode", "x", "y", "z", "speed", "durationTicks", "gravityScale", "hitbox", "projectile", "aimState", "capabilityId", "capabilityVersion", "parameters", "presentationId", "placement", "endTick", "acquisitionRange", "acquisitionHalfAngleDegrees", "maxYawDegrees", "maxPitchDegrees", "yawDegreesPerSecond", "pitchDegreesPerSecond");
             var kind = String(p, "kind", opPath + ".kind", d);
             var tick = UShort(p, "tick", opPath + ".tick", d);
             var unit = ParseUnit(p, "unit", opPath + ".unit", d);
@@ -938,6 +948,17 @@ public static class CharacterPackageSourceCodec
                 case "startCapability": result.Add(new StartCapabilityOperationSource(tick, unit, String(p, "capabilityId", opPath + ".capabilityId", d), String(p, "capabilityVersion", opPath + ".capabilityVersion", d), ParseCapabilityParameters(p, opPath, d))); break;
                 case "emitPresentation": result.Add(new EmitPresentationOperationSource(tick, unit, String(p, "presentationId", opPath + ".presentationId", d), ParsePlacement(p, opPath, d))); break;
                 case "completeTimeline": result.Add(new CompleteTimelineOperationSource(tick, unit)); break;
+                case "startupAimCorrection":
+                    result.Add(new StartupAimCorrectionOperationSource(
+                        tick, unit,
+                        UShort(p, "endTick", opPath + ".endTick", d),
+                        Float(p, "acquisitionRange", opPath + ".acquisitionRange", d),
+                        Float(p, "acquisitionHalfAngleDegrees", opPath + ".acquisitionHalfAngleDegrees", d),
+                        Float(p, "maxYawDegrees", opPath + ".maxYawDegrees", d),
+                        Float(p, "maxPitchDegrees", opPath + ".maxPitchDegrees", d),
+                        Float(p, "yawDegreesPerSecond", opPath + ".yawDegreesPerSecond", d),
+                        Float(p, "pitchDegreesPerSecond", opPath + ".pitchDegreesPerSecond", d)));
+                    break;
                 default: d.Error("operation.unknown", opPath + ".kind", "Unknown timeline operation."); break;
             }
             i++;
@@ -958,6 +979,7 @@ public static class CharacterPackageSourceCodec
             "startCapability" => new[] { "kind", "tick", "unit", "capabilityId", "capabilityVersion", "parameters" },
             "emitPresentation" => new[] { "kind", "tick", "unit", "presentationId", "placement" },
             "completeTimeline" => new[] { "kind", "tick", "unit" },
+            "startupAimCorrection" => new[] { "kind", "tick", "unit", "endTick", "acquisitionRange", "acquisitionHalfAngleDegrees", "maxYawDegrees", "maxPitchDegrees", "yawDegreesPerSecond", "pitchDegreesPerSecond" },
             _ => System.Array.Empty<string>(),
         };
         if (allowed.Length == 0) return;

@@ -327,6 +327,15 @@ public sealed class SteamGameServerHost : IAsyncDisposable
             return;
         }
 
+        if (frame[0] == SteamGameplayWire.Control)
+        {
+            if (!reliable || !NetplayControlPacket.TryDeserialize(frame.Slice(1), out var control) ||
+                control.Kind != NetplayControlKind.Ready || control.EntityId != connection.EntityId ||
+                _orchestrator?.TryMarkSteamReady(connection.MatchId, connection.Id, control) != true)
+                EndConnection(connection, "Invalid or spoofed Steam control frame", closeNative: true);
+            return;
+        }
+
         if (reliable || !SteamGameplayInputCodec.TryParse(frame, connection.EntityId, out uint tick, out var input))
         {
             EndConnection(connection, "Invalid or spoofed Steam input frame", closeNative: true);

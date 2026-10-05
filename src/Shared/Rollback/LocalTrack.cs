@@ -49,6 +49,17 @@ namespace SlopArena.Shared.Rollback
             _history.Add((0, _sim.GetState(_entityId), default));
         }
 
+        /// <summary>Seed the absolute server timeline before local simulation advances.</summary>
+        public bool SetTimeline(uint lastCompletedTick)
+        {
+            if (_history.Count != 1 || lastCompletedTick < _localTick)
+                return false;
+            _localTick = lastCompletedTick;
+            _lastAuthoritativeTick = lastCompletedTick;
+            _sim.SetTick(lastCompletedTick);
+            _history[0] = (lastCompletedTick, _sim.GetState(_entityId), default);
+            return true;
+        }
         /// <summary>Register-or-update a read-only mirror of another entity, purely so
         /// ServerSimulation's target-lock lookups resolve. Never rendered from this track.</summary>
         public void SyncOpponentMirror(ulong id, CharacterDefinition def, CharacterState state)

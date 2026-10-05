@@ -10,6 +10,12 @@ namespace SlopArena.Server.Tests;
 
 public class MatchInputProtocolTests
 {
+    private static byte[] Control(NetplayControlKind kind, ulong entityId, uint tick = 0, uint startTick = 0)
+    {
+        var frame = new byte[NetplayControlPacket.Size];
+        new NetplayControlPacket(kind, entityId, tick, startTick).Serialize(frame);
+        return frame;
+    }
     [Fact]
     public void InvalidUplinksCannotClaimEndpointOrStartCountdown()
     {
@@ -62,8 +68,8 @@ public class MatchInputProtocolTests
             match.Start();
             var socketField = typeof(MatchInstance).GetField("_udpServer", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
             Assert.True(SpinWait.SpinUntil(() => socketField.GetValue(match) != null, 3000), "Local UDP listener did not bind.");
-            var sentinelInput = Input(2);
-            sentinel.Send(sentinelInput, sentinelInput.Length, endpoint);
+            var sentinelBootstrap = Control(NetplayControlKind.Bootstrap, 2);
+            sentinel.Send(sentinelBootstrap, sentinelBootstrap.Length, endpoint);
             var invalid = Input(1);
             rejected.Send(invalid, invalid.Length - 1, endpoint); // old 20-byte input
             invalid[^1] = 99;
@@ -71,7 +77,29 @@ public class MatchInputProtocolTests
             var oversized = new byte[invalid.Length + 1];
             Input(1).CopyTo(oversized, 0);
             rejected.Send(oversized, oversized.Length, endpoint);
-            var state = AwaitState(accepted, Input(1));
+            var acceptedBootstrap = Control(NetplayControlKind.Bootstrap, 1);
+            var state = AwaitState(accepted, acceptedBootstrap);
+            var sentinelState = AwaitState(sentinel, sentinelBootstrap);
+            Assert.Equal(MatchState.Waiting, state.State.MatchState);
+            accepted.Send(Control(NetplayControlKind.Ready, 1, state.Tick), NetplayControlPacket.Size, endpoint);
+            sentinel.Send(Control(NetplayControlKind.Ready, 2, sentinelState.Tick), NetplayControlPacket.Size, endpoint);
+            var countdownTimer = Stopwatch.StartNew();
+            ServerEntityPacket countdown = default;
+            bool sawCountdown = false;
+            while (countdownTimer.ElapsedMilliseconds < 1500 && !sawCountdown)
+            {
+                accepted.Send(acceptedBootstrap, acceptedBootstrap.Length, endpoint);
+                if (!accepted.Client.Poll(30_000, SelectMode.SelectRead)) continue;
+                var remote = new IPEndPoint(IPAddress.Any, 0);
+                var received = accepted.Receive(ref remote);
+                if ((received.Length == ServerEntityPacket.NoInputSize || received.Length == ServerEntityPacket.MaxSize) &&
+                    ServerEntityPacket.Deserialize(received).State.MatchState == MatchState.Countdown)
+                {
+                    countdown = ServerEntityPacket.Deserialize(received);
+                    sawCountdown = true;
+                }
+            }
+            Assert.True(sawCountdown, "Ready peers did not enter countdown.");
             var ping = new byte[12];
             ping[0] = (byte)'P'; ping[1] = (byte)'I'; ping[2] = (byte)'N'; ping[3] = (byte)'G';
             BinaryPrimitives.WriteInt64LittleEndian(ping.AsSpan(4), 0x102030405060708);
@@ -95,8 +123,7 @@ public class MatchInputProtocolTests
 
             rejected.Send(ping, ping.Length, endpoint);
             Assert.False(rejected.Client.Poll(200_000, SelectMode.SelectRead), "An unadmitted peer received a ping echo.");
-            Assert.Equal(MatchState.Countdown, state.State.MatchState);
-            Assert.False(rejected.Client.Poll(0, SelectMode.SelectRead));
+            Assert.Equal(MatchState.Countdown, countdown.State.MatchState);
         }
         finally
         {
@@ -134,31 +161,103 @@ public class MatchInputProtocolTests
             input.Write(frame.AsSpan(12));
             client.Send(frame, frame.Length, endpoint);
         }
+        void SendControl(UdpClient client, NetplayControlKind kind, ulong entity, uint tick = 0, uint startTick = 0)
+        {
+            var control = Control(kind, entity, tick, startTick);
+            client.Send(control, control.Length, endpoint);
+        }
+        void BootstrapAndReady(UdpClient client, ulong entity)
+        {
+            var timer = Stopwatch.StartNew();
+            var entities = new HashSet<ulong>();
+            uint baselineTick = 0;
+            while (timer.Elapsed < TimeSpan.FromSeconds(3) && entities.Count < 2)
+            {
+                SendControl(client, NetplayControlKind.Bootstrap, entity);
+                if (!client.Client.Poll(30_000, SelectMode.SelectRead)) continue;
+                var remote = new IPEndPoint(IPAddress.Any, 0);
+                var frame = client.Receive(ref remote);
+                if (frame.Length != ServerEntityPacket.NoInputSize && frame.Length != ServerEntityPacket.MaxSize) continue;
+                var state = ServerEntityPacket.Deserialize(frame);
+                entities.Add(state.EntityId);
+                baselineTick = Math.Max(baselineTick, state.Tick);
+            }
+            Assert.Equal(2, entities.Count);
+            SendControl(client, NetplayControlKind.Ready, entity, baselineTick);
+        }
+        void SendPing(UdpClient client)
+        {
+            var ping = new byte[12];
+            ping[0] = (byte)'P'; ping[1] = (byte)'I'; ping[2] = (byte)'N'; ping[3] = (byte)'G';
+            BinaryPrimitives.WriteInt64LittleEndian(ping.AsSpan(4), Stopwatch.GetTimestamp());
+            client.Send(ping, ping.Length, endpoint);
+        }
+        uint ReadServerTick(UdpClient client)
+        {
+            long nonce = Stopwatch.GetTimestamp();
+            var ping = new byte[12];
+            ping[0] = (byte)'P'; ping[1] = (byte)'I'; ping[2] = (byte)'N'; ping[3] = (byte)'G';
+            BinaryPrimitives.WriteInt64LittleEndian(ping.AsSpan(4), nonce);
+            client.Send(ping, ping.Length, endpoint);
+            var timer = Stopwatch.StartNew();
+            while (timer.Elapsed < TimeSpan.FromSeconds(1))
+            {
+                if (!client.Client.Poll(30_000, SelectMode.SelectRead)) continue;
+                var remote = new IPEndPoint(IPAddress.Any, 0);
+                var frame = client.Receive(ref remote);
+                if (frame.Length == 16 && frame[0] == (byte)'P' &&
+                    BinaryPrimitives.ReadInt64LittleEndian(frame.AsSpan(4, 8)) == nonce)
+                    return BinaryPrimitives.ReadUInt32LittleEndian(frame.AsSpan(12, 4));
+            }
+            throw new TimeoutException("No authoritative UDP clock response.");
+        }
         match.Start();
         try
         {
-            Assert.True(SpinWait.SpinUntil(() => match.IsRunning, 3000));
+            BootstrapAndReady(wibou, 1);
+            BootstrapAndReady(opponent, 2);
             var timer = Stopwatch.StartNew();
             bool playing = false;
+            uint playingTick = 0;
+            long nextHeartbeat = 500;
             while (timer.Elapsed < TimeSpan.FromSeconds(8) && !playing)
             {
-                Send(wibou, 1, 0, default);
-                Send(opponent, 2, 0, default);
+                if (timer.ElapsedMilliseconds >= nextHeartbeat)
+                {
+                    SendPing(wibou);
+                    SendPing(opponent);
+                    nextHeartbeat += 1000;
+                }
                 if (!opponent.Client.Poll(30_000, SelectMode.SelectRead)) continue;
                 var remote = new IPEndPoint(IPAddress.Any, 0);
                 var frame = opponent.Receive(ref remote);
-                if ((frame.Length == ServerEntityPacket.NoInputSize || frame.Length == ServerEntityPacket.MaxSize)
-                    && ServerEntityPacket.Deserialize(frame).State.MatchState == MatchState.Playing)
+                if (frame.Length != ServerEntityPacket.NoInputSize && frame.Length != ServerEntityPacket.MaxSize) continue;
+                var packet = ServerEntityPacket.Deserialize(frame);
+                if (packet.State.MatchState == MatchState.Playing)
+                {
                     playing = true;
+                    playingTick = packet.Tick;
+                }
             }
             Assert.True(playing, "UDP match did not reach Playing.");
-            for (uint tick = 1; tick <= 120; tick++)
-                Send(wibou, 1, tick, tick == 1
-                    ? new InputState { ActiveSlot = AbilitySlots.A, IsAiming = true } : default);
+            uint nextTick = playingTick + 7;
+            for (uint tick = 0; tick < 120; tick++)
+            {
+                Send(wibou, 1, nextTick++,
+                    tick == 0 ? new InputState { ActiveSlot = AbilitySlots.A, IsAiming = true } : default);
+                Thread.Sleep(16);
+            }
             bool sawThree = false, sawEmptyAfter = false;
             timer.Restart();
+            long projectileHeartbeat = 500;
             while (timer.Elapsed < TimeSpan.FromSeconds(4) && !sawEmptyAfter)
             {
+                if (timer.ElapsedMilliseconds >= projectileHeartbeat)
+                {
+                    SendPing(wibou);
+                    SendPing(opponent);
+                    projectileHeartbeat += 1000;
+                }
                 if (!opponent.Client.Poll(30_000, SelectMode.SelectRead)) continue;
                 var remote = new IPEndPoint(IPAddress.Any, 0);
                 var frame = opponent.Receive(ref remote);
@@ -168,12 +267,23 @@ public class MatchInputProtocolTests
             }
             Assert.True(sawThree, "Opponent never received three authoritative kunai.");
             Assert.True(sawEmptyAfter, "Opponent never received the kunai removal snapshot.");
-            for (uint tick = 121; tick <= 200; tick++)
-                Send(wibou, 1, tick, tick == 121 ? new InputState { ActiveSlot = 3 } : default);
+            nextTick = ReadServerTick(wibou) + 6;
+            for (uint tick = 0; tick < 80; tick++)
+            {
+                Send(wibou, 1, nextTick++, tick == 0 ? new InputState { ActiveSlot = 3 } : default);
+                Thread.Sleep(16);
+            }
             bool sawSword = false, sawSwordEmptyAfter = false;
             timer.Restart();
+            long swordHeartbeat = 500;
             while (timer.Elapsed < TimeSpan.FromSeconds(4) && !sawSwordEmptyAfter)
             {
+                if (timer.ElapsedMilliseconds >= swordHeartbeat)
+                {
+                    SendPing(wibou);
+                    SendPing(opponent);
+                    swordHeartbeat += 1000;
+                }
                 if (!opponent.Client.Poll(30_000, SelectMode.SelectRead)) continue;
                 var remote = new IPEndPoint(IPAddress.Any, 0);
                 var frame = opponent.Receive(ref remote);

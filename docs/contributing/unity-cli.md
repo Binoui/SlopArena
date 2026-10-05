@@ -76,6 +76,13 @@ restores declared state, and releases only after actual work settles. Do not sen
 ordinary verification requests to another owner's inbox or inject commands into
 their session. Missing, blocked or uncertain ownership never means free.
 
+If the gateway process exits and loses its release token, a settled lease can remain
+held indefinitely. A human can select `Window/Pipeline/Recover Editor Lease...`
+and confirm the displayed owner/batch. The action rejects busy, blocked or changed
+state and revokes the previous token; callers then acquire normally. It is not a
+CLI recovery command or timeout takeover. See the shared protocol for the recovery
+constraints. Starting/stopping Pipeline alone does not clear session ownership.
+
 The gateway uses the installed Unity CLI and the canonical project's
 `Library/Pipeline/.unity-pipeline-port`; never overwrite that descriptor or use
 raw `unity command --project-path` to bypass ownership.

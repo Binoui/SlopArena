@@ -64,6 +64,7 @@ public sealed record AbilityLabTimelineProjection
                     ArmorWindowOperationSource armorWindow => operationStart + armorWindow.DurationTicks,
                     ForwardLungeOperationSource lunge => operationStart + lunge.DurationTicks,
                     EmitPresentationOperationSource presentation => operationStart + presentation.Placement.DurationTicks,
+                    StartupAimCorrectionOperationSource correction => startTick + correction.EndTick,
                     _ => operationStart + 1,
                 };
                 operations.Add(new AbilityLabOperationProjection(
@@ -106,6 +107,7 @@ public sealed record AbilityLabTimelineProjection
         StartCapabilityOperationSource => CookedOperationKind.StartCapability,
         EmitPresentationOperationSource => CookedOperationKind.EmitPresentation,
         CompleteTimelineOperationSource => CookedOperationKind.CompleteTimeline,
+        StartupAimCorrectionOperationSource => CookedOperationKind.StartupAimCorrection,
         _ => throw new InvalidDataException($"Unknown timeline operation type '{operation.GetType().FullName}'."),
     };
 
@@ -121,6 +123,7 @@ public sealed record AbilityLabTimelineProjection
         StartCapabilityOperationSource => "Start ability",
         EmitPresentationOperationSource => "Presentation",
         CompleteTimelineOperationSource => "Complete move",
+        StartupAimCorrectionOperationSource => "Startup aim correction",
         _ => throw new InvalidDataException($"Unknown timeline operation type '{operation.GetType().FullName}'."),
     };
 }

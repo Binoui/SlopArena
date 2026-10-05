@@ -116,4 +116,4 @@ MonoBehaviour:
     _poseTrackId: pose.fightguy.slide
   _presentations:
   - _semanticId: presentation.fightguy.ki-shot.hit
-    _prefab: {fileID: 583897833427099164, guid: 9cd63d5e221f1c53195c4af1a5c4d61a, type: 3}
+    _prefab: {fileID: 583897833427099164, guid: 6560b49a31294a90a4b69e4d85d68b7f, type: 3}

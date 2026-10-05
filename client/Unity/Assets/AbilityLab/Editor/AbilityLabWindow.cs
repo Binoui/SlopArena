@@ -74,6 +74,14 @@ public sealed partial class AbilityLabWindow : EditorWindow
     private string _timelineProjectionSlotId = "";
     private CharacterAuthoringDocument? _timelineProjectionDraft;
     private AbilityLabOperationProjection? _selectedOperation;
+    private int _inspectedStageIndex;
+    private int _selectedHitboxSourceIndex = -1;
+    private string _timelineProjectionPackageRoot = "";
+    private IntegerField _timelineSeek = null!;
+    private Label _timelineNotice = null!;
+    private VisualElement _fieldsInlineHost = null!;
+    private Button _detachFields = null!;
+    [SerializeField] private AbilityLabInspectorWindow? _fieldsWindow;
     private readonly Dictionary<string, VisualElement> _pages = new(StringComparer.Ordinal);
     private bool _airborneSelector;
     private bool _grabSelected;
@@ -257,6 +265,8 @@ public sealed partial class AbilityLabWindow : EditorWindow
         SceneView.duringSceneGui -= OnSceneGUI;
         DisposeAttachmentPreview();
         if (_grabSelected && _lab != null) _lab.ShowHitboxes = _grabPriorShowHitboxes;
+        _workspace.StatusChanged -= RefreshAll;
+        _fieldsWindow?.OwnerUnavailable(this);
         DestroyOwnedLab();
     }
 
@@ -264,6 +274,7 @@ public sealed partial class AbilityLabWindow : EditorWindow
     {
         if (_uiReady && ReferenceEquals(_root, rootVisualElement)) return;
         _uiReady = false;
+        string focusedName = CaptureFieldsFocus();
         _root = rootVisualElement;
         _root.Clear();
         var tree = AssetDatabase.LoadAssetAtPath<VisualTreeAsset>("Assets/AbilityLab/Editor/AbilityLabWindow.uxml");
@@ -291,7 +302,9 @@ public sealed partial class AbilityLabWindow : EditorWindow
             RefreshAll();
         _workspace.StatusChanged -= RefreshAll;
         _workspace.StatusChanged += RefreshAll;
+        _fieldsWindow?.CreateGUI();
         _uiReady = true;
+        RestoreFocus(focusedName);
     }
 
     private void Update()
@@ -323,6 +336,13 @@ public sealed partial class AbilityLabWindow : EditorWindow
         _timelineSlider = Required<SliderInt>("timeline-slider");
         _timelineDuration = Required<Label>("timeline-duration");
         _stageSelector = Required<DropdownField>("stage-selector");
+        _timelineSeek = Required<IntegerField>("timeline-seek");
+        _timelineNotice = Required<Label>("timeline-notice");
+        _fieldsInlineHost = Required<VisualElement>("fields-inline-host");
+        _detachFields = Required<Button>("detach-fields");
+        _detachFields.clicked += DetachInspectorFields;
+        _inspector.RegisterCallback<GeometryChangedEvent>(evt =>
+            _inspector.EnableInClassList("fields-narrow", evt.newRect.width < 420));
         _timelineZoom = Required<Slider>("timeline-zoom");
         _timelineScroll = Required<ScrollView>("timeline-scroll");
         _scenarioAction = Required<Label>("scenario-action");
@@ -409,6 +429,46 @@ public sealed partial class AbilityLabWindow : EditorWindow
         _activePage = pageName;
         foreach (var page in _pages)
             page.Value.style.display = page.Key == pageName ? DisplayStyle.Flex : DisplayStyle.None;
+        _fieldsWindow?.RefreshAvailability();
+    }
+
+    internal bool MovesPageActive => _activePage == "moves-page";
+    internal string InspectorContext => _lab == null ? "Moves fields" :
+        $"{_workspace.PackageId} · {_lab.SelectedSlotId} · source stage {_inspectedStageIndex + 1}";
+    internal bool HasDetachedFields(AbilityLabInspectorWindow window) => _fieldsWindow == window;
+    internal void HandleFieldsKeyDown(KeyDownEvent evt) => OnRootKeyDown(evt);
+
+    private void DetachInspectorFields()
+    {
+        var window = GetWindow<AbilityLabInspectorWindow>(false, "Ability Lab · Fields", false);
+        window.BindOwner(this);
+    }
+
+    internal void AttachInspectorFields(AbilityLabInspectorWindow window, VisualElement host)
+    {
+        if (_inspector == null || _fieldsInlineHost == null) return;
+        string focusedName = CaptureFieldsFocus();
+        _fieldsWindow = window;
+        host.Add(_inspector);
+        _fieldsInlineHost.style.display = DisplayStyle.None;
+        _detachFields.text = "Fields detached";
+        window.RefreshAvailability();
+        RestoreFocus(focusedName);
+    }
+
+    internal void ReturnInspectorInline(AbilityLabInspectorWindow window)
+    {
+        if (_fieldsWindow != window) return;
+        string focusedName = CaptureFieldsFocus();
+        _fieldsWindow = null;
+        if (_fieldsInlineHost != null && _inspector != null)
+        {
+            _fieldsInlineHost.Add(_inspector);
+            _fieldsInlineHost.style.display = DisplayStyle.Flex;
+            _detachFields.text = "Detach fields";
+        }
+        window.RefreshAvailability();
+        RestoreFocus(focusedName);
     }
 
 
@@ -456,6 +516,10 @@ public sealed partial class AbilityLabWindow : EditorWindow
         {
             if (!_updatingControls) ApplyCumulativeTick(evt.newValue);
         });
+        _timelineSeek.RegisterValueChangedCallback(evt =>
+        {
+            if (!_updatingControls) ApplyCumulativeTick(evt.newValue);
+        });
         _timelineZoom.RegisterValueChangedCallback(evt => SetTimelineZoom(evt.newValue));
         SetTimelineZoom(_timelineZoom.value);
         _stageSelector.RegisterValueChangedCallback(evt =>
@@ -463,7 +527,10 @@ public sealed partial class AbilityLabWindow : EditorWindow
             if (!_updatingControls && _lab?.IsScenarioPreview != true &&
                 int.TryParse(evt.newValue.Replace("Stage ", ""), out var stage))
             {
-                _lab?.SetStage(stage - 1);
+                _inspectedStageIndex = stage - 1;
+                _selectedOperation = null;
+                _selectedHitboxSourceIndex = -1;
+                _lab?.SelectHitbox(-1);
                 UpdateTimelineControls();
                 RefreshInspector();
             }
@@ -1119,7 +1186,13 @@ public sealed partial class AbilityLabWindow : EditorWindow
 
     private void RefreshAll()
     {
-        string focusedName = (_root?.panel?.focusController?.focusedElement as VisualElement)?.name ?? "";
+        string focusedName = CaptureFieldsFocus();
+        bool retainCursor = _lab != null && _timelineProjection != null &&
+            _timelineProjectionPackageRoot == _workspace.PackageRoot &&
+            _timelineProjectionSlotId == _lab.SelectedSlotId &&
+            !_lab.PhasePreviewActive && !_lab.IsScenarioPreview && !_grabSelected;
+        int priorTick = retainCursor ? CumulativeTick(_timelineProjection!, _lab!.StageIndex, _lab.Tick) : 0;
+        bool wasPlaying = retainCursor && _lab!.Playing;
         _lab = FindLab();
         _inspection = _workspace.HasPackage
             ? new CharacterPackageAuthoringService(UnityCharacterAssetCooker.ProjectRoot()).Inspect(_workspace.PackageRoot)
@@ -1134,24 +1207,42 @@ public sealed partial class AbilityLabWindow : EditorWindow
         RefreshDiagnostics();
         RefreshRigState();
         UpdateTimelineControls();
+        if (retainCursor && _lab?.IsPackagePreview == true && _timelineProjection != null)
+        {
+            int restoredTick = Mathf.Clamp(priorTick, 0, Mathf.Max(0, _timelineProjection.DurationTicks - 1));
+            if (TryResolveCumulativeTick(_timelineProjection, restoredTick, out var cursorStage, out ushort cursorLocal, out _))
+            {
+                _lab.SetStage(cursorStage.SourceStageIndex);
+                _lab.SetTick(cursorLocal);
+            }
+            _lab.Playing = wasPlaying;
+            UpdateTimelineControls();
+            _timelineNotice.text = restoredTick == priorTick ? "" : $"Cursor clamped from {priorTick} to {restoredTick}: move duration changed.";
+        }
         RefreshScenarioControls();
         RefreshInspector();
         RestoreFocus(focusedName);
     }
 
-    private void RestoreFocus(string focusedName)
+    internal string CaptureFieldsFocus()
     {
-        if (!string.IsNullOrEmpty(focusedName))
+        var element = (_fieldsWindow?.rootVisualElement.panel?.focusController?.focusedElement ??
+            _root?.panel?.focusController?.focusedElement) as VisualElement;
+        while (element != null)
         {
-            var target = _root.Q<VisualElement>(focusedName);
-            if (target != null && target.focusable)
-            {
-                target.Focus();
-                return;
-            }
+            if (element.focusable && !string.IsNullOrEmpty(element.name) &&
+                !element.name.StartsWith("unity-", StringComparison.Ordinal))
+                return element.name;
+            element = element.parent;
         }
-        if (_timelineTrack != null)
-            _timelineTrack.Focus();
+        return "";
+    }
+
+    internal void RestoreFocus(string focusedName)
+    {
+        if (string.IsNullOrEmpty(focusedName)) return;
+        var target = _inspector?.Q<VisualElement>(focusedName) ?? _root.Q<VisualElement>(focusedName);
+        if (target != null && target.focusable) target.Focus();
     }
 
 
@@ -1621,7 +1712,11 @@ public sealed partial class AbilityLabWindow : EditorWindow
     private void UpdateTimelineControls()
     {
         RefreshPhaseControls();
-        if (UpdatePhaseTimeline()) return;
+        if (UpdatePhaseTimeline())
+        {
+            SyncNumericSeek();
+            return;
+        }
         if (_lab?.IsScenarioPreview == true && _lab.Scenario != null)
         {
             var result = _lab.Scenario;
@@ -1631,10 +1726,9 @@ public sealed partial class AbilityLabWindow : EditorWindow
             _timelineProjection = null;
             _moveTimeline.style.display = DisplayStyle.Flex;
             _updatingControls = true;
-            _timelineSlider.lowValue = 0;
-            _timelineSlider.highValue = lastFrame;
-            _timelineSlider.SetValueWithoutNotify(frame);
+            SetTimelineRange(lastFrame, frame);
             _timelineSlider.SetEnabled(true);
+            SyncNumericSeek();
             _timelinePlay.SetEnabled(true);
             _timelinePlay.text = _lab.Playing ? "Pause" : "Play";
             _timelineTick.text = $"Frame {sample.FrameIndex} · Match tick {sample.MatchTick}";
@@ -1652,6 +1746,7 @@ public sealed partial class AbilityLabWindow : EditorWindow
         {
             _timelineProjection = null;
             _timelineSlider.SetEnabled(false);
+            _timelineSeek.SetEnabled(false);
             _timelinePlay.SetEnabled(false);
             _stageSelector.style.display = DisplayStyle.None;
             _moveTimeline.style.display = DisplayStyle.None;
@@ -1664,6 +1759,7 @@ public sealed partial class AbilityLabWindow : EditorWindow
             _timelineTick.text = "Tick 0";
             _timelineDuration.text = "Duration —";
             _timelineSlider.SetEnabled(false);
+            _timelineSeek.SetEnabled(false);
             _timelinePlay.SetEnabled(false);
             _stageSelector.style.display = DisplayStyle.None;
             _stageSelector.SetEnabled(false);
@@ -1676,10 +1772,9 @@ public sealed partial class AbilityLabWindow : EditorWindow
         int cumulativeTick = CumulativeTick(_timelineProjection, _lab.StageIndex, _lab.Tick);
         int duration = _timelineProjection.DurationTicks;
         _updatingControls = true;
-        _timelineSlider.lowValue = 0;
-        _timelineSlider.highValue = Mathf.Max(0, duration);
-        _timelineSlider.SetValueWithoutNotify(Mathf.Clamp(cumulativeTick, 0, duration));
+        SetTimelineRange(Mathf.Max(0, duration - 1), cumulativeTick);
         _timelineSlider.SetEnabled(true);
+        SyncNumericSeek();
         _timelinePlay.SetEnabled(true);
         _timelinePlay.text = _lab.Playing ? "Pause" : "Play";
         _timelineTick.text = $"Tick {cumulativeTick}";
@@ -1691,6 +1786,23 @@ public sealed partial class AbilityLabWindow : EditorWindow
             _timelineTrack.SelectedOperation = _selectedOperation;
         _updatingControls = false;
         UpdateStageSelector();
+        SyncSelectedHitbox();
+    }
+
+    private void SetTimelineRange(int lastTick, int tick)
+    {
+        // Range setters otherwise enqueue a seek after the refresh guard is cleared.
+        if (_timelineSlider.value > lastTick)
+            _timelineSlider.SetValueWithoutNotify(lastTick);
+        _timelineSlider.lowValue = 0;
+        _timelineSlider.highValue = lastTick;
+        _timelineSlider.SetValueWithoutNotify(tick);
+    }
+
+    private void SyncNumericSeek()
+    {
+        _timelineSeek.SetValueWithoutNotify(_timelineSlider.value);
+        _timelineSeek.SetEnabled(_timelineSlider.enabledSelf);
     }
 
     private AbilityLabTimelineProjection? BuildTimelineProjection()
@@ -1700,13 +1812,31 @@ public sealed partial class AbilityLabWindow : EditorWindow
             _timelineProjection = null;
             _timelineProjectionSlotId = "";
             _timelineProjectionDraft = null;
+            _timelineProjectionPackageRoot = "";
+            _selectedOperation = null;
+            _selectedHitboxSourceIndex = -1;
             return null;
         }
-        if (ReferenceEquals(_timelineProjectionDraft, _workspace.Draft) && _timelineProjectionSlotId == _lab.SelectedSlotId)
+        bool sameContext = _timelineProjectionPackageRoot == _workspace.PackageRoot &&
+            _timelineProjectionSlotId == _lab.SelectedSlotId;
+        if (sameContext && _timelineProjection != null && ReferenceEquals(_timelineProjectionDraft, _workspace.Draft))
             return _timelineProjection;
+        if (!sameContext)
+        {
+            _selectedOperation = null;
+            _selectedHitboxSourceIndex = -1;
+            _inspectedStageIndex = Mathf.Max(0, _lab.StageIndex);
+            _timelineNotice.text = "";
+        }
+        _timelineProjectionPackageRoot = _workspace.PackageRoot;
         _timelineProjectionSlotId = _lab.SelectedSlotId;
         _timelineProjectionDraft = _workspace.Draft;
-        return _timelineProjection = AbilityLabTimelineProjection.Build(sourceSlot);
+        _timelineProjection = AbilityLabTimelineProjection.Build(sourceSlot);
+        _inspectedStageIndex = Mathf.Clamp(_inspectedStageIndex, 0, Mathf.Max(0, _timelineProjection.Stages.Count - 1));
+        if (_selectedOperation != null)
+            _selectedOperation = FindProjectedOperation(_selectedOperation.SourceStageIndex, _selectedOperation.SourceOperationIndex);
+        CacheSelectedHitbox();
+        return _timelineProjection;
     }
 
     private static AbilityLabTimelineProjection EmptyTimeline()
@@ -1774,6 +1904,8 @@ public sealed partial class AbilityLabWindow : EditorWindow
             return;
         _lab.SetStage(stage.SourceStageIndex);
         _lab.SetTick(local);
+        _timelineNotice.text = cumulativeTick == CumulativeTick(_timelineProjection, stage.SourceStageIndex, local)
+            ? "" : $"Cursor clamped to valid move tick {CumulativeTick(_timelineProjection, stage.SourceStageIndex, local)}.";
         UpdateTimelineControls();
     }
 
@@ -1784,14 +1916,16 @@ public sealed partial class AbilityLabWindow : EditorWindow
         {
             _stageSelector.style.display = DisplayStyle.None;
             _stageSelector.SetEnabled(false);
-            _stageSelector.choices = new List<string>();
+            if (_stageSelector.choices.Count != 0) _stageSelector.choices = new List<string>();
             _stageSelector.SetValueWithoutNotify("");
             return;
         }
-        var choices = _timelineProjection.Stages.Select(stage => $"Stage {stage.SourceStageIndex + 1}").ToList();
+        var choices = _stageSelector.choices;
+        if (choices.Count != _timelineProjection.Stages.Count)
+            choices = _timelineProjection.Stages.Select(stage => $"Stage {stage.SourceStageIndex + 1}").ToList();
         _stageSelector.style.display = DisplayStyle.Flex;
         _stageSelector.choices = choices;
-        _stageSelector.SetValueWithoutNotify(choices[Mathf.Clamp(_lab!.StageIndex, 0, choices.Count - 1)]);
+        _stageSelector.SetValueWithoutNotify(choices[Mathf.Clamp(_inspectedStageIndex, 0, choices.Count - 1)]);
         _stageSelector.SetEnabled(true);
     }
 
@@ -1863,31 +1997,36 @@ public sealed partial class AbilityLabWindow : EditorWindow
 
     private void SelectOperation(AbilityLabOperationProjection operation)
     {
-        if (_lab?.IsScenarioPreview == true) return;
+        if (_lab?.IsScenarioPreview == true || _lab == null) return;
         _selectedOperation = operation;
-        if (_lab == null) return;
-        _lab.SetStage(operation.SourceStageIndex);
-        var projection = _timelineProjection ?? BuildTimelineProjection();
-        int local = projection == null || operation.SourceStageIndex >= projection.Stages.Count
-            ? 0
-            : Mathf.Clamp(operation.StartTick - projection.Stages[operation.SourceStageIndex].StartTick, 0,
-                Mathf.Max(0, projection.Stages[operation.SourceStageIndex].DurationTicks - 1));
-        _lab.SetTick((ushort)local);
-        int hitboxIndex = -1;
-        if (operation.Source is SpawnHitboxOperationSource)
-        {
-            if (_workspace.TryResolveCanonicalSlot(_lab.SelectedSlotId, out _, out var sourceSlot) &&
-                operation.SourceStageIndex < sourceSlot.Timeline.Stages.Count)
-            {
-                var operations = sourceSlot.Timeline.Stages[operation.SourceStageIndex].Operations;
-                for (int i = 0; i < operation.SourceOperationIndex; i++)
-                    if (operations[i] is SpawnHitboxOperationSource) hitboxIndex++;
-                hitboxIndex++;
-            }
-        }
-        _lab.SelectHitbox(hitboxIndex);
+        _inspectedStageIndex = operation.SourceStageIndex;
+        _sceneRadiusEditing = false;
+        _scenePresentationEditing = false;
+        CacheSelectedHitbox();
+        SyncSelectedHitbox();
         UpdateTimelineControls();
         RefreshInspector();
+    }
+
+    private void CacheSelectedHitbox()
+    {
+        _selectedHitboxSourceIndex = -1;
+        if (_selectedOperation?.Source is not SpawnHitboxOperationSource || _lab == null ||
+            !_workspace.TryResolveCanonicalSlot(_lab.SelectedSlotId, out _, out var slot))
+            return;
+        var operations = slot.Timeline.Stages[_selectedOperation.SourceStageIndex].Operations;
+        int index = 0;
+        for (int i = 0; i < _selectedOperation.SourceOperationIndex; i++)
+            if (operations[i] is SpawnHitboxOperationSource) index++;
+        _selectedHitboxSourceIndex = index;
+    }
+
+    private void SyncSelectedHitbox()
+    {
+        if (_lab == null || _lab.IsScenarioPreview || _lab.PhasePreviewActive) return;
+        int index = _selectedOperation != null && _selectedOperation.SourceStageIndex == _lab.StageIndex
+            ? _selectedHitboxSourceIndex : -1;
+        if (_lab.SelectedHitboxEventIndex != index) _lab.SelectHitbox(index);
     }
     private void CompleteTimelineDrag(AbilityLabTimelineDrag drag)
     {
@@ -1906,6 +2045,9 @@ public sealed partial class AbilityLabWindow : EditorWindow
         _lab.SetTick((ushort)Mathf.Clamp(drag.Tick, 0, ushort.MaxValue));
         _timelineProjection = BuildTimelineProjection();
         _selectedOperation = FindProjectedOperation(drag.SourceStageIndex, drag.SourceOperationIndex);
+        _inspectedStageIndex = drag.SourceStageIndex;
+        CacheSelectedHitbox();
+        SyncSelectedHitbox();
         _timelineTrack.SelectedOperation = _selectedOperation;
         RefreshInspector();
         SceneView.RepaintAll();
@@ -1935,8 +2077,24 @@ public sealed partial class AbilityLabWindow : EditorWindow
 
     private void RefreshInspector()
     {
+        string focusedName = CaptureFieldsFocus();
+        bool attachmentExpanded = _inspector.Q<Foldout>("attachment-authoring")?.value ?? false;
+        bool updating = _updatingControls;
+        _updatingControls = true;
+        try
+        {
+            RefreshInspectorContents();
+            var attachment = _inspector.Q<Foldout>("attachment-authoring");
+            if (attachment != null) attachment.SetValueWithoutNotify(attachmentExpanded || _workspace.AttachmentDraftDirty);
+        }
+        finally { _updatingControls = updating; }
+        _fieldsWindow?.RefreshAvailability();
+        RestoreFocus(focusedName);
+    }
+
+    private void RefreshInspectorContents()
+    {
         _inspector.Clear();
-        AddAttachmentAuthoring();
         _moveTimeline.style.display = _grabSelected && _lab?.IsScenarioPreview != true
             ? DisplayStyle.None
             : DisplayStyle.Flex;
@@ -1947,6 +2105,7 @@ public sealed partial class AbilityLabWindow : EditorWindow
         }
         if (_lab?.PhasePreviewActive == true && !_grabSelected)
         {
+            AddAttachmentAuthoring();
             _inspector.Add(new Label("Presentation-only phase preview. Choose Timeline to edit gameplay operations."));
             return;
         }
@@ -1994,13 +2153,14 @@ public sealed partial class AbilityLabWindow : EditorWindow
         }
         if (_lab == null || !_workspace.HasPackage ||
             !_workspace.TryResolveCanonicalSlot(_lab.SelectedSlotId, out _, out var slot) ||
-            _lab.StageIndex < 0 || _lab.StageIndex >= slot.Timeline.Stages.Count)
+            slot.Timeline.Stages.Count == 0)
         {
             _stageSelector.style.display = DisplayStyle.None;
             _stageSelector.SetEnabled(false);
             _inspector.Add(new Label("Select a cooked package and move."));
             return;
         }
+        BuildTimelineProjection();
 
         bool multiStage = slot.Timeline.Stages.Count > 1;
         _stageSelector.style.display = multiStage ? DisplayStyle.Flex : DisplayStyle.None;
@@ -2008,23 +2168,24 @@ public sealed partial class AbilityLabWindow : EditorWindow
         if (multiStage)
             _inspector.Add(_stageSelector);
 
-        var stage = slot.Timeline.Stages[_lab.StageIndex];
-        var moveGroup = new Foldout { text = $"Move · {slot.Name}", value = true };
+        int stageIndex = _inspectedStageIndex;
+        var stage = slot.Timeline.Stages[stageIndex];
+        var moveGroup = new Foldout { name = "move-overview", text = $"Move overview · {slot.Name} · Stage {stageIndex + 1}", value = true };
         moveGroup.Add(new Label($"Duration {stage.DurationTicks} · IASA {stage.IasaTicks} · Landing lag {stage.LandingLagTicks}"));
-        var durationField = new IntegerField("Duration ticks") { value = stage.DurationTicks, isDelayed = true };
+        var durationField = new IntegerField("Duration ticks") { name = "move-duration", value = stage.DurationTicks, isDelayed = true };
         durationField.RegisterValueChangedCallback(evt =>
         {
             if (_updatingControls || _lab == null) return;
             int duration = Mathf.Clamp(evt.newValue, 1, ushort.MaxValue);
-            CommitStage(current => current with { DurationTicks = (ushort)duration }, _lab.StageIndex);
+            CommitStage(current => current with { DurationTicks = (ushort)duration }, stageIndex);
         });
         moveGroup.Add(durationField);
-        var iasaField = new IntegerField("IASA ticks") { value = stage.IasaTicks, isDelayed = true };
+        var iasaField = new IntegerField("IASA ticks") { name = "move-iasa", value = stage.IasaTicks, isDelayed = true };
         iasaField.RegisterValueChangedCallback(evt =>
         {
             if (_updatingControls || _lab == null) return;
             int iasa = Mathf.Clamp(evt.newValue, 0, stage.DurationTicks);
-            CommitStage(current => current with { IasaTicks = (ushort)iasa }, _lab.StageIndex);
+            CommitStage(current => current with { IasaTicks = (ushort)iasa }, stageIndex);
         });
         moveGroup.Add(iasaField);
         moveGroup.Add(new Label($"Auto-cancel before {stage.AutoCancelBeforeTicks} · after {stage.AutoCancelAfterTicks}"));
@@ -2035,12 +2196,14 @@ public sealed partial class AbilityLabWindow : EditorWindow
             .Distinct(StringComparer.Ordinal)
             .ToList();
         var animationChoices = BuildAnimationChoices(animationIds);
+        int animationIndex = 0;
         foreach (string animationId in stage.AnimationIds ?? Array.Empty<string>())
         {
             var selectedChoice = animationChoices.FirstOrDefault(choice => choice.SemanticId == animationId);
             var choices = animationChoices.Select(choice => choice.Label).ToList();
             var field = new PopupField<string>($"Animation · {selectedChoice?.Label ?? $"Unknown ({animationId})"}", choices,
                 selectedChoice == null ? 0 : choices.IndexOf(selectedChoice.Label));
+            field.name = $"move-animation-{animationIndex++}";
             field.RegisterValueChangedCallback(evt =>
             {
                 var choice = animationChoices.FirstOrDefault(item => item.Label == evt.newValue);
@@ -2048,7 +2211,7 @@ public sealed partial class AbilityLabWindow : EditorWindow
                     CommitStage(current => current with
                     {
                         AnimationIds = current.AnimationIds.Select(id => id == animationId ? choice.SemanticId : id).ToArray()
-                    }, _lab.StageIndex);
+                    }, stageIndex);
             });
             moveGroup.Add(field);
             var animationEntry = _preview?.AnimationCatalog?.Animations
@@ -2060,9 +2223,11 @@ public sealed partial class AbilityLabWindow : EditorWindow
         }
         var addHitbox = new Button(() =>
         {
-            if (_lab == null || !_workspace.AddHitbox(_lab.SelectedSlotId, _lab.StageIndex)) return;
+            if (_lab == null || !_workspace.AddHitbox(_lab.SelectedSlotId, stageIndex)) return;
             UpdateTimelineControls();
-            _selectedOperation = _timelineProjection?.Stages[_lab.StageIndex].Operations.LastOrDefault();
+            _selectedOperation = _timelineProjection?.Stages[stageIndex].Operations.LastOrDefault();
+            CacheSelectedHitbox();
+            SyncSelectedHitbox();
             _timelineTrack.SelectedOperation = _selectedOperation;
             RefreshInspector();
             SceneView.RepaintAll();
@@ -2074,9 +2239,11 @@ public sealed partial class AbilityLabWindow : EditorWindow
         moveGroup.Add(addHitbox);
         var addForwardLunge = new Button(() =>
         {
-            if (_lab == null || !_workspace.AddForwardLunge(_lab.SelectedSlotId, _lab.StageIndex)) return;
+            if (_lab == null || !_workspace.AddForwardLunge(_lab.SelectedSlotId, stageIndex)) return;
             UpdateTimelineControls();
-            _selectedOperation = _timelineProjection?.Stages[_lab.StageIndex].Operations.LastOrDefault();
+            _selectedOperation = _timelineProjection?.Stages[stageIndex].Operations.LastOrDefault();
+            CacheSelectedHitbox();
+            SyncSelectedHitbox();
             _timelineTrack.SelectedOperation = _selectedOperation;
             RefreshInspector();
             SceneView.RepaintAll();
@@ -2088,9 +2255,11 @@ public sealed partial class AbilityLabWindow : EditorWindow
         moveGroup.Add(addForwardLunge);
         var addGravityWindow = new Button(() =>
         {
-            if (_lab == null || !_workspace.AddGravityWindow(_lab.SelectedSlotId, _lab.StageIndex)) return;
+            if (_lab == null || !_workspace.AddGravityWindow(_lab.SelectedSlotId, stageIndex)) return;
             UpdateTimelineControls();
-            _selectedOperation = _timelineProjection?.Stages[_lab.StageIndex].Operations.LastOrDefault();
+            _selectedOperation = _timelineProjection?.Stages[stageIndex].Operations.LastOrDefault();
+            CacheSelectedHitbox();
+            SyncSelectedHitbox();
             _timelineTrack.SelectedOperation = _selectedOperation;
             RefreshInspector();
             SceneView.RepaintAll();
@@ -2102,9 +2271,11 @@ public sealed partial class AbilityLabWindow : EditorWindow
         moveGroup.Add(addGravityWindow);
         var addTargetedLeap = new Button(() =>
         {
-            if (_lab == null || !_workspace.AddTargetedLeap(_lab.SelectedSlotId, _lab.StageIndex)) return;
+            if (_lab == null || !_workspace.AddTargetedLeap(_lab.SelectedSlotId, stageIndex)) return;
             UpdateTimelineControls();
-            _selectedOperation = _timelineProjection?.Stages[_lab.StageIndex].Operations.LastOrDefault();
+            _selectedOperation = _timelineProjection?.Stages[stageIndex].Operations.LastOrDefault();
+            CacheSelectedHitbox();
+            SyncSelectedHitbox();
             _timelineTrack.SelectedOperation = _selectedOperation;
             RefreshInspector();
             SceneView.RepaintAll();
@@ -2129,11 +2300,13 @@ public sealed partial class AbilityLabWindow : EditorWindow
             string presentationId = presentationIds[0];
             if (!_workspace.AddOperation(
                     sourceSlotIndex,
-                    _lab.StageIndex,
+                    stageIndex,
                     new EmitPresentationOperationSource(0, AuthoringUnit.Ticks, presentationId)))
                 return;
             UpdateTimelineControls();
-            _selectedOperation = _timelineProjection?.Stages[_lab.StageIndex].Operations.LastOrDefault();
+            _selectedOperation = _timelineProjection?.Stages[stageIndex].Operations.LastOrDefault();
+            CacheSelectedHitbox();
+            SyncSelectedHitbox();
             _timelineTrack.SelectedOperation = _selectedOperation;
             RefreshInspector();
             SceneView.RepaintAll();
@@ -2145,21 +2318,55 @@ public sealed partial class AbilityLabWindow : EditorWindow
         addPresentation.SetEnabled(presentationIds.Count > 0);
         moveGroup.Add(addPresentation);
         _inspector.Add(moveGroup);
-        foreach (var operation in stage.Operations.Select((_, index) =>
-                     FindProjectedOperation(_lab.StageIndex, index)).Where(operation => operation != null))
+        var inventory = new Foldout { name = "effect-inventory", text = "Effects · all source stages", value = true };
+        inventory.Add(new Label("Selecting an effect inspects its source; it does not seek the preview."));
+        foreach (var sourceStage in _timelineProjection!.Stages)
         {
-            var projected = operation!;
-            bool expanded = _selectedOperation != null &&
-                _selectedOperation.SourceStageIndex == projected.SourceStageIndex &&
-                _selectedOperation.SourceOperationIndex == projected.SourceOperationIndex;
-            _inspector.Add(BuildOperationFoldout(projected, expanded));
+            inventory.Add(new Label($"Stage {sourceStage.SourceStageIndex + 1} · move ticks [{sourceStage.StartTick}, {sourceStage.EndTick})"));
+            foreach (var operation in sourceStage.Operations)
+            {
+                bool selected = _selectedOperation?.SourceStageIndex == operation.SourceStageIndex &&
+                    _selectedOperation.SourceOperationIndex == operation.SourceOperationIndex;
+                var button = new Button(() => SelectOperation(operation))
+                {
+                    name = $"effect-{operation.SourceStageIndex}-{operation.SourceOperationIndex}",
+                    text = $"{(selected ? "Selected · " : "")}{operation.Summary} · {EffectTiming(operation, sourceStage.StartTick)}",
+                    tooltip = $"Source stage {operation.SourceStageIndex + 1}, operation {operation.SourceOperationIndex + 1}.",
+                };
+                button.AddToClassList("effect-inventory-row");
+                inventory.Add(button);
+            }
         }
+        _inspector.Add(inventory);
+        if (_selectedOperation != null)
+        {
+            var seek = new Button(() => ApplyCumulativeTick(_selectedOperation!.StartTick))
+            {
+                name = "seek-selected-effect", text = "Seek to selected effect",
+            };
+            _inspector.Add(seek);
+            var detail = BuildOperationFoldout(_selectedOperation, true);
+            detail.name = "selected-effect-fields";
+            _inspector.Add(detail);
+        }
+        else _inspector.Add(new Label("Select an effect for its fields."));
+        AddAttachmentAuthoring();
+    }
+
+    private static string EffectTiming(AbilityLabOperationProjection operation, int stageStart)
+    {
+        int localStart = operation.StartTick - stageStart;
+        if (operation.Source is StartCapabilityOperationSource)
+            return $"trigger {localStart} (move {operation.StartTick}); capability-owned / conditional windows";
+        if (operation.Source is EmitPresentationOperationSource presentation && presentation.Placement.DurationTicks == 0)
+            return $"trigger {localStart} (move {operation.StartTick}); prefab-owned lifetime";
+        return $"stage ticks [{localStart}, {operation.EndTick - stageStart}) · move ticks [{operation.StartTick}, {operation.EndTick})";
     }
 
     private Foldout BuildOperationFoldout(AbilityLabOperationProjection operation, bool expanded)
     {
         string range = $"[{operation.StartTick}, {operation.EndTick})";
-        var group = new Foldout { text = $"{operation.Summary} · {range}", value = expanded };
+        var group = new Foldout { name = "selected-effect-fields", text = $"{operation.Summary} · {range}", value = expanded };
         group.AddToClassList("timeline-operation");
         group.RegisterValueChangedCallback(evt =>
         {
@@ -2247,6 +2454,7 @@ public sealed partial class AbilityLabWindow : EditorWindow
                 "Presentation",
                 labels,
                 labels.IndexOf(selectedChoice.Label));
+            field.name = FieldName(group, "Presentation");
             field.RegisterValueChangedCallback(evt =>
             {
                 var choice = choices.FirstOrDefault(item => item.Label == evt.newValue);
@@ -2258,6 +2466,7 @@ public sealed partial class AbilityLabWindow : EditorWindow
                 value => CommitPresentationOperationStart(operation, value));
             AddPresentationPlacement(group, operation, presentationOperation.Placement);
         }
+        else group.Add(new Label("Fields unavailable for this operation type. Source remains visible in the inventory."));
 
 
         return group;
@@ -2266,7 +2475,7 @@ public sealed partial class AbilityLabWindow : EditorWindow
     private void AddPresentationPlacement(Foldout group, AbilityLabOperationProjection operation, PresentationPlacement placement)
     {
         var placementGroup = new Foldout { text = "Placement", value = true };
-        var mode = new EnumField("Attachment", placement.AttachmentMode);
+        var mode = new EnumField("Attachment", placement.AttachmentMode) { name = FieldName(placementGroup, "Attachment") };
         mode.RegisterValueChangedCallback(evt =>
             CommitPresentationPlacement(operation, current => current with
             {
@@ -2339,7 +2548,7 @@ public sealed partial class AbilityLabWindow : EditorWindow
             value => CommitHitbox(h => h with { Interruptible = value }));
         AddDelayedInteger(landing, "Hit group", leap.Hitbox.HitGroup,
             value => CommitHitbox(h => h with { HitGroup = (byte)Mathf.Clamp(value, 0, byte.MaxValue) }));
-        var direction = new EnumField("Knockback direction", leap.Hitbox.KnockbackDirection);
+        var direction = new EnumField("Knockback direction", leap.Hitbox.KnockbackDirection) { name = FieldName(landing, "Knockback direction") };
         direction.RegisterValueChangedCallback(evt =>
             CommitHitbox(h => h with { KnockbackDirection = (AuthoringKnockbackDirection)evt.newValue }));
         landing.Add(direction);
@@ -2379,6 +2588,12 @@ public sealed partial class AbilityLabWindow : EditorWindow
         AbilityLabOperationProjection operation,
         StartCapabilityOperationSource capability)
     {
+        group.Add(new Label($"Capability · {capability.CapabilityId}"));
+        group.Add(new Label("Capability timing and remaining parameters are capability-owned; no complete typed editor is available here."));
+        AddDelayedInteger(group, "Start tick", capability.Tick,
+            value => CommitCapabilityStart(operation, value));
+        if (capability.Parameters is not (MankiRoundBombCapabilityParameters or MankiJetpackBoostCapabilityParameters or MankiBazookaCapabilityParameters))
+            return;
         string presentationId = capability.Parameters switch
         {
             MankiRoundBombCapabilityParameters parameters => parameters.ExplosionPresentationId,
@@ -2394,6 +2609,7 @@ public sealed partial class AbilityLabWindow : EditorWindow
             labels,
             labels.IndexOf(selectedChoice.Label))
         {
+            name = FieldName(group, "Explosion VFX"),
             tooltip = "Package-owned explosion presentation emitted by this capability.",
         };
         field.RegisterValueChangedCallback(evt =>
@@ -2402,10 +2618,7 @@ public sealed partial class AbilityLabWindow : EditorWindow
             if (choice != null)
                 CommitCapabilityPresentationId(operation, choice.SemanticId);
         });
-        group.Add(new Label($"Capability · {capability.CapabilityId}"));
         group.Add(field);
-        AddDelayedInteger(group, "Start tick", capability.Tick,
-            value => CommitCapabilityStart(operation, value));
     }
 
 
@@ -2550,18 +2763,18 @@ public sealed partial class AbilityLabWindow : EditorWindow
     {
         if (_updatingControls || _lab == null) return;
         _updatingControls = true;
-        try { _workspace.ReplaceStage(_lab.SelectedSlotId, stageIndex, edit(CurrentStage())); }
+        try { _workspace.ReplaceStage(_lab.SelectedSlotId, stageIndex, edit(CurrentStage(stageIndex))); }
         finally { _updatingControls = false; }
         UpdateTimelineControls();
         RefreshInspector();
         SceneView.RepaintAll();
     }
 
-    private CharacterStageSource CurrentStage()
+    private CharacterStageSource CurrentStage(int stageIndex = -1)
     {
         if (_lab == null || !_workspace.TryResolveCanonicalSlot(_lab.SelectedSlotId, out _, out var slot))
             throw new InvalidOperationException("No selected source slot.");
-        return slot.Timeline.Stages[_lab.StageIndex];
+        return slot.Timeline.Stages[stageIndex >= 0 ? stageIndex : _selectedOperation?.SourceStageIndex ?? _inspectedStageIndex];
     }
 
     private void CommitForwardLunge(Func<ForwardLungeOperationSource, ForwardLungeOperationSource> edit)
@@ -2720,7 +2933,7 @@ public sealed partial class AbilityLabWindow : EditorWindow
     private void AddHitboxShape(Foldout group, HitboxSource value)
     {
         var shape = new Foldout { text = "Shape", value = true };
-        var enumField = new EnumField("Shape", value.Shape);
+        var enumField = new EnumField("Shape", value.Shape) { name = FieldName(shape, "Shape") };
         enumField.RegisterValueChangedCallback(evt => CommitHitbox(h => h with { Shape = (AuthoringHitboxShape)evt.newValue }));
         shape.Add(enumField);
         AddDelayedFloat(shape, "Radius", value.Radius, v => CommitHitbox(h => h with { Radius = v }));
@@ -2746,7 +2959,7 @@ public sealed partial class AbilityLabWindow : EditorWindow
         var choices = AuthoringBoneChoices();
         if (!string.IsNullOrEmpty(value) && !choices.Contains(value, StringComparer.Ordinal))
             choices.Add(value);
-        var field = new PopupField<string>(label, choices, choices.IndexOf(value ?? ""));
+        var field = new PopupField<string>(label, choices, choices.IndexOf(value ?? "")) { name = FieldName(group, label) };
         field.RegisterValueChangedCallback(evt => commit(string.IsNullOrEmpty(evt.newValue) ? null : evt.newValue));
         group.Add(field);
     }
@@ -2766,24 +2979,27 @@ public sealed partial class AbilityLabWindow : EditorWindow
 
     private void AddDelayedFloat(VisualElement parent, string label, float value, Action<float> commit)
     {
-        var field = new FloatField(label) { value = value, isDelayed = true };
+        var field = new FloatField(label) { name = FieldName(parent, label), value = value, isDelayed = true };
         field.RegisterValueChangedCallback(evt => commit(evt.newValue));
         parent.Add(field);
     }
 
     private void AddDelayedInteger(VisualElement parent, string label, int value, Action<int> commit)
     {
-        var field = new IntegerField(label) { value = value, isDelayed = true };
+        var field = new IntegerField(label) { name = FieldName(parent, label), value = value, isDelayed = true };
         field.RegisterValueChangedCallback(evt => commit(evt.newValue));
         parent.Add(field);
     }
 
     private void AddToggle(VisualElement parent, string label, bool value, Action<bool> commit)
     {
-        var field = new Toggle(label) { value = value };
+        var field = new Toggle(label) { name = FieldName(parent, label), value = value };
         field.RegisterValueChangedCallback(evt => commit(evt.newValue));
         parent.Add(field);
     }
+
+    private static string FieldName(VisualElement parent, string label) =>
+        $"{(string.IsNullOrEmpty(parent.name) ? (parent as Foldout)?.text ?? "fields" : parent.name)}/{label}";
 
     private void CreateOrSelectLabRig()
     {
@@ -2904,7 +3120,7 @@ public sealed partial class AbilityLabWindow : EditorWindow
     private void DrawPresentationHandles()
     {
         if (_selectedOperation?.Source is not EmitPresentationOperationSource presentation ||
-            _lab?.Renderer == null)
+            _lab?.Renderer == null || _selectedOperation.SourceStageIndex != _lab.StageIndex)
             return;
         if (Event.current.type == EventType.KeyDown && Event.current.keyCode == KeyCode.Escape)
         {

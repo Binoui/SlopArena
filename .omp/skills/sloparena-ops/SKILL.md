@@ -1,9 +1,9 @@
 ---
 name: sloparena-ops
-description: Operate and debug the SlopArena self-hosted backend on the mini PC (alfred) — status checks, log locations, connectivity tests, the diagnostic ladder, and every known failure mode with fixes. Use when the game can't connect, a service is down, registration is stale, or anyone asks "is the server up?".
+description: Diagnoses SlopArena backend readiness and connection failures. Use when the game cannot connect, registration is stale, a service is down, or the user asks 'is the server up?'. Select Steam/VPS versus Alfred before using host-specific commands.
 ---
 
-# SlopArena Ops (alfred mini-PC backend)
+# SlopArena backend operations
 
 ## When to use
 
@@ -11,6 +11,20 @@ description: Operate and debug the SlopArena self-hosted backend on the mini PC 
 - Checking whether the master, game server, or tunnel is up
 - After any deploy/restart, verifying registration + heartbeat
 - Anything in `docs/systems/troubleshooting.md` (this skill is the compressed playbook)
+
+## Select the deployment first
+
+Steam Playtest uses the restricted VPS, not Alfred. Read
+`deploy/vps/README.md` and `docs/systems/release-pipeline.md` from the approved
+game checkout; on the verified VPS, use the installed
+`/opt/sloparena/deploy/vps/release.py status --target-dir /var/lib/sloparena`
+through an authenticated sudo session. Readiness and fresh registration, not
+container uptime alone, determine admission. Never open gameplay UDP ports or
+apply home rsync/restart recipes to that Steam-only environment.
+
+The topology and failure catalog below describe the historical **Alfred home
+backend**. Use them only when that host is explicitly selected, and load its
+current homelab runbook before operating.
 
 ## Topology
 
@@ -65,15 +79,18 @@ Verify: `sudo ufw status | grep 7777`, re-run probes. Rule must match
 `server.json` port + `maxConcurrentMatches` (4 matches = 7777-7780; 15 = 7777-7791).
 
 ### Registration fails `400 Invalid IP address: <domain>`
-Master's validator rejected DNS hostnames (fixed: `Uri.CheckHostName is IPv4 or
-Dns`). If it recurs, the deployed master is stale → redeploy (flow C in
-sloparena-build-export). Then `docker compose restart server-1` — the game
-server registers ONCE at startup and NEVER retries.
+Master's validator historically rejected DNS hostnames. If the deployed Master
+still does, use the home redeploy procedure in `docs/systems/production-hosting.md`.
+Current GameServer binaries retry transient registration failures with capped
+backoff and re-register after a missing/rejected heartbeat identity. A Master
+restart alone does not require restarting GameServer.
 
 ### Heartbeat stale / server not in GameServers
-Server crashed, or was restarted before registering. Check
-`docker compose logs server-1` for the crash; restart: `docker compose restart
-server-1`. Verify age returns to seconds.
+Inspect Master reachability, the selected deployment profile, host credentials,
+and `docker compose logs server-1` before acting. Transient outages recover;
+permanent registration rejection fails startup and needs its cause corrected.
+Restart only a crashed process or replaced binary through the approved host
+procedure, then verify fresh heartbeat/readiness. Do not interrupt active matches.
 
 ### rsync wiped the master config
 `--delete` / `--delete-excluded` on the master publish dir deletes
@@ -98,15 +115,15 @@ registers it and the middleware uses `context.RequestServices`.
   shared project is closed; never close another owner's Editor or route standalone
   batchmode flags through a live gateway command.
 
-### Version stamp / PipelineAsset drift after a failed release build
-`build-release.sh` stamps `bundleVersion` pre-build, reverts post-build; a
-failure leaves the tree dirty. Restore:
-```bash
-git checkout -- client/Unity/ProjectSettings/ProjectSettings.asset \
-  client/Unity/Assets/Settings client/Unity/Assets/UniversalRenderPipelineGlobalSettings.asset
-rm -rf client/Unity/Assets/StreamingAssets/Server client/Unity/Assets/StreamingAssets/arenas \
-  client/Unity/Assets/StreamingAssets.meta client/Unity/Assets/packages-merged-link*
-```
+### Saved settings / staging after a failed release build
+`build-release.sh` backs up the saved `ProjectSettings.asset` bytes and existing
+StreamingAssets directories, then restores them with an EXIT trap on normal
+success or failure. It rejects unstaged settings edits; it does not reset files
+from Git. If forcibly terminated before cleanup, recover that run's private
+`build/.release-stage.*` backup after proving it has stopped. Unity may separately
+re-serialize assets; preserve unrelated changes and restore only task-owned
+differences against the pre-build snapshot. Never blanket `git checkout` or
+delete StreamingAssets/meta files.
 
 ### Dev machine DNS broken (known)
 Resolver is misconfigured (systemd-resolved/NetworkManager). Use
@@ -121,5 +138,5 @@ colosseum, Island_arena.
 ## Deploying (cross-ref)
 - Dedicated server: `scripts/deploy-server.sh` (publish → rsync → restart → verify)
 - Exe zip: `scripts/build-release.sh <version>`
-- Master: manual, master repo (see sloparena-build-export skill, flow C)
+- Master: explicit home procedure in `docs/systems/production-hosting.md`
 - Depth: `docs/systems/production-hosting.md`, `docs/systems/troubleshooting.md`

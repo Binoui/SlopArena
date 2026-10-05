@@ -37,12 +37,12 @@ public sealed class SteamMatchRoutingWireTests
     [Fact]
     public void Descriptor_ParsesLosslessServerIdentityAndRejectsIncompatibleRoute()
     {
-        const string json = """
-            {"transport":"steam-p2p","matchId":"11111111-2222-3333-4444-555555555555","serverSteamId":"90293421017699331","virtualPort":0,"protocolVersion":4,"contentHash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","admissionExpiresAtUtc":"2026-09-26T12:00:00Z"}
+        string json = $$"""
+            {"transport":"steam-p2p","matchId":"11111111-2222-3333-4444-555555555555","serverSteamId":"90293421017699331","virtualPort":0,"protocolVersion":{{SteamMatchDescriptor.CurrentProtocolVersion}},"contentHash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","admissionExpiresAtUtc":"2026-09-26T12:00:00Z"}
             """;
         using var document = JsonDocument.Parse(json);
         Assert.True(SteamMatchDescriptor.TryParse(document.RootElement, out var descriptor));
-        using var previousVersion = JsonDocument.Parse(json.Replace("\"protocolVersion\":4", "\"protocolVersion\":3"));
+        using var previousVersion = JsonDocument.Parse(json.Replace($"\"protocolVersion\":{SteamMatchDescriptor.CurrentProtocolVersion}", $"\"protocolVersion\":{SteamMatchDescriptor.CurrentProtocolVersion - 1}"));
 
         Assert.False(SteamMatchDescriptor.TryParse(previousVersion.RootElement, out _));
         using var wrongPort = JsonDocument.Parse(json.Replace("\"virtualPort\":0", "\"virtualPort\":1"));
@@ -52,14 +52,14 @@ public sealed class SteamMatchRoutingWireTests
     }
 
     [Fact]
-    public void ProtocolFourStart_RejectsDuplicateRosterOrMissingDeadline()
+    public void SteamStart_RejectsDuplicateRosterOrMissingDeadline()
     {
-        const string json = """
-            {"matchId":"11111111-2222-3333-4444-555555555555","arenaName":"slop_court","players":[{"steamId":76561198000000001,"characterClass":"Manki","entityId":1},{"steamId":76561198000000002,"characterClass":"Bonk","entityId":2}],"protocolVersion":4,"virtualPort":0,"catalogHash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","admissionExpiresAtUtc":"2026-09-26T12:00:00Z"}
+        string json = $$"""
+            {"matchId":"11111111-2222-3333-4444-555555555555","arenaName":"slop_court","players":[{"steamId":76561198000000001,"characterClass":"Manki","entityId":1},{"steamId":76561198000000002,"characterClass":"Bonk","entityId":2}],"protocolVersion":{{SteamMatchDescriptor.CurrentProtocolVersion}},"virtualPort":0,"catalogHash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","admissionExpiresAtUtc":"2026-09-26T12:00:00Z"}
             """;
         using var valid = JsonDocument.Parse(json);
         Assert.NotNull(MatchStartRequestCodec.TryParse(valid.RootElement));
-        using var previousVersion = JsonDocument.Parse(json.Replace("\"protocolVersion\":4", "\"protocolVersion\":3"));
+        using var previousVersion = JsonDocument.Parse(json.Replace($"\"protocolVersion\":{SteamMatchDescriptor.CurrentProtocolVersion}", $"\"protocolVersion\":{SteamMatchDescriptor.CurrentProtocolVersion - 1}"));
         Assert.Null(MatchStartRequestCodec.TryParse(previousVersion.RootElement));
         using var duplicate = JsonDocument.Parse(json.Replace("76561198000000002", "76561198000000001"));
         Assert.Null(MatchStartRequestCodec.TryParse(duplicate.RootElement));

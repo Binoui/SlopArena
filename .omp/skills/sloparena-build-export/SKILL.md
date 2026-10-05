@@ -1,172 +1,87 @@
 ---
 name: sloparena-build-export
-description: Build/export SlopArena distributables, publish or deploy servers, and operate releases when explicitly requested. Not the general Shared test or Unity compilation workflow.
+description: Ships compatible SlopArena clients and backend releases. Use when user says 'release on Steam/VPS', 'build a release', 'deploy the servers', or 'publish SlopArena'. Not for ordinary Shared tests or Unity compilation.
 ---
-
-Unity operation rule: for live Editor operations, set `ORCA_TERMINAL_HANDLE` to your own runtime-issued terminal handle before using the canonical gateway; the gateway verifies its incarnation and fails closed if missing or mismatched. Follow [`docs/contributing/unity-cli.md`](../../../docs/contributing/unity-cli.md) and the [shared Editor coordination protocol](file:///home/binoui/Documents/projects/sloparena-workspace/docs/unity-editor-coordination.md): wait for an independent lease; never inject requests into an owner's batch. Runtime ownership status replaces historical Markdown ownership; blocked/unknown is not free. Standalone offline builds require separate authorization and a confirmed closed project; never close someone else's Editor.
 
 # SlopArena Build, Export & Release
 
-## When to use
+Act as the release operator. Deliver a compatible client/backend release with
+observed live identities and a receipt another operator can resume without this
+conversation. Build, image publication, VPS deployment, Steam upload and branch
+activation are separate outcomes; do not report one as proof of another.
 
-- Packaging the client/server distributable or release zip
-  and release artifacts. General verification follows [`docs/testing.md`](../../../docs/testing.md).
-- Publishing or deploying the dedicated or Master server
-- Building the Unity player as part of a requested release
-- Cutting a GitHub release or checking CI status
-- Answering how to ship main to players or to alfred
+## Resolution rules
 
-## The three flows (mental model)
+- `{game-root}` is the approved canonical game checkout. An explicit worktree wins;
+  otherwise use the current game checkout or resolve the workspace's `SlopArena/`
+  link. Never substitute main for an invalid explicit checkout.
+- `{planning-root}` is the SlopArena workspace, separate from the game and Master
+  repositories. Repository commands run with the corresponding checkout as `cwd`.
+- Project paths below resolve from `{game-root}`. Load its instructions first;
+  resolve the separate Master checkout and its instructions when publishing it.
 
-```
-A. New exe zip (friends)      → scripts/build-release.sh <version>
-B. Dedicated server on alfred → scripts/deploy-server.sh [host]
-C. Master server on alfred    → manual (master repo, see below)
+## Default: Steam Playtest + VPS
 
-Client-only change  → A only
-src/Server|Shared   → A (bundled server) + B (dedicated server)
-Master repo change  → C only
-```
+Read `{game-root}/docs/systems/release-pipeline.md` for the current end-to-end
+procedure and `{game-root}/deploy/vps/README.md` for guarded deployment/recovery.
+Use `{game-root}/docs/testing.md` for applicable verification, not historical test
+counts or a mandatory unrelated runtime pass.
 
-## Core verification reference
+Steam Playtest AppID is **5325920**, depot **5325921**. Use one operator release
+ID across GameHost, Master and migration images, with exact source revisions and
+published digests. Keep the client version, Steam BuildID, depot manifest and
+live branch observation in `{game-root}/build/playtest/<version>/candidate.json`.
+Load the previous receipt to recover paths/identities, then recheck live state;
+its readiness, match count and authentication observations are not current proof.
 
-General Shared, Server, and Unity verification follows [`docs/testing.md`](../../../docs/testing.md).
-Use this skill for release packaging and deployment operations, not ordinary Shared tests
-or Unity compilation.
+- Ship only the approved source snapshot. Preserve unrelated edits; release
+  approval does not implicitly authorize commits, pushes or installations.
+- Coordinate saved-source writers. Live Unity commands use the canonical gateway
+  in `{planning-root}/scripts/unity-editor-gateway.ts`, your own runtime-issued
+  `ORCA_TERMINAL_HANDLE`, and the current coordination protocol. Missing identity,
+  blocked ownership or ambiguous settlement is a blocker, not permission.
+- An open Editor can build through native gateway `build`/`build_status` commands.
+  Shared plugin copies and external staging require your own bounded hold.
+  Never nest a claim inside that hold. Offline batchmode/ZIP builds require a
+  separately authorized, confirmed-closed project; never close another owner's
+  Editor to clear its lock.
+- Verify current cooked-package freshness, exact roster/payload bytes, compiled
+  Master endpoint, Shared/native library identity, attribution and secret/dev-file
+  exclusions. Back up existing local staging and restore it after settlement.
+- Credentials stay in the operator's visible local terminals/private VPS files.
+  SSH-key unlock, VPS sudo, Steam login and mobile approval are distinct gates;
+  cached Steamworks browser authentication does not prove SteamCMD login works.
+- A changed roster needs the new catalog hash in private Master admission before
+  deployment. Prepare a separate release-specific private Master environment and
+  reference it in the candidate's `runtime.master_env_file`; preserve every
+  credential/unrelated line and leave the previous release's file untouched.
+  Automatic recovery restores file paths, not overwritten private contents.
+  Never copy these environments into a release receipt.
+- Require a successful fresh backup and a fresh zero-active-match observation
+  immediately before guarded replacement. `release.py` does not enforce the
+  zero-match operator gate. Never activate Steam default before compatible VPS
+  readiness and registration are observed.
+- `scripts/steam-playtest.sh <version> --upload` uploads only; it does not set a
+  branch live. Activate the exact BuildID in authenticated Steamworks, complete
+  any mobile confirmation, then observe the branch and depot manifest again.
+  Crop screenshots to release proof; branch passwords/account settings stay out.
 
-The current admitted roster is Manki, FightGuy, Wibou, and Bonk. The server
-project and both release scripts derive required package IDs from the roster
-manifest and verify all four payloads in every publish/staging tree.
+## Explicit alternate targets
 
-## Flow A — Release zip (Windows exe)
+For a ZIP/GitHub release or the Alfred home backend, use the corresponding
+sections of `{game-root}/docs/systems/release-pipeline.md` and
+`{game-root}/docs/systems/production-hosting.md`. Never apply home public-UDP or
+rsync instructions to the Steam-only VPS. Current GameServer binaries retry
+transient Master failures; a Master restart alone is not a reason to restart
+GameHost. `build-release.sh` restores its saved settings/staging on normal exit,
+including failure; do not blanket-reset the user's tree.
 
-```bash
-# Preconditions: Unity Editor CLOSED (locks the project; a second instance
-# aborts with "Another Unity instance is running with this project open").
-# ProjectSettings.asset must be CLEAN (the script stamps bundleVersion then
-# reverts via git checkout, and refuses to run otherwise).
-./scripts/build-release.sh 0.2.0-demo.1
-# → build/release/SlopArena-<version>.zip (90MB), contains:
-#   SlopArena.exe + SlopArena_Data/ + StreamingAssets/Server/ (self-contained
-#   win-x64 game server, embedded host-and-play) + arenas + README/HOSTING.txt
-```
+## Completion
 
-What the script does: build Shared → run tests → publish win-x64 self-contained
-server to `StreamingAssets/Server` → publish linux-x64 to `build/minipc` →
-stage arenas → stamp `bundleVersion` → Unity `-buildWindows64Player` → restore
-stamp → unstage build artifacts → zip with docs.
-
-**Leak guard (Task 7.2):** the script deletes `server.json` from both publish
-outputs — the csproj copies dev defaults (`localhost:5000`) which must never
-ship or clobber the live config. Verify after building:
-
-```bash
-unzip -l build/release/*.zip | grep -c server.json        # expect 0
-unzip -q build/release/*.zip -d /tmp/scan && grep -rl "localhost:5000" /tmp/scan
-```
-
-Publish (public — needs explicit operator go):
-
-```bash
-gh release create v0.2.0-demo.1 build/release/SlopArena-0.2.0-demo.1.zip \
-  --title "SlopArena 0.2.0-demo.1" \
-  --notes "$(sed 's/<version>/0.2.0-demo.1/' docs/release/RELEASE_NOTES.template.md)"
-```
-
-The `--notes` text above is a placeholder: pushing the `v*` tag (which
-`gh release create` does automatically) fires `.github/workflows/patch-notes.yml`
-within a minute or two, which overwrites the release notes with a generated
-factual changelog (parsed from Conventional Commit subjects since the
-previous tag) plus a short DeepSeek-written context blurb, and copies through
-the static Online/How-to-play/Known-issues sections from
-`docs/release/RELEASE_NOTES.template.md`. Requires a `DEEPSEEK_API_KEY` repo
-secret (Settings → Secrets → Actions) — without it the job fails loudly
-(nuget-publish still succeeds independently). To preview or re-run locally:
-`DEEPSEEK_API_KEY=... GH_TOKEN=$(gh auth token) python3 scripts/generate_patch_notes.py v0.2.0-demo.1`.
-
-## Flow B — Dedicated server on alfred (one command)
-
-```bash
-scripts/deploy-server.sh            # ssh alias "alfred" by default
-# publish linux-x64 → rsync binaries + arenas → restart server-1 → verify
-# registration + heartbeat freshness in postgres
-```
-
-Why the restart: the game server registers with the master **once at startup
-and never retries** — after any deploy (or master redeploy) a restart is
-required or it stays unregistered.
-
-Safety: never uses rsync `--delete*` (would wipe live config); publish output
-has `server.json` deleted so `/srv/sloparena/server/server.json` (the live
-config: `masterServerUrl`, `publicIp`, `maxConcurrentMatches: 4`) is never
-clobbered.
-
-## Flow C — Master server deploy (manual, master repo)
-
-```bash
-cd ~/Documents/projects/SlopArena-MasterServer
-# /tmp, NOT build/: publishing inside the repo pulls MasterServer.Tests
-# bin/obj into the output and grows recursively on re-publish → MSB3030.
-dotnet publish -c Release -o /tmp/minipc-master
-rsync -avz --exclude 'appsettings.Production.json' /tmp/minipc-master/ \
-  alfred:/srv/sloparena/master/publish/
-# NEVER rsync --delete / --delete-excluded here (config lives inside publish/)
-ssh alfred 'cd /root/homelab/sloparena && docker compose restart master server-1'
-# server-1 too: it must re-register (registers once, never retries)
-```
-
-## Unity Player Build (manual, not scripted)
-
-When explicitly authorized, the existing standalone player build is an offline operation: confirm the shared project is closed without closing another owner's Editor, then run the installed Unity Editor directly. Do not route legacy batchmode player-build flags through the gateway.
-
-```bash
-"$UNITY_EDITOR" -batchmode -quit -projectPath client/Unity \
-  -buildLinux64Player build/linux/SlopArena.x86_64
-# or -buildWindows64Player build/windows/SlopArena.exe
-```
-
-`$UNITY_EDITOR` = `/home/binoui/Unity/Hub/Editor/6000.0.78f1/Editor/Unity`.
-Player builds fail on editor-only API in runtime scripts
-(`UnityEditor.*` — grep `Assets/Scripts/Runtime/`); `dotnet build` does NOT
-compile Unity scripts. Validate through the authorized offline player build
-before claiming compile-clean.
-
-## CI Status (as of 2026-08)
-
-- `.github/workflows/ci.yml` (this repo): push to main + PR → build Shared, run
-  Shared.Tests (~451), build Server.
-- `.github/workflows/patch-notes.yml`: push of tag `v*` → generates and
-  publishes release notes (see Flow A Publish above). Needs `DEEPSEEK_API_KEY`.
-- `.github/workflows/{nuget-publish, discord-push}.yml`: existing.
-- Master repo `.github/workflows/build.yml`: build + test on push/PR to main;
-  on `v*` tag push, publishes `dotnet publish -c Release` output as an Actions
-  artifact.
-- **No Unity build in CI** (exe is built locally by Flow A). Deploy is manual
-  (home infra is not CI-reliable).
-
-## Operations (alfred)
-
-```bash
-ssh alfred 'cd /root/homelab/sloparena && docker compose ps'   # 3 containers Up
-curl -s https://sloparena.barakaslurp.fr/health                # {"status":"ok",...}
-# registration + heartbeat freshness (age should be seconds):
-ssh alfred 'docker exec sloparena-postgres psql -U sloparena -d sloparena -c \
-  "SELECT \"Name\", \"IpAddress\", \"Port\", NOW() - \"LastHeartbeat\" AS age FROM \"GameServers\";"'
-# game ports MUST be open in UFW too (Bbox forward alone is not enough):
-ssh alfred 'sudo ufw status | grep 7777'   # 7777/tcp + 7777:7791/udp ALLOW
-```
-
-Backups: `/etc/cron.d/sloparena-backup` — weekly pg_dump Mondays 04:30, keep 90
-days. See `docs/systems/production-hosting.md` (runbook) and
-`docs/systems/troubleshooting.md` (failure playbook) for depth.
-
-## Gotchas (all hit for real 2026-08-02)
-
-- **Unity `.meta` files must be committed** — Unity regenerates GUIDs otherwise, breaking prefab/script references.
-- **`Library/` is gitignored** — never commit it; it's a local cache.
-- **Shared DLL drift** — if the Unity client shows stale behavior, rebuild `src/Shared/` (the plugin copy is post-build).
-- **UFW drops game ports** — "Join hangs" = client log shows the join line then silence; fix is `ufw allow 7777/tcp + 7777:7791/udp` on alfred.
-- **rsync `--delete-excluded` deletes excluded files** — it wiped `appsettings.Production.json` once. Never use `--delete*` on the master or server deploys.
-- **Version-stamp drift after failed build** — `build-release.sh` aborts leave `bundleVersion` stamped + `StreamingAssets/` staged + PipelineAsset/URP re-serialized. Restore: `git checkout -- client/Unity/ProjectSettings/ProjectSettings.asset client/Unity/Assets/Settings client/Unity/Assets/UniversalRenderPipelineGlobalSettings.asset`, `rm -rf client/Unity/Assets/StreamingAssets/... client/Unity/Assets/packages-merged-link*`.
-- **Editor lock** — a running Unity Editor prevents standalone batch builds; use a separately authorized confirmed-closed-project window, never close another owner's Editor to clear the lock.
-- **`data/arenas/` stubs** — 4 of 7 files (cross/pit/sanctum/split) are <500B placeholders that fail `[ArenaRegistry] Failed to load`; expected, not a deploy bug. Playable: training, colosseum, Island_arena.
+Record source/image pins, package/catalog identity, observed Steam branch and
+manifest, VPS readiness/registration, backup/schema results and any unexercised
+player flow. Preserve resumable state at a human authentication gate; never mark
+an uploaded but inactive build or a prepared but undeployed image as live.
+Clean task-owned staging/helpers and close task-owned privileged sessions once
+settled. Build/backend checks do not prove a packaged two-account match/rematch;
+state that limit unless the actual player flow was exercised.

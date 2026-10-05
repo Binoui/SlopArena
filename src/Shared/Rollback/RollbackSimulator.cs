@@ -22,6 +22,7 @@ namespace SlopArena.Shared.Rollback
         private readonly Dictionary<ulong, uint> _latestPacketTick = new();
         private readonly HashSet<ulong> _terminalInteractions = new(); // Match-unique IDs stay ended across later snapshots.
         private readonly Dictionary<ulong, ServerEntityPacket> _pendingCompanions = new();
+        private ServerEntityPacket? _futureSelf;
         private const uint CompanionWindow = 30;
 
         public RollbackSimulator(ArenaDefinition arena, ulong selfEntityId, IMatchRule? rule = null)
@@ -44,6 +45,14 @@ namespace SlopArena.Shared.Rollback
                 _rawTrackLatest[id] = initialState; // opponents start on RawTrack until their first packet
         }
 
+        /// <summary>Seed the absolute server tick before prediction begins.</summary>
+        public bool SetTimeline(uint lastCompletedTick)
+        {
+            if (lastCompletedTick < _localTick || !_local.SetTimeline(lastCompletedTick))
+                return false;
+            _localTick = lastCompletedTick;
+            return true;
+        }
         /// <summary>Advance the self entity one tick. Mirrors every other known entity's
         /// current best-known state into LocalTrack first (target-lock crash fix, Task 3).</summary>
         public void Tick(Dictionary<ulong, InputState> inputs)
@@ -56,6 +65,13 @@ namespace SlopArena.Shared.Rollback
             _local.Tick(input);
             _localTick++;
             Publish(_local.DrainPresentationEvents());
+            if (_futureSelf is ServerEntityPacket future && future.Tick <= _localTick)
+            {
+                _futureSelf = null;
+                if (!_terminalInteractions.Contains(future.State.InteractionId))
+                    _local.ReconcileWithServer(future);
+                Publish(_local.DrainPresentationEvents());
+            }
 
         }
 
@@ -124,6 +140,11 @@ namespace SlopArena.Shared.Rollback
                     }
                 }
 
+                if (packet.EntityId == _selfId && !localReconciled && packet.Tick > _localTick)
+                {
+                    _futureSelf = packet;
+                    continue;
+                }
                 _pendingCompanions.Remove(packet.EntityId);
                 if (packet.EntityId == _selfId)
                 {

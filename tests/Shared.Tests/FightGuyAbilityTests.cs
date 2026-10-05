@@ -175,78 +175,85 @@ public class FightGuyAbilityTests
 
     // ── F (FightGuy Fist of Fury) ──
 
-    [Fact]
-    public void FightGuyFistOfFury_PunchesPullAndRehit()
+    [Theory]
+    [InlineData(0.9f, 0, 0, CharacterClass.FightGuy)]
+    [InlineData(1.6f, 150, 0, CharacterClass.FightGuy)]
+    [InlineData(1.6f, 0, 20, CharacterClass.FightGuy)]
+    [InlineData(1.6f, 0, 28, CharacterClass.FightGuy)]
+    [InlineData(1.6f, 0, 36, CharacterClass.FightGuy)]
+    [InlineData(1.6f, 0, 44, CharacterClass.FightGuy)]
+    [InlineData(1.6f, 0, 52, CharacterClass.FightGuy)]
+    [InlineData(1.6f, 150, 60, CharacterClass.FightGuy)]
+    [InlineData(1.6f, 0, 70, CharacterClass.FightGuy)]
+    [InlineData(0.9f, 150, 60, CharacterClass.Bonk)]
+    [InlineData(1.6f, 150, 60, CharacterClass.Manki)]
+    [InlineData(1.6f, 150, 60, CharacterClass.Wibou)]
+    public void FightGuyFistOfFury_PunchCatchRemainsLockedUntilFootFinisher(
+        float distance, ushort startingDamage, ushort entryTick, CharacterClass targetClass)
     {
         var def = TestHelpers.FightGuyDef;
         var baked = TestHelpers.LoadBakedData(def);
+        var targetDef = TestHelpers.ResolveDef(targetClass);
+        var targetBaked = TestHelpers.LoadBakedData(targetDef);
+        var slot = def.GetCookedSlotAbility(AbilitySlots.F, false)!;
+        var finisher = slot.Timeline.Stages.SelectMany(stage => stage.Operations)
+            .OfType<CookedSpawnHitboxOperation>()
+            .Single(operation => operation.Hitbox.StartBoneId == "bone.right-foot");
         var sim = TestHelpers.MakeSim();
-        var player = TestHelpers.PlayerState();
+        // Keep the combo away from the heightmap boundary while inward hits resolve pushboxes.
+        var player = TestHelpers.PlayerState(50f, 50f);
         player.PY = GroundPY;
-        player.FacingYaw = 0f;
         sim.RegisterEntity(1, def, player, baked);
 
-        var npc = TestHelpers.NpcState(0f, 0.9f);
-        npc.PY = GroundPY;
-        sim.RegisterEntity(100, def, npc, baked);
-
-        ushort maxHitstun = 0;
-        float positionAfterPunches = 0f;
-        ushort damageAfterPunches = 0;
-        for (int i = 0; i < 100; i++)
+        bool registered = false, caught = false, kicked = false, launched = false;
+        int punchContacts = 0, kickContacts = 0;
+        for (int i = 0; i < 220; i++)
         {
-            sim.Tick(new()
+            if (!registered && sim.GetState(1).AttackElapsedTicks >= Math.Max(0, entryTick - 1))
             {
-                { 1, i == 0 ? TestHelpers.Input(activeSlot: 6) : default },
-                { 100, default },
-            });
-            maxHitstun = Math.Max(maxHitstun, sim.GetState(100).HitstunTicks);
-            if (i == 55)
-            {
-                var afterPunches = sim.GetState(100);
-                positionAfterPunches = afterPunches.PZ;
-                damageAfterPunches = afterPunches.DamagePercent;
+                var npc = TestHelpers.NpcState(50f, 50f + distance);
+                npc.PY = TestHelpers.GroundPY(targetDef);
+                npc.DamagePercent = startingDamage;
+                sim.RegisterEntity(100, targetDef, npc, targetBaked);
+                registered = true;
             }
-        }
 
-        var target = sim.GetState(100);
-        Assert.Equal((ushort)13, target.DamagePercent);
-        Assert.True(damageAfterPunches > 0,
-            "the six inward punches must hit before the authored push-away hitboxes");
-        Assert.True(positionAfterPunches < 0.9f,
-            $"the six punches should pull inward before the authored push-away hitboxes, got PZ={positionAfterPunches:F3}");
-        Assert.True(maxHitstun > 0, "punches must apply hitstun");
-    }
-
-    [Fact]
-    public void FightGuyFistOfFury_RightFootFinisherLaunchesAway()
-    {
-        var def = TestHelpers.FightGuyDef;
-        var baked = TestHelpers.LoadBakedData(def);
-        var sim = TestHelpers.MakeSim();
-        var player = TestHelpers.PlayerState();
-        player.PY = GroundPY;
-        player.FacingYaw = 0f;
-        sim.RegisterEntity(1, def, player, baked);
-
-        var npc = TestHelpers.NpcState(0f, 0.9f);
-        npc.PY = GroundPY;
-        sim.RegisterEntity(100, def, npc, baked);
-
-        float beforeKickZ = 0f;
-        for (int i = 0; i < 140; i++)
-        {
             sim.Tick(new()
             {
                 { 1, i == 0 ? TestHelpers.Input(activeSlot: 6) : default },
-                { 100, default },
+                { 100, caught ? TestHelpers.Input(moveY: 1f, jump: true, jumpHeld: true) : default },
             });
-            if (i == 80) beforeKickZ = sim.GetState(100).PZ;
+            if (!registered) continue;
+
+            foreach (var hit in sim.LastTickHits.Where(hit => hit.TargetEntityId == 100))
+            {
+                Assert.False(hit.Blocked);
+                if (hit.Damage == finisher.Hitbox.Damage)
+                {
+                    Assert.True(caught, "the foot must finish an opponent caught by a punch");
+                    kicked = true;
+                    kickContacts++;
+                    Assert.Equal(AuthoringKnockbackDirection.AwayFromOwner, hit.KnockbackDirection);
+                }
+                else
+                {
+                    caught = true;
+                    punchContacts++;
+                    Assert.Equal(AuthoringKnockbackDirection.TowardOwner, hit.KnockbackDirection);
+                }
+            }
+
+            var target = sim.GetState(100);
+            if (caught && !kicked)
+                Assert.True(target.HitstopTicks > 0 || target.HitstunTicks > 0,
+                    $"caught opponent escaped before the foot at simulation tick {i}");
+            if (kicked && target.HitstopTicks == 0 && target.KVZ > 0f)
+                launched = true;
         }
 
-        var target = sim.GetState(100);
-        Assert.Equal((ushort)13, target.DamagePercent);
-        Assert.True(target.PZ > beforeKickZ, $"right-foot finisher must launch away, before={beforeKickZ:F3} after={target.PZ:F3}");
+        Assert.True(punchContacts > 0, "the entry must connect with the punch flurry");
+        Assert.Equal(1, kickContacts);
+        Assert.True(launched, "only the foot finisher should launch the victim outward");
     }
 
     // ── Status ──

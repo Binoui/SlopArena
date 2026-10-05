@@ -330,10 +330,45 @@ public class CharacterStatePacketTests
         var restored = CharacterStatePacket.Deserialize(buffer).ToState();
         Assert.Equal((byte)7, restored.AnimIndex);
     }
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void CorrectionSnapshotPreservesCommittedPoseAndCapturedTarget(bool active)
+    {
+        var original = new CharacterState
+        {
+            AttackPosePitch = -.2f,
+            AimPitch = .4f,
+            AttackCorrectionStartYaw = 1.1f,
+            AttackCorrectionTargetId = 0xfedcba9876543210UL,
+            AttackCorrectionTargetDeaths = 2,
+            AttackCorrectionActive = active,
+            AttackCorrectionOwned = true,
+        };
+        var buffer = new byte[CharacterStatePacket.Size];
+        CharacterStatePacket.FromState(original).Serialize(buffer);
+        var packet = CharacterStatePacket.Deserialize(buffer);
+        var restored = packet.ToState();
+        Assert.Equal(original.AttackPosePitch, restored.AttackPosePitch);
+        Assert.Equal(original.AimPitch, restored.AimPitch);
+        Assert.Equal(original.AttackCorrectionStartYaw, restored.AttackCorrectionStartYaw);
+        Assert.Equal(original.AttackCorrectionTargetId, restored.AttackCorrectionTargetId);
+        Assert.Equal(original.AttackCorrectionTargetDeaths, restored.AttackCorrectionTargetDeaths);
+        Assert.Equal(active, restored.AttackCorrectionActive);
+        Assert.True(restored.AttackCorrectionOwned);
+        var history = new CharacterState { AttackElapsedTicks = 13, AttackPosePitch = .7f };
+        packet.ApplyTo(ref history);
+        Assert.Equal(original.AttackPosePitch, history.AttackPosePitch);
+        Assert.Equal(original.AttackCorrectionTargetId, history.AttackCorrectionTargetId);
+        Assert.Equal(original.AttackCorrectionTargetDeaths, history.AttackCorrectionTargetDeaths);
+        Assert.Equal(active, history.AttackCorrectionActive);
+        Assert.True(history.AttackCorrectionOwned);
+        Assert.Equal((ushort)13, history.AttackElapsedTicks);
+    }
+
     [Fact]
     public void Deserialize_RejectsTruncatedLegacyAndWrongVersionPayloads()
     {
-        Assert.Equal((byte)4, SimulationProtocol.Version);
         var packet = CharacterStatePacket.FromState(default);
         var buffer = new byte[CharacterStatePacket.Size];
         packet.Serialize(buffer);

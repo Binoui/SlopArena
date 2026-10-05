@@ -817,8 +817,11 @@ namespace SlopArena.Client.Tools
             string packageHash)
         {
             ClearScenario();
-            DestroyPreviewCatalog();
-            _previewAnimationCatalog = animationCatalog;
+            if (!ReferenceEquals(_previewAnimationCatalog, animationCatalog))
+            {
+                DestroyPreviewCatalog();
+                _previewAnimationCatalog = animationCatalog;
+            }
             _previewRig = rig;
             var definition = CookedCharacterRuntimeAdapter.ToCharacterDefinition(package, CharacterClass.None);
             SelectedPackageHash = packageHash;

@@ -1,136 +1,278 @@
-# Release Pipeline — cutting a SlopArena demo release
+# Release Pipeline — Steam Playtest + VPS
 
-## Version scheme
+The default release target is the Windows **Steam Playtest** client plus the
+restricted VPS Master/GameHost pair. ZIP/GitHub and Alfred home deployment are
+explicit alternatives, not steps to mix into the Steam-only deployment.
 
-`v<major>.<minor>.<patch>-demo.<n>` (e.g. `v0.2.0-demo.1`). The `-demo`
-suffix marks friends-only releases.
+The operator's durable receipt is `build/playtest/<version>/candidate.json`, with
+bounded supporting evidence alongside it. The rollout of `0.2.0-playtest.5`
+(BuildID `25702912`, VPS release `steam-playtest-20261004-5`) is recorded in
+[Testing and Verification](../testing.md). That record is historical evidence,
+not proof of today's branch, service readiness, registration or match count.
 
-## What the pipeline produces
+## 1. Choose source and release identities
 
-| Artifact | Where | Contents |
+Resolve the approved game checkout to its canonical path. An explicit worktree
+wins; otherwise use the current game checkout or the workspace's `SlopArena/`
+link. Keep the separate Master checkout and planning workspace distinct, load
+each repository's instructions, and run commands with the appropriate checkout
+as `cwd`. Do not switch/pull/reset a dirty checkout as release preflight.
+
+Use client version `0.2.0-playtest.<n>` and one operator `release_id` across
+GameHost, Master and migration image publication. Record full source revisions
+for each repository; the version, image release ID, Steam BuildID and depot
+manifest are different identities. Examples below assume `VERSION`, `RELEASE_ID`,
+`GAME` and `WORKSPACE` have been set to those approved values/absolute paths.
+
+Inspect saved-source and staged changes before building. Agree the bounded source
+snapshot with the user; building a dirty checkout and labeling it only with HEAD
+is not auditable. Commit/push/install require their own authorization. Coordinate
+other source writers before Unity imports or plugin copies. A surprise write
+invalidates the source proof.
+
+Run applicable checks from [Testing and Verification](../testing.md); do not
+copy historical test counts into a new result. Check the current cooked roster
+and package freshness before packaging. The roster manifest owns package IDs,
+not a second hand-written roster list. Raw authoring JSON, manual animation
+configs and source skeletons are not runtime release inputs.
+
+## 2. Build and verify the client
+
+Follow [Unity CLI](../contributing/unity-cli.md) and the
+[shared Editor coordination protocol](file:///home/binoui/Documents/projects/sloparena-workspace/docs/unity-editor-coordination.md).
+For an open Editor, use the canonical gateway with your own runtime-issued
+`ORCA_TERMINAL_HANDLE`; do not infer it from the active pane. A command lease
+does not prevent automatic imports: coordinate a stable saved-source window.
+Missing caller identity, blocked ownership or uncertain settlement stops the
+operation. Never close someone else's Editor or start competing batchmode.
+
+Acquire your own bounded interactive gateway hold before external Shared builds
+that copy the plugin or staging mutations. Snapshot the existing settings and
+StreamingAssets first, including ignored skeletons and metadata; finish the copy,
+let imports/compilation settle, then release. Do not nest another gateway claim
+inside a retained hold. See the protocol for interruption/restoration rules.
+
+Set the approved client version in saved project settings. Stage the current
+cooked roster and its package payloads into the client, preserving pre-existing
+local staging for restoration. Steam needs the client cooked content; do not add
+the ZIP workflow's bundled home server or raw authoring files just because that
+alternate script stages them. Build through the native command:
+
+```bash
+bun "$WORKSPACE/scripts/unity-editor-gateway.ts" \
+  --project-path "$GAME/client/Unity" -- build \
+  --target StandaloneWindows64 \
+  --outputPath "$GAME/build/release/SlopArena-$VERSION/SlopArena.exe"
+bun "$WORKSPACE/scripts/unity-editor-gateway.ts" \
+  --project-path "$GAME/client/Unity" -- build_status
+```
+
+Observe the build result/report, not only submission success. Before releasing
+source staging, prove the build has settled. Restore the exact saved staging and
+settings after it settles, under your own bounded hold when the Editor is open.
+Preserve unrelated Unity re-serialization; never blanket-reset files from Git.
+
+Verify the actual extracted build:
+
+- Compare `SlopArena_Data/StreamingAssets/content-cooked/roster/manifest.json`
+  and every roster-selected `manifest.json`, `character.runtime.json`, `poses.bin`
+  and `client.bindings` byte-for-byte against the approved cooked snapshot.
+- Load the packaged payloads through `CookedCharacterPackageLoader` and
+  `MatchContentCatalogBuilder`. Require successful admission and compute the
+  canonical `SteamMatchDescriptor.HashContent` over the serialized content-handle
+  map. A file checksum of the roster alone is **not** this catalog hash.
+- Check the compiled client Master endpoint against the selected HTTPS VPS;
+  record Shared/player assembly and Steam native-library hashes. Do not reuse a
+  prior DLL simply because its filename/version matches.
+- Include `CREDITS.txt` from `CREDITS.md` and the required license/attribution
+  files. Scan the release for credentials, local configuration, source skeletons,
+  developer PDBs and Burst debug output. Inspect the upload mappings/exclusions.
+- Record warnings/errors, source pins, exact content/catalog identity and staging
+  restoration. A successful build/content load is not a player launch or match.
+
+Keep task-owned probes temporary; retain their decisive output, not one-off
+operator scripts containing private host/configuration details.
+
+## 3. Publish compatible images
+
+Game and Master image publication are independent. With approved source already
+published on each repository's `main`, dispatch from that repository:
+
+```bash
+# Game checkout:
+gh workflow run gameserver-image.yml --ref main -f release_id="$RELEASE_ID"
+# Master checkout:
+gh workflow run container-images.yml --ref main -f release_id="$RELEASE_ID"
+```
+
+Wait for the exact runs, inspect their source revisions, and download their
+receipts. The GameServer workflow tests Shared/Server and exercises a real
+`slop_court` match-start/content admission inside the image before publishing.
+The Master workflow tests the service and verifies migrations/readiness on an
+isolated database. Those smoke paths do not prove Steam player admission.
+
+Retain `gameserver-image.txt` and the Master/migration release record. Use exact
+published `repository@sha256:<digest>` references, full source revisions, the
+shared release ID, and explicit target/compatible migrations in the private
+operator release JSON. Do not deploy mutable tags, local Docker IDs, or images
+from unrelated schema revisions. Image publication alone deploys nothing.
+
+## 4. Authenticate and prepare the VPS
+
+Use the [VPS runbook](../../deploy/vps/README.md) as the authority for private
+runtime paths, release JSON schema, backup/migration, ingress and recovery.
+No implicit SSH host or automatic CI deployment exists. Verify the selected host
+and SSH key fingerprint; do not copy another environment's runtime configuration.
+
+Four human gates are independent:
+
+| Gate | Where | What it authorizes |
 |---|---|---|
-| `build/release/SlopArena-<version>.zip` | dev machine | Windows player `.exe`, bundled self-contained game server (`StreamingAssets/Server/`), arenas, `README.txt`, `HOSTING.txt` |
-| `build/minipc/` | dev machine | linux-x64 framework-dependent game server (rsync'd to alfred) |
-| Master server | alfred via rsync | published separately (see below) |
+| Encrypted SSH-key unlock | Visible local operator terminal/agent | SSH login; not sudo |
+| VPS sudo password | Authenticated interactive VPS terminal | Privileged release/configuration work |
+| SteamCMD account login/Steam Guard | Visible local upload terminal | Depot upload; not branch activation |
+| Steamworks mobile confirmation | Operator's Steam app | Requested branch activation |
 
-## Steps
+Never request passwords/codes in chat, put them in command arguments or logs,
+or assume browser login proves SteamCMD is authenticated. Label the operator
+terminals; when awaiting input, retain the candidate and state exactly which
+gate remains. Inspect an ambiguous terminal delivery before sending it again.
 
-### 1. Preflight
+The private Master `Room__CatalogHash` must match the candidate's canonical
+catalog hash when cooked identity changes. Copy the active release's private
+Master environment to a **new release-specific file**, for example
+`/etc/sloparena/private/master.<release_id>.env`. Replace only `Room__CatalogHash`
+in that copy, preserving every credential, unrelated line, owner and restrictive
+mode. Set the candidate release JSON's `runtime.master_env_file` to this new path.
+Leave the previous release's referenced environment file unchanged: automatic
+recovery restores its **path**, not overwritten file contents. Retain the
+release-specific private files for guarded compatible rollback.
 
-```bash
-git checkout main && git pull --ff-only
-dotnet build src/Shared/ --nologo
-dotnet test tests/Shared.Tests/ --nologo     # CI runs this too
-```
+Do not paste or copy these environments into Git, receipts or public artifacts.
+Do not restart Master early: guarded deployment applies the new admission file
+with the compatible pair. A changed catalog still requires explicit client/image,
+private configuration and schema compatibility checks before rollback.
 
-### 2. Build the zip
+Prepare the private release record from `deploy/vps/release.example.json` with
+all required runtime file paths. The server uses explicit `vps` profile, approved
+host identity, private Master/control URLs and separate registration/control keys.
+The GameHost has one Steam P2P listener and **no published gameplay UDP ports**;
+`publicIp` is browser metadata, not Steam connection identity. Use the runbook's
+checksum-pinned Steam redistributable mount and verify redistribution permission
+before changing packaging. Development UDP smoke is not a public fallback.
 
-```bash
-scripts/build-release.sh 0.2.0-demo.1
-# requires the Unity editor (6000.0.78f1) — ~10 min batch build.
-# Output: build/release/SlopArena-0.2.0-demo.1.zip
-```
+## 5. Upload without activating
 
-The script builds Shared + tests, publishes the self-contained Windows server
-(embedded host-and-play), publishes the linux-x64 server for the mini PC,
-stages the arenas plus every package named by the cooked roster manifest,
-stamps `bundleVersion`, runs the Unity Windows player build,
-then restores `ProjectSettings.asset` and unstages `StreamingAssets/`.
-
-Both client and server staging trees contain the roster manifest and all four
-payloads (`manifest.json`, `character.runtime.json`, `poses.bin`, and
-`client.bindings`) for every admitted package: Manki, FightGuy, Wibou, and Bonk.
-The scripts derive package IDs from `content-cooked/roster/manifest.json`;
-they do not maintain a separate character list.
-
-Raw authoring JSON, manual animation configs, and skeleton source files are not
-release inputs.
-
-> The version stamp is reverted via `git checkout` of ProjectSettings.asset —
-> the script refuses to run if that file has uncommitted changes.
-
-### 3. Refresh the official game server (mini PC)
-
-Optional if only the client changed. See `docs/systems/production-hosting.md`
-("Redeploy game server"). Restart `server-1` after replacing its binaries;
-new GameServer binaries recover registration after Master restarts without
-a manual restart.
-
-### 4. Publish to GitHub Releases
+The existing script targets Playtest AppID **5325920**, depot **5325921** and
+requires an already available SteamCMD executable plus a build-authorized account.
+Set `STEAMCMD` to that executable and `STEAM_BUILD_USER` to the account name;
+credentials are entered interactively. Preview, then upload from the game checkout:
 
 ```bash
-gh release create v0.2.0-demo.1 build/release/SlopArena-0.2.0-demo.1.zip \
-  --title "SlopArena 0.2.0-demo.1" \
-  --notes "$(sed 's/<version>/0.2.0-demo.1/' docs/release/RELEASE_NOTES.template.md)"
+scripts/steam-playtest.sh "$VERSION"
+scripts/steam-playtest.sh "$VERSION" --upload
 ```
 
-Send the release URL to friends. They download → unzip → run → Training or Join.
+Preview still invokes SteamCMD/login but does not upload. The upload emits a
+BuildID and depot manifest; keep the relevant logs/VDF under the candidate's
+evidence directory. Neither invocation changes a Steam branch. Upload may precede
+VPS deployment, but default activation must wait for compatible backend proof.
 
-## Off-site image packaging (not a home deploy)
+## 6. Deploy and prove compatibility
 
-`.github/workflows/gameserver-image.yml` runs on explicit dispatch from `main`
-(`release_id` required) or a published release. It tests Shared and Server,
-builds a Linux amd64 image, then starts the image with only an external test
-config: a real match-start request must load `slop_court` and validate the
-admitted cooked catalog. Only then does it push
-`ghcr.io/binoui/sloparena-gameserver:<game-source-sha>`; no `latest` tag is
-published. The image includes the published runtime, all cooked packages
-selected by `content-cooked/roster/manifest.json`, and `data/arenas/*.arena`.
-The runtime base is .NET 8.0.31; the build SDK is 8.0.425.
+On the selected VPS, the installed tooling lives at
+`/opt/sloparena/deploy/vps/`. Read status first. Require both application readiness
+checks, fresh host registration, expected current schema/image/source identities,
+and a fresh **zero-active-match** observation immediately before replacement.
+Match count is heartbeat-reported, not a synchronous simulation query;
+`release.py` does not implement this operator zero-match gate. If freshness or
+zero-match proof is absent, stop rather than interrupting players.
 
-The job uploads `gameserver-image.txt` with the image digest, source revision,
-runtime/SDK patches, and operator release ID. Pair it with the independently
-published Master image/migration record from the Master repository under the
-**same operator release ID**; retain both source SHAs and immutable digests in
-the operator-controlled release record. Do not deploy tags or combine images
-from unrelated schema revisions without checking compatibility. Publishing
-does not change home services, player DNS, or the client endpoint.
-
-For a local image-only check with Docker access:
+Require a fresh successful off-host backup and enough disk space. On the current
+installed host the operator invokes `sloparena-backup.service`, then checks
+`last-offhost-backup.json` and `last-backup-attempt.json` through status. Schema
+changes additionally require the guarded pre-migration dump and pinned EF bundle.
+A successful backup upload is not evidence of a successful restore.
 
 ```bash
-docker build --platform linux/amd64 -f Dockerfile.gameserver \
-  --build-arg SOURCE_REVISION="$(git rev-parse HEAD)" \
-  --build-arg RELEASE_ID=local-test -t sloparena-gameserver:local-test .
-scripts/smoke-gameserver-image.sh sloparena-gameserver:local-test
+sudo python3 /opt/sloparena/deploy/vps/release.py status \
+  --target-dir /var/lib/sloparena
+sudo python3 /opt/sloparena/deploy/vps/release.py deploy \
+  --target-dir /var/lib/sloparena --config /etc/sloparena/release.json
+sudo python3 /opt/sloparena/deploy/vps/release.py status \
+  --target-dir /var/lib/sloparena
 ```
 
-The Steam VPS GameHost starts with an operator-owned, read-only `server.json`
-at an absolute path supplied as the container argument. Its
-`deploymentProfile` must be `"vps"`; a missing file/profile is fatal. Pin
-`hostId` to Master `ApprovedHost:Id`, use the private Master URL, control port,
-match capacity, and `data/arenas`. The `publicIp` remains browser metadata,
-not a Steam connection identity. Configure distinct private
-`registrationKey`/`matchControlKey` values matching Master; never embed those
-credentials in an image, client, release record or repository.
+The guarded CLI validates digests/labels, DNS, Compose and migration compatibility
+before writer disruption. After deployment, observe exact active release/image
+and source pins, Master/GameHost readiness, fresh registered Steam host/protocol
+and catalog hash, schema and backup results. Verify the public HTTPS endpoint
+independently, including rejection of unauthorized admission. `/health` alone is
+a listener check, not readiness. Current GameServer binaries retry transient
+Master outages and recover after missing/rejected heartbeat identity; a Master
+restart alone does not require a GameHost restart.
 
-Compose mounts a checksum-pinned Valve SteamCMD `steamclient.so` read-only
-alongside the already pinned Steamworks.NET wrapper and sets the Playtest
-AppID. This mount is for the controlled test only; confirm the permitted
-dedicated-server redistributable before production packaging. The GameHost
-has one Steam P2P listener and **no published gameplay UDP ports**. Private
-Master→GameHost `/match/start` and `/match/abort` stay on the control
-network. Development smoke continues to use explicit UDP mode, not a public
-fallback. Apply the `AddSteamAuthIdentity` and `AddSteamMatchRouting`
-Master migrations through the backed-up pinned release workflow before
-starting the compatible Master/GameHost pair.
+A failed gate blocks Steam activation. Use the runbook's guarded compatible
+rollback or repair/roll-forward; never expose legacy UDP, disable authentication,
+restore an incompatible schema/configuration, or use destructive volume cleanup.
 
-The restricted VPS profile and operator-only ingress, migration, deployment
-and rollback gates are in [`deploy/vps/README.md`](../../deploy/vps/README.md).
-Publishing an image still does not deploy either the VPS or the home host.
+## 7. Activate and observe Steam default
 
-## CI
+In authenticated [Steamworks builds](https://partner.steamgames.com/apps/builds/5325920),
+select **default** for the exact uploaded BuildID, preview the change, check the
+new depot manifest, then request **Set Build Live Now**. Complete any requested
+Steam mobile app confirmation. Submission or a confirmation prompt is not proof
+that the branch changed.
 
-- This repo (`.github/workflows/ci.yml`): on push to main + PR — build
-  `src/Shared/`, run `tests/Shared.Tests/` (757 passing, 9 skipped), build `src/Server/`.
-- Master repo (`.github/workflows/build.yml`): build + test on push/PR to
-  main; on `v*` tag push, publishes `dotnet publish -c Release` output as a
-  GitHub Actions artifact.
-- Deploy is NOT CI-triggered — home infra is not CI-reliable; deploy stays
-  manual/scripted (rsync/ssh per this doc).
+Observe the successful activation and the current branch table again: default
+must show the candidate BuildID and manifest. Preserve a cropped screenshot and
+bounded branch observation in the candidate directory. Exclude account settings,
+branch passwords and unrelated rows. Leave `test` and other branches unchanged
+unless separately requested.
 
-## Manual deploy (not in CI)
+Record the final candidate with source/image pins, catalog/package identity,
+Steam BuildID/manifest/default observation, VPS readiness/registration,
+backup/schema results, and any unexercised flow. Remove task-owned staging/helpers,
+close task-owned privileged/authentication sessions and stop temporary SSH agents.
+Do not delete reusable evidence or unrelated files.
 
-Master server publish + rsync: see `docs/systems/production-hosting.md`
-("Redeploy master"). The master repo publishes independently of the game repo
-and is NOT part of `build-release.sh`.
+A packaged two-account match/rematch, valid Steam-ticket admission, external
+firewall exposure tests, and a fresh isolated backup restore are separate proofs.
+Only claim each if exercised; see the VPS runbook's live acceptance criteria.
+
+## Explicit alternatives: ZIP/GitHub and Alfred
+
+For friends-only ZIP releases, use `0.2.0-demo.<n>`. With a separately authorized,
+confirmed-closed Unity project, `scripts/build-release.sh <version>` produces
+`build/release/SlopArena-<version>.zip`: Windows player, embedded self-contained
+server, arenas, admitted cooked roster/payloads, `README.txt` and `HOSTING.txt`.
+It also publishes the framework-dependent Linux server under `build/minipc/`.
+Master is separate; this script does not deploy any host.
+
+The script saves `ProjectSettings.asset` and existing staging to a private
+`build/.release-stage.*` backup and restores saved bytes/directories through its
+EXIT trap on normal success or failure. It rejects unstaged settings changes,
+not every possible staged change. Forced termination can prevent cleanup;
+prove settlement before recovering that run's backup. Do not blanket `git checkout`
+or delete existing StreamingAssets/meta files; Unity asset re-serialization
+outside the script's saved inputs must be compared to the pre-build snapshot.
+
+Only when GitHub publication is requested, create the matching release with the
+ZIP and approved notes from `docs/release/RELEASE_NOTES.template.md`. Include the
+current attribution/license files. Do not silently create tags/releases as part
+of Steam upload.
+
+For an explicitly selected Alfred deployment, follow
+[Production Hosting](production-hosting.md) and its current homelab runbook.
+The legacy home binaries need explicit `development` profiles before upgrading.
+GameServer replacement uses `scripts/deploy-server.sh`; Master is independently
+published/rsynced. Preserve private configuration and avoid destructive rsync
+options. Restart replaced binaries, not GameHost solely because Master restarted.
+
+## CI boundaries
+
+Game `ci.yml` checks documentation, builds Shared/Server and runs their suites.
+`gameserver-image.yml` and Master `container-images.yml` publish tested immutable
+images independently. Master `build.yml` supplies its own build/test/publish
+artifacts. None deploys the VPS/home backend or activates a Steam branch.
+Website publication is separate and is not implied by releasing game/backend.

@@ -5,6 +5,10 @@ All notable changes to this package will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+- Add the human-only `Window/Pipeline/Recover Editor Lease...` action for a held, settled lease whose gateway lost its release token. Confirmation is bound to the current session, lease and revision; active/unknown work is refused and the previous token is revoked. No remote recovery endpoint or automatic timeout takeover.
+
 ## [0.5.0-exp.1] - 2026-08-10
 
 - New `GET /api/progress` endpoint: the currently executing command's task progress, served off the main thread so it answers even while a long synchronous command has the Editor blocked. Command authors report via the new `CliProgress.Report(title, info, current, total, progress)` API (thread-safe, callable from a blocked main thread) or the `CliEditorProgress.DisplayProgressBar` drop-in wrappers around `EditorUtility.DisplayProgressBar`; running `UnityEditor.Progress` items are mirrored automatically. Consumed by the `unity` CLI to render live terminal progress bars during `unity command` / `unity run --command`. (CLI-488, coordinated with CLI-335)

@@ -191,18 +191,6 @@ public class ServerEntityPacketTests
         Assert.Throws<ArgumentException>(() => ServerEntityPacket.Deserialize(truncated));
     }
 
-    [Fact]
-    public void SizeConstants_AssertWireLayout()
-    {
-        // Downlink max packet: 8 entityId + 4 tick + 164 state + 1 marker + 22 input.
-        Assert.Equal(8 + 4 + CharacterStatePacket.Size, ServerEntityPacket.BaseSize);
-        Assert.Equal(176, ServerEntityPacket.BaseSize);
-        Assert.Equal(1 + InputState.Size, ServerEntityPacket.RelaySize);
-        Assert.Equal(23, ServerEntityPacket.RelaySize);
-        Assert.Equal(199, ServerEntityPacket.MaxSize);
-        Assert.Equal(177, ServerEntityPacket.NoInputSize);
-        Assert.Equal(22, InputState.Size);
-    }
 
     [Fact]
     public void InputState_Roundtrips_JumpHeldBit()

@@ -93,7 +93,11 @@ travel.
 This is a local feel-test tuning; animation/gamefeel acceptance remains pending.
 
 Fist of Fury uses `fightguy_spell_f_2` for its full two-phase presentation:
-six inward-stunning punches followed by a right-foot knockback finisher.
+seven inward-stunning punches followed by a right-foot knockback finisher.
+Punches use horizontal, zero-growth pull so damage percent cannot eject the victim.
+Their fixed Hitstun covers the remaining timeline through the kick's active window;
+the stronger inward pull keeps late catches in reach despite outward defensive drift.
+Only the tick-88 right-foot hit launches outward. Ground and air F share this timeline.
 The cooked timeline and hitbox direction are authoritative.
 
 ## Ki Shot projectile visual

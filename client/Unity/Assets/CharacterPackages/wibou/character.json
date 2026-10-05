@@ -218,13 +218,22 @@
             "autoCancelAfterTicks": 0,
             "attackRange": 2.5,
             "warpRange": 0,
-            "useTargetLock": true,
-            "rotateTowardTarget": true,
-            "trackingStrength": 0.85,
             "animationIds": [
               "anim.wibou.g1"
             ],
             "operations": [
+              {
+                "kind": "startupAimCorrection",
+                "tick": 0,
+                "unit": "ticks",
+                "endTick": 13,
+                "acquisitionRange": 4,
+                "acquisitionHalfAngleDegrees": 180,
+                "maxYawDegrees": 45,
+                "maxPitchDegrees": 0,
+                "yawDegreesPerSecond": 360,
+                "pitchDegreesPerSecond": 0
+              },
               {
                 "kind": "spawnHitbox",
                 "tick": 13,
@@ -278,13 +287,22 @@
             "autoCancelAfterTicks": 0,
             "attackRange": 2.75,
             "warpRange": 0,
-            "useTargetLock": true,
-            "rotateTowardTarget": true,
-            "trackingStrength": 0.85,
             "animationIds": [
               "anim.wibou.g2"
             ],
             "operations": [
+              {
+                "kind": "startupAimCorrection",
+                "tick": 0,
+                "unit": "ticks",
+                "endTick": 9,
+                "acquisitionRange": 4,
+                "acquisitionHalfAngleDegrees": 180,
+                "maxYawDegrees": 45,
+                "maxPitchDegrees": 0,
+                "yawDegreesPerSecond": 360,
+                "pitchDegreesPerSecond": 0
+              },
               {
                 "kind": "spawnHitbox",
                 "tick": 9,
@@ -338,13 +356,22 @@
             "autoCancelAfterTicks": 0,
             "attackRange": 2.5,
             "warpRange": 0,
-            "useTargetLock": true,
-            "rotateTowardTarget": true,
-            "trackingStrength": 0.8,
             "animationIds": [
               "anim.wibou.g3"
             ],
             "operations": [
+              {
+                "kind": "startupAimCorrection",
+                "tick": 0,
+                "unit": "ticks",
+                "endTick": 14,
+                "acquisitionRange": 4,
+                "acquisitionHalfAngleDegrees": 180,
+                "maxYawDegrees": 45,
+                "maxPitchDegrees": 0,
+                "yawDegreesPerSecond": 360,
+                "pitchDegreesPerSecond": 0
+              },
               {
                 "kind": "spawnHitbox",
                 "tick": 14,
@@ -398,13 +425,22 @@
             "autoCancelAfterTicks": 0,
             "attackRange": 2.75,
             "warpRange": 0,
-            "useTargetLock": true,
-            "rotateTowardTarget": true,
-            "trackingStrength": 0.8,
             "animationIds": [
               "anim.wibou.g4"
             ],
             "operations": [
+              {
+                "kind": "startupAimCorrection",
+                "tick": 0,
+                "unit": "ticks",
+                "endTick": 41,
+                "acquisitionRange": 4,
+                "acquisitionHalfAngleDegrees": 180,
+                "maxYawDegrees": 45,
+                "maxPitchDegrees": 0,
+                "yawDegreesPerSecond": 360,
+                "pitchDegreesPerSecond": 0
+              },
               {
                 "kind": "spawnHitbox",
                 "tick": 41,
@@ -458,13 +494,22 @@
             "autoCancelAfterTicks": 16,
             "attackRange": 2.25,
             "warpRange": 0,
-            "useTargetLock": true,
-            "rotateTowardTarget": true,
-            "trackingStrength": 0.8,
             "animationIds": [
               "anim.wibou.a1"
             ],
             "operations": [
+              {
+                "kind": "startupAimCorrection",
+                "tick": 0,
+                "unit": "ticks",
+                "endTick": 6,
+                "acquisitionRange": 4,
+                "acquisitionHalfAngleDegrees": 180,
+                "maxYawDegrees": 45,
+                "maxPitchDegrees": 15,
+                "yawDegreesPerSecond": 360,
+                "pitchDegreesPerSecond": 180
+              },
               {
                 "kind": "spawnHitbox",
                 "tick": 6,
@@ -518,13 +563,22 @@
             "autoCancelAfterTicks": 15,
             "attackRange": 2.5,
             "warpRange": 0,
-            "useTargetLock": true,
-            "rotateTowardTarget": true,
-            "trackingStrength": 0.8,
             "animationIds": [
               "anim.wibou.a2"
             ],
             "operations": [
+              {
+                "kind": "startupAimCorrection",
+                "tick": 0,
+                "unit": "ticks",
+                "endTick": 4,
+                "acquisitionRange": 4,
+                "acquisitionHalfAngleDegrees": 180,
+                "maxYawDegrees": 45,
+                "maxPitchDegrees": 15,
+                "yawDegreesPerSecond": 360,
+                "pitchDegreesPerSecond": 180
+              },
               {
                 "kind": "spawnHitbox",
                 "tick": 4,
@@ -578,13 +632,22 @@
             "autoCancelAfterTicks": 15,
             "attackRange": 2.25,
             "warpRange": 0,
-            "useTargetLock": true,
-            "rotateTowardTarget": true,
-            "trackingStrength": 0.8,
             "animationIds": [
               "anim.wibou.a3"
             ],
             "operations": [
+              {
+                "kind": "startupAimCorrection",
+                "tick": 0,
+                "unit": "ticks",
+                "endTick": 10,
+                "acquisitionRange": 4,
+                "acquisitionHalfAngleDegrees": 180,
+                "maxYawDegrees": 45,
+                "maxPitchDegrees": 0,
+                "yawDegreesPerSecond": 360,
+                "pitchDegreesPerSecond": 0
+              },
               {
                 "kind": "spawnHitbox",
                 "tick": 10,
@@ -638,13 +701,22 @@
             "autoCancelAfterTicks": 23,
             "attackRange": 2.5,
             "warpRange": 0,
-            "useTargetLock": true,
-            "rotateTowardTarget": true,
-            "trackingStrength": 0.8,
             "animationIds": [
               "anim.wibou.a4"
             ],
             "operations": [
+              {
+                "kind": "startupAimCorrection",
+                "tick": 0,
+                "unit": "ticks",
+                "endTick": 8,
+                "acquisitionRange": 4,
+                "acquisitionHalfAngleDegrees": 180,
+                "maxYawDegrees": 45,
+                "maxPitchDegrees": 0,
+                "yawDegreesPerSecond": 360,
+                "pitchDegreesPerSecond": 0
+              },
               {
                 "kind": "spawnHitbox",
                 "tick": 8,

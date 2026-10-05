@@ -83,7 +83,7 @@ public static class CookedCharacterPackageLoader
         {
             var m=ParseManifest(copied[CharacterPackageAssembler.ManifestPath]);
             if(m.PackageId!=requirement!.PackageId||m.Version!=requirement.Version||m.CookedContentHash!=requirement.CookedContentHash||m.PackageHash!=requirement.PackageHash) d.Add(Error("package.identity.mismatch","manifest","Package identity does not match the requested requirement."));
-            if(m.CookedSchemaVersion!=3||(m.RuntimeApiMin!="1.0.0"&&m.RuntimeApiMin!="1.1.0"&&m.RuntimeApiMin!="1.2.0"&&m.RuntimeApiMin!="1.3.0")||m.RuntimeApiMax!="1.x") d.Add(Error("package.compatibility.unsupported","manifest","Cooked package schema/API is not supported."));
+            if(m.CookedSchemaVersion!=3||(m.RuntimeApiMin!="1.0.0"&&m.RuntimeApiMin!="1.1.0"&&m.RuntimeApiMin!="1.2.0"&&m.RuntimeApiMin!="1.3.0"&&m.RuntimeApiMin!="1.4.0")||m.RuntimeApiMax!="1.x") d.Add(Error("package.compatibility.unsupported","manifest","Cooked package schema/API is not supported."));
             if(m.Dependencies.Count!=0) d.Add(Error("package.dependencies.unsupported","manifest.dependencies","Unresolved package dependencies are not supported."));
             foreach (var c in m.Capabilities)
             {
@@ -95,6 +95,7 @@ public static class CookedCharacterPackageLoader
             var package=RuntimeParser.Parse(copied[CharacterPackageAssembler.RuntimePath]);
             ValidateCapabilityOperations(package.Definition, d);
             ValidateArmorAndFixedHitstun(package.Definition, m.RuntimeApiMin, d);
+            ValidateStartupAimCorrections(package.Definition, m.RuntimeApiMin, d);
             if(package.Metadata.PackageId!=m.PackageId||package.Metadata.Version!=m.Version||package.Metadata.CookedSchemaVersion!=m.CookedSchemaVersion) d.Add(Error("package.runtime.metadata-mismatch",CharacterPackageAssembler.RuntimePath,"Runtime package metadata does not match manifest."));
             var baked=BakedAnimationData.LoadFromBin(copied[CharacterPackageAssembler.PosePath]);
             using var bindings = JsonDocument.Parse(copied[CharacterPackageAssembler.BindingPath]);
@@ -176,11 +177,80 @@ public static class CookedCharacterPackageLoader
                 ValidateFixedHitstun(leap.Hitbox.FixedHitstunTicks, leap.Hitbox.StunTicks,
                     slot.Id, diagnostics, ref requiresApi13);
         }
-        if (requiresApi13 && runtimeApiMin != "1.3.0")
+        if (requiresApi13 && runtimeApiMin is not ("1.3.0" or "1.4.0"))
             diagnostics.Add(Error("package.compatibility.unsupported", "manifest.runtimeApiMin",
-                "Armor windows and fixed hitstun require runtime API 1.3.0."));
+                "Armor windows and fixed hitstun require runtime API 1.3.0 or later."));
     }
 
+    private static void ValidateStartupAimCorrections(
+        CookedCharacterDefinition definition,
+        string runtimeApiMin,
+        List<CharacterDiagnostic> diagnostics)
+    {
+        foreach (var slot in definition.Slots)
+        {
+            int stageStart = 0;
+            int windowCount = 0;
+            var commitments = new List<int>();
+            var windows = new List<(int StageIndex, int StageStart, CookedStartupAimCorrectionOperation Operation)>();
+            for (int stageIndex = 0; stageIndex < slot.Timeline.Stages.Count; stageIndex++)
+            {
+                var stage = slot.Timeline.Stages[stageIndex];
+                foreach (var operation in stage.Operations)
+                {
+                    if (operation is CookedStartupAimCorrectionOperation correction)
+                    {
+                        if (runtimeApiMin != "1.4.0")
+                            diagnostics.Add(Error("package.compatibility.unsupported", "manifest.runtimeApiMin",
+                                "Startup aim correction requires runtime API 1.4.0."));
+                        windowCount++;
+                        windows.Add((stageIndex, stageStart, correction));
+                    }
+                    else if (operation is CookedSpawnHitboxOperation or CookedSpawnProjectileOperation
+                        or CookedForwardLungeOperation
+                        || operation is CookedSetVelocityOperation velocity
+                            && (velocity.X != 0f || velocity.Z != 0f))
+                    {
+                        commitments.Add(stageStart + operation.Tick);
+                    }
+                }
+                stageStart += stage.DurationTicks;
+            }
+            if (windowCount > 1)
+                diagnostics.Add(Error("package.operation.invalid", slot.Id,
+                    "A timeline may contain only one startup aim-correction window."));
+            foreach (var (stageIndex, start, correction) in windows)
+            {
+                var stage = slot.Timeline.Stages[stageIndex];
+                string path = slot.Id + ".timeline.stages[" + stageIndex + "].startupAimCorrection";
+                float[] values =
+                {
+                    correction.AcquisitionRange, correction.AcquisitionHalfAngleDegrees,
+                    correction.MaxYawDegrees, correction.MaxPitchDegrees,
+                    correction.YawDegreesPerSecond, correction.PitchDegreesPerSecond,
+                };
+                bool finite = values.All(value => !float.IsNaN(value) && !float.IsInfinity(value));
+                int globalStart = start + correction.Tick;
+                int cutoff = start + correction.EndTick;
+                int? nextCommitment = commitments.Where(value => value >= globalStart)
+                    .Select(value => (int?)value).Min();
+                if (!finite || correction.Unit != AuthoringUnit.Ticks
+                    || correction.EndTick <= correction.Tick || correction.EndTick > stage.DurationTicks
+                    || correction.AcquisitionRange <= 0f || correction.AcquisitionRange > CharacterPackageCompiler.MaxStartupAcquisitionRange
+                    || correction.AcquisitionHalfAngleDegrees <= 0f || correction.AcquisitionHalfAngleDegrees > CharacterPackageCompiler.MaxStartupAngleDegrees
+                    || correction.MaxYawDegrees < 0f || correction.MaxYawDegrees > CharacterPackageCompiler.MaxStartupAngleDegrees
+                    || correction.MaxPitchDegrees < 0f || correction.MaxPitchDegrees > CharacterPackageCompiler.MaxStartupPitchDegrees
+                    || correction.YawDegreesPerSecond < 0f || correction.YawDegreesPerSecond > CharacterPackageCompiler.MaxStartupRateDegreesPerSecond
+                    || correction.MaxYawDegrees > 0f && correction.YawDegreesPerSecond == 0f
+                    || correction.PitchDegreesPerSecond < 0f || correction.PitchDegreesPerSecond > CharacterPackageCompiler.MaxStartupRateDegreesPerSecond
+                    || correction.MaxPitchDegrees > 0f && correction.PitchDegreesPerSecond == 0f
+                    || commitments.Any(value => value < globalStart)
+                    || nextCommitment.HasValue && cutoff > nextCommitment.Value)
+                    diagnostics.Add(Error("package.operation.invalid", path,
+                        "Startup aim correction has invalid bounds, cutoff, unit, or follows a prior commitment."));
+            }
+        }
+    }
     private static void ValidateFixedHitstun(
         ushort fixedTicks,
         ushort stunGate,
@@ -325,6 +395,7 @@ public static class CookedCharacterPackageLoader
                 CookedOperationKind.ForwardLunge => ForwardLunge(e, tick, unit),
                 CookedOperationKind.GravityWindow => GravityWindow(e, tick, unit),
                 CookedOperationKind.ArmorWindow => ArmorWindow(e, tick, unit),
+                CookedOperationKind.StartupAimCorrection => StartupAimCorrection(e, tick, unit),
                 CookedOperationKind.SpawnHitbox => new CookedSpawnHitboxOperation(tick, unit, ParseHitbox(O(e, "kind", "tick", "unit", "hitbox")["hitbox"])),
                 CookedOperationKind.SpawnProjectile => new CookedSpawnProjectileOperation(tick, unit, ParseProjectile(O(e, "kind", "tick", "unit", "projectile")["projectile"])),
                 CookedOperationKind.SetAimState => new CookedSetAimStateOperation(tick, unit, (AuthoringAimMode)B(O(e, "kind", "tick", "unit", "aimState"), "aimState")),
@@ -355,6 +426,16 @@ public static class CookedCharacterPackageLoader
         {
             var q = O(e, "kind", "tick", "unit", "durationTicks");
             return new CookedArmorWindowOperation(tick, unit, U(q, "durationTicks"));
+        }
+        private static CookedStartupAimCorrectionOperation StartupAimCorrection(JsonElement e, ushort tick, AuthoringUnit unit)
+        {
+            var q = O(e, "kind", "tick", "unit", "endTick", "acquisitionRange",
+                "acquisitionHalfAngleDegrees", "maxYawDegrees", "maxPitchDegrees",
+                "yawDegreesPerSecond", "pitchDegreesPerSecond");
+            return new CookedStartupAimCorrectionOperation(tick, unit, U(q, "endTick"),
+                F(q, "acquisitionRange"), F(q, "acquisitionHalfAngleDegrees"),
+                F(q, "maxYawDegrees"), F(q, "maxPitchDegrees"),
+                F(q, "yawDegreesPerSecond"), F(q, "pitchDegreesPerSecond"));
         }
 
         private static CookedStartCapabilityOperation Capability(JsonElement e, ushort tick, AuthoringUnit unit)

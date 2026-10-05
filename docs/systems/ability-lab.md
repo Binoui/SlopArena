@@ -104,12 +104,23 @@ each seek. Edit Mode playback is driven by the editor update loop and editor
 clock, not by updates on the hidden preview rig. Play Mode authoring retains
 scaled delta-time behavior; recorded scenarios retain their realtime clock.
 
+Aerial authoring previews suspend ambient gravity for the isolated actor, so
+long moves remain at their starting height after the character's float window.
+Authored vertical velocity and capability-owned motion still execute in Shared.
+Recorded two-fighter scenarios and matches retain normal gravity; use a scenario
+to inspect falling, landing, and impact timing.
+
 Package authoring and recorded previews select clips from the Shared state's
 animation phase, independently of the number of timeline stages, and use the
 same playback-speed calculation as the runtime renderer. Aim/release capabilities
 can have multiple animation phases inside one timeline stage; clamping the phase
 to that stage count would display the wrong clip and pose. Live-draft refreshes
 also reattach the selected catalog's weapon props when reusing preview renderers.
+
+The active preview owns its temporary animation-catalog snapshot. Reapplying the
+same snapshot must preserve it; only replacing it with a different snapshot or
+closing the preview may destroy it. Save status notifications can synchronously
+refresh the UI before the save path reapplies the preview.
 
 The workspace prepares current source in memory through existing compiler,
 verified poses, catalog, and rig; it does not save, cook, change Undo history,
@@ -182,6 +193,20 @@ catalog/rig bindings are reported at the preview seam, and the rig setup state d
 no scene rig, valid rig, and unavailable package preview.
 
 ## Moves interaction
+
+Moves fields are grouped into a move overview, an all-source-stage effect inventory, and
+selected-effect details. Selecting an effect or inspected stage changes the authoring
+context without seeking the preview. `Seek tick` uses cumulative move ticks; `Seek to
+selected effect` explicitly seeks its source-stage start. Field bounds and edits use the
+inspected source stage, not the preview stage. Commits and Undo retain the cumulative cursor
+and camera; shortening a move clamps the cursor and explains the change. Capability-owned
+or conditional windows remain labelled as such; unavailable editors are not presented as complete.
+
+`Detach fields` moves the same fields subtree into a native Editor pane, sharing the owner's
+draft and Undo history. Dock panes and SceneView manually. Closing the fields pane or using
+`Return fields inline` restores the fields inline without saving; other authoring tabs hide
+detached Moves controls. Fields scroll independently of transport, adapt to narrow panes,
+and keep native text-input shortcuts. There is no embedded renderer or automatic window layout.
 
 The Moves timeline supports snapped marker/body drags and hitbox endpoint resizing. Each
 release applies one immutable source edit and one workspace Undo snapshot; canceled or

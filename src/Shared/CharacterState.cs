@@ -196,6 +196,25 @@ namespace SlopArena.Shared
         /// <summary>Combat aim pitch in radians — sent by client, used for projectile direction.</summary>
         public float AimPitch;
 
+        /// <summary>Committed attack-pose pitch, independent of raw camera aim.</summary>
+        public float AttackPosePitch;
+        public float AttackCorrectionStartYaw;
+        public ulong AttackCorrectionTargetId;
+        public byte AttackCorrectionTargetDeaths;
+        public bool AttackCorrectionActive;
+        /// <summary>This activation owns facing even after its correction window closes.</summary>
+        public bool AttackCorrectionOwned;
+
+        internal void ClearStartupAimCorrection()
+        {
+            AttackPosePitch = 0f;
+            AttackCorrectionStartYaw = 0f;
+            AttackCorrectionTargetId = 0;
+            AttackCorrectionTargetDeaths = 0;
+            AttackCorrectionActive = false;
+            AttackCorrectionOwned = false;
+        }
+
         /// <summary>True while player is holding an aim-to-fire ability (RMB charge, Q throw).</summary>
         public bool IsAiming;
 

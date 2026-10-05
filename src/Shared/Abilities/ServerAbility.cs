@@ -24,6 +24,8 @@ namespace SlopArena.Shared.Abilities
         private bool _armorTickActive;
         private bool _armorStartsOnFirstTick;
         internal bool FrozenForSimulationTick { get; set; }
+        internal ServerSimulation? OwnerSimulation { get; set; }
+        internal InputState ActivationInput { get; set; }
         // ── Lifecycle (implement in subclasses) ──
 
         /// <summary>Whether this activation currently owns vertical motion.</summary>

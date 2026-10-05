@@ -1,12 +1,13 @@
 .ability-lab-root {
     flex-grow: 1;
-    min-width: 360px;
+    min-width: 240px;
     min-height: 240px;
     background-color: rgb(30, 30, 34);
     color: rgb(235, 235, 235);
 }
 .toolbar {
     flex-direction: row;
+    flex-wrap: wrap;
     align-items: center;
     flex-shrink: 0;
     min-height: 34px;
@@ -27,6 +28,7 @@
 .split-view { flex-grow: 1; min-height: 190px; }
 .move-selector { flex-direction: row; align-items: center; min-height: 38px; padding: 4px 6px; background-color: rgb(36, 36, 41); }
 .move-list { flex-direction: row; flex-grow: 1; min-width: 0; padding-left: 6px; }
+.move-selector, .move-list { flex-wrap: wrap; }
 .move-slot { flex-grow: 1; min-width: 28px; margin-right: 3px; min-height: 26px; }
 .move-slot-selected { background-color: rgb(65, 105, 145); }
 .move-slot-air-selected { background-color: rgb(150, 132, 62); }
@@ -37,6 +39,17 @@
 .ground-air-button { min-width: 64px; margin-right: 4px; }
 .ground-air-selected { background-color: rgb(65, 105, 145); }
 .inspector { flex-grow: 1; min-height: 0; padding: 8px; background-color: rgb(40, 40, 45); }
+.fields-toolbar { flex-direction: row; flex-wrap: wrap; align-items: center; flex-shrink: 0; margin-bottom: 4px; }
+.fields-toolbar > * { margin-right: 6px; }
+.fields-host { flex-grow: 1; min-height: 0; min-width: 0; }
+.ability-lab-fields-root { flex-grow: 1; min-width: 240px; min-height: 180px; background-color: rgb(30, 30, 34); color: rgb(235, 235, 235); }
+.fields-context, .timeline-notice { white-space: normal; margin: 4px 6px; }
+.effect-inventory-row { white-space: normal; -unity-text-align: middle-left; min-height: 26px; margin-top: 2px; }
+.inspector Label { white-space: normal; }
+.timeline-seek { min-width: 130px; max-width: 180px; }
+.timeline-seek > .unity-base-field__label { min-width: 55px; }
+.fields-narrow .unity-base-field { flex-direction: column; align-items: stretch; }
+.fields-narrow .unity-base-field__label { min-width: 0; white-space: normal; }
 .move-timeline { flex-direction: column; align-items: stretch; min-height: 120px; padding: 8px; margin-top: 6px; background-color: rgb(42, 42, 48); }
 .timeline-controls { flex-direction: row; flex-wrap: wrap; align-items: center; width: 100%; min-height: 28px; }
 .timeline-controls > * { margin-right: 6px; margin-bottom: 3px; }

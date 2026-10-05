@@ -39,6 +39,10 @@ public static class CharacterPackageCompiler
     private const string RuntimeApiMin = "1.2.0";
     private const string RuntimeApiMax = "1.x";
     private const ushort MaxFixedHitstunTicks = 240;
+    internal const float MaxStartupAcquisitionRange = 32f;
+    internal const float MaxStartupAngleDegrees = 180f;
+    internal const float MaxStartupPitchDegrees = 90f;
+    internal const float MaxStartupRateDegreesPerSecond = 1440f;
     private static readonly string[] CanonicalSlots = CanonicalSlotProjection.All
         .Select(slot => slot.Id)
         .ToArray();
@@ -185,7 +189,9 @@ public static class CharacterPackageCompiler
         if (d.HasErrors) return;
         var metadata = new CookedPackageMetadata(
             m.PackageId, m.Version, CookedSchemaVersion,
-            RequiresRuntimeApi13(c) ? "1.3.0" : RuntimeApiMin, RuntimeApiMax);
+            c.Slots.Any(slot => slot.Timeline.Stages.Any(stage => stage.Operations.Any(operation =>
+                operation is StartupAimCorrectionOperationSource))) ? "1.4.0"
+                : RequiresRuntimeApi13(c) ? "1.3.0" : RuntimeApiMin, RuntimeApiMax);
         var definition = new CookedCharacterDefinition(
             c.DisplayName,
             c.Weight,
@@ -267,7 +273,79 @@ public static class CharacterPackageCompiler
                 ValidateOperation(operation, c, d);
             }
         }
+        ValidateStartupAimCorrection(slot, index, d);
     }
+    private static void ValidateStartupAimCorrection(CharacterSlotSource slot, int slotIndex, DiagnosticBag d)
+    {
+        string timelinePath = $"character.slots[{slotIndex}].timeline";
+        int windowCount = 0;
+        int stageStart = 0;
+        var commitments = new List<int>();
+        var windows = new List<(int StageIndex, int StageStart, StartupAimCorrectionOperationSource Operation)>();
+        for (int stageIndex = 0; stageIndex < slot.Timeline.Stages.Count; stageIndex++)
+        {
+            var stage = slot.Timeline.Stages[stageIndex];
+            foreach (var operation in stage.Operations)
+            {
+                if (operation is StartupAimCorrectionOperationSource correction)
+                {
+                    windowCount++;
+                    windows.Add((stageIndex, stageStart, correction));
+                }
+                else if (IsStartupCommitment(operation))
+                {
+                    commitments.Add(stageStart + operation.Tick);
+                }
+            }
+            stageStart += stage.DurationTicks;
+        }
+
+        if (windowCount > 1)
+            d.Error("operation.ambiguous", timelinePath,
+                "A timeline may contain only one startup aim-correction window.");
+
+        foreach (var (stageIndex, start, correction) in windows)
+        {
+            string path = $"{timelinePath}.stages[{stageIndex}].operations.startupAimCorrection";
+            ValidateFiniteValues(new[]
+            {
+                correction.AcquisitionRange, correction.AcquisitionHalfAngleDegrees,
+                correction.MaxYawDegrees, correction.MaxPitchDegrees,
+                correction.YawDegreesPerSecond, correction.PitchDegreesPerSecond,
+            }, path, d);
+            if (correction.EndTick <= correction.Tick || correction.EndTick > slot.Timeline.Stages[stageIndex].DurationTicks)
+                d.Error("value.out-of-range", path + ".endTick", "End tick must be exclusive, after the operation tick, and inside the stage.");
+            if (correction.AcquisitionRange <= 0f || correction.AcquisitionRange > MaxStartupAcquisitionRange)
+                d.Error("value.out-of-range", path + ".acquisitionRange", $"Acquisition range must be greater than zero and at most {MaxStartupAcquisitionRange} meters.");
+            if (correction.AcquisitionHalfAngleDegrees <= 0f || correction.AcquisitionHalfAngleDegrees > MaxStartupAngleDegrees)
+                d.Error("value.out-of-range", path + ".acquisitionHalfAngleDegrees", $"Acquisition half-angle must be greater than zero and at most {MaxStartupAngleDegrees} degrees.");
+            if (correction.MaxYawDegrees < 0f || correction.MaxYawDegrees > MaxStartupAngleDegrees)
+                d.Error("value.out-of-range", path + ".maxYawDegrees", $"Maximum yaw must be between zero and {MaxStartupAngleDegrees} degrees.");
+            if (correction.MaxPitchDegrees < 0f || correction.MaxPitchDegrees > MaxStartupPitchDegrees)
+                d.Error("value.out-of-range", path + ".maxPitchDegrees", $"Maximum pitch must be between zero and {MaxStartupPitchDegrees} degrees.");
+            if (correction.YawDegreesPerSecond < 0f || correction.YawDegreesPerSecond > MaxStartupRateDegreesPerSecond ||
+                correction.MaxYawDegrees > 0f && correction.YawDegreesPerSecond == 0f)
+                d.Error("value.out-of-range", path + ".yawDegreesPerSecond", $"Yaw rate must be positive for nonzero yaw correction and at most {MaxStartupRateDegreesPerSecond} degrees per second.");
+            if (correction.PitchDegreesPerSecond < 0f || correction.PitchDegreesPerSecond > MaxStartupRateDegreesPerSecond ||
+                correction.MaxPitchDegrees > 0f && correction.PitchDegreesPerSecond == 0f)
+                d.Error("value.out-of-range", path + ".pitchDegreesPerSecond", $"Pitch rate must be positive for nonzero pitch correction and at most {MaxStartupRateDegreesPerSecond} degrees per second.");
+
+            int globalStart = start + correction.Tick;
+            if (commitments.Any(commitment => commitment < globalStart))
+                d.Error("operation.commitment-precedes-correction", path,
+                    "Startup aim correction cannot follow a prior active or launch commitment.");
+            int cutoff = start + correction.EndTick;
+            int? nextCommitment = commitments.Where(commitment => commitment >= globalStart).Select(commitment => (int?)commitment).Min();
+            if (nextCommitment.HasValue && cutoff > nextCommitment.Value)
+                d.Error("operation.cutoff-after-commitment", path + ".endTick",
+                    "Startup aim correction must end no later than the earliest contact, projectile, or directional launch commitment.");
+        }
+    }
+
+    private static bool IsStartupCommitment(CharacterTimelineOperationSource operation)
+        => operation is SpawnHitboxOperationSource or SpawnProjectileOperationSource or ForwardLungeOperationSource
+            || operation is SetVelocityOperationSource velocity
+                && (velocity.X != 0f || velocity.Z != 0f);
     private static int FindSourceSlotIndex(IReadOnlyList<CharacterSlotSource> slots, string id)
     {
         for (var i = 0; i < (slots?.Count ?? 0); i++)
@@ -358,6 +436,8 @@ public static class CharacterPackageCompiler
                 break;
             case StartCapabilityOperationSource capability when capability.Parameters is TargetedLeapCapabilityParameters leap:
                 ValidateTargetedLeap(leap, c, d);
+                break;
+            case StartupAimCorrectionOperationSource:
                 break;
         }
     }
@@ -590,6 +670,7 @@ public static class CharacterPackageCompiler
             SetAimStateOperationSource x => x with { },
             StartCapabilityOperationSource x => x with { Parameters = CloneParameters(x.Parameters) },
             EmitPresentationOperationSource x => x with { },
+            StartupAimCorrectionOperationSource x => x with { },
             CompleteTimelineOperationSource x => x with { },
             _ => throw new InvalidDataException("Unknown operation.")
         };
@@ -639,6 +720,12 @@ public static class CharacterPackageCompiler
                         capabilities++;
                         if (x.Parameters is TargetedLeapCapabilityParameters) hitboxes++;
                         cookedOps.Add(new CookedStartCapabilityOperation(x.Tick, x.Unit, x.CapabilityId, x.CapabilityVersion, CookParameters(x.Parameters)));
+                        break;
+                    case StartupAimCorrectionOperationSource x:
+                        cookedOps.Add(new CookedStartupAimCorrectionOperation(
+                            x.Tick, x.Unit, x.EndTick, x.AcquisitionRange,
+                            x.AcquisitionHalfAngleDegrees, x.MaxYawDegrees, x.MaxPitchDegrees,
+                            x.YawDegreesPerSecond, x.PitchDegreesPerSecond));
                         break;
                     case EmitPresentationOperationSource x: cookedOps.Add(new CookedEmitPresentationOperation(x.Tick, x.Unit, x.PresentationId, cookedOperationOrdinal, x.Placement)); break;
                     case CompleteTimelineOperationSource x: cookedOps.Add(new CookedCompleteTimelineOperation(x.Tick, x.Unit)); break;
@@ -838,6 +925,15 @@ public static class CharacterPackageCompiler
                 break;
             case CookedArmorWindowOperation armor:
                 w.WriteNumber("durationTicks", armor.DurationTicks);
+                break;
+            case CookedStartupAimCorrectionOperation correction:
+                w.WriteNumber("endTick", correction.EndTick);
+                Number(w, "acquisitionRange", correction.AcquisitionRange);
+                Number(w, "acquisitionHalfAngleDegrees", correction.AcquisitionHalfAngleDegrees);
+                Number(w, "maxYawDegrees", correction.MaxYawDegrees);
+                Number(w, "maxPitchDegrees", correction.MaxPitchDegrees);
+                Number(w, "yawDegreesPerSecond", correction.YawDegreesPerSecond);
+                Number(w, "pitchDegreesPerSecond", correction.PitchDegreesPerSecond);
                 break;
             case CookedCompleteTimelineOperation:
                 break;

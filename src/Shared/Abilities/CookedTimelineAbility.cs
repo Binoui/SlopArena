@@ -19,6 +19,9 @@ public sealed class CookedTimelineAbility : ServerAbility
     private ushort _gravityWindowTicksRemaining;
     private float _gravityWindowScale = 1f;
     private readonly bool _timelineOwnsVerticalMotion;
+    private readonly CookedStartupAimCorrectionOperation? _startupCorrection;
+    private readonly int _startupCorrectionStage;
+    internal bool UsesStartupAimCorrection { get; }
 
     public override float GravityMultiplier
         => _gravityWindowTicksRemaining > 0 ? _gravityWindowScale : 1f;
@@ -41,17 +44,22 @@ public sealed class CookedTimelineAbility : ServerAbility
         _slot = slot ?? throw new ArgumentNullException(nameof(slot));
         AnimationNames = animationNames ?? Array.Empty<string>();
         bool ownsVerticalMotion = false;
-        for (var i = 0; i < _slot.Timeline.Stages.Count && !ownsVerticalMotion; i++)
+        for (var i = 0; i < _slot.Timeline.Stages.Count; i++)
         {
             var operations = _slot.Timeline.Stages[i].Operations;
             for (var j = 0; j < operations.Count; j++)
             {
+                if (operations[j] is CookedStartupAimCorrectionOperation correction)
+                {
+                    _startupCorrection = correction;
+                    _startupCorrectionStage = i;
+                    UsesStartupAimCorrection = true;
+                }
                 if (operations[j] is CookedSetVelocityOperation velocity &&
                     (velocity.VelocityMode == AuthoringVelocityMode.Absolute ||
                      velocity.Y != 0f))
                 {
                     ownsVerticalMotion = true;
-                    break;
                 }
             }
         }
@@ -82,6 +90,7 @@ public sealed class CookedTimelineAbility : ServerAbility
         _forwardLungeTicksRemaining = 0;
         _forwardLungeActive = false;
         _gravityWindowTicksRemaining = 0;
+        s.ClearStartupAimCorrection();
         ClearArmorWindow();
         _gravityWindowScale = 1f;
         s.State = ActionState.Attacking;
@@ -90,6 +99,12 @@ public sealed class CookedTimelineAbility : ServerAbility
         s.IsAiming = false;
         AnimIndex = 0;
         s.AnimLockTicks = CurrentStage.DurationTicks;
+        if (_startupCorrection != null)
+        {
+            if (OwnerSimulation == null)
+                throw new InvalidOperationException("Startup correction requires a registered simulation.");
+            OwnerSimulation.BeginStartupAimCorrection(ref s, _startupCorrection, ActivationInput);
+        }
         ExecuteOperations(ref s, def);
         if (_completed)
             return;
@@ -106,7 +121,10 @@ public sealed class CookedTimelineAbility : ServerAbility
 
         bool wasAiming = _unlimitedAimHold && s.State == ActionState.Aiming;
         if (!wasAiming)
+        {
             _stageTick++;
+            UpdateStartupAimCorrection(ref s);
+        }
         ExecuteOperations(ref s, def);
         if (_completed)
             return;
@@ -144,6 +162,7 @@ public sealed class CookedTimelineAbility : ServerAbility
     public override void OnEnd(ref CharacterState s)
     {
         CompleteCapabilities(ref s, cancel: false);
+        s.ClearStartupAimCorrection();
         s.SlideAttackCarryActive = false;
         _gravityWindowTicksRemaining = 0;
         _gravityWindowScale = 1f;
@@ -153,6 +172,7 @@ public sealed class CookedTimelineAbility : ServerAbility
     public override void OnCancel(ref CharacterState s)
     {
         CompleteCapabilities(ref s, cancel: true);
+        s.ClearStartupAimCorrection();
         s.SlideAttackCarryActive = false;
         s.IsAiming = false;
         _forwardLungeActive = false;
@@ -168,6 +188,21 @@ public sealed class CookedTimelineAbility : ServerAbility
             _capabilities[i].OnHitEntity(ref attacker, ref target, attackerDef, targetDef, ref damage, ref knockbackForce);
     }
 
+    private void UpdateStartupAimCorrection(ref CharacterState s)
+    {
+        if (_startupCorrection == null || !s.AttackCorrectionActive)
+            return;
+        if (_stageIndex > _startupCorrectionStage ||
+            _stageIndex == _startupCorrectionStage && _stageTick >= _startupCorrection.EndTick)
+        {
+            s.AttackCorrectionActive = false;
+            return;
+        }
+        OwnerSimulation!.UpdateStartupAimCorrection(ref s, _startupCorrection,
+            applyPose: _stageIndex == _startupCorrectionStage && _stageTick >= _startupCorrection.Tick);
+    }
+
+
     private CookedStage CurrentStage => _slot.Timeline.Stages[_stageIndex];
 
     private void ExecuteOperations(ref CharacterState s, CharacterDefinition def)
@@ -181,6 +216,9 @@ public sealed class CookedTimelineAbility : ServerAbility
                 flattenedOperationIndex += _slot.Timeline.Stages[i].Operations.Count;
             switch (operation)
             {
+                case CookedStartupAimCorrectionOperation:
+                    // OnStart captures once; the cached profile drives its authored window.
+                    break;
                 case CookedSetVelocityOperation velocity:
                     ClearVelocityOwnership(ref s);
                     bool verticalWrite = velocity.VelocityMode == AuthoringVelocityMode.Absolute || velocity.Y != 0f;
@@ -300,10 +338,11 @@ public sealed class CookedTimelineAbility : ServerAbility
 
     private void SpawnCookedProjectile(ref CharacterState s, CookedProjectile projectile, int operationIndex)
     {
-        float aimYaw = s.AimYaw + projectile.YawOffsetDegrees * MathF.PI / 180f;
-        float cosPitch = MathF.Cos(s.AimPitch);
+        float aimYaw = (s.AttackCorrectionOwned ? s.FacingYaw : s.AimYaw) + projectile.YawOffsetDegrees * MathF.PI / 180f;
+        float aimPitch = s.AttackCorrectionOwned ? s.AttackPosePitch : s.AimPitch;
+        float cosPitch = MathF.Cos(aimPitch);
         float dirX = cosPitch * MathF.Sin(aimYaw);
-        float dirY = MathF.Sin(s.AimPitch);
+        float dirY = MathF.Sin(aimPitch);
         float dirZ = cosPitch * MathF.Cos(aimYaw);
         float cosYaw = MathF.Cos(s.FacingYaw);
         float sinYaw = MathF.Sin(s.FacingYaw);

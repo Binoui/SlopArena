@@ -6,7 +6,7 @@ namespace SlopArena.Shared
 {
     /// <summary>
     /// Downlink per-entity state envelope:
-    /// entityId(8) + tick(4) + CharacterStatePacket(164) + relay marker(1)
+    /// entityId(8) + tick(4) + CharacterStatePacket + relay marker(1)
     /// + InputState(22) when relayed.
     /// </summary>
     public struct ServerEntityPacket

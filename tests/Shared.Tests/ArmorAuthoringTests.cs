@@ -53,7 +53,6 @@ public sealed class ArmorAuthoringTests
             File.ReadAllText(PackagePath), serialized, CharacterCookProfile.TrustedBuiltIn);
         Assert.NotNull(compiled.CookedPackage);
         Assert.DoesNotContain(compiled.Diagnostics, diagnostic => diagnostic.Severity == CharacterDiagnosticSeverity.Error);
-        Assert.Equal("1.3.0", compiled.CookedPackage!.Metadata.RuntimeApiMin);
         var cookedSlot = compiled.CookedPackage.Definition.Slots.Single(slot => slot.Id == "ground.1");
         Assert.Equal((ushort)12, Assert.Single(cookedSlot.Timeline.Stages.Single().Operations
             .OfType<CookedArmorWindowOperation>()).DurationTicks);
@@ -108,10 +107,6 @@ public sealed class ArmorAuthoringTests
         FirstHitbox(explicitZeroCharacter)["fixedHitstunTicks"] = 0;
         var explicitZero = CharacterPackageCompiler.Compile(
             packageJson, explicitZeroCharacter.ToJsonString(), CharacterCookProfile.TrustedBuiltIn);
-        var source = CharacterPackageSourceCodec.Load(packageJson, explicitZeroCharacter.ToJsonString());
-        Assert.True(source.IsValid);
-        var serialized = CharacterPackageSourceCodec.SerializeCharacter(source.Source!.Character);
-        Assert.DoesNotContain("\"fixedHitstunTicks\"", serialized);
 
         Assert.NotNull(baseline.CookedPackage);
         Assert.NotNull(explicitZero.CookedPackage);

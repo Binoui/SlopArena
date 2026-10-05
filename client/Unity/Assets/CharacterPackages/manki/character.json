@@ -224,13 +224,22 @@
             "autoCancelAfterTicks": 0,
             "attackRange": 2,
             "warpRange": 0,
-            "useTargetLock": true,
-            "rotateTowardTarget": true,
-            "trackingStrength": 0.9,
             "animationIds": [
               "anim.manki.g1"
             ],
             "operations": [
+              {
+                "kind": "startupAimCorrection",
+                "tick": 0,
+                "unit": "ticks",
+                "endTick": 9,
+                "acquisitionRange": 4,
+                "acquisitionHalfAngleDegrees": 180,
+                "maxYawDegrees": 45,
+                "maxPitchDegrees": 0,
+                "yawDegreesPerSecond": 360,
+                "pitchDegreesPerSecond": 0
+              },
               {
                 "kind": "spawnHitbox",
                 "tick": 9,
@@ -284,13 +293,22 @@
             "autoCancelAfterTicks": 26,
             "attackRange": 1.75,
             "warpRange": 0,
-            "useTargetLock": true,
-            "rotateTowardTarget": true,
-            "trackingStrength": 0.8,
             "animationIds": [
               "anim.manki.a1"
             ],
             "operations": [
+              {
+                "kind": "startupAimCorrection",
+                "tick": 0,
+                "unit": "ticks",
+                "endTick": 7,
+                "acquisitionRange": 4,
+                "acquisitionHalfAngleDegrees": 180,
+                "maxYawDegrees": 45,
+                "maxPitchDegrees": 15,
+                "yawDegreesPerSecond": 360,
+                "pitchDegreesPerSecond": 180
+              },
               {
                 "kind": "spawnHitbox",
                 "tick": 7,
@@ -370,13 +388,22 @@
             "autoCancelAfterTicks": 0,
             "attackRange": 0,
             "warpRange": 0,
-            "useTargetLock": true,
-            "rotateTowardTarget": true,
-            "trackingStrength": 0.85,
             "animationIds": [
               "anim.manki.g2"
             ],
             "operations": [
+              {
+                "kind": "startupAimCorrection",
+                "tick": 0,
+                "unit": "ticks",
+                "endTick": 9,
+                "acquisitionRange": 4,
+                "acquisitionHalfAngleDegrees": 180,
+                "maxYawDegrees": 45,
+                "maxPitchDegrees": 0,
+                "yawDegreesPerSecond": 360,
+                "pitchDegreesPerSecond": 0
+              },
               {
                 "kind": "spawnHitbox",
                 "tick": 9,
@@ -430,13 +457,22 @@
             "autoCancelAfterTicks": 33,
             "attackRange": 0,
             "warpRange": 0,
-            "useTargetLock": true,
-            "rotateTowardTarget": true,
-            "trackingStrength": 0.8,
             "animationIds": [
               "anim.manki.a2"
             ],
             "operations": [
+              {
+                "kind": "startupAimCorrection",
+                "tick": 0,
+                "unit": "ticks",
+                "endTick": 8,
+                "acquisitionRange": 4,
+                "acquisitionHalfAngleDegrees": 180,
+                "maxYawDegrees": 45,
+                "maxPitchDegrees": 15,
+                "yawDegreesPerSecond": 360,
+                "pitchDegreesPerSecond": 180
+              },
               {
                 "kind": "spawnHitbox",
                 "tick": 8,
@@ -516,13 +552,22 @@
             "autoCancelAfterTicks": 0,
             "attackRange": 0,
             "warpRange": 0,
-            "useTargetLock": true,
-            "rotateTowardTarget": true,
-            "trackingStrength": 0.85,
             "animationIds": [
               "anim.manki.g3"
             ],
             "operations": [
+              {
+                "kind": "startupAimCorrection",
+                "tick": 0,
+                "unit": "ticks",
+                "endTick": 9,
+                "acquisitionRange": 4,
+                "acquisitionHalfAngleDegrees": 180,
+                "maxYawDegrees": 45,
+                "maxPitchDegrees": 0,
+                "yawDegreesPerSecond": 360,
+                "pitchDegreesPerSecond": 0
+              },
               {
                 "kind": "spawnHitbox",
                 "tick": 9,
@@ -576,13 +621,22 @@
             "autoCancelAfterTicks": 35,
             "attackRange": 0,
             "warpRange": 0,
-            "useTargetLock": true,
-            "rotateTowardTarget": true,
-            "trackingStrength": 0.8,
             "animationIds": [
               "anim.manki.a3"
             ],
             "operations": [
+              {
+                "kind": "startupAimCorrection",
+                "tick": 0,
+                "unit": "ticks",
+                "endTick": 16,
+                "acquisitionRange": 4,
+                "acquisitionHalfAngleDegrees": 180,
+                "maxYawDegrees": 45,
+                "maxPitchDegrees": 0,
+                "yawDegreesPerSecond": 360,
+                "pitchDegreesPerSecond": 0
+              },
               {
                 "kind": "spawnHitbox",
                 "tick": 16,
@@ -636,13 +690,22 @@
             "autoCancelAfterTicks": 0,
             "attackRange": 0,
             "warpRange": 0,
-            "useTargetLock": true,
-            "rotateTowardTarget": true,
-            "trackingStrength": 0.85,
             "animationIds": [
               "anim.manki.g4"
             ],
             "operations": [
+              {
+                "kind": "startupAimCorrection",
+                "tick": 0,
+                "unit": "ticks",
+                "endTick": 12,
+                "acquisitionRange": 4,
+                "acquisitionHalfAngleDegrees": 180,
+                "maxYawDegrees": 45,
+                "maxPitchDegrees": 0,
+                "yawDegreesPerSecond": 360,
+                "pitchDegreesPerSecond": 0
+              },
               {
                 "kind": "spawnHitbox",
                 "tick": 12,
@@ -696,13 +759,22 @@
             "autoCancelAfterTicks": 44,
             "attackRange": 0,
             "warpRange": 0,
-            "useTargetLock": true,
-            "rotateTowardTarget": true,
-            "trackingStrength": 0.8,
             "animationIds": [
               "anim.manki.a4"
             ],
             "operations": [
+              {
+                "kind": "startupAimCorrection",
+                "tick": 0,
+                "unit": "ticks",
+                "endTick": 23,
+                "acquisitionRange": 4,
+                "acquisitionHalfAngleDegrees": 180,
+                "maxYawDegrees": 45,
+                "maxPitchDegrees": 0,
+                "yawDegreesPerSecond": 360,
+                "pitchDegreesPerSecond": 0
+              },
               {
                 "kind": "spawnHitbox",
                 "tick": 23,

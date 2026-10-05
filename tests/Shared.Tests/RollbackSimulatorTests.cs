@@ -19,6 +19,25 @@ public class RollbackSimulatorTests
         };
 
     [Fact]
+    public void TimelineAlignmentAndFutureSelfSnapshotsUseAbsoluteTicks()
+    {
+        var sim = new SlopArena.Shared.Rollback.RollbackSimulator(TestHelpers.TestArena(), SelfId);
+        sim.RegisterEntity(SelfId, TestHelpers.MankiDef, TestHelpers.PlayerState());
+        sim.RegisterEntity(OpponentId, TestHelpers.MankiDef, TestHelpers.PlayerState(x: 10f));
+        Assert.True(sim.SetTimeline(300));
+
+        var newest = TestHelpers.PlayerState(x: 77f);
+        var older = TestHelpers.PlayerState(x: 33f);
+        sim.IngestAuthoritativeBatch(new[] { MakePacket(SelfId, 305, newest) });
+        sim.IngestAuthoritativeBatch(new[] { MakePacket(SelfId, 304, older) });
+        for (int i = 0; i < 5; i++)
+            sim.Tick(new Dictionary<ulong, InputState>());
+
+        Assert.Equal(77f, sim.GetState(SelfId).PX);
+        Assert.False(sim.SetTimeline(306));
+    }
+
+    [Fact]
     public void SelfEntity_UsesLocalTrack_OpponentIdle_UsesPredictedTrack()
     {
         var arena = TestHelpers.TestArena();

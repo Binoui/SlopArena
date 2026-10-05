@@ -96,6 +96,51 @@ namespace Unity.Pipeline.Editor
         [MenuItem("Window/Pipeline/Stop Server", true)]
         private static bool MenuStopServerValidate() => m_Server != null && m_Server.IsRunning;
 
+        [MenuItem("Window/Pipeline/Recover Editor Lease...")]
+        private static void MenuRecoverEditorLease()
+        {
+            if (Application.isBatchMode || EditorCommandOwnershipContext.Current != null)
+            {
+                Debug.LogWarning("Editor lease recovery requires a human using the Pipeline menu.");
+                return;
+            }
+
+            const string title = "Recover Editor Lease";
+            var ownership = EditorCommandOwnershipSession.GetOrCreate();
+            var confirmation = ownership.GetRecoveryConfirmation();
+            if (EditorApplication.isCompiling || EditorApplication.isUpdating || !confirmation.HasValue)
+            {
+                var status = ownership.GetStatus();
+                EditorUtility.DisplayDialog(title,
+                    $"No settled lease can be recovered. State: {status.state}; active operations: {status.activeOperations}.\n" +
+                    (status.reason ?? "Wait for compilation, imports and admitted work to settle. Unknown completion requires an Editor restart."),
+                    "OK");
+                return;
+            }
+
+            var expected = confirmation.Value;
+            if (!EditorUtility.DisplayDialog(title,
+                    $"Revoke this idle lease?\n\nSession: {expected.EditorSessionId}\n" +
+                    $"Owner: {expected.TerminalHandle}\nIncarnation: {expected.IncarnationId}\nBatch: {expected.BatchId}\n\n" +
+                    "The previous gateway will lose access. This does not cancel work or restart the Editor.",
+                    "Recover lease", "Cancel"))
+                return;
+
+            if (EditorApplication.isCompiling || EditorApplication.isUpdating)
+            {
+                EditorUtility.DisplayDialog(title, "The Editor became busy. The lease was not recovered.", "OK");
+                return;
+            }
+            if (!ownership.TryRecoverSettledLease(expected, out var recovered))
+            {
+                EditorUtility.DisplayDialog(title,
+                    $"The lease changed or work started while confirming. Nothing was revoked.\n" +
+                    $"State: {recovered.state}; active operations: {recovered.activeOperations}.", "OK");
+                return;
+            }
+            Debug.Log($"Recovered settled Pipeline lease for {expected.TerminalHandle}, batch {expected.BatchId}; previous token revoked.");
+        }
+
         /// <summary>
         /// Select the EditorPipelineManager settings asset, creating it under Assets/Settings/Pipeline
         /// on first use (the live server otherwise runs from built-in defaults).

@@ -48,11 +48,11 @@ MonoBehaviour:
   - Character: 2
     AttackSlot: 11
     Airborne: 0
-    Prefab: {fileID: 1617565517647809096, guid: 17a3a126fd8ca3f54b8e42a260217c8c, type: 3}
+    Prefab: {fileID: 1617565517647809096, guid: 6fc2ced513c34be3a909aeb9fe179e48, type: 3}
     Scale: 0.5
   - Character: 2
     AttackSlot: 11
     Airborne: 1
-    Prefab: {fileID: 1617565517647809096, guid: 17a3a126fd8ca3f54b8e42a260217c8c, type: 3}
+    Prefab: {fileID: 1617565517647809096, guid: 6fc2ced513c34be3a909aeb9fe179e48, type: 3}
     Scale: 0.5
   ExplosionOverrides: []

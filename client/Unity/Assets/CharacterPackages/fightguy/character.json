@@ -58,8 +58,16 @@
     "width": 0.68,
     "height": 1.15,
     "offsetY": 0.57,
-    "attackerAnchor": { "x": 0, "y": 0.57, "z": 0.25 },
-    "victimAnchor": { "x": 0, "y": 0.57, "z": 0.39 }
+    "attackerAnchor": {
+      "x": 0,
+      "y": 0.57,
+      "z": 0.25
+    },
+    "victimAnchor": {
+      "x": 0,
+      "y": 0.57,
+      "z": 0.39
+    }
   },
   "hurtboxCapsules": [
     {
@@ -209,13 +217,22 @@
             "autoCancelAfterTicks": 0,
             "attackRange": 1.75,
             "warpRange": 0,
-            "useTargetLock": true,
-            "rotateTowardTarget": true,
-            "trackingStrength": 0.85,
             "animationIds": [
               "anim.low-kick"
             ],
             "operations": [
+              {
+                "kind": "startupAimCorrection",
+                "tick": 0,
+                "unit": "ticks",
+                "endTick": 7,
+                "acquisitionRange": 4,
+                "acquisitionHalfAngleDegrees": 180,
+                "maxYawDegrees": 45,
+                "maxPitchDegrees": 0,
+                "yawDegreesPerSecond": 360,
+                "pitchDegreesPerSecond": 0
+              },
               {
                 "kind": "spawnHitbox",
                 "tick": 7,
@@ -269,13 +286,22 @@
             "autoCancelAfterTicks": 26,
             "attackRange": 1.75,
             "warpRange": 0,
-            "useTargetLock": true,
-            "rotateTowardTarget": true,
-            "trackingStrength": 0.8,
             "animationIds": [
               "anim.double-punch"
             ],
             "operations": [
+              {
+                "kind": "startupAimCorrection",
+                "tick": 0,
+                "unit": "ticks",
+                "endTick": 7,
+                "acquisitionRange": 4,
+                "acquisitionHalfAngleDegrees": 180,
+                "maxYawDegrees": 45,
+                "maxPitchDegrees": 15,
+                "yawDegreesPerSecond": 360,
+                "pitchDegreesPerSecond": 180
+              },
               {
                 "kind": "spawnHitbox",
                 "tick": 7,
@@ -355,13 +381,22 @@
             "autoCancelAfterTicks": 0,
             "attackRange": 2.25,
             "warpRange": 0,
-            "useTargetLock": true,
-            "rotateTowardTarget": true,
-            "trackingStrength": 0.85,
             "animationIds": [
               "anim.straight-punch"
             ],
             "operations": [
+              {
+                "kind": "startupAimCorrection",
+                "tick": 0,
+                "unit": "ticks",
+                "endTick": 6,
+                "acquisitionRange": 4,
+                "acquisitionHalfAngleDegrees": 180,
+                "maxYawDegrees": 45,
+                "maxPitchDegrees": 0,
+                "yawDegreesPerSecond": 360,
+                "pitchDegreesPerSecond": 0
+              },
               {
                 "kind": "spawnHitbox",
                 "tick": 6,
@@ -415,13 +450,22 @@
             "autoCancelAfterTicks": 33,
             "attackRange": 1.75,
             "warpRange": 0,
-            "useTargetLock": true,
-            "rotateTowardTarget": true,
-            "trackingStrength": 0.8,
             "animationIds": [
               "anim.floating-kick"
             ],
             "operations": [
+              {
+                "kind": "startupAimCorrection",
+                "tick": 0,
+                "unit": "ticks",
+                "endTick": 8,
+                "acquisitionRange": 4,
+                "acquisitionHalfAngleDegrees": 180,
+                "maxYawDegrees": 45,
+                "maxPitchDegrees": 15,
+                "yawDegreesPerSecond": 360,
+                "pitchDegreesPerSecond": 180
+              },
               {
                 "kind": "spawnHitbox",
                 "tick": 8,
@@ -501,13 +545,22 @@
             "autoCancelAfterTicks": 0,
             "attackRange": 2.25,
             "warpRange": 0,
-            "useTargetLock": true,
-            "rotateTowardTarget": true,
-            "trackingStrength": 0.85,
             "animationIds": [
               "anim.sweeping-kick"
             ],
             "operations": [
+              {
+                "kind": "startupAimCorrection",
+                "tick": 0,
+                "unit": "ticks",
+                "endTick": 8,
+                "acquisitionRange": 4,
+                "acquisitionHalfAngleDegrees": 180,
+                "maxYawDegrees": 45,
+                "maxPitchDegrees": 0,
+                "yawDegreesPerSecond": 360,
+                "pitchDegreesPerSecond": 0
+              },
               {
                 "kind": "spawnHitbox",
                 "tick": 8,
@@ -561,13 +614,22 @@
             "autoCancelAfterTicks": 35,
             "attackRange": 1.75,
             "warpRange": 0,
-            "useTargetLock": true,
-            "rotateTowardTarget": true,
-            "trackingStrength": 0.8,
             "animationIds": [
               "anim.high-kick"
             ],
             "operations": [
+              {
+                "kind": "startupAimCorrection",
+                "tick": 0,
+                "unit": "ticks",
+                "endTick": 16,
+                "acquisitionRange": 4,
+                "acquisitionHalfAngleDegrees": 180,
+                "maxYawDegrees": 45,
+                "maxPitchDegrees": 0,
+                "yawDegreesPerSecond": 360,
+                "pitchDegreesPerSecond": 0
+              },
               {
                 "kind": "spawnHitbox",
                 "tick": 16,
@@ -621,13 +683,22 @@
             "autoCancelAfterTicks": 0,
             "attackRange": 0,
             "warpRange": 0,
-            "useTargetLock": true,
-            "rotateTowardTarget": true,
-            "trackingStrength": 0.85,
             "animationIds": [
               "anim.double-kick"
             ],
             "operations": [
+              {
+                "kind": "startupAimCorrection",
+                "tick": 0,
+                "unit": "ticks",
+                "endTick": 12,
+                "acquisitionRange": 4,
+                "acquisitionHalfAngleDegrees": 180,
+                "maxYawDegrees": 45,
+                "maxPitchDegrees": 0,
+                "yawDegreesPerSecond": 360,
+                "pitchDegreesPerSecond": 0
+              },
               {
                 "kind": "spawnHitbox",
                 "tick": 12,
@@ -681,13 +752,22 @@
             "autoCancelAfterTicks": 44,
             "attackRange": 0,
             "warpRange": 0,
-            "useTargetLock": true,
-            "rotateTowardTarget": true,
-            "trackingStrength": 0.8,
             "animationIds": [
               "anim.air-smash"
             ],
             "operations": [
+              {
+                "kind": "startupAimCorrection",
+                "tick": 0,
+                "unit": "ticks",
+                "endTick": 23,
+                "acquisitionRange": 4,
+                "acquisitionHalfAngleDegrees": 180,
+                "maxYawDegrees": 45,
+                "maxPitchDegrees": 0,
+                "yawDegreesPerSecond": 360,
+                "pitchDegreesPerSecond": 0
+              },
               {
                 "kind": "spawnHitbox",
                 "tick": 23,
@@ -1002,10 +1082,11 @@
                   "startBoneId": "bone.right-hand",
                   "endBoneId": null,
                   "damage": 2,
-                  "angle": 8,
-                  "baseKnockback": 4,
+                  "angle": 0,
+                  "baseKnockback": 20,
                   "knockbackGrowth": 0,
                   "stunTicks": 12,
+                  "fixedHitstunTicks": 90,
                   "durationTicks": 5,
                   "interruptible": true,
                   "hitGroup": 0,
@@ -1028,10 +1109,11 @@
                   "startBoneId": "bone.left-hand",
                   "endBoneId": null,
                   "damage": 2,
-                  "angle": 8,
-                  "baseKnockback": 4,
+                  "angle": 0,
+                  "baseKnockback": 20,
                   "knockbackGrowth": 0,
                   "stunTicks": 12,
+                  "fixedHitstunTicks": 80,
                   "durationTicks": 5,
                   "interruptible": true,
                   "hitGroup": 0,
@@ -1054,10 +1136,11 @@
                   "startBoneId": "bone.right-hand",
                   "endBoneId": null,
                   "damage": 2,
-                  "angle": 8,
-                  "baseKnockback": 4,
+                  "angle": 0,
+                  "baseKnockback": 20,
                   "knockbackGrowth": 0,
                   "stunTicks": 12,
+                  "fixedHitstunTicks": 72,
                   "durationTicks": 5,
                   "interruptible": true,
                   "hitGroup": 0,
@@ -1080,10 +1163,11 @@
                   "startBoneId": "bone.left-hand",
                   "endBoneId": null,
                   "damage": 2,
-                  "angle": 8,
-                  "baseKnockback": 4,
+                  "angle": 0,
+                  "baseKnockback": 20,
                   "knockbackGrowth": 0,
                   "stunTicks": 12,
+                  "fixedHitstunTicks": 64,
                   "durationTicks": 5,
                   "interruptible": true,
                   "hitGroup": 0,
@@ -1106,10 +1190,11 @@
                   "startBoneId": "bone.right-hand",
                   "endBoneId": null,
                   "damage": 2,
-                  "angle": 8,
-                  "baseKnockback": 4,
+                  "angle": 0,
+                  "baseKnockback": 20,
                   "knockbackGrowth": 0,
                   "stunTicks": 12,
+                  "fixedHitstunTicks": 56,
                   "durationTicks": 4,
                   "interruptible": true,
                   "hitGroup": 0,
@@ -1132,10 +1217,11 @@
                   "startBoneId": "bone.left-hand",
                   "endBoneId": null,
                   "damage": 2,
-                  "angle": 8,
-                  "baseKnockback": 4,
+                  "angle": 0,
+                  "baseKnockback": 20,
                   "knockbackGrowth": 0,
                   "stunTicks": 12,
+                  "fixedHitstunTicks": 48,
                   "durationTicks": 4,
                   "interruptible": true,
                   "hitGroup": 0,
@@ -1184,14 +1270,15 @@
                   "startBoneId": "bone.right-hand",
                   "endBoneId": null,
                   "damage": 1,
-                  "angle": 45,
-                  "baseKnockback": 5,
-                  "knockbackGrowth": 80,
-                  "stunTicks": 10,
+                  "angle": 0,
+                  "baseKnockback": 20,
+                  "knockbackGrowth": 0,
+                  "stunTicks": 12,
+                  "fixedHitstunTicks": 40,
                   "durationTicks": 11,
                   "interruptible": false,
                   "hitGroup": 0,
-                  "knockbackDirection": "awayFromOwner"
+                  "knockbackDirection": "towardOwner"
                 }
               }
             ]

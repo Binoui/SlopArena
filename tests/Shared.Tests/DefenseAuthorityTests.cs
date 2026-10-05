@@ -107,7 +107,7 @@ public class DefenseAuthorityTests
     public void ReorderedTerminalEndsCaptureAndRepeatedUpdatesDoNotReapplyIt()
     {
         var sim = Match();
-        sim.Tick(new Dictionary<ulong, InputState> { [Self] = new InputState { ActiveSlot = AbilitySlots.Slot1 } });
+        Assert.True(sim.SetTimeline(9));
         var captured = TestHelpers.PlayerState();
         captured.State = ActionState.Grabbed;
         captured.InteractionId = 53;
@@ -156,6 +156,7 @@ public class DefenseAuthorityTests
     public void OpponentCaptureArrivingFirstUsesNewestSnapshotOnlyAfterMatchingSelfIdentityAndTick()
     {
         var sim = Match();
+        Assert.True(sim.SetTimeline(3));
         sim.Tick(new Dictionary<ulong, InputState>());
         var older = TestHelpers.PlayerState(x: 3);
         older.State = ActionState.Throwing;

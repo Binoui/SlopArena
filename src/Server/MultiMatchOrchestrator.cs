@@ -170,6 +170,9 @@ namespace SlopArena.Server
         public bool TryQueueSteamInput(Guid matchId, long connectionId, uint tick, InputState input) =>
             _steamMatches.TryGetValue(matchId, out var match) && match.TryQueueSteamInput(connectionId, tick, input);
 
+        public bool TryMarkSteamReady(Guid matchId, long connectionId, NetplayControlPacket control) =>
+            _steamMatches.TryGetValue(matchId, out var match) && match.TryMarkSteamReady(connectionId, control);
+
         public void DisconnectSteamPlayer(Guid matchId, long connectionId)
         {
             if (_steamMatches.TryGetValue(matchId, out var match))

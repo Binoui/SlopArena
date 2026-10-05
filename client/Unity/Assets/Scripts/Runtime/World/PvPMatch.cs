@@ -33,12 +33,15 @@ namespace SlopArena.Client.World
 
         private readonly Dictionary<ulong, PlayerRenderer> _opponentRenderers = new();
         private PlayerRenderer[] _opponentArray = System.Array.Empty<PlayerRenderer>();
+        private readonly Dictionary<ulong, InputState> _localInputs = new(1);
 
 
         private uint _tick;
         private MatchState _lastMatchState = MatchState.Waiting;
         private RollbackSimulationBridge _bridge = null!;
         private readonly Dictionary<ulong, ushort> _lastPresentedDeaths = new();
+        private int _observedConnectionGeneration = -1;
+        private int _clockAcknowledgedGeneration = -1;
         private bool _resultsScheduled;
         private Coroutine? _countdownPresentation;
         protected override ISimulationBridge Bridge => _bridge;
@@ -256,6 +259,7 @@ namespace SlopArena.Client.World
                 ClientSession.RejectMatchStart("PvP match has no approved transport.");
                 return;
             }
+            _observedConnectionGeneration = _networkClient.ConnectionGeneration;
 
 
             // Shared camera + aim setup
@@ -284,10 +288,37 @@ namespace SlopArena.Client.World
             var s = SpawnPointFor(arena, entityId);
             return new Vector3(s.X, s.Y, s.Z);
         }
+        private bool HasCompleteRosterBaseline()
+        {
+            if (!_bridge.HasInitialState(PlayerEntityId))
+                return false;
+            foreach (var opponent in MatchConfig.Opponents)
+                if (!_bridge.HasInitialState(opponent.EntityId))
+                    return false;
+            return true;
+        }
 
         protected override void OnMatchFixedUpdate()
         {
             if (_bridge == null || _playerRenderer == null) return;
+            int connectionGeneration = _networkClient.ConnectionGeneration;
+            if (connectionGeneration != _observedConnectionGeneration)
+            {
+                _observedConnectionGeneration = connectionGeneration;
+                _clockAcknowledgedGeneration = -1;
+                _bridge.ResetInitialStates();
+            }
+            _bridge.PumpNetwork();
+            foreach (var frame in _bridge.LastControlFrames)
+                if (frame.Packet.EntityId == PlayerEntityId &&
+                    frame.Packet.Kind == NetplayControlKind.Clock)
+                    _clockAcknowledgedGeneration = connectionGeneration;
+
+            bool rosterBaselineReady = HasCompleteRosterBaseline();
+            if (rosterBaselineReady && _networkClient.IsServerConnected &&
+                _networkClient.LastPingMilliseconds.HasValue &&
+                _clockAcknowledgedGeneration != connectionGeneration)
+                _networkClient.SendReady();
 
             byte slot = _inputController.ConsumePendingSlotPress();
 
@@ -310,10 +341,12 @@ namespace SlopArena.Client.World
                 canMove: null,
                 targetEntityId: targetEntityId);
 
-            _bridge.Tick(new Dictionary<ulong, InputState>
+            if (rosterBaselineReady && _networkClient.IsServerConnected &&
+                _clockAcknowledgedGeneration == connectionGeneration)
             {
-                { PlayerEntityId, input }
-            });
+                _localInputs[PlayerEntityId] = input;
+                _bridge.Tick(_localInputs);
+            }
             var projectileSnapshot = _networkClient.ReceiveProjectileVisuals();
             var swordTrailSnapshot = _networkClient.ReceiveSwordTrailSnapshot();
             _combatFeedback?.OnTick();
@@ -344,8 +377,7 @@ namespace SlopArena.Client.World
 
             PresentStockLosses();
 
-            // Presentation follows authoritative match-state transitions.
-            var matchState = _bridge.GetState(PlayerEntityId).MatchState;
+            var matchState = _bridge.AuthoritativeMatchState;
             if (matchState != _lastMatchState)
             {
                 Debug.Log($"[PvP] MatchState transition: {_lastMatchState} → {matchState}");

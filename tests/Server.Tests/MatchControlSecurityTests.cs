@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Sockets;
@@ -218,6 +219,13 @@ public class MatchControlSecurityTests
         return frame;
     }
 
+    private static byte[] Control(NetplayControlKind kind, ulong entityId, uint tick = 0, uint startTick = 0)
+    {
+        var frame = new byte[NetplayControlPacket.Size];
+        new NetplayControlPacket(kind, entityId, tick, startTick).Serialize(frame);
+        return frame;
+    }
+
     private static byte[] PingFrame(long nonce)
     {
         var frame = new byte[12];
@@ -238,43 +246,119 @@ public class MatchControlSecurityTests
         UdpClient first, ulong firstEntity, UdpClient second, ulong secondEntity, int port)
     {
         var endpoint = new IPEndPoint(IPAddress.Loopback, port);
-        var firstInput = InputFrame(firstEntity);
-        var secondInput = InputFrame(secondEntity);
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(9));
-        var nextKeepAlive = DateTime.MinValue;
+        var firstBaseline = new HashSet<ulong>();
+        var secondBaseline = new HashSet<ulong>();
+        uint firstTick = 0, secondTick = 0, firstStartTick = 0, secondStartTick = 0;
+        bool firstClock = false, secondClock = false, firstPlaying = false, secondPlaying = false;
+        var nextBootstrap = DateTime.MinValue;
+        var nextReady = DateTime.MinValue;
+        var firstReceive = first.ReceiveAsync(timeout.Token).AsTask();
+        var secondReceive = second.ReceiveAsync(timeout.Token).AsTask();
+
+        void Observe(UdpReceiveResult result, bool isFirst)
+        {
+            var frame = result.Buffer;
+            if (frame.Length == NetplayControlPacket.Size &&
+                NetplayControlPacket.TryDeserialize(frame, out var control))
+            {
+                if (isFirst && control.EntityId == firstEntity)
+                {
+                    firstTick = control.Tick;
+                    firstStartTick = control.StartTick;
+                    firstClock |= control.Kind == NetplayControlKind.Clock;
+                }
+                else if (!isFirst && control.EntityId == secondEntity)
+                {
+                    secondTick = control.Tick;
+                    secondStartTick = control.StartTick;
+                    secondClock |= control.Kind == NetplayControlKind.Clock;
+                }
+                return;
+            }
+
+            if (frame.Length is not (ServerEntityPacket.NoInputSize or ServerEntityPacket.MaxSize))
+                return;
+            var state = ServerEntityPacket.Deserialize(frame);
+            if (isFirst)
+            {
+                firstBaseline.Add(state.EntityId);
+                firstTick = Math.Max(firstTick, state.Tick);
+                firstPlaying |= state.EntityId == firstEntity && state.State.MatchState == MatchState.Playing;
+            }
+            else
+            {
+                secondBaseline.Add(state.EntityId);
+                secondTick = Math.Max(secondTick, state.Tick);
+                secondPlaying |= state.EntityId == secondEntity && state.State.MatchState == MatchState.Playing;
+            }
+        }
+
         try
         {
             while (!timeout.IsCancellationRequested)
             {
-                if (DateTime.UtcNow >= nextKeepAlive)
+                if (DateTime.UtcNow >= nextBootstrap)
                 {
-                    first.Send(firstInput, firstInput.Length, endpoint);
-                    second.Send(secondInput, secondInput.Length, endpoint);
-                    nextKeepAlive = DateTime.UtcNow.AddMilliseconds(250);
+                    var firstBootstrap = Control(NetplayControlKind.Bootstrap, firstEntity);
+                    var secondBootstrap = Control(NetplayControlKind.Bootstrap, secondEntity);
+                    first.Send(firstBootstrap, firstBootstrap.Length, endpoint);
+                    second.Send(secondBootstrap, secondBootstrap.Length, endpoint);
+                    nextBootstrap = DateTime.UtcNow.AddMilliseconds(250);
                 }
-                var packet = await first.ReceiveAsync(timeout.Token);
-                if (packet.Buffer.Length is not (ServerEntityPacket.NoInputSize or ServerEntityPacket.MaxSize))
-                    continue;
-                var state = ServerEntityPacket.Deserialize(packet.Buffer);
-                if (state.EntityId == firstEntity && state.State.MatchState == MatchState.Playing)
+
+                bool firstBaselineReady = firstBaseline.Contains(firstEntity) && firstBaseline.Contains(secondEntity);
+                bool secondBaselineReady = secondBaseline.Contains(firstEntity) && secondBaseline.Contains(secondEntity);
+                if (DateTime.UtcNow >= nextReady)
+                {
+                    if (firstBaselineReady && !firstClock)
+                    {
+                        var ready = Control(NetplayControlKind.Ready, firstEntity, firstTick, firstStartTick);
+                        first.Send(ready, ready.Length, endpoint);
+                    }
+                    if (secondBaselineReady && !secondClock)
+                    {
+                        var ready = Control(NetplayControlKind.Ready, secondEntity, secondTick, secondStartTick);
+                        second.Send(ready, ready.Length, endpoint);
+                    }
+                    nextReady = DateTime.UtcNow.AddMilliseconds(250);
+                }
+                if (firstPlaying && secondPlaying)
                     return true;
+
+                var completed = await Task.WhenAny(firstReceive, secondReceive,
+                    Task.Delay(25, timeout.Token));
+                if (completed == firstReceive)
+                {
+                    Observe(await firstReceive, isFirst: true);
+                    firstReceive = first.ReceiveAsync(timeout.Token).AsTask();
+                }
+                if (completed == secondReceive)
+                {
+                    Observe(await secondReceive, isFirst: false);
+                    secondReceive = second.ReceiveAsync(timeout.Token).AsTask();
+                }
             }
         }
         catch (OperationCanceledException) { }
         return false;
     }
-
     private static async Task<bool> ProbeMatchAsync(UdpClient peer, int port, ulong entityId,
         long nonce, TimeSpan timeout)
     {
         var target = new IPEndPoint(IPAddress.Loopback, port);
-        byte[] input = InputFrame(entityId);
+        byte[] bootstrap = Control(NetplayControlKind.Bootstrap, entityId);
         byte[] ping = PingFrame(nonce);
         using var cancellation = new CancellationTokenSource(timeout);
+        var nextProbe = DateTime.MinValue;
         while (!cancellation.IsCancellationRequested)
         {
-            peer.Send(input, input.Length, target);
-            peer.Send(ping, ping.Length, target);
+            if (DateTime.UtcNow >= nextProbe)
+            {
+                peer.Send(bootstrap, bootstrap.Length, target);
+                peer.Send(ping, ping.Length, target);
+                nextProbe = DateTime.UtcNow.AddMilliseconds(250);
+            }
             try
             {
                 var received = await peer.ReceiveAsync(cancellation.Token);
@@ -284,4 +368,5 @@ public class MatchControlSecurityTests
         }
         return false;
     }
+
 }

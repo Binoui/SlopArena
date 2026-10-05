@@ -113,6 +113,33 @@ namespace SlopArena.Client.Entities
         [SerializeField] private float _modelVisualScale = 1f;
         private CharacterDefinition? _charDef;
         private GameObject _modelInstance;
+        private Vector3 _attackPoseModelOffset;
+
+        private void ApplyAttackPoseModel(CharacterState state)
+        {
+            if (_modelInstance == null || _charDef == null) return;
+            float pitch = state.AttackPosePitch;
+            Transform model = _modelInstance.transform;
+            model.localRotation = Quaternion.identity;
+            model.localPosition = Vector3.zero;
+            if (pitch == 0f)
+            {
+                model.localRotation = Quaternion.identity;
+                model.localPosition = Vector3.zero;
+                _attackPoseModelOffset = Vector3.zero;
+                return;
+            }
+
+            Vector3 pivotWorld = new(state.PX,
+                _charDef.BoneYToWorldY(state.PY, 0f), state.PZ);
+            Vector3 pivotParent = transform.InverseTransformPoint(pivotWorld);
+            Quaternion pitchRotation = Quaternion.Euler(-pitch * Mathf.Rad2Deg, 0f, 0f);
+            Vector3 pivotScaled = Vector3.Scale(model.localScale, model.InverseTransformPoint(pivotWorld));
+            Vector3 localOffset = pivotParent - pitchRotation * pivotScaled;
+            model.localRotation = pitchRotation;
+            model.localPosition = localOffset;
+            _attackPoseModelOffset = localOffset;
+        }
         private GameObject _shieldInstance;
         private bool _reportedModelRootDrift;
 
@@ -198,6 +225,11 @@ namespace SlopArena.Client.Entities
 
             ReplaceModel(prefab, _modelName, _modelVisualScale);
             ConfigureModelAnimation(def);
+            if (TryGetAnimation(def.IdleAnim, out var idleClip, out _))
+            {
+                _currentAnimState = _animancer.Play(idleClip, 0f);
+                _animancer.Evaluate(0f);
+            }
         }
 
         /// <summary>
@@ -421,6 +453,11 @@ namespace SlopArena.Client.Entities
                 || !TryGetBakedWeaponPose(state, airborne, out var pose, out var animationName, out int frame)
                 || !TryGetAnimation(animationName, out var clip, out _))
                 return false;
+            if (_modelInstance != null)
+            {
+                _modelInstance.transform.localRotation = Quaternion.identity;
+                _modelInstance.transform.localPosition = Vector3.zero;
+            }
             // History needs a valid animated origin even before the rig becomes
             // visible to a camera; Unity's animator culling must not skip it.
             if (_animancer.Animator.cullingMode != AnimatorCullingMode.AlwaysAnimate)
@@ -452,6 +489,16 @@ namespace SlopArena.Client.Entities
                 state.PX + localTip.x * cos + localTip.z * sin,
                 state.PY + _modelYOffset + localTip.y,
                 state.PZ - localTip.x * sin + localTip.z * cos);
+            if (state.AttackPosePitch != 0f && _charDef != null)
+            {
+                float hx = hilt.x, hy = hilt.y, hz = hilt.z;
+                float tx = tip.x, ty = tip.y, tz = tip.z;
+                HitboxGeometry.ApplyAttackPosePitch(in state, _charDef, ref hx, ref hy, ref hz);
+                HitboxGeometry.ApplyAttackPosePitch(in state, _charDef, ref tx, ref ty, ref tz);
+                hilt = new Vector3(hx, hy, hz);
+                tip = new Vector3(tx, ty, tz);
+            }
+            ApplyAttackPoseModel(state);
             return true;
         }
 
@@ -753,6 +800,7 @@ namespace SlopArena.Client.Entities
             _wasGrounded = snapshot.IsGrounded;
             UpdateShield(snapshot);
             EvaluateScrubbedPose();
+            ApplyAttackPoseModel(snapshot);
             return true;
         }
 
@@ -915,6 +963,7 @@ namespace SlopArena.Client.Entities
             CaptureAttackAirborneIdentity(state);
             UpdateAnimationState(state);
             MaintainTumbleLoop();
+            ApplyAttackPoseModel(state);
 
             UpdateShield(state);
             CaptureWeaponTrailState(state);
@@ -1680,7 +1729,7 @@ namespace SlopArena.Client.Entities
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
             if (_modelInstance != null)
             {
-                float drift = _modelInstance.transform.localPosition.magnitude;
+                float drift = (_modelInstance.transform.localPosition - _attackPoseModelOffset).magnitude;
                 if (drift > ModelRootDriftWarningDistance && !_reportedModelRootDrift)
                 {
                     Debug.LogWarning(

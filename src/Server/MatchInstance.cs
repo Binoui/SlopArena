@@ -35,6 +35,7 @@ namespace SlopArena.Server
 		private ArenaDefinition _arena;
 		private ServerSimulation _sim = null!;
 		private uint _serverTick;
+		private uint _startTick;
 
 		/// <summary>
 		/// The inputs the server actually consumed for the last sim tick, keyed by
@@ -45,6 +46,7 @@ namespace SlopArena.Server
 		/// playing tick (countdown broadcasts relay nothing).
 		/// </summary>
 		private Dictionary<ulong, InputState>? _lastTickInputs;
+		private readonly Dictionary<ulong, InputState> _tickInputs = new();
 
 		private const double TimeoutSeconds = 5.0;
 
@@ -120,6 +122,8 @@ namespace SlopArena.Server
 		public bool IsRunning => _running;
 		public string MatchId => _matchId;
 		public bool HasStartedCountdown => _matchState != MatchState.Waiting;
+		public uint ServerTick => _serverTick;
+		public uint StartTick => _startTick;
 		public MatchContentHandleMap? ContentHandleMap => _contentHandleMap;
 
 		/// <summary>Number of rostered players.</summary>
@@ -195,12 +199,12 @@ namespace SlopArena.Server
 					}
 					replacedConnectionId = slot.ConnectionId;
 				}
-				slot.Queue.Clear();
+				slot.ReadyConnectionId = 0;
 				slot.LastInput = default;
 				slot.LastInputConnectionId = connectionId;
 				slot.ConnectionId = connectionId;
 				slot.SteamConnected = true;
-				slot.SteamEverJoined = true;
+				slot.MissingInputTicks = 0;
 				slot.Disconnected = false;
 				entityId = slot.EntityId;
 				denialCode = 0;
@@ -217,6 +221,8 @@ namespace SlopArena.Server
 					{
 						slot.ConnectionId = 0;
 						slot.SteamConnected = false;
+						slot.ReadyConnectionId = 0;
+						slot.MissingInputTicks = 0;
 						slot.Disconnected = true;
 						slot.Queue.Clear();
 						slot.LastInput = default;
@@ -230,6 +236,8 @@ namespace SlopArena.Server
 		{
 			if (_steamSend is null || connectionId <= 0 || !_running)
 				return false;
+			if (tick <= _serverTick || tick - _serverTick > NetplayClock.HistoryTicks)
+				return false;
 			if (Interlocked.Increment(ref _steamInputCount) > _slots.Count * 64)
 			{
 				Interlocked.Decrement(ref _steamInputCount);
@@ -238,13 +246,28 @@ namespace SlopArena.Server
 			lock (_steamGate)
 			{
 				foreach (var slot in _slots)
-					if (slot.ConnectionId == connectionId && slot.SteamConnected)
+					if (slot.ConnectionId == connectionId && slot.SteamConnected && slot.ReadyConnectionId == connectionId)
 					{
 						_steamInputs.Enqueue(new SteamInput(connectionId, slot.EntityId, tick, input));
 						return true;
 					}
 			}
 			Interlocked.Decrement(ref _steamInputCount);
+			return false;
+		}
+		public bool TryMarkSteamReady(long connectionId, NetplayControlPacket control)
+		{
+			lock (_steamGate)
+			{
+				foreach (var slot in _slots)
+					if (slot.ConnectionId == connectionId && slot.SteamConnected &&
+						slot.EntityId == control.EntityId && control.Kind == NetplayControlKind.Ready &&
+						control.Tick <= _serverTick && control.StartTick == _startTick)
+					{
+						slot.ReadyConnectionId = connectionId;
+						return true;
+					}
+			}
 			return false;
 		}
 		private void Run()
@@ -309,50 +332,43 @@ namespace SlopArena.Server
 						Stop("unfilled");
 						break;
 					}
-					if (_steamSend is not null)
+					if (_matchState == MatchState.Waiting && AllReady())
 					{
-						if (_matchState == MatchState.Waiting && AllConnected())
-						{
-							_matchState = MatchState.Countdown;
-							_countdownTicks = CountdownDuration;
-							Console.WriteLine($"[Match:{_matchId}] All {_slots.Count} Steam players joined — countdown started!");
-						}
-						if (_matchState is MatchState.Countdown or MatchState.Playing)
-						{
-							int connected = ConnectedPlayerCount();
-							if (connected <= 1)
-							{
-								var now = _clock.GetUtcNow();
-								_noOpponentSinceUtc ??= now;
-								if (now - _noOpponentSinceUtc.Value >= TimeSpan.FromSeconds(60))
-								{
-									Stop("absent");
-									break;
-								}
-							}
-							else _noOpponentSinceUtc = null;
-						}
+						_matchState = MatchState.Countdown;
+						_countdownTicks = CountdownDuration;
+						Console.WriteLine($"[Match:{_matchId}] All {_slots.Count} players ready — countdown started!");
 					}
-					if (AllConnected())
+					if (_steamSend is not null && _matchState is MatchState.Countdown or MatchState.Playing)
 					{
-						// Development UDP keeps its existing idle timeout; Steam presence
-						// is driven by authenticated connection lifecycle callbacks.
-						if (_steamSend is null)
+						int connected = ConnectedPlayerCount();
+						if (connected <= 1)
 						{
-							var now = DateTime.UtcNow;
-							foreach (var slot in _slots)
+							var now = _clock.GetUtcNow();
+							_noOpponentSinceUtc ??= now;
+							if (now - _noOpponentSinceUtc.Value >= TimeSpan.FromSeconds(60))
 							{
-								if (slot.EndPoint == null || slot.Disconnected) continue;
-								if ((now - slot.LastPacket).TotalSeconds > TimeoutSeconds)
-								{
-									slot.Disconnected = true;
-									slot.Queue.Clear();
-									Console.WriteLine($"[Match:{_matchId}] Player (entity {slot.EntityId}) disconnected — entity goes idle.");
-								}
+								Stop("absent");
+								break;
 							}
 						}
-						Tick();
+						else _noOpponentSinceUtc = null;
 					}
+					if (_steamSend is null)
+					{
+						var now = DateTime.UtcNow;
+						foreach (var slot in _slots)
+						{
+							if (slot.EndPoint == null || slot.Disconnected) continue;
+							if ((now - slot.LastPacket).TotalSeconds > TimeoutSeconds)
+							{
+								slot.Disconnected = true;
+								slot.ReadyConnectionId = 0;
+								slot.Queue.Clear();
+								Console.WriteLine($"[Match:{_matchId}] Player (entity {slot.EntityId}) disconnected — entity goes idle.");
+							}
+						}
+					}
+					Tick();
 					nextTickTime += tickDurationMs;
 
 					if (currentTime > nextTickTime + tickDurationMs * 10)
@@ -375,11 +391,17 @@ namespace SlopArena.Server
 				_onSteamMatchEnd?.Invoke(matchGuid);
 		}
 
-		private bool AllConnected()
+		private bool AllReady()
 		{
-			foreach (var slot in _slots)
-				if (_steamSend is null ? slot.EndPoint == null : !slot.SteamEverJoined) return false;
-			return true;
+			lock (_steamGate)
+			{
+				foreach (var slot in _slots)
+					if (_steamSend is null
+						? slot.EndPoint == null || !slot.Ready || slot.Disconnected
+						: !slot.SteamConnected || slot.ReadyConnectionId != slot.ConnectionId)
+						return false;
+				return true;
+			}
 		}
 
 		private int ConnectedPlayerCount()
@@ -470,6 +492,7 @@ namespace SlopArena.Server
 							if (!admittedSlot.Disconnected && admittedSlot.EndPoint != null && admittedSlot.EndPoint.Equals(remoteEP))
 							{
 								admitted = true;
+								admittedSlot.LastPacket = DateTime.UtcNow;
 								break;
 							}
 						if (!admitted) continue;
@@ -481,37 +504,47 @@ namespace SlopArena.Server
 						_udpServer.Send(pong, pong.Length, remoteEP);
 						continue;
 					}
-					if (data.Length != 8 + 4 + InputState.Size) continue;
+					if (NetplayControlPacket.TryDeserialize(data, out var control))
+					{
+						var controlSlot = FindSlot(control.EntityId);
+						if (controlSlot == null) continue;
+						if (control.Kind == NetplayControlKind.Bootstrap)
+						{
+							if (controlSlot.EndPoint != null && !controlSlot.Disconnected &&
+								!controlSlot.EndPoint.Equals(remoteEP))
+								continue;
+							if (controlSlot.EndPoint == null || !controlSlot.EndPoint.Equals(remoteEP))
+							{
+								controlSlot.Queue.Clear();
+								controlSlot.LastInput = default;
+								controlSlot.MissingInputTicks = 0;
+								controlSlot.Ready = false;
+							}
+							controlSlot.EndPoint = remoteEP;
+							controlSlot.Disconnected = false;
+							controlSlot.LastPacket = DateTime.UtcNow;
+						}
+						else if (control.Kind == NetplayControlKind.Ready &&
+							control.Tick <= _serverTick && control.StartTick == _startTick &&
+							controlSlot.EndPoint?.Equals(remoteEP) == true && !controlSlot.Disconnected)
+						{
+							controlSlot.Ready = true;
+							controlSlot.LastPacket = DateTime.UtcNow;
+						}
+						continue;
+					}
 
+					if (data.Length != 8 + 4 + InputState.Size) continue;
 					ulong entityId = BitConverter.ToUInt64(data, 0);
 					uint clientTick = BitConverter.ToUInt32(data, 8);
 					InputState inputState;
 					try { inputState = InputState.Deserialize(data.AsSpan(12, InputState.Size)); }
 					catch (ArgumentException) { continue; }
 					catch (InvalidDataException) { continue; }
-
 					var slot = FindSlot(entityId);
-					if (slot == null) continue;
-					if (slot.Disconnected)
-					{
-						slot.Disconnected = false;
-						Console.WriteLine($"[Match:{_matchId}] Player (entity {entityId}) reconnected.");
-					}
-					if (slot.EndPoint == null)
-					{
-						slot.EndPoint = remoteEP;
-						slot.LastPacket = DateTime.UtcNow;
-						Console.WriteLine($"[Match:{_matchId}] Player (entity {entityId}) connected: {remoteEP}");
-						if (AllConnected() && _matchState == MatchState.Waiting)
-						{
-							_matchState = MatchState.Countdown;
-							_countdownTicks = CountdownDuration;
-							Console.WriteLine($"[Match:{_matchId}] All {_slots.Count} players connected — countdown started!");
-						}
-						continue;
-					}
+					if (slot == null || slot.Disconnected || !slot.Ready || slot.EndPoint?.Equals(remoteEP) != true) continue;
 					slot.LastPacket = DateTime.UtcNow;
-					if (clientTick <= _serverTick) continue;
+					if (clientTick <= _serverTick || clientTick - _serverTick > NetplayClock.HistoryTicks) continue;
 					slot.Queue.Push(clientTick, inputState);
 				}
 				catch (SocketException ex)
@@ -537,20 +570,25 @@ namespace SlopArena.Server
 
 		private void Tick()
 		{
-			// ── Countdown ──
+			if (_matchState == MatchState.Waiting)
+			{
+				SendState();
+				return;
+			}
+
 			if (_matchState == MatchState.Countdown)
 			{
+				_serverTick++;
 				if (--_countdownTicks == 0)
 				{
 					_matchState = MatchState.Playing;
+					_startTick = _serverTick + 1;
 					Console.WriteLine($"[Match:{_matchId}] GO!");
-					PrimeTickCounter();
 				}
 				SendState();
 				return;
 			}
 
-			// ── Ended ──
 			if (_matchState == MatchState.Ended)
 			{
 				if (--_postMatchTicks == 0)
@@ -558,77 +596,78 @@ namespace SlopArena.Server
 					Console.WriteLine($"[Match:{_matchId}] Post-match complete — stopping.");
 					_running = false;
 				}
-				else
-				{
-					SendState();
-				}
+				else SendState();
 				return;
 			}
 
-			var inputs = new Dictionary<ulong, InputState>();
+			_tickInputs.Clear();
+			var inputs = _tickInputs;
 			uint targetTick = _serverTick + 1;
-			bool anyPending = false;
 			foreach (var slot in _slots)
 			{
-				bool eliminated = _rule.IsEliminated(_sim.GetState(slot.EntityId));
 				lock (_steamGate)
 				{
-					if (slot.Disconnected || eliminated)
+					if (slot.Disconnected || _rule.IsEliminated(_sim.GetState(slot.EntityId)))
 					{
 						slot.Queue.Clear();
+						slot.LastInput = default;
+						slot.MissingInputTicks = 0;
 						continue;
 					}
-					slot.Queue.Prune(_serverTick);
-					if (slot.Queue.Count == 0) continue;
-					anyPending = true;
 
+					slot.Queue.Prune(_serverTick);
 					InputState input;
 					if (slot.Queue.TryTake(targetTick, out var queuedInput))
 					{
-						// Exact buffered input retains every edge, including DownPressed.
 						input = queuedInput;
+						slot.MissingInputTicks = 0;
+					}
+					else if (slot.MissingInputTicks++ < 6)
+					{
+						input = slot.LastInput;
+						input.Jump = false;
+						input.FaceToCamera = false;
+						input.ToggleLock = false;
+						input.DownPressed = false;
+						input.ShieldPressed = false;
+						input.GrabPressed = false;
+						input.RetargetPressed = false;
+						input.ActiveSlot = 0;
 					}
 					else
 					{
-						// A held input reused for a missing tick may not replay a render-frame
-						// edge. Preserve every other input bit exactly.
-						input = slot.LastInput;
-						input.DownPressed = false;
+						input = default;
+						slot.LastInput = default;
 					}
+
 					slot.LastInput = input;
 					inputs[slot.EntityId] = input;
 				}
 			}
 
-			// Run authoritative simulation (movement + hit detection + hurtboxes + void death).
 			_lastTickInputs = inputs;
-			if (anyPending)
+			_sim.SetTick(_serverTick);
+			_serverTick = targetTick;
+			_sim.Tick(inputs);
+			var outcome = _rule.Evaluate(_sim.GetAllStates());
+			if (outcome.IsEnded)
 			{
-				_serverTick = targetTick;
-				_sim.Tick(inputs);
+				_matchState = MatchState.Ended;
+				_winnerEntityId = outcome.WinnerEntityId;
+				_matchResultPacket = BuildMatchResultPacket(outcome);
+				_postMatchTicks = PostMatchDuration;
+				Console.WriteLine(outcome.IsSharedVictory
+					? $"[Match:{_matchId}] Shared victory — all players eliminated simultaneously."
+					: $"[Match:{_matchId}] Winner: {_winnerEntityId}");
 
-				var outcome = _rule.Evaluate(_sim.GetAllStates());
-				if (outcome.IsEnded)
+				if (_onMatchResult != null && Guid.TryParse(_matchId, out var matchGuid))
 				{
-					_matchState = MatchState.Ended;
-					_winnerEntityId = outcome.WinnerEntityId;
-					_matchResultPacket = BuildMatchResultPacket(outcome);
-					_postMatchTicks = PostMatchDuration;
-					Console.WriteLine(outcome.IsSharedVictory
-						? $"[Match:{_matchId}] Shared victory — all players eliminated simultaneously."
-						: $"[Match:{_matchId}] Winner: {_winnerEntityId}");
-
-					if (_onMatchResult != null && Guid.TryParse(_matchId, out var matchGuid))
-					{
-						long winnerSteamId = 0;
-						var winnerSlot = FindSlot(_winnerEntityId);
-						if (winnerSlot != null) winnerSteamId = winnerSlot.SteamId;
-						_onMatchResult(matchGuid, winnerSteamId);
-					}
+					long winnerSteamId = 0;
+					var winnerSlot = FindSlot(_winnerEntityId);
+					if (winnerSlot != null) winnerSteamId = winnerSlot.SteamId;
+					_onMatchResult(matchGuid, winnerSteamId);
 				}
 			}
-
-			// Broadcast every tick, including empty ones.
 			SendState();
 		}
 
@@ -753,6 +792,9 @@ namespace SlopArena.Server
 						else if (steamResult is not null)
 							_steamSend(_steamMatchGuid, slot.EntityId, steamResult, true);
 					}
+					bool ready = _steamSend is null ? slot.Ready : slot.ReadyConnectionId == slot.ConnectionId;
+					if (!ready || _serverTick % 6 == 0)
+						SendNetplayControl(slot, ready ? NetplayControlKind.Clock : NetplayControlKind.Bootstrap);
 					foreach (var evt in presentationPackets)
 					{
 						if (_steamSend is null) _udpServer!.Send(evt.buffer, evt.length, slot.EndPoint!);
@@ -774,6 +816,18 @@ namespace SlopArena.Server
 			{
 				Console.WriteLine($"[Match:{_matchId}] Send error: {ex.Message}");
 			}
+		}
+		private void SendNetplayControl(PlayerSlot slot, NetplayControlKind kind)
+		{
+			var control = new NetplayControlPacket(kind, slot.EntityId, _serverTick, _startTick);
+			int offset = _steamSend is null ? 0 : 1;
+			var frame = new byte[NetplayControlPacket.Size + offset];
+			if (offset != 0) frame[0] = SteamGameplayWire.Control;
+			control.Serialize(frame.AsSpan(offset));
+			if (_steamSend is null)
+				_udpServer!.Send(frame, frame.Length, slot.EndPoint!);
+			else
+				_steamSend(_steamMatchGuid, slot.EntityId, frame, true);
 		}
 
 
@@ -814,29 +868,6 @@ namespace SlopArena.Server
 			return new MatchResultPacket(_serverTick, outcome.IsSharedVictory, ranked);
 		}
 
-		/// <summary>
-		/// On GO, the clients' tick counters are already ~CountdownDuration ahead (they
-		/// predict and send during countdown). Discard the countdown-era input backlog
-		/// and start the shared tick counter at the clients' current tick, so the server
-		/// and client sim clocks stay aligned from the first Playing tick instead of the
-		/// server replaying five seconds of stale inputs.
-		/// </summary>
-		private void PrimeTickCounter()
-		{
-			lock (_steamGate)
-			{
-				uint maxQueued = 0;
-				foreach (var slot in _slots)
-					if (slot.Queue.MaxTick is uint maxTick)
-						maxQueued = Math.Max(maxQueued, maxTick);
-				if (maxQueued > 0)
-				{
-					_serverTick = maxQueued;
-					foreach (var slot in _slots)
-						slot.Queue.Clear();
-				}
-			}
-		}
 
 		/// <summary>
 		/// Per-player state held outside the simulation: the client's UDP endpoint,
@@ -852,14 +883,14 @@ namespace SlopArena.Server
 			public DateTime LastPacket { get; set; } = DateTime.UtcNow;
 			private volatile bool _disconnected;
 			private volatile bool _steamConnected;
-			private volatile bool _steamEverJoined;
 			public bool Disconnected { get => _disconnected; set => _disconnected = value; }
 			public bool SteamConnected { get => _steamConnected; set => _steamConnected = value; }
-			public bool SteamEverJoined { get => _steamEverJoined; set => _steamEverJoined = value; }
 			public long ConnectionId { get; set; }
 			public long LastInputConnectionId { get; set; }
+			public long ReadyConnectionId { get; set; }
+			public bool Ready { get; set; }
+			public int MissingInputTicks { get; set; }
 			public TickInputBuffer Queue { get; } = new();
-			/// <summary>Last input consumed for this slot.</summary>
 			public InputState LastInput;
 
 			public PlayerSlot(ulong entityId, CharacterClass characterClass, long steamId, MatchContentEntry content)

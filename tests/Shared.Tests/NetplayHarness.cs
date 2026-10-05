@@ -55,26 +55,40 @@ internal sealed class NetplayHarness
         _client.RegisterEntity(OpponentId, def, p2);
     }
 
-    /// <summary>One tick. in1/in2 are fed to the server for entities 1/2; the client
-    /// predicts self with in1.</summary>
-    public void Step(InputState in1, InputState in2)
+    /// <summary>Align both simulations to an authority tick before the first prediction step.</summary>
+    public bool SetTimeline(uint lastCompletedTick)
+    {
+        if (_serverTick != 0 || !_client.SetTimeline(lastCompletedTick))
+            return false;
+        _serverTick = lastCompletedTick;
+        _server.SetTick(lastCompletedTick);
+        return true;
+    }
+
+    /// <summary>One authority step with independently timed uplink inputs. The legacy overload
+    /// keeps client prediction and server consumption identical for existing traces.</summary>
+    public void Step(InputState clientSelfInput, InputState serverSelfInput, InputState opponentInput)
     {
         _serverTick++;
-        _server.Tick(new Dictionary<ulong, InputState> { { SelfId, in1 }, { OpponentId, in2 } });
+        _server.Tick(new Dictionary<ulong, InputState>
+        {
+            { SelfId, serverSelfInput },
+            { OpponentId, opponentInput },
+        });
 
-        _client.Tick(new Dictionary<ulong, InputState> { { SelfId, in1 } });
+        _client.Tick(new Dictionary<ulong, InputState> { { SelfId, clientSelfInput } });
 
         var selfPacket = new ServerEntityPacket
         {
             EntityId = SelfId, Tick = _serverTick,
             State = CharacterStatePacket.FromState(_server.GetState(SelfId), _serverTick),
-            HasInput = true, Input = in1,
+            HasInput = true, Input = serverSelfInput,
         };
         var oppPacket = new ServerEntityPacket
         {
             EntityId = OpponentId, Tick = _serverTick,
             State = CharacterStatePacket.FromState(_server.GetState(OpponentId), _serverTick),
-            HasInput = true, Input = in2,
+            HasInput = true, Input = opponentInput,
         };
         _inFlight.Enqueue((_serverTick, selfPacket, oppPacket));
 
@@ -89,6 +103,10 @@ internal sealed class NetplayHarness
         }
     }
 
+    public void Step(InputState in1, InputState in2)
+        => Step(in1, in1, in2);
+
+
     /// <summary>Enable/disable packet loss. The fuzz disables loss during its idle
     /// settle tail so the final reconcile + replay is guaranteed to re-converge.</summary>
     public void SetDropsEnabled(bool enabled) => _dropsEnabled = enabled;
@@ -97,8 +115,8 @@ internal sealed class NetplayHarness
     public CharacterState ClientState(ulong id) => _client.GetState(id);
 
     /// <summary>True when the client self state equals the server's on every wire
-    /// field (exact — deterministic sim, identical inputs). On divergence, outputs
-    /// the compared packets so AssertSelfConverged can dump both.</summary>
+    /// field after both timelines have settled on the same authoritative inputs. On
+    /// divergence, outputs the compared packets so AssertSelfConverged can dump both.</summary>
     public static bool IsSelfConverged(NetplayHarness h, out CharacterStatePacket expected, out CharacterStatePacket actual)
     {
         expected = CharacterStatePacket.FromState(h.ServerState(SelfId));

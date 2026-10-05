@@ -14,7 +14,7 @@ public sealed record SteamMatchDescriptor(
     string ContentHash,
     DateTimeOffset AdmissionExpiresAtUtc)
 {
-    public const int CurrentProtocolVersion = 4;
+    public const int CurrentProtocolVersion = SimulationProtocol.Version;
     public const int GameplayVirtualPort = 0;
     public const string Transport = "steam-p2p";
 

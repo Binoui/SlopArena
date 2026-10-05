@@ -41,7 +41,7 @@
         System.Threading.Tasks.Extensions.dll" />
   </ItemGroup>
 
-  <Target Name="CopyToUnity" AfterTargets="Build">
+  <Target Name="CopyToUnity" AfterTargets="Build" Condition="'$(SkipUnityPluginCopy)' != 'true'">
     <!-- Ship the Shared DLL + the full restored dependency closure (SignalR
          client + System.Text.Json + transitives) into Assets/Plugins so
          Unity's Assembly-CSharp can resolve LobbyClient.cs (issue #33,

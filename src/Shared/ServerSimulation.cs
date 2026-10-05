@@ -90,6 +90,10 @@ namespace SlopArena.Shared
 	/// applied and never gate ability start. Null = normal cooldowns (PvP default).</summary>
 	public ulong? NoCooldownsEntityId;
 
+		/// <summary>Authoring-only opt-in: suspend ambient gravity for one entity.
+		/// Authored velocity and owned vertical motion still run. Null = normal match gravity.</summary>
+		public ulong? NoGravityEntityId;
+
 		/// <param name="rule">Win-condition rule (elimination + match end). Defaults to stock mode, 3 stocks.</param>
 		/// <param name="downActionTuning">Immutable down-action tuning. Defaults to the shared production values.</param>
 		public ServerSimulation(ArenaDefinition arena, IMatchRule? rule = null, DownActionTuning? downActionTuning = null)
@@ -187,6 +191,7 @@ namespace SlopArena.Shared
 				&& ability.Slot < AbilitySlots.Count && NoCooldownsEntityId != id)
 				state.SetCooldown((byte)(ability.Slot + 1), ability.Cooldown);
 			CancelAttackRuntime(id, state);
+			state.ClearStartupAimCorrection();
 		}
 
 
@@ -211,7 +216,7 @@ namespace SlopArena.Shared
 		/// Activate a server ability for an entity.
 		/// Calls OnStart and registers the ability for per-tick updates.
 		/// </summary>
-		public void ActivateAbility(ulong entityId, ServerAbility ability, byte slot, CharacterDefinition def, short? activationAimYaw = null)
+		public void ActivateAbility(ulong entityId, ServerAbility ability, byte slot, CharacterDefinition def, short? activationAimYaw = null, InputState activationInput = default)
 		{
 			if (!_states.TryGetValue(entityId, out var state)) return;
 			unchecked
@@ -222,6 +227,8 @@ namespace SlopArena.Shared
 			ability.ActivationId = _nextActivationId;
 			_lastActivationIds[entityId] = ability.ActivationId;
 			ability.Resolver = _spellResolver;
+			ability.OwnerSimulation = this;
+			ability.ActivationInput = activationInput;
 			ability.SimulationStates = _states;
 			ability.BakedData = _bakedData.TryGetValue(entityId, out var b) ? b : null;
 			ability.CharacterDef = def;
@@ -261,13 +268,16 @@ namespace SlopArena.Shared
 			ability.PresentationAttackSequence = state.AttackSequence;
 			ability.PresentationOperationIndex = -1;
 			ability.ClearArmorWindow();
-			ability.OnStart(ref state, def);
-			if (_abilityTickPhaseComplete)
-				ability.AccountForCurrentContactFrame();
+			state.ClearStartupAimCorrection();
             bool aimingAbility = cookedSlot != null
                 ? cookedSlot.AimMode != AuthoringAimMode.None
                 : spec != null && spec.AimMode != AimMode.None;
-            if (aimingAbility)
+            if (aimingAbility && ability is CookedTimelineAbility { UsesStartupAimCorrection: true })
+                state.FacingYaw = state.AimYaw;
+			ability.OnStart(ref state, def);
+			if (_abilityTickPhaseComplete)
+				ability.AccountForCurrentContactFrame();
+            if (aimingAbility && !state.AttackCorrectionOwned)
                 state.FacingYaw = activationAimYaw.HasValue
                     ? activationAimYaw.Value * 0.01f * (MathF.PI / 180f)
                     : state.AimYaw;
@@ -445,6 +455,7 @@ namespace SlopArena.Shared
 						wx += (hbd.OffX * cos) + (hbd.OffZ * sin);
 						wy += hbd.OffY;
 						wz += (-hbd.OffX * sin) + (hbd.OffZ * cos);
+						HitboxGeometry.ApplyAttackPosePitch(in state, def, ref wx, ref wy, ref wz);
 						list.Add(new SpellResolver.EntityData
 						{
 							Id = entityId, PosX = wx, PosY = wy, PosZ = wz,
@@ -468,6 +479,8 @@ namespace SlopArena.Shared
 					float ex = state.PX + (cap.Ex * cos) + (cap.Ez * sin);
 					float ey = state.PY + cap.Ey;
 					float ez = state.PZ + ((-cap.Ex * sin) + (cap.Ez * cos));
+					HitboxGeometry.ApplyAttackPosePitch(in state, def, ref sx, ref sy, ref sz);
+					HitboxGeometry.ApplyAttackPosePitch(in state, def, ref ex, ref ey, ref ez);
 					list.Add(new SpellResolver.EntityData
 					{
 						Id = entityId, PosX = sx, PosY = sy, PosZ = sz, Radius = cap.Radius,
@@ -924,7 +937,7 @@ namespace SlopArena.Shared
 
 				ability.Cooldown = cookedSlot.CooldownTicks;
                 ability.AnimationNames = cookedSlot.Timeline.Stages.SelectMany(x => x.AnimationIds).ToArray();
-				ActivateAbility(id, ability, (byte)(input.ActiveSlot - 1), def, input.AimYaw);
+				ActivateAbility(id, ability, (byte)(input.ActiveSlot - 1), def, input.AimYaw, input);
 
                 // Spend charges from the cooked pool; capabilities refund valid hits.
                 if (maxCharges > 0 && _states.TryGetValue(id, out var afterState))
@@ -1207,6 +1220,7 @@ namespace SlopArena.Shared
 
 		private static void ClearAttackState(ref CharacterState state)
 		{
+			state.ClearStartupAimCorrection();
 			state.AttackSlot = 0;
 			state.ComboStage = 0;
 			state.AttackElapsedTicks = 0;
@@ -1376,7 +1390,8 @@ namespace SlopArena.Shared
 				bool verticalMotionOwned = activeAbility?.OwnsVerticalMotion == true;
                 Simulation.SimulateTick(ref state, def, input, _arena,
 					out bool ordinaryActionOpportunity, out bool movementActionAccepted,
-					_downActionTuning, verticalMotionOwned, activeAbility?.GravityMultiplier ?? 1f);
+					_downActionTuning, verticalMotionOwned,
+					NoGravityEntityId == id ? 0f : activeAbility?.GravityMultiplier ?? 1f);
 				if (state.State is ActionState.Shielding or ActionState.GrabAttempt or ActionState.AirDodgeMovement)
 					CancelDefenseAttackRuntime(id, ref state);
 
@@ -1622,6 +1637,104 @@ namespace SlopArena.Shared
 			return selected != 0 && IsEligibleEnemy(selfId, selected, selfX, selfZ,
 				LockRangeMeters, out _) ? selected : 0;
 		}
+		internal void BeginStartupAimCorrection(ref CharacterState state, CookedStartupAimCorrectionOperation operation, in InputState input)
+		{
+			state.AttackCorrectionOwned = true;
+			state.AttackCorrectionStartYaw = state.FacingYaw;
+			state.AttackPosePitch = 0f;
+			ulong preferred = state.LockOn && !input.ToggleLock && !input.RetargetPressed
+				? state.TargetEntityId : input.TargetEntityId;
+			ulong targetId = 0;
+			float bestDistance = float.MaxValue;
+			if (!input.RetargetPressed && IsStartupCorrectionTarget(state, preferred, operation, acquire: true, out _))
+				targetId = preferred;
+			else
+			{
+				foreach (var candidate in _states)
+				{
+					if (!IsStartupCorrectionTarget(state, candidate.Key, operation, acquire: true, out float distance))
+						continue;
+					if (targetId == 0 || distance < bestDistance || distance == bestDistance && candidate.Key < targetId)
+					{
+						targetId = candidate.Key;
+						bestDistance = distance;
+					}
+				}
+			}
+			state.AttackCorrectionTargetId = targetId;
+			state.AttackCorrectionTargetDeaths = targetId != 0 ? _states[targetId].Deaths : (byte)0;
+			state.AttackCorrectionActive = targetId != 0;
+		}
+
+		internal void UpdateStartupAimCorrection(ref CharacterState state, CookedStartupAimCorrectionOperation operation, bool applyPose)
+		{
+			if (!state.AttackCorrectionActive)
+				return;
+			if (!IsStartupCorrectionTarget(state, state.AttackCorrectionTargetId, operation, acquire: false, out _))
+			{
+				state.AttackCorrectionActive = false;
+				return;
+			}
+			var target = _states[state.AttackCorrectionTargetId];
+			if (target.Deaths != state.AttackCorrectionTargetDeaths)
+			{
+				state.AttackCorrectionActive = false;
+				return;
+			}
+			if (!applyPose)
+				return;
+			float dx = target.PX - state.PX;
+			float dz = target.PZ - state.PZ;
+			float horizontalSquared = dx * dx + dz * dz;
+			const float radiansPerDegree = MathF.PI / 180f;
+			float targetYaw = horizontalSquared > 0.000001f ? MathF.Atan2(dx, dz) : state.FacingYaw;
+			float yawOffset = Math.Clamp(CorrectionAngleDelta(targetYaw - state.AttackCorrectionStartYaw),
+				-operation.MaxYawDegrees * radiansPerDegree, operation.MaxYawDegrees * radiansPerDegree);
+			float yawStep = operation.YawDegreesPerSecond * radiansPerDegree / 60f;
+			state.FacingYaw += Math.Clamp(CorrectionAngleDelta(state.AttackCorrectionStartYaw + yawOffset - state.FacingYaw),
+				-yawStep, yawStep);
+			if (operation.MaxPitchDegrees > 0f)
+			{
+				float sourceHipY = _defs[state.EntityId].BoneYToWorldY(state.PY, 0f);
+				// A size-scaled upper-body reference; animation cannot move the aim point.
+				float targetTorsoY = target.PY + _defs[target.EntityId].CapsuleHeight * .25f;
+				float targetPitch = Math.Clamp(MathF.Atan2(targetTorsoY - sourceHipY, MathF.Sqrt(horizontalSquared)),
+					-operation.MaxPitchDegrees * radiansPerDegree, operation.MaxPitchDegrees * radiansPerDegree);
+				float pitchStep = operation.PitchDegreesPerSecond * radiansPerDegree / 60f;
+				state.AttackPosePitch += Math.Clamp(targetPitch - state.AttackPosePitch, -pitchStep, pitchStep);
+			}
+		}
+
+		private bool IsStartupCorrectionTarget(in CharacterState state, ulong targetId,
+			CookedStartupAimCorrectionOperation operation, bool acquire, out float distanceSquared)
+		{
+			if (targetId == 0 || !IsEligibleEnemy(state.EntityId, targetId, state.PX, state.PZ,
+				operation.AcquisitionRange, out distanceSquared))
+			{
+				distanceSquared = 0f;
+				return false;
+			}
+			var target = _states[targetId];
+			float dy = target.PY - state.PY;
+			distanceSquared += dy * dy;
+			if (distanceSquared > operation.AcquisitionRange * operation.AcquisitionRange)
+				return false;
+			if (!acquire)
+				return true;
+			float dx = target.PX - state.PX;
+			float dz = target.PZ - state.PZ;
+			return dx * dx + dz * dz <= 0.000001f
+				|| MathF.Abs(CorrectionAngleDelta(MathF.Atan2(dx, dz) - state.FacingYaw))
+					<= operation.AcquisitionHalfAngleDegrees * (MathF.PI / 180f);
+		}
+
+		private static float CorrectionAngleDelta(float angle)
+		{
+			while (angle > MathF.PI) angle -= 2f * MathF.PI;
+			while (angle < -MathF.PI) angle += 2f * MathF.PI;
+			return angle;
+		}
+
 		/// <summary>
 		/// Resolve a sticky lock target and soft-target selection for each entity. Client
 		/// selection is validated only when a lock is acquired; retarget always chooses
@@ -1757,6 +1870,11 @@ namespace SlopArena.Shared
 					continue;
 				}
 				if (state.HitstopTicks > 0)
+				{
+					_states[id] = state;
+					continue;
+				}
+				if (state.AttackCorrectionOwned)
 				{
 					_states[id] = state;
 					continue;

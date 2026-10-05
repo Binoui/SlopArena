@@ -541,15 +541,15 @@ namespace SlopArena.Client.Input
             input.RetargetPressed = _pendingRetarget;
             _pendingRetarget = false;
 
-            // Facing yaw from body rotation
-            float deg = bodyYawDeg;
-            input.FacingYaw = (short)Math.Clamp(deg * 100f, -32768f, 32767f);
+            // Yaw wraps before centidegree encoding; camera turns must not saturate the wire angle.
+            float deg = Mathf.DeltaAngle(0f, bodyYawDeg);
+            input.FacingYaw = (short)(deg * 100f);
 
             // Aim yaw: camera default, overridden by active ability
-            float aimDeg = camera != null ? camera.GetCameraYawDeg() : deg;
-            input.AimYaw = (short)Math.Clamp(aimDeg * 100f, -32768f, 32767f);
-            if (aimCtx.AimYawRad.HasValue)
-                input.AimYaw = (short)Math.Clamp(aimCtx.AimYawRad.Value * Mathf.Rad2Deg * 100f, -32768f, 32767f);
+            float aimDeg = aimCtx.AimYawRad.HasValue
+                ? aimCtx.AimYawRad.Value * Mathf.Rad2Deg
+                : camera != null ? camera.GetCameraYawDeg() : deg;
+            input.AimYaw = (short)(Mathf.DeltaAngle(0f, aimDeg) * 100f);
 
             // Aim pitch: camera default, overridden by active ability
             float aimPitchDeg = camera != null ? camera.GetCameraPitchDeg() : 0f;

@@ -99,8 +99,14 @@ namespace SlopArena.Shared
         public ushort AirDodgeRecoveryTicks;
         /// <summary>Sticky target ID, required to replay lock acquisition deterministically.</summary>
         public ulong TargetEntityId;
-        /// <summary>164 bytes: fixed state fields, target lock state and protocol version.</summary>
-        public const int Size = 164;
+        public float AttackPosePitch;
+        public float AttackCorrectionStartYaw;
+        public ulong AttackCorrectionTargetId;
+        public byte AttackCorrectionTargetDeaths;
+        public bool AttackCorrectionActive;
+        public bool AttackCorrectionOwned;
+        /// <summary>Fixed state, target lock, startup correction and protocol version.</summary>
+        public const int Size = 182;
 
         /// <summary>Convert from CharacterState to serializable packet.</summary>
         public static CharacterStatePacket FromState(CharacterState s, uint tick = 0)
@@ -176,6 +182,12 @@ namespace SlopArena.Shared
                 CapturedYaw = s.CapturedYaw,
                 AirDodgeRecoveryTicks = s.AirDodgeRecoveryTicks,
                 TargetEntityId = s.TargetEntityId,
+                AttackPosePitch = s.AttackPosePitch,
+                AttackCorrectionStartYaw = s.AttackCorrectionStartYaw,
+                AttackCorrectionTargetId = s.AttackCorrectionTargetId,
+                AttackCorrectionTargetDeaths = s.AttackCorrectionTargetDeaths,
+                AttackCorrectionActive = s.AttackCorrectionActive,
+                AttackCorrectionOwned = s.AttackCorrectionOwned,
             };
         }
  
@@ -251,6 +263,12 @@ namespace SlopArena.Shared
                 CapturedYaw = CapturedYaw,
                 AirDodgeRecoveryTicks = AirDodgeRecoveryTicks,
                 TargetEntityId = TargetEntityId,
+                AttackPosePitch = AttackPosePitch,
+                AttackCorrectionStartYaw = AttackCorrectionStartYaw,
+                AttackCorrectionTargetId = AttackCorrectionTargetId,
+                AttackCorrectionTargetDeaths = AttackCorrectionTargetDeaths,
+                AttackCorrectionActive = AttackCorrectionActive,
+                AttackCorrectionOwned = AttackCorrectionOwned,
             };
         }
 
@@ -331,6 +349,11 @@ namespace SlopArena.Shared
             BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(153, 2), AirDodgeRecoveryTicks);
             BinaryPrimitives.WriteUInt64LittleEndian(buffer.Slice(155, 8), TargetEntityId);
             buffer[163] = SimulationProtocol.Version;
+            BinaryPrimitives.WriteUInt64LittleEndian(buffer.Slice(164, 8), AttackCorrectionTargetId);
+            BinaryPrimitives.WriteInt32LittleEndian(buffer.Slice(172, 4), BitConverter.SingleToInt32Bits(AttackCorrectionStartYaw));
+            BinaryPrimitives.WriteInt32LittleEndian(buffer.Slice(176, 4), BitConverter.SingleToInt32Bits(AttackPosePitch));
+            buffer[180] = (byte)((AttackCorrectionActive ? 1 : 0) | (AttackCorrectionOwned ? 2 : 0));
+            buffer[181] = AttackCorrectionTargetDeaths;
         }
 
         public static CharacterStatePacket Deserialize(ReadOnlySpan<byte> buffer)
@@ -410,6 +433,12 @@ namespace SlopArena.Shared
             packet.CapturedYaw = BinaryPrimitives.ReadInt16LittleEndian(buffer.Slice(151, 2));
             packet.AirDodgeRecoveryTicks = BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(153, 2));
             packet.TargetEntityId = BinaryPrimitives.ReadUInt64LittleEndian(buffer.Slice(155, 8));
+            packet.AttackCorrectionTargetId = BinaryPrimitives.ReadUInt64LittleEndian(buffer.Slice(164, 8));
+            packet.AttackCorrectionStartYaw = BitConverter.Int32BitsToSingle(BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(172, 4)));
+            packet.AttackPosePitch = BitConverter.Int32BitsToSingle(BinaryPrimitives.ReadInt32LittleEndian(buffer.Slice(176, 4)));
+            packet.AttackCorrectionActive = (buffer[180] & 1) != 0;
+            packet.AttackCorrectionOwned = (buffer[180] & 2) != 0;
+            packet.AttackCorrectionTargetDeaths = buffer[181];
             return packet;
         }
 
@@ -478,6 +507,12 @@ namespace SlopArena.Shared
             s.CapturedYaw = CapturedYaw;
             s.AirDodgeRecoveryTicks = AirDodgeRecoveryTicks;
             s.TargetEntityId = TargetEntityId;
+            s.AttackPosePitch = AttackPosePitch;
+            s.AttackCorrectionStartYaw = AttackCorrectionStartYaw;
+            s.AttackCorrectionTargetId = AttackCorrectionTargetId;
+            s.AttackCorrectionTargetDeaths = AttackCorrectionTargetDeaths;
+            s.AttackCorrectionActive = AttackCorrectionActive;
+            s.AttackCorrectionOwned = AttackCorrectionOwned;
         }
     }
 }

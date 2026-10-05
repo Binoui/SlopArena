@@ -51,6 +51,7 @@ public sealed class AbilityLabSimulationController
         var simulation = new ServerSimulation(CreateArena(floorY))
         {
             NoCooldownsEntityId = PreviewEntityId,
+            NoGravityEntityId = airborne ? PreviewEntityId : (ulong?)null,
         };
         simulation.SetTick(0);
         var state = new CharacterState

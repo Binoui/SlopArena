@@ -338,4 +338,48 @@ public class HitboxGeometryTests
         Assert.Equal(1.7f, wy, 5); // would be 1.55 if the ground duration were used
         Assert.Equal(0f, wz, 5);
     }
+    [Fact]
+    public void AttackPosePitch_RotatesEndpointAroundHipPivot()
+    {
+        var state = new CharacterState
+        {
+            PX = 2f, PY = 3f, PZ = -1f,
+            FacingYaw = 0f, AttackPosePitch = MathF.PI / 2f,
+        };
+        var def = TestHelpers.EngineDef;
+        def.CapsuleHeight = 2f;
+        def.HipHeight = 1f;
+        float x = 2f, y = 4f, z = 1f;
+
+        HitboxGeometry.ApplyAttackPosePitch(in state, def, ref x, ref y, ref z);
+
+        Assert.Equal(2f, x, 5);
+        Assert.Equal(5f, y, 5); // Hip pivot Y=3 plus the original two-metre forward offset.
+        Assert.Equal(-2f, z, 5);
+    }
+
+    [Fact]
+    public void AttackPosePitch_TransformsBothResolvedCapsuleEndpoints()
+    {
+        var state = new CharacterState
+        {
+            PX = 0f, PY = 2f, PZ = 0f,
+            FacingYaw = MathF.PI / 2f, AttackPosePitch = MathF.PI / 2f,
+        };
+        var def = TestHelpers.EngineDef;
+        def.CapsuleHeight = 2f;
+        def.HipHeight = 1f;
+        var evt = new HitboxEvent { Shape = HitboxShape.Capsule, OffZ = 1f, EndOffZ = 1f };
+        HitboxGeometry.ResolvePositions(in state, in evt, null, def, null, 0, 2, false,
+            out float startX, out float startY, out float startZ,
+            out float endX, out float endY, out float endZ);
+
+        Assert.Equal(0f, startX, 5);
+        Assert.Equal(3f, startY, 5);
+        Assert.Equal(0f, startZ, 5);
+        Assert.Equal(0f, endX, 5);
+        Assert.Equal(4f, endY, 5);
+        Assert.Equal(0f, endZ, 5);
+    }
 }
+

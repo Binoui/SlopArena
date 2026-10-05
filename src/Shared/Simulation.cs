@@ -863,6 +863,7 @@ namespace SlopArena.Shared
 
         private static void ClearDefenseAttackState(ref CharacterState state)
         {
+            state.ClearStartupAimCorrection();
             state.AttackSlot = 0;
             state.ComboStage = 0;
             state.AttackElapsedTicks = 0;
@@ -1936,6 +1937,7 @@ namespace SlopArena.Shared
             ushort stunTicks, float weight, bool applyScale = true)
         {
             ClearMovementInterruptionFlags(ref s);
+            s.ClearStartupAimCorrection();
             s.LandingLagTicks = 0;
             float mass = MathF.Max(0.01f, weight + 100f);
             float magnitude = (baseKB + growthKB * (s.DamagePercent * 0.01f + 1f)
@@ -1994,6 +1996,7 @@ namespace SlopArena.Shared
             sbyte angleDeg, float force, ushort stunTicks)
         {
             ClearMovementInterruptionFlags(ref s);
+            s.ClearStartupAimCorrection();
             s.LandingLagTicks = 0;
             float rad = angleDeg * MathF.PI / 180f;
             float cosA = MathF.Cos(rad);

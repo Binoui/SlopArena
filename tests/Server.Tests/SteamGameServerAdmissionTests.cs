@@ -36,6 +36,11 @@ public class SteamGameServerAdmissionTests
             onMatchCancelled: onCancel, admissionDeadlineUtc: deadline, contentHash: ContentHash,
             steamSend: static (_, _, _, _) => { }, clock: clock);
 
+    private static void MarkSteamReady(MatchInstance match, long connectionId, ulong entityId)
+    {
+        var ready = new NetplayControlPacket(NetplayControlKind.Ready, entityId, match.ServerTick, match.StartTick);
+        Assert.True(match.TryMarkSteamReady(connectionId, ready));
+    }
     [Fact]
     public void SteamInputCodecRejectsEntitySpoofAndAcceptsOnlyTheBoundSlot()
     {
@@ -66,7 +71,9 @@ public class SteamGameServerAdmissionTests
         Assert.False(first.TryBindSteamPlayer(1001, 11, "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", out _, out _, out _));
         Assert.True(first.TryBindSteamPlayer(1001, 11, ContentHash, out ulong firstEntity, out _, out _));
         Assert.Equal(1UL, firstEntity);
-        Assert.True(second.TryBindSteamPlayer(2001, 22, ContentHash, out _, out _, out _));
+        Assert.True(second.TryBindSteamPlayer(2001, 22, ContentHash, out ulong secondEntity, out _, out _));
+        MarkSteamReady(first, 11, firstEntity);
+        MarkSteamReady(second, 22, secondEntity);
         Assert.False(first.TryQueueSteamInput(22, 1, default));
         Assert.True(second.TryQueueSteamInput(22, 1, default));
 
@@ -94,6 +101,10 @@ public class SteamGameServerAdmissionTests
             bool secondAdmitted = match.TryBindSteamPlayer(1002, 22, ContentHash, out _, out _, out denial);
             Assert.True(secondAdmitted,
                 $"Second admission denied: code={denial}, countdown={match.HasStartedCountdown}, running={match.IsRunning}.");
+            Assert.False(match.HasStartedCountdown);
+            MarkSteamReady(match, 11, 1);
+            Assert.False(match.HasStartedCountdown);
+            MarkSteamReady(match, 22, 2);
             Assert.True(SpinWait.SpinUntil(() => match.HasStartedCountdown, 2000),
                 $"Expected countdown, running={match.IsRunning}.");
 
@@ -101,8 +112,10 @@ public class SteamGameServerAdmissionTests
             Assert.True(reconnected,
                 $"Same-account reconnect denied: code={denial}, countdown={match.HasStartedCountdown}, running={match.IsRunning}.");
             Assert.Equal(11L, replaced);
-            Assert.False(match.TryQueueSteamInput(11, 1, default));
-            Assert.True(match.TryQueueSteamInput(33, 1, default));
+            Assert.False(match.TryQueueSteamInput(11, match.ServerTick + 1, default));
+            Assert.False(match.TryQueueSteamInput(33, match.ServerTick + 1, default));
+            MarkSteamReady(match, 33, 1);
+            Assert.True(match.TryQueueSteamInput(33, match.ServerTick + 1, default));
         }
         finally
         {
@@ -187,17 +200,29 @@ public class SteamGameServerAdmissionTests
         {
             Assert.True(match.TryBindSteamPlayer(1001, 11, ContentHash, out _, out _, out _));
             Assert.True(match.TryBindSteamPlayer(1002, 22, ContentHash, out _, out _, out _));
+            Assert.False(match.HasStartedCountdown);
+            MarkSteamReady(match, 11, 1);
+            Assert.False(match.HasStartedCountdown);
+            MarkSteamReady(match, 22, 2);
             await playing.Task.WaitAsync(TimeSpan.FromSeconds(8));
-            for (uint tick = 1; tick <= 120; tick++)
-                Assert.True(match.TryQueueSteamInput(11, tick,
-                    tick == 1 ? new InputState { ActiveSlot = AbilitySlots.A, IsAiming = true } : default));
+            uint nextTick = match.ServerTick + 6;
+            for (uint i = 0; i < 120; i++)
+            {
+                Assert.True(match.TryQueueSteamInput(11, nextTick++,
+                    i == 0 ? new InputState { ActiveSlot = AbilitySlots.A, IsAiming = true } : default));
+                Thread.Sleep(16);
+            }
             var packet = await spawned.Task.WaitAsync(TimeSpan.FromSeconds(3));
             Assert.Equal(3, packet.Projectiles.Select(x => x.OperationIndex).Distinct().Count());
             Assert.All(packet.Projectiles, x => Assert.Equal(CharacterClass.Wibou, x.Character));
             await removed.Task.WaitAsync(TimeSpan.FromSeconds(4));
-            for (uint tick = 121; tick <= 200; tick++)
-                Assert.True(match.TryQueueSteamInput(11, tick,
-                    tick == 121 ? new InputState { ActiveSlot = AbilitySlots.Slot1 } : default));
+            nextTick = match.ServerTick + 6;
+            for (uint i = 0; i < 80; i++)
+            {
+                Assert.True(match.TryQueueSteamInput(11, nextTick++,
+                    i == 0 ? new InputState { ActiveSlot = AbilitySlots.Slot1 } : default));
+                Thread.Sleep(16);
+            }
             await swordActive.Task.WaitAsync(TimeSpan.FromSeconds(3));
             await swordRemoved.Task.WaitAsync(TimeSpan.FromSeconds(3));
         }
@@ -233,6 +258,8 @@ public class SteamGameServerAdmissionTests
         {
             Assert.True(active.TryBindSteamPlayer(2001, 55, ContentHash, out _, out _, out _));
             Assert.True(active.TryBindSteamPlayer(2002, 66, ContentHash, out _, out _, out _));
+            MarkSteamReady(active, 55, 1);
+            MarkSteamReady(active, 66, 2);
             Assert.True(SpinWait.SpinUntil(() => active.HasStartedCountdown, 2000));
             active.DisconnectSteamPlayer(55);
             await Task.Delay(50); // Let the simulation observe absence before advancing the injected clock.

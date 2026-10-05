@@ -311,6 +311,7 @@ public enum CookedOperationKind : byte
     ForwardLunge = 7,
     GravityWindow = 8,
     ArmorWindow = 9,
+    StartupAimCorrection = 10,
 }
 public abstract class CookedTimelineOperation
 {
@@ -374,6 +375,38 @@ public sealed class CookedArmorWindowOperation : CookedTimelineOperation
     public CookedArmorWindowOperation(ushort tick, AuthoringUnit unit, ushort durationTicks)
         : base(tick, unit, CookedOperationKind.ArmorWindow)
         => DurationTicks = durationTicks;
+}
+
+public sealed class CookedStartupAimCorrectionOperation : CookedTimelineOperation
+{
+    public ushort EndTick { get; }
+    public float AcquisitionRange { get; }
+    public float AcquisitionHalfAngleDegrees { get; }
+    public float MaxYawDegrees { get; }
+    public float MaxPitchDegrees { get; }
+    public float YawDegreesPerSecond { get; }
+    public float PitchDegreesPerSecond { get; }
+
+    public CookedStartupAimCorrectionOperation(
+        ushort tick,
+        AuthoringUnit unit,
+        ushort endTick,
+        float acquisitionRange,
+        float acquisitionHalfAngleDegrees,
+        float maxYawDegrees,
+        float maxPitchDegrees,
+        float yawDegreesPerSecond,
+        float pitchDegreesPerSecond)
+        : base(tick, unit, CookedOperationKind.StartupAimCorrection)
+    {
+        EndTick = endTick;
+        AcquisitionRange = acquisitionRange;
+        AcquisitionHalfAngleDegrees = acquisitionHalfAngleDegrees;
+        MaxYawDegrees = maxYawDegrees;
+        MaxPitchDegrees = maxPitchDegrees;
+        YawDegreesPerSecond = yawDegreesPerSecond;
+        PitchDegreesPerSecond = pitchDegreesPerSecond;
+    }
 }
 
 
