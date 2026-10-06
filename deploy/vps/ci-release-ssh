@@ -1,0 +1,9 @@
+#!/bin/sh
+set -eu
+
+if [ "${SSH_ORIGINAL_COMMAND-}" != "sloparena-release" ] || [ "$#" -ne 0 ]; then
+    printf '%s\n' 'only sloparena-release is accepted' >&2
+    exit 126
+fi
+
+exec /usr/bin/sudo -n -- /usr/bin/python3 -I /opt/sloparena/deploy/vps/ci_release.py

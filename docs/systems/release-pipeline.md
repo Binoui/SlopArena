@@ -1,14 +1,95 @@
 # Release Pipeline — Steam Playtest + VPS
 
 The default release target is the Windows **Steam Playtest** client plus the
-restricted VPS Master/GameHost pair. ZIP/GitHub and Alfred home deployment are
-explicit alternatives, not steps to mix into the Steam-only deployment.
+restricted VPS Master/GameHost pair, driven by **Release Steam Playtest**
+(`.github/workflows/release-playtest.yml`). Steam default-build activation remains
+manual. ZIP/GitHub and Alfred home deployment are explicit alternatives.
 
-The operator's durable receipt is `build/playtest/<version>/candidate.json`, with
-bounded supporting evidence alongside it. The rollout of `0.2.0-playtest.5`
-(BuildID `25702912`, VPS release `steam-playtest-20261004-5`) is recorded in
-[Testing and Verification](../testing.md). That record is historical evidence,
-not proof of today's branch, service readiness, registration or match count.
+The Actions artifacts retain `candidate-public.json`, client/upload receipts, and
+`release.json`; the job summary links the exact Steam BuildID to promote. Manual
+fallback receipts remain under `build/playtest/<version>/`. Historical release
+records in [Testing and Verification](../testing.md) are not proof of today's
+branch, service readiness, registration or match count.
+
+## GitHub Actions — routine release
+
+After the workflow changes are published to both repositories' `main` branches
+and the one-time setup below is complete, dispatch from the game checkout:
+
+```bash
+gh workflow run release-playtest.yml --ref main -f 'version=0.2.0-playtest.<n>'
+```
+
+The run pins the gameplay commit and a full Master commit reachable from Master
+`main`, then builds/tests the backend images and an isolated Unity 6000.0.78f1
+Windows Mono player in parallel. `master_revision` optionally selects an older
+full Master SHA reachable from `main`; it is not a branch/tag input. The Editor
+build verifies canonical cooked packages without rewriting authoring data,
+restores settings/staging, and records the catalog identity from packaged content.
+The portable verifier checks packaged bytes, endpoint, version and attribution.
+The runner never borrows the workstation's open Unity Editor. Its CI-only method,
+`scripts/ci/PlaytestReleaseBuilder.cs`, lives outside the Unity asset tree; Actions
+copies it into `Assets/Editor` only in that runner's checkout. Editing this method
+does not trigger imports in the canonical development project.
+
+Only after all builds pass does SteamCMD upload depot **5325921** for app
+**5325920**. A zero process exit alone is insufficient: the coordinator requires
+one successful app BuildID, one new depot manifest, and matching generated depot
+metadata. Steam upload does **not** activate the default build.
+
+The protected `playtest-vps` job sends a bounded public candidate over pinned-host
+SSH to one forced command. The VPS supplies private runtime configuration, checks
+fresh successful off-host backup evidence and fresh zero-match registration under
+the release lock, verifies immutable digests/source labels, and uses the existing
+guarded migration/deploy/compatible-recovery path. After readiness and registration
+pass, CI records the public receipt and independently checks HTTPS `/ready`.
+`migration_from` is empty by default; a schema upgrade requires the operator to
+explicitly name the current migration and approve the target migration. It does
+not authorize incompatible rollback or destructive database recovery.
+
+**Final human action:** open the Steamworks builds link in the successful job
+summary and set the recorded **BuildID** live on the Playtest default branch.
+No CI secret grants or code path performs this activation. Then exercise the
+packaged-client match/rematch acceptance described below.
+
+### One-time configuration
+
+No self-hosted runner is required. Create the environments **before** provisioning
+their secrets. Select **Selected branches and tags** with exactly one **Branch**
+rule named `main` in each environment, and require an authorized reviewer for
+`playtest-vps`. The preflight rejects absent environments, wildcard/tag rules,
+additional allowed branches or missing VPS reviewers before publishing images.
+Keep workflow/source changes behind the repository's normal review.
+For a private Master repository, enable reusable-workflow access from the game
+repository in Master's Actions settings.
+
+| Scope | Name | Value/authority |
+|---|---|---|
+| Game repository secret | `MASTER_RELEASE_TOKEN` | Binoui-owned token able to read Master source and publish its GHCR packages; a classic PAT needs `repo` for private checkout and `write:packages`. Keep it out of artifacts. |
+| `playtest-build` secrets | `UNITY_EMAIL`, `UNITY_PASSWORD`, and either `UNITY_LICENSE` or `UNITY_SERIAL` | Valid headless Unity activation. `UNITY_LICENSE` is the raw `.ulf` contents, not base64; use the account/license procedure in [GameCI activation](https://game.ci/docs/github/activation/). |
+| `playtest-build` variable | `PLAYTEST_MASTER_URL` | Approved HTTPS Master endpoint, currently `https://master-test.sloparena.barakaslurp.fr`; must equal the compiled client endpoint and private VPS test host. |
+| `playtest-build` variable | `STEAM_BUILD_USER` | Dedicated Steam account with permission to upload only this Playtest app/depot. |
+| `playtest-build` secret | `STEAM_CONFIG_VDF` | Single-line base64 (`base64 -w0` on Linux) of the builder account's authenticated SteamCMD `config.vdf`; obtain/renew it in a private local SteamCMD session with Steam Guard, not in chat or CI logs. |
+| `playtest-vps` variables | `PLAYTEST_SSH_HOST`, `PLAYTEST_SSH_PORT`, `PLAYTEST_SSH_USER` | Explicit reviewed VPS and restricted deployment account. |
+| `playtest-vps` secrets | `PLAYTEST_SSH_PRIVATE_KEY`, `PLAYTEST_SSH_KNOWN_HOSTS` | Dedicated noninteractive CI key and out-of-band-verified OpenSSH host-key lines (including `[host]:port` for a nondefault port). Never disable host-key checking. |
+
+Install the forced-command account and root-owned helper using the
+[VPS CI setup](../../deploy/vps/README.md#restricted-ci-release-account).
+The existing VPS profile, private files, registry pull authorization, firewall
+policy and successful off-host backup service must already be configured.
+Hosted runner SSH ingress requires a reviewed provider/host policy; do not open
+management SSH globally or run bootstrap again merely to accommodate CI.
+
+Receipts are sanitized; Steam session files, raw SteamCMD output, private VPS
+environment files and Docker logs are not uploaded. A failed/ambiguous deploy is
+not success: inspect private host status/events before another action. Use a new
+workflow run for a new candidate. A release ID is immutable, so rerunning the full
+pipeline after deployment can produce a different Steam BuildID/image digest and
+be rejected instead of overwriting the old release.
+
+The numbered sections below are the **manual fallback**. Do not repeat their
+build/upload/deploy steps alongside a running CI release.
+
 
 ## 1. Choose source and release identities
 
@@ -121,8 +202,9 @@ from unrelated schema revisions. Image publication alone deploys nothing.
 
 Use the [VPS runbook](../../deploy/vps/README.md) as the authority for private
 runtime paths, release JSON schema, backup/migration, ingress and recovery.
-No implicit SSH host or automatic CI deployment exists. Verify the selected host
-and SSH key fingerprint; do not copy another environment's runtime configuration.
+Verify the selected host and SSH key fingerprint; do not copy another environment's
+runtime configuration. The human authentication gates below apply to manual
+fallback, not the separately provisioned forced-command CI account.
 
 Four human gates are independent:
 

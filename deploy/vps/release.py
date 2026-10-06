@@ -779,6 +779,8 @@ def deploy(event: dict[str, Any], args: argparse.Namespace, target: Path, manife
         if not needs_migration and not schema_compatible(manifest, current_schema):
             raise ReleaseError(f"release {manifest['release_id']} does not support current schema {current_schema!r}")
         capture_logs(event, target, db_env, override, env)
+        if previous is not None:
+            require_idle_registration(target, db_env, override, env)
         disrupted = True
         compose_action(event, target, db_env, override, env, "stop_writers", ["stop", "-t", "30", "master", "game"])
         if needs_migration:
@@ -850,6 +852,8 @@ def rollback(event: dict[str, Any], args: argparse.Namespace, target: Path, env:
         if not schema_compatible(manifest, current_schema):
             raise ReleaseError(f"rollback to {release} is incompatible with current schema {current_schema!r}; restore the database separately")
         capture_logs(event, target, db_env, override, env)
+        if previous is not None:
+            require_idle_registration(target, db_env, override, env)
         disrupted = True
         compose_action(event, target, db_env, override, env, "stop_writers", ["stop", "-t", "30", "master", "game"])
         os.replace(candidate, active_env)
@@ -964,6 +968,18 @@ def registration_status(target: Path, env_file: Path, override: Path | None, env
     except (subprocess.TimeoutExpired, UnicodeError, ValueError, KeyError, TypeError):
         return {"available": False}
 
+def require_idle_registration(target: Path, env_file: Path, override: Path | None, env: dict[str, str]) -> dict[str, Any]:
+    status = registration_status(target, env_file, override, env)
+    if not status.get("available"):
+        raise ReleaseError("cannot verify fresh GameServer registration before replacement")
+    if status.get("registered") is not True:
+        raise ReleaseError("replacement requires a fresh GameServer registration")
+    active_matches = status.get("active_matches")
+    if type(active_matches) is not int or active_matches < 0:
+        raise ReleaseError("cannot verify active match count before replacement")
+    if active_matches != 0:
+        raise ReleaseError("replacement requires zero active matches")
+    return status
 
 def status_or_logs(args: argparse.Namespace, target: Path, env: dict[str, str]) -> None:
     active = active_manifest(target, args.allow_disposable_host)

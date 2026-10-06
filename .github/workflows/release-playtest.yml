@@ -1,0 +1,269 @@
+name: Release Steam Playtest
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Client version (X.Y.Z-playtest.N); Steam default promotion stays manual
+        required: true
+        type: string
+      master_revision:
+        description: Full approved Master commit SHA; empty selects current Master main
+        required: false
+        default: ''
+        type: string
+      migration_from:
+        description: Explicit approved current EF migration if this release upgrades schema; otherwise empty
+        required: false
+        default: ''
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sloparena-playtest-release
+  cancel-in-progress: false
+
+jobs:
+  resolve:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.source.outputs.version }}
+      release_id: ${{ steps.source.outputs.release_id }}
+      game_revision: ${{ steps.source.outputs.game_revision }}
+      master_revision: ${{ steps.source.outputs.master_revision }}
+      migration_from: ${{ steps.source.outputs.migration_from }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require configured main-only environments and VPS approval
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/playtest-release.py check-environments
+      - name: Resolve approved immutable sources
+        id: source
+        env:
+          GH_TOKEN: ${{ secrets.MASTER_RELEASE_TOKEN }}
+          VERSION: ${{ inputs.version }}
+          MASTER_REVISION: ${{ inputs.master_revision }}
+          MIGRATION_FROM: ${{ inputs.migration_from }}
+          GAME_REVISION: ${{ github.sha }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          test -n "$GH_TOKEN" || { echo 'Set MASTER_RELEASE_TOKEN with Master contents/read and packages/write permissions'; exit 1; }
+          python3 scripts/playtest-release.py resolve \
+            --version "$VERSION" --source-revision "$GAME_REVISION" \
+            --master-revision "$MASTER_REVISION" --migration-from "$MIGRATION_FROM" \
+            --run-id "$RUN_ID"
+
+  gameplay:
+    needs: resolve
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/gameserver-image.yml
+    with:
+      release_id: ${{ needs.resolve.outputs.release_id }}
+      source_revision: ${{ needs.resolve.outputs.game_revision }}
+
+  master:
+    needs: resolve
+    permissions:
+      contents: read
+      packages: write
+    uses: Binoui/SlopArena-MasterServer/.github/workflows/container-images.yml@main
+    with:
+      release_id: ${{ needs.resolve.outputs.release_id }}
+      source_revision: ${{ needs.resolve.outputs.master_revision }}
+    secrets:
+      publish_token: ${{ secrets.MASTER_RELEASE_TOKEN }}
+
+  client:
+    needs: resolve
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    environment: playtest-build
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve.outputs.game_revision }}
+      - name: Verify the immutable source checkout before generated files
+        env:
+          RELEASE_SOURCE_REVISION: ${{ needs.resolve.outputs.game_revision }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$RELEASE_SOURCE_REVISION"
+          test -z "$(git status --porcelain --untracked-files=all)"
+      - name: Inject the CI-only Editor build method
+        run: |
+          mkdir -p client/Unity/Assets/Editor
+          cp scripts/ci/PlaytestReleaseBuilder.cs client/Unity/Assets/Editor/PlaytestReleaseBuilder.cs
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '8.0.x'
+      - name: Build the selected Shared plugin
+        run: dotnet build src/Shared/ -c Release --nologo
+      - name: Check Unity license configuration
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          MASTER_URL: ${{ vars.PLAYTEST_MASTER_URL }}
+        run: |
+          test -n "$UNITY_EMAIL" && test -n "$UNITY_PASSWORD" && test -n "$MASTER_URL" || { echo 'Configure Unity credentials and PLAYTEST_MASTER_URL in playtest-build'; exit 1; }
+          test -n "$UNITY_LICENSE" || test -n "$UNITY_SERIAL" || { echo 'Configure an activated Unity license or serial'; exit 1; }
+          [[ "$MASTER_URL" =~ ^https://[a-z0-9]([a-z0-9.-]*[a-z0-9])?$ ]] || { echo 'Master URL must be a plain HTTPS hostname, without whitespace or Unity arguments'; exit 1; }
+      - name: Build and verify the isolated Windows player
+        uses: game-ci/unity-builder@4423ee75828dff56037d1d1cfdac6b68e3a6ba00 # v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          projectPath: client/Unity
+          targetPlatform: StandaloneWindows64
+          unityVersion: 6000.0.78f1
+          customImage: unityci/editor@sha256:24b1f6790f97af0f11491fd78421641d1edcbbb14bd07899addaf731eefb54e1
+          buildMethod: PlaytestReleaseBuilder.Build
+          versioning: None
+          allowDirtyBuild: true
+          runAsHostUser: true
+          customParameters: >-
+            -releaseVersion ${{ needs.resolve.outputs.version }}
+            -releaseSourceRevision ${{ needs.resolve.outputs.game_revision }}
+            -releaseOutput build/release/SlopArena-${{ needs.resolve.outputs.version }}
+            -releaseReceipt build/playtest/client.json
+            -releaseMasterEndpoint ${{ vars.PLAYTEST_MASTER_URL }}
+      - name: Verify actual extracted package
+        env:
+          VERSION: ${{ needs.resolve.outputs.version }}
+          REVISION: ${{ needs.resolve.outputs.game_revision }}
+          MASTER_URL: ${{ vars.PLAYTEST_MASTER_URL }}
+        run: |
+          python3 scripts/playtest-release.py verify-client --client build/playtest/client.json \
+            --version "$VERSION" --source-revision "$REVISION" --endpoint "$MASTER_URL"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: playtest-client
+          compression-level: 0
+          if-no-files-found: error
+          path: |
+            build/release/SlopArena-${{ needs.resolve.outputs.version }}/
+            build/playtest/client.json
+
+  upload:
+    needs: [resolve, gameplay, master, client]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    environment: playtest-build
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve.outputs.game_revision }}
+      - uses: actions/download-artifact@v8
+        with:
+          name: playtest-client
+          path: build
+      - name: Install SteamCMD runtime dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y lib32gcc-s1
+      - name: Upload without activating any Steam branch
+        env:
+          VERSION: ${{ needs.resolve.outputs.version }}
+          REVISION: ${{ needs.resolve.outputs.game_revision }}
+          MASTER_URL: ${{ vars.PLAYTEST_MASTER_URL }}
+          STEAM_BUILD_USER: ${{ vars.STEAM_BUILD_USER }}
+          STEAM_CONFIG_VDF: ${{ secrets.STEAM_CONFIG_VDF }}
+        run: |
+          python3 scripts/playtest-release.py upload --client build/playtest/client.json \
+            --version "$VERSION" --source-revision "$REVISION" --endpoint "$MASTER_URL" \
+            --output build/playtest/steam.json
+      - name: Assemble the exact public deployment candidate
+        env:
+          VERSION: ${{ needs.resolve.outputs.version }}
+          REVISION: ${{ needs.resolve.outputs.game_revision }}
+          MASTER_REVISION: ${{ needs.resolve.outputs.master_revision }}
+          RELEASE_ID: ${{ needs.resolve.outputs.release_id }}
+          MASTER_URL: ${{ vars.PLAYTEST_MASTER_URL }}
+          GAME_IMAGE: ${{ needs.gameplay.outputs.gameplay_image }}
+          MASTER_IMAGE: ${{ needs.master.outputs.master_image }}
+          MIGRATION_IMAGE: ${{ needs.master.outputs.migration_image }}
+          TARGET_MIGRATION: ${{ needs.master.outputs.target_migration }}
+          MIGRATION_FROM: ${{ needs.resolve.outputs.migration_from }}
+        run: |
+          python3 scripts/playtest-release.py assemble --client build/playtest/client.json \
+            --version "$VERSION" --source-revision "$REVISION" --endpoint "$MASTER_URL" \
+            --release-id "$RELEASE_ID" --master-revision "$MASTER_REVISION" \
+            --game-image "$GAME_IMAGE" --master-image "$MASTER_IMAGE" --migration-image "$MIGRATION_IMAGE" \
+            --target-migration "$TARGET_MIGRATION" --migration-from "$MIGRATION_FROM" \
+            --steam build/playtest/steam.json --output build/playtest/candidate-public.json
+      - name: Retain sanitized upload/candidate receipts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playtest-upload-receipts
+          if-no-files-found: warn
+          path: |
+            build/playtest/client.json
+            build/playtest/steam.json
+            build/playtest/candidate-public.json
+      - name: Record upload identity
+        run: |
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          if Path('build/playtest/steam.json').is_file():
+              s = json.load(open('build/playtest/steam.json'))
+              with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as f:
+                  f.write(f"### Steam upload (not activated)\nBuildID: `{s['build_id']}`\nDepot manifest: `{s['manifest_id']}`\n")
+          PY
+
+  deploy:
+    needs: [resolve, upload]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 100
+    environment: playtest-vps
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.resolve.outputs.game_revision }}
+      - uses: actions/download-artifact@v8
+        with:
+          name: playtest-upload-receipts
+          path: build/playtest
+      - name: Deploy through the fixed restricted SSH command
+        env:
+          PLAYTEST_SSH_HOST: ${{ vars.PLAYTEST_SSH_HOST }}
+          PLAYTEST_SSH_PORT: ${{ vars.PLAYTEST_SSH_PORT }}
+          PLAYTEST_SSH_USER: ${{ vars.PLAYTEST_SSH_USER }}
+          PLAYTEST_SSH_PRIVATE_KEY: ${{ secrets.PLAYTEST_SSH_PRIVATE_KEY }}
+          PLAYTEST_SSH_KNOWN_HOSTS: ${{ secrets.PLAYTEST_SSH_KNOWN_HOSTS }}
+        run: |
+          python3 scripts/playtest-release.py deploy --candidate build/playtest/candidate-public.json \
+            --output build/playtest/release.json
+      - name: Publish resumable sanitized release evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playtest-release-receipt
+          if-no-files-found: warn
+          path: |
+            build/playtest/client.json
+            build/playtest/steam.json
+            build/playtest/candidate-public.json
+            build/playtest/release.json
+      - name: Show the only remaining operator step
+        run: |
+          python3 - <<'PY'
+          import json, os
+          r = json.load(open('build/playtest/release.json'))
+          c = r['candidate']
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as f:
+              f.write(f"### Backend deployed and ready: `{c['release_id']}`\n")
+              f.write(f"Set **Steam BuildID `{c['steam']['build_id']}`** live on **default** manually.\n")
+              f.write(f"Depot `{c['steam']['depot_id']}` manifest: `{c['steam']['manifest_id']}`\n\n")
+              f.write(r['manualPromotionUrl'] + '\n')
+          PY

@@ -1,5 +1,22 @@
 name: GameServer image
 on:
+  workflow_call:
+    inputs:
+      release_id:
+        description: Release identity (no latest)
+        required: true
+        type: string
+      source_revision:
+        description: Full gameplay source commit SHA
+        required: true
+        type: string
+    outputs:
+      gameplay_image:
+        description: Exact published gameplay image reference including digest
+        value: ${{ jobs.image.outputs.gameplay_image }}
+      source_revision:
+        description: Checked-out gameplay source commit SHA
+        value: ${{ jobs.image.outputs.source_revision }}
   workflow_dispatch:
     inputs:
       release_id:
@@ -16,8 +33,29 @@ jobs:
     permissions:
       contents: read
       packages: write
+    outputs:
+      gameplay_image: ${{ steps.receipt.outputs.gameplay_image }}
+      source_revision: ${{ steps.checkout.outputs.source_revision }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          repository: Binoui/SlopArena
+          ref: ${{ inputs.source_revision || github.sha }}
+      - name: Verify pinned source checkout
+        id: checkout
+        env:
+          EXPECTED_SOURCE_REVISION: ${{ inputs.source_revision || github.sha }}
+        run: |
+          if [[ ! "$EXPECTED_SOURCE_REVISION" =~ ^[0-9a-f]{40}$ ]]; then
+            echo 'Source revision must be a full lowercase commit SHA' >&2
+            exit 1
+          fi
+          actual="$(git rev-parse HEAD)"
+          if [[ "$actual" != "$EXPECTED_SOURCE_REVISION" ]]; then
+            echo "Checked out $actual, expected $EXPECTED_SOURCE_REVISION" >&2
+            exit 1
+          fi
+          echo "source_revision=$actual" >> "$GITHUB_OUTPUT"
       - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '8.0.x'
@@ -31,44 +69,56 @@ jobs:
         env:
           INPUT_ID: ${{ inputs.release_id }}
           REF_ID: ${{ github.event.release.tag_name }}
-          REPOSITORY: ${{ github.repository }}
         run: |
           id="${REF_ID:-$INPUT_ID}"
           if [[ ! "$id" =~ ^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$ ]]; then
             echo 'Invalid release identity' >&2; exit 1
           fi
           echo "id=$id" >> "$GITHUB_OUTPUT"
-          echo "image=ghcr.io/${REPOSITORY,,}-gameserver" >> "$GITHUB_OUTPUT"
+          echo "image=ghcr.io/binoui/sloparena-gameserver" >> "$GITHUB_OUTPUT"
       - name: Build Linux amd64 image
         env:
           IMAGE: ${{ steps.release.outputs.image }}
           RELEASE_ID: ${{ steps.release.outputs.id }}
+          SOURCE_REVISION: ${{ steps.checkout.outputs.source_revision }}
         run: |
           docker buildx build --platform linux/amd64 --load -f Dockerfile.gameserver \
-            --build-arg SOURCE_REVISION="$GITHUB_SHA" --build-arg RELEASE_ID="$RELEASE_ID" \
-            -t "$IMAGE:$GITHUB_SHA" .
+            --build-arg SOURCE_REVISION="$SOURCE_REVISION" --build-arg RELEASE_ID="$RELEASE_ID" \
+            -t "$IMAGE:$SOURCE_REVISION" .
+          revision_label="$(docker image inspect "$IMAGE:$SOURCE_REVISION" --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')"
+          version_label="$(docker image inspect "$IMAGE:$SOURCE_REVISION" --format '{{index .Config.Labels "org.opencontainers.image.version"}}')"
+          [[ "$revision_label" == "$SOURCE_REVISION" && "$version_label" == "$RELEASE_ID" ]]
       - name: Smoke fresh image without source mounts
         env:
           IMAGE: ${{ steps.release.outputs.image }}
-        run: scripts/smoke-gameserver-image.sh "$IMAGE:$GITHUB_SHA"
+          SOURCE_REVISION: ${{ steps.checkout.outputs.source_revision }}
+        run: scripts/smoke-gameserver-image.sh "$IMAGE:$SOURCE_REVISION"
       - name: Push only after tests and smoke
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           IMAGE: ${{ steps.release.outputs.image }}
+          SOURCE_REVISION: ${{ steps.checkout.outputs.source_revision }}
         run: |
           echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
-          docker push "$IMAGE:$GITHUB_SHA"
+          docker push "$IMAGE:$SOURCE_REVISION"
       - name: Record exact published identity
+        id: receipt
         env:
           IMAGE: ${{ steps.release.outputs.image }}
           RELEASE_ID: ${{ steps.release.outputs.id }}
+          SOURCE_REVISION: ${{ steps.checkout.outputs.source_revision }}
         run: |
-          digest="$(docker image inspect "$IMAGE:$GITHUB_SHA" --format '{{index .RepoDigests 0}}')"
-          test -n "$digest"
-          printf 'release_id=%s\ngameserver_image=%s\ngameserver_revision=%s\ngameserver_runtime=8.0.31\ngameserver_sdk=8.0.425\n' \
-            "$RELEASE_ID" "$digest" "$GITHUB_SHA" > gameserver-image.txt
+          image_ref="$(docker image inspect "$IMAGE:$SOURCE_REVISION" --format '{{index .RepoDigests 0}}')"
+          [[ "$image_ref" =~ ^ghcr\.io/binoui/sloparena-gameserver@sha256:[0-9a-f]{64}$ ]]
+          printf 'release_id=%s\ngameserver_image=%s\ngameplay_image=%s\ngameserver_revision=%s\ngameserver_runtime=8.0.31\ngameserver_sdk=8.0.425\n' \
+            "$RELEASE_ID" "$image_ref" "$image_ref" "$SOURCE_REVISION" > gameserver-image.txt
+          printf '{"release_id":"%s","gameplay_image":"%s","source_revision":"%s"}\n' \
+            "$RELEASE_ID" "$image_ref" "$SOURCE_REVISION" > gameserver-image.json
+          echo "gameplay_image=$image_ref" >> "$GITHUB_OUTPUT"
           cat gameserver-image.txt >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v7
         with:
-          name: gameserver-image-${{ github.sha }}
-          path: gameserver-image.txt
+          name: gameserver-image-${{ steps.checkout.outputs.source_revision }}
+          path: |
+            gameserver-image.txt
+            gameserver-image.json

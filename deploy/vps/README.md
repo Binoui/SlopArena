@@ -1,6 +1,6 @@
 # Restricted VPS release
 
-This profile deploys SlopArena to a dedicated Ubuntu 24.04 amd64 VPS. It is separate from `deploy/local/` and any home deployment. There is no implicit SSH host or automatic deployment from CI. Use a host dedicated to this profile; do not copy credentials, runtime configuration, or database state from another environment.
+This profile deploys SlopArena to a dedicated Ubuntu 24.04 amd64 VPS. It is separate from `deploy/local/` and any home deployment. CI deployment is opt-in through the separately provisioned restricted account below; there is no implicit SSH host. Use a host dedicated to this profile; do not copy credentials, runtime configuration, or database state from another environment.
 
 ## Operator prerequisites
 
@@ -37,9 +37,133 @@ sudo python3 deploy/vps/release.py rollback \
   --target-dir /var/lib/sloparena --release-id <previous-compatible-release-id>
 ```
 
-The deployment lock serializes changes; image/digest/label, DNS and Compose checks precede writer disruption. Schema changes stop writers, require a successful `pg_dump` before running the pinned EF bundle, then check the applied migration. Keep an off-host copy of the pre-migration backup before relying on disaster recovery. Do not use `down -v`, destructive prune, or runtime-config rsync.
+The deployment lock serializes changes; image/digest/label, DNS and Compose checks precede writer disruption. Deployment and rollback of an active release also require fresh Master heartbeat evidence of zero active matches immediately before stopping writers; stale/unavailable registration is not zero. Schema changes stop writers, require a successful `pg_dump` before running the pinned EF bundle, then check the applied migration. Keep an off-host copy of the pre-migration backup before relying on disaster recovery. Do not use `down -v`, destructive prune, or runtime-config rsync.
 
 A prior raw-UDP release record may remain readable for preflight, but it must not be restored through a Steam-only deployment as an insecure public fallback. If migration or compatibility checks fail, pause new matches and repair/roll forward.
+
+## Restricted CI release account
+
+This is **one-time privileged operator setup**, not something the workflow
+performs. The host must already have an active release at `/var/lib/sloparena`,
+private runtime files, registry pull access and working off-host backups.
+The public Actions candidate contains only version/release/source identities,
+allowlisted immutable image references, canonical catalog hash, HTTPS endpoint,
+explicit schema compatibility and Steam upload identities. It cannot select
+runtime paths, credentials, a state directory or arbitrary shell commands.
+
+Install the reviewed helper versions into the existing root-owned code directory:
+
+```bash
+sudo install -o root -g root -m 0644 \
+  deploy/vps/release.py deploy/vps/recovery.py deploy/vps/ci_release.py \
+  /opt/sloparena/deploy/vps/
+sudo install -o root -g root -m 0755 deploy/vps/ci-release-ssh \
+  /opt/sloparena/deploy/vps/ci-release-ssh
+sudo useradd --user-group --home-dir /var/lib/sloparena-ci --shell /bin/sh sloparena-ci
+sudo install -d -o root -g root -m 0755 /var/lib/sloparena-ci
+sudo install -d -o root -g sloparena-ci -m 0750 /var/lib/sloparena-ci/.ssh
+```
+
+Keep `/opt/sloparena`, its deployment directories, installed scripts/Compose
+files and their ancestors root-owned and not writable by the account/operator.
+Do not use a symlink into a writable Git checkout. The CI account must not join
+the Docker group or receive general sudo access.
+
+Create a dedicated CI key privately. Install its public key as the single line
+below in `/var/lib/sloparena-ci/.ssh/authorized_keys`, owned by
+`root:sloparena-ci`, mode `0640`. The root-owned home prevents replacement of the
+key directory; the account's group can read but not rewrite the key:
+
+```text
+restrict,command="/opt/sloparena/deploy/vps/ci-release-ssh" ssh-ed25519 <dedicated-ci-public-key> sloparena-ci
+```
+
+Using `visudo -f /etc/sudoers.d/sloparena-ci-release`, grant only:
+
+```sudoers
+sloparena-ci ALL=(root) NOPASSWD: NOSETENV: /usr/bin/python3 -I /opt/sloparena/deploy/vps/ci_release.py
+```
+
+Keep that file root-owned, mode `0440`, and validate it with `visudo -cf`.
+The arguments above are exact: no wildcards, interpreter variations,
+`--validate-only`, extra arguments or `NOPASSWD: ALL`. Python isolated mode
+excludes user-controlled imports/environment; the receiver adds only its trusted
+installed sibling directory. The SSH wrapper accepts the literal remote command
+`sloparena-release` and no arguments.
+
+### CI ingress without weakening management SSH
+
+GitHub-hosted runner addresses are not the workstation's management CIDR.
+Preserve the existing management listener/firewall. Either use already reviewed
+controlled CI egress, or provision a **separate CI-only SSH listener**. A dedicated
+Ubuntu listener can use the following root-owned configuration at
+`/etc/ssh/sshd_config.sloparena-ci`; port `2223` is explicit and IPv4-only:
+
+```text
+Port 2223
+AddressFamily inet
+ListenAddress 0.0.0.0
+PidFile /run/sshd-sloparena-ci.pid
+HostKey /etc/ssh/ssh_host_ed25519_key
+AuthorizedKeysFile /var/lib/sloparena-ci/.ssh/authorized_keys
+AllowUsers sloparena-ci
+AuthenticationMethods publickey
+PubkeyAuthentication yes
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+PermitRootLogin no
+PermitTTY no
+AllowTcpForwarding no
+AllowAgentForwarding no
+X11Forwarding no
+PermitTunnel no
+PermitUserEnvironment no
+PermitUserRC no
+ForceCommand /opt/sloparena/deploy/vps/ci-release-ssh
+UsePAM yes
+```
+
+Validate with `sudo /usr/sbin/sshd -t -f /etc/ssh/sshd_config.sloparena-ci`.
+Run it through a dedicated systemd service whose `ExecStartPre` is that validation
+and whose `ExecStart` is
+`/usr/sbin/sshd -D -e -f /etc/ssh/sshd_config.sloparena-ci`; do not replace the
+existing management `ssh.service`. Permit **only reviewed CI source CIDRs** to
+TCP `2223` in both provider and host firewalls, keeping management SSH restricted.
+GitHub publishes hosted runner ranges through its [metadata API](https://docs.github.com/en/rest/meta/meta#get-github-meta-information);
+review/update them as infrastructure policy rather than opening management SSH
+to the world. Keep CI IPv6 closed unless separately reviewed. If no reviewed
+route exists, leave CI deployment disabled.
+
+Set the protected `playtest-vps` environment's host/user/port variables and pinned
+host-key secret only after verifying the new listener/key out of band. Port `2223`
+requires `[hostname]:2223` known-hosts entries. Confirm a malformed stdin candidate
+is refused and `ssh ... id`, interactive sessions and forwarding are rejected;
+do not submit a valid candidate merely to test authentication.
+
+### Candidate handling and recovery
+
+For local public-contract validation without root, Docker or private host state:
+
+```bash
+python3 -I deploy/vps/ci_release.py --validate-only < candidate-public.json
+```
+
+The receiver runs the existing off-host backup service, then acquires the release
+lock and requires fresh successful evidence for the still-active release. It
+copies the active Master environment to an immutable release-specific private
+file, changing only `Room__CatalogHash` and preserving other bytes/owner/mode.
+The prior environment remains unchanged for compatible recovery. The candidate
+HTTPS endpoint must exactly match the active private test host. Identical
+release-ID retries verify the active result; different content under an existing
+ID is rejected.
+
+The receiver emits only bounded public readiness/source/image/schema/Steam and
+sanitized backup evidence. Private paths, environment contents and raw logs stay
+on the VPS. On timeout or failure, use the authenticated operator's private
+`release.py status`/events to reconcile before retrying. CI does not bootstrap a
+host, grant schema-upgrade permission implicitly, bypass active fights, activate
+a Steam build, or perform destructive database recovery.
+
 
 ## Disposable rehearsal
 
