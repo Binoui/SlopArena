@@ -258,6 +258,7 @@ namespace SlopArena.Client.Network
             StopSteamTransport();
             StopUdpTransport();
             ClearReceiveQueues();
+            _transport = UI.MatchTransport.SteamP2P;
             ResetServerClockState();
             _steamDescriptor = descriptor;
             _steamFailureReported = false;

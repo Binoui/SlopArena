@@ -59,7 +59,7 @@ Cosmetic-only maintenance that does not change composition (for example, replaci
 - `hazard`, `moving-geometry`, and special-mode variants must be declared explicitly in the stage brief, name their required authoritative capability, and fail closed until that Shared/server capability exists. Never approximate them with Unity-only scripts or decorative animation.
 - The normal human PVP review is external to the repository. Agents must not drive it or claim that it passed.
 
-Observe runtime ownership status: `held`/`releasing` means invoke a gateway command and let it wait for an independent lease; `blocked`/unknown means stop. A `free`, settled status with zero active operations is only an availability observation. The gateway still claims atomically for each command. For Shared builds that copy the plugin to Unity, coordinate saved-source writers and use your own bounded gateway hold around the separate shell build; wait for imports/compile settlement before ending that hold, and do not nest a gateway claim.
+Use the gateway directly: `held`/`releasing` waits for your own lease; `blocked`/unknown means stop. Do not message the Editor owner or collect blanket acknowledgments. For source conflicts and plugin-copying Shared builds, follow the [shared protocol](file:///home/binoui/Documents/projects/sloparena-workspace/docs/unity-editor-coordination.md) and [build gate](../sloparena-build/SKILL.md); plugin copies still require your own bounded hold.
 
 The repository provides the typed bake and inspect commands below. Use them instead of the legacy `Tools/SlopArena/Bake Arena...` editor menu:
 

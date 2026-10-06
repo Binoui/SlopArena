@@ -216,7 +216,12 @@ namespace Unity.Pipeline
                     || !m_Operations.ContainsKey(context.OperationId))
                     return false;
 
-                m_HostActivities[context.OperationId] = new HostActivity { Id = context.OperationId, Kind = kind };
+                m_HostActivities[context.OperationId] = new HostActivity
+                {
+                    Id = context.OperationId,
+                    Kind = kind,
+                    Command = context.Command
+                };
                 Volatile.Write(ref m_HostBusy, m_HostActivities.Count);
                 changed = ChangedLocked();
             }
@@ -393,7 +398,8 @@ namespace Unity.Pipeline
                 Reason = m_Reason,
                 Revision = m_Revision,
                 Operations = m_Operations.Values.Select(o => new Operation { Id = o.Id, Command = o.Command }).ToList(),
-                HostActivities = m_HostActivities.Values.Select(a => new HostActivity { Id = a.Id, Kind = a.Kind }).ToList()
+                HostActivities = m_HostActivities.Values.Select(a =>
+                    new HostActivity { Id = a.Id, Kind = a.Kind, Command = a.Command }).ToList()
             };
         }
 
@@ -448,6 +454,7 @@ namespace Unity.Pipeline
         {
             public string Id;
             public string Kind;
+            public string Command;
         }
 
         internal sealed class PersistenceState

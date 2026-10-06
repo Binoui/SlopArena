@@ -213,9 +213,9 @@ namespace SlopArena.Client.Input
             AddButton("Grab", "<Keyboard>/c");
             AddButton("Down", "<Keyboard>/x", "<Gamepad>/leftTrigger");
             AddButton("Slot1", "<Keyboard>/1", "<Gamepad>/buttonSouth");
-            AddButton("Slot2", "<Keyboard>/2", "<Gamepad>/buttonEast");
-            AddButton("Slot3", "<Keyboard>/3", "<Gamepad>/buttonWest");
-            AddButton("Slot4", "<Keyboard>/4", "<Gamepad>/buttonNorth");
+            AddButton("Slot2", "<Keyboard>/2", "<Gamepad>/buttonWest");
+            AddButton("Slot3", "<Keyboard>/3", "<Gamepad>/buttonNorth");
+            AddButton("Slot4", "<Keyboard>/4", "<Gamepad>/buttonEast");
             var keyboard = Keyboard.current;
             string slotAKey = keyboard != null ? keyboard.FindKeyOnCurrentKeyboardLayout("A").name : "q";
             AddButton("SlotA", $"<Keyboard>/{slotAKey}");

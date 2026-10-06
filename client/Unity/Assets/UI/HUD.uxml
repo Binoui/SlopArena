@@ -16,7 +16,7 @@
         <ui:VisualElement name="player-billboard" class="player-billboard" />
         <ui:VisualElement name="kit-diamonds" class="kit-diamonds">
             <ui:VisualElement name="ability-group-1-4" class="slot-group normal-diamond">
-                <ui:VisualElement name="ab-1" class="slot slot-top">
+                <ui:VisualElement name="ab-1" class="slot slot-bottom">
                     <ui:VisualElement class="slot-content">
                         <ui:VisualElement name="ab-1-icon" class="slot-icon-inner" />
                         <ui:VisualElement name="ab-1-flash" class="slot-flash" />
@@ -28,7 +28,7 @@
                         <ui:Label name="ab-1-key" class="slot-key-label" />
                     </ui:VisualElement>
                 </ui:VisualElement>
-                <ui:VisualElement name="ab-2" class="slot slot-right">
+                <ui:VisualElement name="ab-2" class="slot slot-left">
                     <ui:VisualElement class="slot-content">
                         <ui:VisualElement name="ab-2-icon" class="slot-icon-inner" />
                         <ui:VisualElement name="ab-2-flash" class="slot-flash" />
@@ -40,7 +40,7 @@
                         <ui:Label name="ab-2-key" class="slot-key-label" />
                     </ui:VisualElement>
                 </ui:VisualElement>
-                <ui:VisualElement name="ab-3" class="slot slot-bottom">
+                <ui:VisualElement name="ab-3" class="slot slot-top">
                     <ui:VisualElement class="slot-content">
                         <ui:VisualElement name="ab-3-icon" class="slot-icon-inner" />
                         <ui:VisualElement name="ab-3-flash" class="slot-flash" />
@@ -52,7 +52,7 @@
                         <ui:Label name="ab-3-key" class="slot-key-label" />
                     </ui:VisualElement>
                 </ui:VisualElement>
-                <ui:VisualElement name="ab-4" class="slot slot-left">
+                <ui:VisualElement name="ab-4" class="slot slot-right">
                     <ui:VisualElement class="slot-content">
                         <ui:VisualElement name="ab-4-icon" class="slot-icon-inner" />
                         <ui:VisualElement name="ab-4-flash" class="slot-flash" />
@@ -66,7 +66,7 @@
                 </ui:VisualElement>
             </ui:VisualElement>
             <ui:VisualElement name="ability-group-a-f" class="slot-group special-diamond">
-                <ui:VisualElement name="ab-a" class="slot slot-top">
+                <ui:VisualElement name="ab-a" class="slot slot-bottom">
                     <ui:VisualElement class="slot-content">
                         <ui:VisualElement name="ab-a-icon" class="slot-icon-inner" />
                         <ui:VisualElement name="ab-a-flash" class="slot-flash" />
@@ -78,7 +78,7 @@
                         <ui:Label name="ab-a-key" class="slot-key-label" />
                     </ui:VisualElement>
                 </ui:VisualElement>
-                <ui:VisualElement name="ab-e" class="slot slot-right">
+                <ui:VisualElement name="ab-e" class="slot slot-top">
                     <ui:VisualElement class="slot-content">
                         <ui:VisualElement name="ab-e-icon" class="slot-icon-inner" />
                         <ui:VisualElement name="ab-e-flash" class="slot-flash" />
@@ -90,7 +90,7 @@
                         <ui:Label name="ab-e-key" class="slot-key-label" />
                     </ui:VisualElement>
                 </ui:VisualElement>
-                <ui:VisualElement name="ab-r" class="slot slot-bottom">
+                <ui:VisualElement name="ab-r" class="slot slot-left">
                     <ui:VisualElement class="slot-content">
                         <ui:VisualElement name="ab-r-icon" class="slot-icon-inner" />
                         <ui:VisualElement name="ab-r-flash" class="slot-flash" />
@@ -102,7 +102,7 @@
                         <ui:Label name="ab-r-key" class="slot-key-label" />
                     </ui:VisualElement>
                 </ui:VisualElement>
-                <ui:VisualElement name="ab-f" class="slot slot-left">
+                <ui:VisualElement name="ab-f" class="slot slot-right">
                     <ui:VisualElement class="slot-content">
                         <ui:VisualElement name="ab-f-icon" class="slot-icon-inner" />
                         <ui:VisualElement name="ab-f-flash" class="slot-flash" />

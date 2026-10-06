@@ -20,6 +20,16 @@ namespace SlopArena.Client.Camera
         private CinemachineOrbitalFollow _orbital;
         private CinemachineInputAxisController _inputAxisController;
 
+        [Header("Lock Camera Assistance")]
+        [SerializeField] private bool _assistLockedTarget = true;
+        [SerializeField, Range(0f, 90f)] private float _lockYawDeadZone = 20f;
+        [SerializeField, Min(0f)] private float _lockYawSpeed = 60f;
+        [SerializeField, Min(0f)] private float _lockYawResponse = 4f;
+        [SerializeField, Min(0f)] private float _lockManualGraceSeconds = 0.75f;
+        private Transform? _lockPlayer;
+        private Vector3 _lockTargetPosition;
+        private float _manualOrbitGraceRemaining;
+
         private CameraMode _mode = CameraMode.Normal;
         private float _frozenYaw;
         private float _frozenPitch = 15f;
@@ -94,8 +104,17 @@ namespace SlopArena.Client.Camera
             // Mouse input is a per-frame delta; stick input is a rate.
             if (_mode == CameraMode.Normal)
             {
-                Vector2 delta = HumanInputActions.MouseLook.ReadValue<Vector2>()
-                    + HumanInputActions.StickLook.ReadValue<Vector2>() * (90f * Time.deltaTime);
+                Vector2 mouseLook = HumanInputActions.MouseLook.ReadValue<Vector2>();
+                Vector2 stickLook = HumanInputActions.StickLook.ReadValue<Vector2>();
+                Vector2 delta = mouseLook + stickLook * (90f * Time.deltaTime);
+                if (mouseLook.sqrMagnitude > 0f || stickLook.sqrMagnitude > 0f)
+                    _manualOrbitGraceRemaining = _lockManualGraceSeconds;
+                else
+                {
+                    _manualOrbitGraceRemaining = Mathf.Max(0f, _manualOrbitGraceRemaining - Time.deltaTime);
+                    if (_manualOrbitGraceRemaining <= 0f)
+                        UpdateLockOrbit(Time.deltaTime);
+                }
                 var settings = ClientSettingsService.Instance;
                 delta *= settings.CameraInputGain;
                 _orbital.HorizontalAxis.Value += delta.x * (settings.InvertCameraHorizontal ? -1f : 1f);
@@ -140,6 +159,8 @@ namespace SlopArena.Client.Camera
         public void SetMode(CameraMode mode)
         {
             _mode = mode;
+            if (mode != CameraMode.Normal)
+                _manualOrbitGraceRemaining = _lockManualGraceSeconds;
             switch (mode)
             {
                 case CameraMode.Normal:
@@ -195,35 +216,16 @@ namespace SlopArena.Client.Camera
             };
         }
 
-        private Transform _lockFocus;
-
         /// <summary>
-        /// While target-locked (ADR-0018 / issue #127): player-centered lock camera
-        /// (souls-like framing). The orbit stays on the PLAYER — mouse orbit, pitch
-        /// and scroll zoom are untouched; only the look aim changes. The camera
-        /// LOOKS at a point ~25% of the way from the player toward the target, so
-        /// the player sits near screen centre with the target beside them — both
-        /// fighters visible from any orbit angle. The look point lerps smoothly
-        /// (frame-rate independent). Call every FixedUpdate while locked.
+        /// Track the authoritative locked target without moving the orbit or look
+        /// anchor away from the player. Called every simulation tick while locked.
         /// </summary>
         public void SetLockFocus(Transform player, Vector3 targetPos)
         {
             if (_cmCam == null || player == null) return;
-            if (_lockFocus == null)
-            {
-                var go = new GameObject("LockFocus");
-                // Root-level on purpose: the CinemachineCamera lives on this same
-                // object and the orbital rig MOVES it every frame. Parenting the
-                // focus under it would couple the focus's world position to the
-                // camera position (and vice versa) — a feedback loop that
-                // oscillates (visible camera shake while locked).
-                _lockFocus = go.transform;
-                _lockFocus.position = player.position;
-            }
-            Vector3 lookPoint = Vector3.Lerp(player.position, targetPos, 0.25f);
-            float k = 1f - Mathf.Exp(-10f * Time.deltaTime);
-            _lockFocus.position = Vector3.Lerp(_lockFocus.position, lookPoint, k);
-            SetTarget(player, _lockFocus);
+            _lockPlayer = player;
+            _lockTargetPosition = targetPos;
+            SetTarget(player);
         }
 
         /// <summary>
@@ -232,21 +234,10 @@ namespace SlopArena.Client.Camera
         /// </summary>
         public void ClearLockFocus(Transform player)
         {
+            _lockPlayer = null;
             if (player != null) SetTarget(player);
         }
 
-        /// <summary>
-        /// Point the camera at a different look target while keeping the orbit on
-        /// the player — used by the target lock to frame both fighters.
-        /// </summary>
-        private void SetTarget(Transform tracking, Transform lookAt)
-        {
-            _cmCam.Target = new CameraTarget
-            {
-                TrackingTarget = tracking,
-                LookAtTarget = lookAt
-            };
-        }
 
         /// <summary>
         /// Snap orbit to face the target from behind at a comfortable angle.
@@ -306,21 +297,26 @@ namespace SlopArena.Client.Camera
             return right.normalized;
         }
 
-        /// <summary>
-        /// Smoothly rotate camera yaw toward a world-space target position.
-        /// Clamps rotation speed so the camera doesn't snap.
-        /// </summary>
-        public void LerpTowardDirection(Vector3 fromPos, Vector3 targetPos, float lerpSpeedDegPerSec)
+        private void UpdateLockOrbit(float deltaTime)
         {
-            float dx = targetPos.x - fromPos.x;
-            float dz = targetPos.z - fromPos.z;
-            if (dx * dx + dz * dz < 0.01f) return;
-            float targetYaw = Mathf.Atan2(dx, dz) * Mathf.Rad2Deg;
-            float currentYaw = GetCameraYawDeg();
-            float diff = Mathf.DeltaAngle(currentYaw, targetYaw);
-            float maxStep = lerpSpeedDegPerSec * Time.deltaTime;
-            float newYaw = currentYaw + Mathf.Clamp(diff, -maxStep, maxStep);
-            SetCameraYawDeg(newYaw);
+            if (!_assistLockedTarget || _lockPlayer == null) return;
+            float yaw = GetCameraYawDeg();
+            SetCameraYawDeg(GetAssistedYaw(yaw, _lockTargetPosition - _lockPlayer.position,
+                _lockYawDeadZone, _lockYawResponse, _lockYawSpeed, deltaTime));
+        }
+
+        private static float GetAssistedYaw(float yaw, Vector3 offset, float deadZone,
+            float response, float speed, float deltaTime)
+        {
+            // Do not swing the movement basis around when fighters overlap/cross up.
+            if (offset.x * offset.x + offset.z * offset.z < 0.25f) return yaw;
+            float targetYaw = Mathf.Atan2(offset.x, offset.z) * Mathf.Rad2Deg;
+            float error = Mathf.DeltaAngle(yaw, targetYaw);
+            if (Mathf.Abs(error) <= deadZone) return yaw;
+            float correction = (error - Mathf.Sign(error) * deadZone)
+                * (1f - Mathf.Exp(-response * deltaTime));
+            float maxStep = speed * deltaTime;
+            return yaw + Mathf.Clamp(correction, -maxStep, maxStep);
         }
     }
 }

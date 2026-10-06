@@ -253,8 +253,16 @@ namespace SlopArena.Client.UI
             for (int i = 0; i < _abilitySlots.Length; i++)
             {
                 var slot = _abilitySlots[i];
-                string action = _showGamepadPrompts && i >= 4
-                    ? AbilitySlotDefs[i - 4].Action : AbilitySlotDefs[i].Action;
+                string action = _showGamepadPrompts
+                    ? AbilitySlotDefs[i].Action switch
+                    {
+                        "SlotA" => "Slot1",
+                        "SlotE" => "Slot3",
+                        "SlotR" => "Slot2",
+                        "SlotF" => "Slot4",
+                        _ => AbilitySlotDefs[i].Action,
+                    }
+                    : AbilitySlotDefs[i].Action;
                 string path = BindingPath(action, group);
                 var buttonGlyph = default(InputPromptAtlas.Glyph);
                 bool hasButton = _showGamepadPrompts &&

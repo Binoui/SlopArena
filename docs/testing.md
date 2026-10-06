@@ -16,10 +16,12 @@ preview is not persisted package verification.
 
 Shared edits require focused behavioral coverage while iterating, then `dotnet build
 src/Shared/ --nologo` and `dotnet test tests/Shared.Tests/ --nologo` at delivery. Before a
-build that copies the Unity plugin, coordinate saved-source writers and acquire your own
-bounded gateway hold; run the build from a separate shell while held, wait for import and
-compile settlement, then end the hold. Never copy into another owner's active Editor or
-nested-claim while holding. Server edits require `dotnet build src/Server/ --nologo` and
+build that copies the Unity plugin, acquire your own bounded gateway hold; run the
+build from a separate shell while held, wait for import and compile settlement, then
+end the hold. Honor explicit source freezes; coordinate only concrete overlapping
+writes or explicitly required stable-source verification under the shared protocol.
+No routine Editor-owner messages or blanket acknowledgments. Never copy without
+your own lease or nested-claim while holding. Server edits require `dotnet build src/Server/ --nologo` and
 `dotnet test tests/Server.Tests/ --nologo`. Unity-facing behavior needs the affected
 runtime check and current compile/console evidence, not all unrelated scenes. Accepted
 character source/asset changes intended to ship cross the explicit cook/inspect/roster-

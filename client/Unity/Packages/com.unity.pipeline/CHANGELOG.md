@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 - Add the human-only `Window/Pipeline/Recover Editor Lease...` action for a held, settled lease whose gateway lost its release token. Confirmation is bound to the current session, lease and revision; active/unknown work is refused and the previous token is revoked. No remote recovery endpoint or automatic timeout takeover.
+- Correlate package operations with persisted Editor ownership IDs and command identity; keep package status serviceable while work settles, and recover add/remove only from a matching native request or a changed manifest plus registered-package postcondition with a matching resolved version/source. Preserve failures and report unproven reloads as unknown without settling ownership.
 
 ## [0.5.0-exp.1] - 2026-08-10
 

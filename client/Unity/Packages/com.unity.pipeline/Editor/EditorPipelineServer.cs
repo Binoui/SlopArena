@@ -71,7 +71,7 @@ namespace Unity.Pipeline.Editor
         /// </summary>
         private static readonly HashSet<string> CommandsServiceableWhileSettling = new HashSet<string> { "editor_status" };
         private static readonly HashSet<string> OwnershipSettlementStatusCommands =
-            new HashSet<string> { "editor_status", "recompile_status", "test_status" };
+            new HashSet<string> { "editor_status", "recompile_status", "test_status", "package_status" };
 
         /// <summary>When true, every command transaction is written to the project transaction log.</summary>
         public bool LogRequestsResponses { get; set; }
@@ -175,8 +175,8 @@ namespace Unity.Pipeline.Editor
 
         /// <summary>
         /// Reject commands while startup is unsettled, then keep ownership admission closed to new
-        /// work during a tracked compile/test operation. Only editor_status, recompile_status, and
-        /// test_status remain serviceable for observing those states; request-thread reads use the
+        /// work during a tracked compile, test, or package operation. Only editor_status,
+        /// recompile_status, test_status, and package_status remain serviceable; request-thread reads use the
         /// volatile settle and host-busy snapshots.
         /// </summary>
         protected override string GetBusyReason(CommandInfo command)
@@ -191,7 +191,7 @@ namespace Unity.Pipeline.Editor
             if (m_Ownership != null && m_Ownership.IsHostBusy
                 && !OwnershipSettlementStatusCommands.Contains(command.Name))
             {
-                return "A known Editor compile or test operation is still active. Poll recompile_status or test_status before starting more work.";
+                return "A known Editor compile, test, or package operation is still active. Poll recompile_status, test_status, or package_status before starting more work.";
             }
 
             return null;

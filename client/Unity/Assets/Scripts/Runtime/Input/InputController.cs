@@ -353,7 +353,7 @@ namespace SlopArena.Client.Input
 
         private static readonly string[] FaceActions = { "Slot1", "Slot2", "Slot3", "Slot4" };
         private static readonly byte[] NormalSlots = { AbilitySlots.Slot1, AbilitySlots.Slot2, AbilitySlots.Slot3, AbilitySlots.Slot4 };
-        private static readonly byte[] SpecialSlots = { AbilitySlots.A, AbilitySlots.E, AbilitySlots.R, AbilitySlots.F };
+        private static readonly byte[] SpecialSlots = { AbilitySlots.A, AbilitySlots.R, AbilitySlots.E, AbilitySlots.F };
 
         /// <summary>
         /// Discard buffered jump/slot presses without consuming them. Called

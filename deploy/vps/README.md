@@ -10,6 +10,14 @@ This profile deploys SlopArena to a dedicated Ubuntu 24.04 amd64 VPS. It is sepa
 4. Publish compatible GameServer, Master and EF migration images under one release ID through their explicit workflows. Pin image digests and source revisions. An upload alone never deploys the VPS.
 5. Keep database, JWT, registration/control, registry and storage credentials in private operator files outside Git. Use only credentials created for this environment. Store runtime files with restrictive permissions and grant only required read access to containers. Never put keys or runtime configuration in a release record, image, log, or chat.
 
+The owner console stays local and reaches Master through a loopback-bound SSH
+forward to its private container address. Keep `/owner` routes excluded from
+public Caddy ingress, including case and encoded-path variants; the dedicated
+`Console__Key` is additional authorization, not permission to publish the route.
+Resolve the current private Master address after container replacement instead
+of opening a public Master port. Use a separate VPS-only console key and preserve
+the previous release's environment file for rollback.
+
 ## Bootstrap
 
 Copy the deployment scripts to the verified fresh VPS, then run bootstrap once:
@@ -316,6 +324,34 @@ Match count comes from the latest Master heartbeat, not a synchronous simulation
 Replace credentials through the environment's documented private configuration and provider controls. Change one credential domain at a time, check readiness/registration, and revoke the old value only after the new path works. Changing a database password file alone does not change an existing database role. Replacing host registration credentials does not necessarily invalidate an already provisioned GameServer API token; follow the Master/GameServer enrollment procedure to invalidate and issue a new token safely. Do not remove an active registration during a match. Preserve provider-console recovery and management-source restrictions when changing SSH keys. Do not reuse restored GameServer registrations or tokens to enroll a new host.
 
 A database restore does not undo schema migrations or reissue credentials. Restore only to a fresh isolated target unless an operator has separately approved and verified a recovery plan. Do not import another environment's in-memory lobby/chat state or runtime configuration.
+
+### Noninteractive agent log access
+
+The configured workstation's `sloparena` SSH alias selects the approved VPS key and
+`IdentityAgent /run/user/%i/ssh-agent.socket`. The existing systemd
+`ssh-agent.socket` is enabled; agents do not need an inherited `SSH_AUTH_SOCK`.
+After login or an agent restart, unlock the encrypted key in an operator terminal:
+
+```bash
+SSH_AUTH_SOCK="/run/user/$(id -u)/ssh-agent.socket" ssh-add ~/.ssh/sloparena_vps
+```
+
+On the verified VPS, `/etc/sudoers.d/sloparena-agent-logs` grants `binoui` only
+these two exact remote commands without a sudo password:
+
+```bash
+ssh -o BatchMode=yes -o StrictHostKeyChecking=yes sloparena \
+  'sudo -n -- /usr/bin/python3 -I /opt/sloparena/deploy/vps/release.py logs --target-dir /var/lib/sloparena --service game --tail 200'
+ssh -o BatchMode=yes -o StrictHostKeyChecking=yes sloparena \
+  'sudo -n -- /usr/bin/python3 -I /opt/sloparena/deploy/vps/release.py logs --target-dir /var/lib/sloparena --service master --tail 200'
+```
+
+Keep the policy root-owned, mode `0440`, with `NOSETENV` and no wildcard arguments.
+The helper, Compose file and their parent directories must remain root-owned and
+not writable by the operator. Python `-I` excludes user-controlled import paths
+and Python environment variables. Changed arguments, arbitrary Python, status,
+deploy and rollback retain normal sudo authentication; this grant does not add
+Docker-group access or remove SSH-key authentication. Logs remain private.
 
 ## Live acceptance
 

@@ -1,138 +1,52 @@
-# Code Quality Tools
+# Code Quality and Verification
 
-## Overview
-SlopArena uses automated tools to maintain code quality without slowing you down.
+Use these commands from the repository root. There is no repository Makefile or
+project pre-commit quality hook. The existing `.githooks` handle session logs and
+commit messages rather than project build/style checks. Do not rely on `make build`,
+`make check`, `make format`, `make clean`, or `make test`.
 
-## Quick Commands
+## Applicable checks
+
+The CI workflow runs documentation checks and Shared/Server build and tests on
+push to `main` and on pull requests. These are the available project verification
+commands:
 
 ```bash
-make build    # Build the project
-make check    # Run all quality checks
-make format   # Auto-format code
-make clean    # Clean build artifacts
+python3 -m unittest discover -s tools -p 'test_check_docs.py'
+python3 tools/check_docs.py
+dotnet build src/Shared/ --nologo
+dotnet test tests/Shared.Tests/ --nologo
+dotnet build src/Server/ --nologo
+dotnet test tests/Server.Tests/ --nologo
 ```
 
-```bash
-make test     # Run all simulation unit tests (63+ tests, <3s)
-```
+Choose checks for the changed surface rather than treating unrelated layers as
+required. See [Testing and Verification](../testing.md) for local iteration,
+integrated changes, package workflows, and distributable-demo verification.
+Shared builds run `CopyToUnity`, copying the Shared DLL and dependency closure
+into `client/Unity/Assets/Plugins/SlopArena.Shared/` unless `SkipUnityPluginCopy`
+is explicitly set. For an open Editor, coordinate saved-source writers, acquire
+your own bounded gateway hold before that build, and let imports/compilation
+settle before ending the hold. Never copy into another owner's Editor window.
 
-> `dotnet test tests/Shared.Tests/ --nologo` is the **first check** after any
-> `src/Shared/` change. It validates state transitions, ability lifecycles, and
-> hit detection without needing Unity or a server.
+The documentation checker validates Markdown links, selected current vocabulary,
+and simple executable targets/paths in this guide, including the documented
+unittest discovery suite. It does not interpret shell programs or prove that
+a command succeeds. Its tests are run in CI by `.github/workflows/ci.yml`.
 
-## Automated Checks
+## EditorConfig and analyzers
 
-### 1. Pre-Commit Hook (Local)
-Runs before every `git commit`:
-- ✅ Build verification
-- ⚠️  Debug log detection (warns if >5 new logs)
-- ⚠️  French comment detection
-- ❌ Engine types in Shared/ (blocks commit)
+`.editorconfig` configures indentation, whitespace, C# style and selected
+diagnostic severities. It does not enforce rules by itself in every editor.
+Analyzer severities are configured there (including selected CA, Roslynator, and
+IDE diagnostics); they are not a generic promise that unused variables,
+performance problems, or code smells are all detected or block commits. Build
+and test results from the applicable .NET projects are the available automated
+compile/test gates. Update `.editorconfig` when changing analyzer configuration.
 
-**Location:** `.githooks/pre-commit`
+## Suppressions
 
-**Skip if needed:** `git commit --no-verify`
-
-### 2. CI/CD (GitHub Actions)
-Runs on every push/PR:
-- Build check
-- Engine types in Shared/ check
-- Debug log count (warning at >50)
-- French comment detection (warning only)
-
-**Location:** `.github/workflows/build.yml`
-
-### 3. EditorConfig
-Enforces code style automatically in your IDE:
-- 4 spaces indentation
-- Unix line endings (LF)
-- Trailing whitespace removal
-- Private fields with `_` prefix
-
-**Location:** `.editorconfig`
-
-### 4. Roslyn Analyzers
-Compile-time checks via Roslynator:
-- Unused variables/parameters
-- Redundant code
-- Performance issues
-- Code smells
-
-**Configured in:** `SlopArena.csproj` + `.editorconfig`
-
-## What Gets Checked
-
-### ✅ Automatic (Blocks Commit/CI)
-- **Build errors** - Must compile
-- **Engine types in Shared/** - Pure C# only
-
-### ⚠️ Warnings (Prompts User)
-- **Debug logs** - >5 new logs or >50 total
-- **French comments** - Should be English
-- **Long methods** - >100 lines
-
-### 💡 Suggestions (IDE Only)
-- Unused private members
-- Redundant casts
-- Simplification opportunities
-
-## Quality Metrics
-
-Current state (as of last check):
-- Debug logs: ~32 statements (target: <50)
-- Avg method length: ~30 lines (target: <50)
-- Build warnings: ~10 (mostly nullable refs)
-
-## Adding New Checks
-
-### Pre-commit hook
-Edit `.githooks/pre-commit` and add your check:
-```bash
-# 5. Check for large files
-LARGE_FILES=$(git diff --cached --name-only | xargs ls -lh | awk '$5 > 1000000')
-if [ -n "$LARGE_FILES" ]; then
-    echo "❌ Large files detected (>1MB)"
-    exit 1
-fi
-```
-
-### CI workflow
-Edit `.github/workflows/build.yml` under the "Code Quality Checks" step.
-
-### Analyzer rules
-Edit `.editorconfig` and add severity levels:
-```ini
-dotnet_diagnostic.CA1234.severity = warning
-```
-
-## Disabling Checks
-
-**Not recommended**, but if you need to:
-
-### Skip pre-commit hook
-```bash
-git commit --no-verify -m "message"
-```
-
-### Disable specific analyzer
-Add to `.editorconfig`:
-```ini
-dotnet_diagnostic.RCS1234.severity = none
-```
-
-### Suppress in code (last resort)
-```csharp
-#pragma warning disable RCS1234
-// code here
-#pragma warning restore RCS1234
-```
-
-## Philosophy
-
-These tools are **guardrails, not roadblocks**:
-- Most checks are **warnings** that can be bypassed
-- Only **critical issues** block commits (build errors, Shared/ violations)
-- Focus is on **catching obvious mistakes**, not enforcing style
-- Goal is **fast feedback**, not slow bureaucracy
-
-When vibing code fast, you can bypass warnings. But take 30s before pushing to review them.
+Use analyzer suppressions only when justified and scoped to the specific
+diagnostic. `.editorconfig` can set a diagnostic's severity, and C# supports
+`#pragma warning disable` / `restore`; these alter diagnostics, not CI workflow
+or repository-wide quality checks.

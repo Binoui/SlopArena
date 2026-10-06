@@ -592,20 +592,23 @@ namespace SlopArena.Client.World
         }
 
         /// <summary>
-        /// While target-locked (ADR-0018 / issue #127): move the Cinemachine follow
-        /// target to the player↔NPC midpoint so both fighters stay framed. Restores
-        /// the player follow target when unlocked or the target renderer is missing.
+        /// Follow the authoritative locked NPC while keeping the camera anchored
+        /// on the player. No camera assistance runs merely because a target exists.
         /// </summary>
         private void UpdateLockCamera()
         {
             if (_cameraMount == null) return;
             var local = _bridge.GetState(PlayerEntityId);
+            if (!local.LockOn)
+            {
+                _cameraMount.ClearLockFocus(_playerRenderer.transform);
+                return;
+            }
             foreach (var npc in _npcs)
             {
                 if (npc.Renderer != null && npc.Id == local.TargetEntityId)
                 {
-                    var midpoint = (_playerRenderer.transform.position + npc.Renderer.transform.position) * 0.5f;
-                    _cameraMount.SetLockFocus(_playerRenderer.transform, midpoint);
+                    _cameraMount.SetLockFocus(_playerRenderer.transform, npc.Renderer.transform.position);
                     return;
                 }
             }

@@ -72,9 +72,11 @@ markers and live coordination plans are not disposable output.
 Read the canonical [shared Editor protocol](file:///home/binoui/Documents/projects/sloparena-workspace/docs/unity-editor-coordination.md)
 before operating the main Editor. Each agent runs its own bounded gateway batch.
 The gateway waits for a busy Editor, atomically claims its own lease, executes,
-restores declared state, and releases only after actual work settles. Do not send
-ordinary verification requests to another owner's inbox or inject commands into
-their session. Missing, blocked or uncertain ownership never means free.
+restores declared state, and releases only after actual work settles. Invoke it
+directly; do not discover/message the current owner, ask for availability or send
+ordinary verification requests to their inbox. Coordinate only concrete source
+conflicts, explicit task dependencies/handoffs or exceptional recovery under the
+shared protocol. Missing, blocked or uncertain ownership never means free.
 
 If the gateway process exits and loses its release token, a settled lease can remain
 held indefinitely. A human can select `Window/Pipeline/Recover Editor Lease...`
@@ -261,13 +263,14 @@ in Play Mode; missing or ambiguous entities fail. `lab.inspect` reports an unava
 presentation through `presentationError`, separately from its workspace status.
 
 The stopped-Editor Lab path is owner-verified; runtime entity inspection still needs
-a coordinated Play-Mode smoke. Compile success alone is not runtime acceptance.
+a Play-Mode smoke in your own bounded gateway batch. Compile success alone is not runtime acceptance.
 
 ### Supported preferences and live Training
 
 **Verification limit:** parser regressions passed in the stopped Editor; live
-preference application and Training sequence execution remain unverified. Coordinate
-Play Mode with the retained Editor owner before exercising these commands.
+preference application and Training sequence execution remain unverified. Exercise
+these commands in your own bounded gateway batch with approved setup/restoration;
+no retained Editor owner's permission or response is required.
 
 `sloparena.settings.inspect` reads the existing settings owner without creating it.
 `sloparena.settings.apply --patch '<JSON object>'` defaults to dry-run; it reports
@@ -393,7 +396,7 @@ null, not a fabricated zero rectangle. `clippingCoverage: inline-and-scroll-view
 is deliberately partial: stylesheet-computed clipping is not fully enumerated, and
 center picking proves only that point, not full-element visibility.
 
-Preserve Editor ownership and its current mode. A screenshot-only task does not recompile,
+Use your own gateway lease and preserve the current mode. A screenshot-only task does not recompile,
 stop, or restart the Editor; actual C# changes are what gate recompile. Website/browser work
 and user-provided image/mockup review do not launch Unity.
 

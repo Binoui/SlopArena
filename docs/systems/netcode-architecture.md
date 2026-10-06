@@ -29,6 +29,10 @@ advance or establish gameplay time. Clock controls carry the server tick and gam
 start tick; the client freezes prediction/input until authoritative Playing and that
 start tick, then seeds its timeline from the server clock.
 
+Transport selection and network pumping remain independent of the gameplay clock gate.
+Clock resets must not disable the selected transport: clients still need to connect,
+receive the roster baseline, and acknowledge readiness while prediction is frozen.
+
 During play, one `NetplayClock` estimate drives prediction, input target ticks, and
 reconciliation. On receipt it compensates for estimated one-way packet transit using
 half the measured RTT; the scheduling lead adds half-RTT ticks plus two safety ticks,

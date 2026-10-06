@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Newtonsoft.Json;
 using System.Threading;
 using Unity.Pipeline.Editor.Commands;
+using Unity.Pipeline.Editor.Commands.PackageManager;
 using Unity.Pipeline.Editor.Testing;
 using UnityEditor;
 using UnityEngine;
@@ -489,11 +490,22 @@ namespace Unity.Pipeline.Editor
             if (ownership == null || !ReferenceEquals(ownership, s_Ownership) || s_Reconciled)
                 return;
             s_Reconciled = true;
+            PackageManagerCommand.RecoverInterruptedOperation();
             if (ownership.GetStatus().state == "blocked")
                 return;
             var state = ownership.SnapshotForPersistence();
             foreach (var operation in state.Operations ?? new System.Collections.Generic.List<EditorCommandOwnership.Operation>())
             {
+                if (IsPackageOperation(operation.Command))
+                {
+                    if (!PackageManagerCommand.TryReconcileOwnershipActivity(operation.Id, ownership, out var packageReason))
+                    {
+                        ownership.Block(packageReason ?? $"Package operation '{operation.Command}' has unknown completion.");
+                        return;
+                    }
+                    ownership.ReconcileOperation(operation.Id);
+                    continue;
+                }
                 var compileKnown = operation.Command == "recompile"
                     && RecompileCommand.IsOperationComplete(operation.Id);
                 if (!compileKnown && operation.Command == "recompile"
@@ -550,6 +562,14 @@ namespace Unity.Pipeline.Editor
                     if (completed)
                         ownership.CompleteHostActivity(activity.Id);
                 }
+                else if (activity.Kind == "package")
+                {
+                    if (!PackageManagerCommand.TryReconcileOwnershipActivity(activity.Id, ownership, out var packageReason))
+                    {
+                        ownership.Block(packageReason ?? "Editor reloaded with an uncorrelated package operation; completion is unknown.");
+                        return;
+                    }
+                }
                 else
                 {
                     ownership.Block($"Editor reloaded with unknown host activity '{activity.Kind}'.");
@@ -560,6 +580,9 @@ namespace Unity.Pipeline.Editor
             ownership.BlockIfOperationsRemain("Editor reloaded with work whose completion is unknown.");
             ownership.FinalizeRecovery();
         }
+
+        private static bool IsPackageOperation(string command) =>
+            command == "package_add" || command == "package_remove" || command == "package_resolve";
 
         private static bool ContainsActivity(EditorCommandOwnership.PersistenceState state, string id, string kind)
         {

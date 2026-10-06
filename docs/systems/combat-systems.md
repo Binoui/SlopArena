@@ -231,6 +231,15 @@ A fresh lock toggle or retarget resolves its new candidate before invalidating t
 previous target. If no eligible candidate exists, lock remains off. Shield freezes
 combat facing without stopping authoritative target selection or lock acquisition.
 
+While locked, the normal camera can gently orbit toward that authoritative target,
+keeping the player as both its follow and look anchor. Horizontal assistance has a
+dead zone and bounded turn speed because movement is camera-relative; pitch and
+zoom stay manual. Mouse/right-stick camera input overrides assistance, which resumes
+after a short grace period. Unlocked, missing-target, explicit aiming and
+input-suppressed modes do not auto-orbit. Training and PvP share this behavior.
+The experimental tuning and enable switch live on `CameraMount` under **Lock Camera
+Assistance** in the Inspector, not in target-selection or Shared gameplay rules.
+
 Aim indicators and camera movement are visual input aids. They do not bypass server validation or replace Shared simulation.
 
 ## Design rules

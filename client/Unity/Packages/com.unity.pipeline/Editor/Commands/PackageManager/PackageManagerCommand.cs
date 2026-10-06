@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading;
+using System.Security.Cryptography;
+using System.Text;
 using Newtonsoft.Json;
 using Unity.Pipeline.Commands;
 using UnityEditor;
@@ -33,12 +35,12 @@ namespace Unity.Pipeline.Editor.Commands.PackageManager
     ///    keeps the (single-request) server responsive and survives the reload.</description></item>
     ///    <item><description><b>synchronous</b> (<c>wait=true</c>) — block until the request completes and return the
     ///    full result. The result is captured in one main-thread hop the moment the request completes
-    ///    (before the compile-triggered reload). Reliable for add; for remove the reload can fire fast
-    ///    enough to drop the reply — the status file still settles, so <c>package_status</c> confirms it.</description></item>
+    ///    (before the compile-triggered reload). A lost reply is recovered only from its correlated
+    ///    terminal receipt or an operation-specific resolved-package postcondition.</description></item>
     ///    </list>
-    ///    Both write the status file, so a lost reply (or a reload mid-wait) is recoverable via
-    ///    <c>package_status</c>; <see cref="RecoverInterruptedOperation"/> settles an <c>in_progress</c>
-    ///    file on the next load.
+    ///    Both write the status file, so a lost reply remains observable via <c>package_status</c>.
+    ///    An interrupted receipt that cannot prove success or failure stays <c>unknown</c>; ownership is
+    ///    not settled from a reload or manifest-only change.
     ///  - <c>package_resolve</c> records its status too, so <c>package_status</c> validates it.
     ///
     /// Mutating commands (add / remove) follow the shared <c>confirm</c>/<c>dry_run</c> convention.
@@ -56,17 +58,28 @@ namespace Unity.Pipeline.Editor.Commands.PackageManager
 
         static readonly object s_Lock = new object();
 
-        // The in-flight mutating request (add/remove) and how to project its result. s_InProgress is a
-        // plain flag (read off-thread by IsBusy) so the busy check never touches main-thread-only Request
-        // members. Both are reset by a domain reload; RecoverInterruptedOperation settles the status file.
+        // The native request and its receipt are one persisted package operation. The ownership host
+        // activity deliberately outlives the HTTP command and is cleared only after a terminal result.
         static volatile bool s_InProgress;
         static Request s_Request;
         static string s_Operation;
         static string s_Argument;
+        static string s_OperationId;
         static Func<Request, PackageSummary> s_ReadPackage;
+        static PackageStatus s_Receipt;
+        static EditorCommandOwnership s_TrackingOwnership;
+        static bool s_RecoveryAttempted;
 
         static PackageManagerCommand()
         {
+            RecoverInterruptedOperation();
+        }
+
+        static void RecoverWhenEditorReady()
+        {
+            if (EditorApplication.isCompiling || EditorApplication.isUpdating)
+                return;
+            EditorApplication.update -= RecoverWhenEditorReady;
             RecoverInterruptedOperation();
         }
 
@@ -252,6 +265,7 @@ namespace Unity.Pipeline.Editor.Commands.PackageManager
             [CliArg("dry_run", "Preview the change without applying it.")] bool dryRun = false,
             [CliArg("wait", "Block until the operation completes and return the result (synchronous). Default: return immediately and poll package_status.")] bool wait = false)
         {
+            var ownershipContext = EditorCommandOwnershipContext.Current;
             if (!PackageIdentifier.TryParse(identifier, out var parsed, out var parseError))
                 return PackageMutationResponse.Failed("add", identifier, parseError);
 
@@ -259,6 +273,7 @@ namespace Unity.Pipeline.Editor.Commands.PackageManager
                 return PackageMutationResponse.Busy("add");
 
             return ExecuteMutation(
+                ownershipContext: ownershipContext,
                 operation: "add",
                 commandName: "package_add",
                 argument: parsed.Identifier,
@@ -286,6 +301,7 @@ namespace Unity.Pipeline.Editor.Commands.PackageManager
             [CliArg("dry_run", "Preview the change without applying it.")] bool dryRun = false,
             [CliArg("wait", "Block until the operation completes and return the result (synchronous). Default: return immediately and poll package_status.")] bool wait = false)
         {
+            var ownershipContext = EditorCommandOwnershipContext.Current;
             if (string.IsNullOrWhiteSpace(name))
                 return PackageMutationResponse.Failed("remove", name, "A package name is required.");
 
@@ -295,6 +311,7 @@ namespace Unity.Pipeline.Editor.Commands.PackageManager
                 return PackageMutationResponse.Busy("remove");
 
             return ExecuteMutation(
+                ownershipContext: ownershipContext,
                 operation: "remove",
                 commandName: "package_remove",
                 argument: packageName,
@@ -313,55 +330,59 @@ namespace Unity.Pipeline.Editor.Commands.PackageManager
             Tags = new[] { "packages" })]
         public static object PackageResolve()
         {
-            WriteStatus(new PackageStatus
-            {
-                Status = "in_progress",
-                Operation = "resolve",
-                StartedAt = NowIso(),
-                Message = "Resolving packages..."
-            });
+            var ownershipContext = EditorCommandOwnershipContext.Current;
+            if (IsBusy())
+                return PackageMutationResponse.Busy("resolve");
+            var receipt = CreateReceipt("resolve", null, ownershipContext);
+            if (ownershipContext != null
+                && !ownershipContext.Ownership.BeginHostActivity(ownershipContext, "package"))
+                return PackageMutationResponse.Failed("resolve", null,
+                    "Editor ownership changed before package resolution could start.");
+
+            receipt.Status = "in_progress";
+            receipt.StartedAt = NowIso();
+            receipt.Message = "Resolving packages...";
+            WriteStatus(receipt);
 
             try
             {
-                // Client.Resolve() is fire-and-forget (returns void) and schedules a resolve on a later
-                // tick, so the response flushes before any reload — no request to wait on.
+                // Client.Resolve() is fire-and-forget; this terminal receipt means only that Unity
+                // accepted the request, not that a package reload or resolution finished.
                 Client.Resolve();
             }
             catch (Exception ex)
             {
-                var failed = new PackageStatus
-                {
-                    Status = "failed",
-                    Operation = "resolve",
-                    Success = false,
-                    Error = ex.Message,
-                    Manifest = SafeReadManifest(),
-                    CompletedAt = NowIso(),
-                    Message = $"Resolve failed: {ex.Message}"
-                };
-                WriteStatus(failed);
-                return PackageMutationResponse.Failed("resolve", null, failed.Error);
+                receipt.Status = "failed";
+                receipt.Success = false;
+                receipt.CompletionEvidence = "command_call";
+                receipt.Error = ex.Message;
+                receipt.Manifest = SafeReadManifest();
+                receipt.CompletedAt = NowIso();
+                receipt.Message = $"Resolve failed: {ex.Message}";
+                WriteStatus(receipt);
+                ownershipContext?.Ownership.CompleteHostActivity(receipt.OperationId);
+                var response = PackageMutationResponse.Failed("resolve", null, receipt.Error);
+                response.OperationId = receipt.OperationId;
+                return response;
             }
 
-            var done = new PackageStatus
-            {
-                Status = "completed",
-                Operation = "resolve",
-                Success = true,
-                RequiresRecompile = true,
-                Manifest = SafeReadManifest(),
-                CompletedAt = NowIso(),
-                Message = "Resolve requested. If assemblies changed, a domain reload follows — poll recompile_status."
-            };
-            WriteStatus(done);
-            return ToMutationResponse(done, plan: null);
+            receipt.Status = "completed";
+            receipt.Success = true;
+            receipt.CompletionEvidence = "command_accepted";
+            receipt.RequiresRecompile = true;
+            receipt.Manifest = SafeReadManifest();
+            receipt.CompletedAt = NowIso();
+            receipt.Message = "Resolve requested. If assemblies changed, a domain reload follows — poll recompile_status.";
+            WriteStatus(receipt);
+            ownershipContext?.Ownership.CompleteHostActivity(receipt.OperationId);
+            return ToMutationResponse(receipt, plan: null);
         }
 
         // ---- Status ----------------------------------------------------------------------------
 
         [CliCommand("package_status",
-            "Status of the last async package operation (add/remove/resolve): idle | in_progress | completed | " +
-            "failed, with the added package, manifest, and any error.",
+            "Status of the last package operation (add/remove/resolve): idle | in_progress | completed | failed | unknown, " +
+            "with its correlated outcome, evidence, manifest, and any error.",
             MainThreadRequired = false,
             Tags = new[] { "packages" })]
         public static string GetPackageStatus()
@@ -380,6 +401,7 @@ namespace Unity.Pipeline.Editor.Commands.PackageManager
         /// via <c>package_status</c> even if the domain reload severs a synchronous reply.
         /// </summary>
         static object ExecuteMutation(
+            EditorCommandOwnership.OperationContext ownershipContext,
             string operation, string commandName, string argument, string planText,
             bool confirm, bool dryRun, bool wait,
             Func<Request> start, Func<Request, PackageSummary> readPackage)
@@ -390,20 +412,57 @@ namespace Unity.Pipeline.Editor.Commands.PackageManager
                 return PackageMutationResponse.Rejected(operation, argument,
                     "Refused: this changes project packages. Re-run with confirm=true to apply, or dry_run=true to preview.");
 
-            // UPM operations are not part of Unity's Undo system, so there is no undo scope here.
+            string startError = null;
+            string operationId = null;
             var request = RunOnMain(() =>
             {
-                var r = start();
-                // async mode finalizes via the update-loop poller; sync mode finalizes itself.
-                BeginTracking(operation, argument, r, readPackage, subscribePoll: !wait);
-                return r;
+                try
+                {
+                    if (!BeginTracking(operation, argument, ownershipContext, readPackage))
+                    {
+                        startError = "Editor ownership changed before the package operation could start.";
+                        return null;
+                    }
+                    operationId = s_OperationId;
+
+                    // Persist ownership correlation and the in-progress receipt before UPM can mutate the
+                    // manifest or trigger a reload.
+                    var started = start();
+                    if (started == null)
+                    {
+                        startError = "The package manager did not return a request.";
+                        FailStartingRequest(startError);
+                        return null;
+                    }
+
+                    lock (s_Lock)
+                        s_Request = started;
+                    if (!wait)
+                        SubscribePoll();
+                    return started;
+                }
+                catch (Exception ex)
+                {
+                    startError = ex.Message;
+                    FailStartingRequest(ex.Message);
+                    return null;
+                }
             });
 
             if (request == null)
-                return PackageMutationResponse.Failed(operation, argument, "Operation was confirmed but failed to start.");
+            {
+                var response = PackageMutationResponse.Failed(operation, argument,
+                    startError ?? "Operation was confirmed but failed to start.");
+                response.OperationId = operationId;
+                return response;
+            }
 
             if (!wait)
-                return PackageMutationResponse.InProgress(operation, argument, planText);
+            {
+                var response = PackageMutationResponse.InProgress(operation, argument, planText);
+                response.OperationId = operationId;
+                return response;
+            }
 
             // Synchronous: poll until complete, capturing status + result atomically on the main thread
             // (a reload can only fire between ticks, so the snapshot can't be interleaved).
@@ -418,38 +477,60 @@ namespace Unity.Pipeline.Editor.Commands.PackageManager
                 {
                     // Hand off to the update-loop poller so package_status still settles after we bail.
                     RunOnMain<object>(() => { SubscribePoll(); return null; });
-                    return PackageMutationResponse.Failed(operation, argument,
+                    var response = PackageMutationResponse.Failed(operation, argument,
                         $"Timed out after {WaitTimeoutSeconds}s; the operation may still be in progress — poll package_status.");
+                    response.OperationId = operationId;
+                    return response;
                 }
 
                 Thread.Sleep(PollIntervalMs);
             }
         }
 
-        /// <summary>Record the in-flight op, write the in_progress status, and (async only) start polling.</summary>
-        static void BeginTracking(string operation, string argument, Request request,
-            Func<Request, PackageSummary> readPackage, bool subscribePoll)
+        /// <summary>Persist operation identity and pre-state before starting the native UPM request.</summary>
+        static bool BeginTracking(string operation, string argument,
+            EditorCommandOwnership.OperationContext ownershipContext, Func<Request, PackageSummary> readPackage)
         {
+            var receipt = CreateReceipt(operation, argument, ownershipContext);
+            if (ownershipContext != null
+                && !ownershipContext.Ownership.BeginHostActivity(ownershipContext, "package"))
+                return false;
+
             lock (s_Lock)
             {
-                s_Request = request;
+                s_Request = null;
                 s_Operation = operation;
                 s_Argument = argument;
+                s_OperationId = receipt.OperationId;
                 s_ReadPackage = readPackage;
+                s_Receipt = receipt;
+                s_TrackingOwnership = ownershipContext?.Ownership;
                 s_InProgress = true;
             }
 
-            WriteStatus(new PackageStatus
-            {
-                Status = "in_progress",
-                Operation = operation,
-                Argument = argument,
-                StartedAt = NowIso(),
-                Message = $"{operation} in progress. Poll package_status."
-            });
+            receipt.Status = "in_progress";
+            receipt.StartedAt = NowIso();
+            receipt.Message = $"{operation} in progress. Poll package_status.";
+            WriteStatus(receipt);
+            return true;
+        }
 
-            if (subscribePoll)
-                SubscribePoll();
+        static void FailStartingRequest(string error)
+        {
+            lock (s_Lock)
+            {
+                if (s_Receipt == null)
+                    return;
+                var failed = CopyReceipt();
+                failed.Status = "failed";
+                failed.Success = false;
+                failed.CompletionEvidence = "command_call";
+                failed.Error = string.IsNullOrEmpty(error) ? "The package manager failed to start the request." : error;
+                failed.Manifest = SafeReadManifest();
+                failed.CompletedAt = NowIso();
+                failed.Message = $"{failed.Operation} failed: {failed.Error}";
+                CompleteTracking(failed);
+            }
         }
 
         static void SubscribePoll()
@@ -480,14 +561,7 @@ namespace Unity.Pipeline.Editor.Commands.PackageManager
                     return null;
 
                 var status = BuildStatus(s_Operation, s_Argument, request, s_ReadPackage);
-                WriteStatus(status);
-
-                s_Request = null;
-                s_Operation = null;
-                s_Argument = null;
-                s_ReadPackage = null;
-                s_InProgress = false;
-                EditorApplication.update -= Poll;
+                CompleteTracking(status);
                 return status;
             }
         }
@@ -495,13 +569,12 @@ namespace Unity.Pipeline.Editor.Commands.PackageManager
         static PackageStatus BuildStatus(string operation, string argument, Request request,
             Func<Request, PackageSummary> readPackage)
         {
-            var status = new PackageStatus
-            {
-                Operation = operation,
-                Argument = argument,
-                CompletedAt = NowIso(),
-                Manifest = SafeReadManifest()
-            };
+            var status = CopyReceipt();
+            status.Operation = operation;
+            status.Argument = argument;
+            status.CompletedAt = NowIso();
+            status.Manifest = SafeReadManifest();
+            status.CompletionEvidence = "upm_request";
 
             if (request.Status == StatusCode.Success)
             {
@@ -516,17 +589,49 @@ namespace Unity.Pipeline.Editor.Commands.PackageManager
             {
                 status.Status = "failed";
                 status.Success = false;
-                status.Error = request.Error?.message ?? "Unknown package manager error.";
+                status.Error = string.IsNullOrWhiteSpace(request.Error?.message)
+                    ? "Unknown package manager error."
+                    : request.Error.message;
                 status.Message = $"{operation} failed: {status.Error}";
             }
 
             return status;
         }
 
+        static PackageStatus CopyReceipt()
+        {
+            var receipt = s_Receipt;
+            return new PackageStatus
+            {
+                Operation = receipt?.Operation ?? s_Operation,
+                Argument = receipt?.Argument ?? s_Argument,
+                OperationId = receipt?.OperationId ?? s_OperationId,
+                PreviousManifest = receipt?.PreviousManifest,
+                PreviousResolvedPackages = receipt?.PreviousResolvedPackages,
+                StartedAt = receipt?.StartedAt
+            };
+        }
+
+        static void CompleteTracking(PackageStatus status)
+        {
+            WriteStatus(status);
+            s_TrackingOwnership?.CompleteHostActivity(s_OperationId);
+            s_Request = null;
+            s_Operation = null;
+            s_Argument = null;
+            s_OperationId = null;
+            s_ReadPackage = null;
+            s_Receipt = null;
+            s_TrackingOwnership = null;
+            s_InProgress = false;
+            EditorApplication.update -= Poll;
+        }
+
         static PackageMutationResponse ToMutationResponse(PackageStatus s, string plan) => new PackageMutationResponse
         {
             Success = s.Success,
             Operation = s.Operation,
+            OperationId = s.OperationId,
             Argument = s.Argument,
             Status = s.Status,
             Applied = s.Success,
@@ -538,38 +643,151 @@ namespace Unity.Pipeline.Editor.Commands.PackageManager
         };
 
         /// <summary>
-        /// On load, settle a status file left at "in_progress" by a domain reload (the expected outcome of
-        /// a successful add/remove). The manifest change that triggered the reload has taken effect, so
-        /// the op is recorded completed; the follow-on recompile is observed via recompile_status.
+        /// Recover only from a correlated terminal receipt or a changed, operation-specific resolved
+        /// package postcondition. A reload alone, a manifest-only change, or a stale receipt is unknown.
         /// </summary>
-        static void RecoverInterruptedOperation()
+        internal static void RecoverInterruptedOperation()
         {
+            EditorApplication.update -= RecoverWhenEditorReady;
+            if (EditorApplication.isCompiling || EditorApplication.isUpdating)
+            {
+                EditorApplication.update += RecoverWhenEditorReady;
+                return;
+            }
+            if (s_RecoveryAttempted)
+                return;
+            s_RecoveryAttempted = true;
+
             try
             {
-                if (!File.Exists(StatusFile))
-                    return;
-
-                var status = JsonConvert.DeserializeObject<PackageStatus>(File.ReadAllText(StatusFile));
+                var status = ReadStatus();
                 if (status == null || status.Status != "in_progress")
                     return;
 
-                status.Status = "completed";
-                status.Success = true;
-                status.RequiresRecompile = true;
+                var currentManifest = SafeReadManifest();
+                var currentPackages = SnapshotResolvedPackages();
+                status.Manifest = currentManifest;
                 status.CompletedAt = NowIso();
-                status.Manifest = SafeReadManifest();
-                status.Message = $"{status.Operation} completed (domain reload). Manifest updated; poll recompile_status for the recompile.";
+                if (TryProveResolvedPostcondition(status, currentManifest, currentPackages))
+                {
+                    status.Status = "completed";
+                    status.Success = true;
+                    status.RequiresRecompile = true;
+                    status.CompletionEvidence = "resolved_package_state";
+                    status.Error = null;
+                    status.Message = $"{status.Operation} completion recovered from its changed registered-package state.";
+                }
+                else
+                {
+                    status.Status = "unknown";
+                    status.Success = false;
+                    status.RequiresRecompile = false;
+                    status.CompletionEvidence = "unproven";
+                    status.Error = "UPM's terminal request result was not persisted and the operation-specific resolved package postcondition could not be verified.";
+                    status.Message = $"{status.Operation ?? "Package"} outcome is unknown after domain reload; ownership remains blocked.";
+                }
                 WriteStatus(status);
             }
             catch (Exception ex)
             {
                 Debug.LogWarning($"[pipeline] package status recovery failed: {ex.Message}");
+                var status = ReadStatus();
+                if (status == null || status.Status != "in_progress")
+                    return;
+                status.Status = "unknown";
+                status.Success = false;
+                status.CompletionEvidence = "unproven";
+                status.CompletedAt = NowIso();
+                status.Error = $"Interrupted package outcome could not be verified: {ex.Message}";
+                status.Message = $"{status.Operation ?? "Package"} outcome is unknown after domain reload; ownership remains blocked.";
+                WriteStatus(status);
             }
+        }
+
+        internal static bool TryReconcileOwnershipActivity(string operationId,
+            EditorCommandOwnership ownership, out string reason)
+        {
+            RecoverInterruptedOperation();
+            return TryReconcileOwnershipActivity(ReadStatus(), operationId, ownership, out reason);
+        }
+
+        internal static bool TryReconcileOwnershipActivity(PackageStatus status, string operationId,
+            EditorCommandOwnership ownership, out string reason)
+        {
+            reason = null;
+            if (ownership == null || string.IsNullOrEmpty(operationId))
+            {
+                reason = "Package recovery has no matching ownership operation.";
+                return false;
+            }
+            if (status == null || status.OperationId != operationId)
+            {
+                reason = "Package receipt is missing or belongs to a different operation; completion is unknown.";
+                return false;
+            }
+            if (status.Operation != "add" && status.Operation != "remove" && status.Operation != "resolve")
+            {
+                reason = "Package receipt has an invalid operation; completion is unknown.";
+                return false;
+            }
+            if ((status.Operation == "add" || status.Operation == "remove")
+                && string.IsNullOrWhiteSpace(status.Argument))
+            {
+                reason = "Package receipt has no operation subject; completion is unknown.";
+                return false;
+            }
+            if (!DateTime.TryParse(status.StartedAt, out _) || !DateTime.TryParse(status.CompletedAt, out _))
+            {
+                reason = "Package receipt is not a complete terminal record; completion is unknown.";
+                return false;
+            }
+
+            var terminalSuccess = status.Status == "completed" && status.Success
+                && ((status.Operation == "add" || status.Operation == "remove")
+                    ? status.CompletionEvidence == "upm_request" || status.CompletionEvidence == "resolved_package_state"
+                    : status.CompletionEvidence == "command_accepted");
+            var terminalFailure = status.Status == "failed" && !status.Success
+                && !string.IsNullOrWhiteSpace(status.Error)
+                && (status.CompletionEvidence == "upm_request" || status.CompletionEvidence == "command_call");
+            if (!terminalSuccess && !terminalFailure)
+            {
+                reason = string.IsNullOrWhiteSpace(status.Error)
+                    ? $"Package operation '{status.Operation}' has no trustworthy terminal receipt; completion is unknown."
+                    : status.Error;
+                return false;
+            }
+
+            var state = ownership.SnapshotForPersistence();
+            var expectedCommand = status.Operation == "add" ? "package_add"
+                : status.Operation == "remove" ? "package_remove" : "package_resolve";
+            var matchingOperation = state.Operations != null
+                && state.Operations.Exists(operation => operation.Id == operationId && operation.Command == expectedCommand);
+            var hasOperation = state.Operations != null
+                && state.Operations.Exists(operation => operation.Id == operationId);
+            var matchingActivity = state.HostActivities != null
+                && state.HostActivities.Exists(activity => activity.Id == operationId
+                    && activity.Kind == "package" && activity.Command == expectedCommand);
+            if ((hasOperation && !matchingOperation) || (!matchingOperation && !matchingActivity))
+            {
+                reason = "Package ownership operation/activity does not match the recovered receipt.";
+                return false;
+            }
+
+            ownership.CompleteHostActivity(operationId);
+            return true;
         }
 
         // ---- Helpers ---------------------------------------------------------------------------
 
-        static bool IsBusy() => s_InProgress;
+        static bool IsBusy()
+        {
+            if (s_InProgress)
+                return true;
+            if (!File.Exists(StatusFile))
+                return false;
+            var status = ReadStatus();
+            return status == null || status.Status == "in_progress";
+        }
 
         /// <summary>
         /// Block until <paramref name="request"/> completes, polling its (main-thread-only) state via
@@ -607,6 +825,155 @@ namespace Unity.Pipeline.Editor.Commands.PackageManager
 
         static Dictionary<string, string> SafeReadManifest() =>
             PackageManifest.TryRead(out var deps, out _) ? deps : null;
+
+        internal static string ManifestFingerprint(string value)
+        {
+            using (var sha = SHA256.Create())
+                return Convert.ToBase64String(sha.ComputeHash(Encoding.UTF8.GetBytes(value ?? string.Empty)));
+        }
+
+        static Dictionary<string, string> SnapshotManifest()
+        {
+            var manifest = SafeReadManifest();
+            if (manifest == null)
+                return null;
+            var fingerprints = new Dictionary<string, string>(StringComparer.Ordinal);
+            using (var sha = SHA256.Create())
+                foreach (var dependency in manifest)
+                    fingerprints[dependency.Key] = Convert.ToBase64String(
+                        sha.ComputeHash(Encoding.UTF8.GetBytes(dependency.Value ?? "")));
+            return fingerprints;
+        }
+        static PackageStatus CreateReceipt(string operation, string argument,
+            EditorCommandOwnership.OperationContext ownershipContext) => new PackageStatus
+        {
+            Operation = operation,
+            Argument = argument,
+            OperationId = ownershipContext?.OperationId ?? Guid.NewGuid().ToString("N"),
+            PreviousManifest = SnapshotManifest(),
+            PreviousResolvedPackages = SnapshotResolvedPackages()
+        };
+
+        static Dictionary<string, string> SnapshotResolvedPackages()
+        {
+            var packages = new Dictionary<string, string>(StringComparer.Ordinal);
+            foreach (var package in PackageInfo.GetAllRegisteredPackages())
+                if (!string.IsNullOrEmpty(package.name))
+                    packages[package.name] = PackageState(package);
+            return packages;
+        }
+
+        static string PackageState(PackageInfo package) =>
+            $"{package.version}\u001f{package.source}\u001f{(package.isDirectDependency ? "1" : "0")}";
+
+        static bool IsDirectPackageState(string state) =>
+            !string.IsNullOrEmpty(state) && state[state.Length - 1] == '1';
+
+        internal static bool TryProveResolvedPostcondition(PackageStatus status,
+            Dictionary<string, string> currentManifest, Dictionary<string, string> currentPackages)
+        {
+            if (status == null || string.IsNullOrEmpty(status.OperationId)
+                || status.PreviousManifest == null || status.PreviousResolvedPackages == null
+                || currentManifest == null || currentPackages == null)
+                return false;
+
+            string packageName;
+            if (status.Operation == "add")
+            {
+                if (!TryFindAddedPackage(status, currentManifest, out packageName)
+                    || !currentManifest.TryGetValue(packageName, out var spec)
+                    || !currentPackages.TryGetValue(packageName, out var currentState)
+                    || !IsDirectPackageState(currentState))
+                    return false;
+
+                if (status.PreviousManifest.TryGetValue(packageName, out var oldSpec)
+                    && string.Equals(oldSpec, ManifestFingerprint(spec), StringComparison.Ordinal))
+                    return false;
+                if (status.PreviousResolvedPackages.TryGetValue(packageName, out var oldState)
+                    && string.Equals(oldState, currentState, StringComparison.Ordinal))
+                    return false;
+
+                if (!PackageIdentifier.TryParse(status.Argument, out var parsed, out _))
+                    return false;
+                var packageState = currentState.Split('\u001f');
+                if (packageState.Length != 3)
+                    return false;
+                if (parsed.Kind == PackageSourceKind.Registry)
+                {
+                    if (!string.Equals(packageState[1], "Registry", StringComparison.Ordinal)
+                        || !string.Equals(spec, packageState[0], StringComparison.Ordinal))
+                        return false;
+                    if (parsed.Version != null
+                        && !string.Equals(spec, parsed.Version, StringComparison.Ordinal))
+                        return false;
+                }
+                if ((parsed.Kind == PackageSourceKind.Git && packageState[1] != "Git")
+                    || (parsed.Kind == PackageSourceKind.Local && packageState[1] != "Local"))
+                    return false;
+                return true;
+            }
+
+            if (status.Operation != "remove")
+                return false;
+
+            packageName = status.Argument;
+            if (string.IsNullOrWhiteSpace(packageName)
+                || !status.PreviousManifest.ContainsKey(packageName)
+                || !status.PreviousResolvedPackages.TryGetValue(packageName, out var previousState)
+                || !IsDirectPackageState(previousState)
+                || currentManifest.ContainsKey(packageName))
+                return false;
+
+            if (currentPackages.TryGetValue(packageName, out var remainingState)
+                && (IsDirectPackageState(remainingState)
+                    || string.Equals(previousState, remainingState, StringComparison.Ordinal)))
+                return false;
+            return true;
+        }
+
+        static bool TryFindAddedPackage(PackageStatus status, Dictionary<string, string> currentManifest,
+            out string packageName)
+        {
+            packageName = null;
+            if (!PackageIdentifier.TryParse(status.Argument, out var parsed, out _))
+                return false;
+            if (parsed.Kind == PackageSourceKind.Registry)
+            {
+                packageName = parsed.Name;
+                return currentManifest.ContainsKey(packageName);
+            }
+
+            foreach (var dependency in currentManifest)
+            {
+                if (!string.Equals(dependency.Value, status.Argument, StringComparison.Ordinal))
+                    continue;
+                if (status.PreviousManifest.TryGetValue(dependency.Key, out var previous)
+                    && string.Equals(previous, ManifestFingerprint(dependency.Value), StringComparison.Ordinal))
+                    continue;
+                if (packageName != null)
+                {
+                    packageName = null;
+                    return false;
+                }
+                packageName = dependency.Key;
+            }
+            return packageName != null;
+        }
+
+
+        static PackageStatus ReadStatus()
+        {
+            if (!File.Exists(StatusFile))
+                return null;
+            try
+            {
+                return JsonConvert.DeserializeObject<PackageStatus>(File.ReadAllText(StatusFile));
+            }
+            catch (Exception)
+            {
+                return null;
+            }
+        }
 
         static PackageSummary Map(PackageInfo p, bool isInstalled = false) => new PackageSummary
         {

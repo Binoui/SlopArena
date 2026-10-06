@@ -76,14 +76,13 @@ namespace Unity.Pipeline.Editor.Commands.PackageManager
 
     /// <summary>
     /// Persisted status of the last async mutating operation (add / remove / resolve), written to a Temp
-    /// status file that survives the domain reload an add/remove/resolve triggers (CLI-203). Read back
-    /// verbatim by <c>package_status</c> so a caller can poll an async op — or validate one whose
-    /// synchronous reply was lost to the reload.
+    /// status file that survives package-triggered domain reloads. It correlates the UPM result with the
+    /// admitted Pipeline operation and records unknown when the request's outcome cannot be proven.
     /// </summary>
     [Serializable]
     public class PackageStatus
     {
-        /// <summary>idle | in_progress | completed | failed.</summary>
+        /// <summary>idle | in_progress | completed | failed | unknown.</summary>
         [JsonProperty("status")] public string Status { get; set; }
 
         /// <summary>add | remove | resolve.</summary>
@@ -91,6 +90,16 @@ namespace Unity.Pipeline.Editor.Commands.PackageManager
 
         /// <summary>The operation's subject (identifier/name), when applicable.</summary>
         [JsonProperty("argument")] public string Argument { get; set; }
+        /// <summary>Pipeline ownership operation correlated with this native UPM request.</summary>
+        [JsonProperty("operationId")] internal string OperationId { get; set; }
+
+        /// <summary>Pre-operation manifest value fingerprints and resolved package state used after reload.</summary>
+        [JsonProperty("previousManifest")] internal Dictionary<string, string> PreviousManifest { get; set; }
+        [JsonProperty("previousResolvedPackages")] internal Dictionary<string, string> PreviousResolvedPackages { get; set; }
+
+        /// <summary>Why this terminal result is trusted: UPM request, resolved state, or resolve accepted.</summary>
+        [JsonProperty("completionEvidence")] internal string CompletionEvidence { get; set; }
+
 
         [JsonProperty("success")] public bool Success { get; set; }
 
@@ -130,6 +139,8 @@ namespace Unity.Pipeline.Editor.Commands.PackageManager
 
         /// <summary>The operation's subject (identifier/name), when applicable.</summary>
         [JsonProperty("argument")] public string Argument { get; set; }
+        /// <summary>Exact package operation ID used to correlate its later status receipt.</summary>
+        [JsonProperty("operationId")] internal string OperationId { get; set; }
 
         /// <summary>in_progress | completed | dry_run | rejected | failed | busy.</summary>
         [JsonProperty("status")] public string Status { get; set; }
@@ -162,7 +173,7 @@ namespace Unity.Pipeline.Editor.Commands.PackageManager
                 Status = "in_progress",
                 Applied = true,
                 Plan = plan,
-                Message = $"{operation} started. Poll package_status until status is 'completed' or 'failed'."
+                Message = $"{operation} started. Poll package_status until status is terminal; an unknown outcome requires recovery."
             };
 
         public static PackageMutationResponse Busy(string operation) =>
@@ -171,7 +182,7 @@ namespace Unity.Pipeline.Editor.Commands.PackageManager
                 Success = false,
                 Operation = operation,
                 Status = "busy",
-                Message = "Another package operation is in progress. Poll package_status, then retry."
+                Message = "Another package operation is in progress or its receipt is unreadable. Inspect package_status before retrying."
             };
 
         public static PackageMutationResponse DryRunPreview(string operation, string argument, string plan, string message) =>

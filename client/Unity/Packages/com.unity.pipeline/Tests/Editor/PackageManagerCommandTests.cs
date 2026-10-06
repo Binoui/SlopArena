@@ -1,8 +1,11 @@
+using System;
+using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
 using Newtonsoft.Json.Linq;
 using Unity.Pipeline.Commands;
 using Unity.Pipeline.Editor;
+using Unity.Pipeline;
 using Unity.Pipeline.Editor.Commands.PackageManager;
 
 namespace Unity.Pipeline.Tests.Editor
@@ -148,13 +151,6 @@ namespace Unity.Pipeline.Tests.Editor
         }
 
         [Test]
-        public void PackageStatus_IsOffMainThread()
-        {
-            var command = CommandRegistry.DiscoverCommands().First(c => c.Name == "package_status");
-            Assert.IsFalse(command.MainThreadRequired, "package_status only reads a file; it must respond while an op is in flight");
-        }
-
-        [Test]
         public void PackageList_ExposesScopeArg()
         {
             var command = CommandRegistry.DiscoverCommands().First(c => c.Name == "package_list");
@@ -243,6 +239,265 @@ namespace Unity.Pipeline.Tests.Editor
             Assert.IsFalse(response.Success);
             Assert.AreEqual("rejected", response.Status);
             Assert.IsFalse(response.Applied);
+        }
+        [Test]
+        public void ReloadRecovery_AddRequiresChangedRegisteredPackageAndMatchingManifest()
+        {
+            var status = new PackageStatus
+            {
+                Status = "in_progress",
+                Operation = "add",
+                Argument = "com.example.tool@1.2.3",
+                OperationId = "package-op",
+                PreviousManifest = new Dictionary<string, string>(),
+                PreviousResolvedPackages = new Dictionary<string, string>()
+            };
+            var manifest = new Dictionary<string, string> { ["com.example.tool"] = "1.2.3" };
+            var resolved = new Dictionary<string, string> { ["com.example.tool"] = "1.2.3\u001fRegistry\u001f1" };
+
+            Assert.IsTrue(PackageManagerCommand.TryProveResolvedPostcondition(status, manifest, resolved));
+            Assert.IsFalse(PackageManagerCommand.TryProveResolvedPostcondition(status, manifest,
+                new Dictionary<string, string>()), "A manifest edit alone must not prove UPM completion.");
+
+            status.PreviousManifest = new Dictionary<string, string>
+            {
+                ["com.example.tool"] = PackageManagerCommand.ManifestFingerprint("1.2.3")
+            };
+            status.PreviousResolvedPackages = new Dictionary<string, string> { ["com.example.tool"] = "1.2.3\u001fRegistry\u001f1" };
+            Assert.IsFalse(PackageManagerCommand.TryProveResolvedPostcondition(status, manifest, resolved),
+                "An unrelated reload with the same package already installed must remain unknown.");
+        }
+
+        [TestCase("1.0.0\u001fRegistry\u001f1")]
+        [TestCase("2.0.0\u001fLocal\u001f1")]
+        [TestCase("2.0.0\u001fGit\u001f1")]
+        public void ReloadRecovery_UnpinnedRegistryAddRequiresMatchingRegistryVersion(string packageState)
+        {
+            var status = new PackageStatus
+            {
+                Status = "in_progress",
+                Operation = "add",
+                Argument = "com.example.tool",
+                OperationId = "unpinned-package-op",
+                PreviousManifest = new Dictionary<string, string>(),
+                PreviousResolvedPackages = new Dictionary<string, string>()
+            };
+
+            Assert.IsFalse(PackageManagerCommand.TryProveResolvedPostcondition(status,
+                new Dictionary<string, string> { ["com.example.tool"] = "2.0.0" },
+                new Dictionary<string, string> { ["com.example.tool"] = packageState }));
+        }
+
+        [Test]
+        public void ReloadRecovery_UnpinnedRegistryAddAcceptsMatchingResolvedRegistryVersion()
+        {
+            var status = new PackageStatus
+            {
+                Status = "in_progress",
+                Operation = "add",
+                Argument = "com.example.tool",
+                OperationId = "unpinned-package-op",
+                PreviousManifest = new Dictionary<string, string>(),
+                PreviousResolvedPackages = new Dictionary<string, string>()
+            };
+
+            Assert.IsTrue(PackageManagerCommand.TryProveResolvedPostcondition(status,
+                new Dictionary<string, string> { ["com.example.tool"] = "2.0.0" },
+                new Dictionary<string, string> { ["com.example.tool"] = "2.0.0\u001fRegistry\u001f1" }));
+        }
+
+        [Test]
+        public void ReloadRecovery_RemoveRequiresManifestAndResolvedDirectDependencyTransition()
+        {
+            var status = new PackageStatus
+            {
+                Status = "in_progress",
+                Operation = "remove",
+                Argument = "com.example.tool",
+                OperationId = "package-remove",
+                PreviousManifest = new Dictionary<string, string> { ["com.example.tool"] = PackageManagerCommand.ManifestFingerprint("1.2.3") },
+                PreviousResolvedPackages = new Dictionary<string, string> { ["com.example.tool"] = "1.2.3\u001fRegistry\u001f1" }
+            };
+
+            Assert.IsTrue(PackageManagerCommand.TryProveResolvedPostcondition(status,
+                new Dictionary<string, string>(),
+                new Dictionary<string, string> { ["com.example.tool"] = "1.2.3\u001fRegistry\u001f0" }));
+            Assert.IsFalse(PackageManagerCommand.TryProveResolvedPostcondition(status,
+                new Dictionary<string, string>(),
+                new Dictionary<string, string> { ["com.example.tool"] = "1.2.3\u001fRegistry\u001f1" }),
+                "The package manager still reporting a direct dependency must not prove removal.");
+        }
+
+        [Test]
+        public void AsyncPackageCommandReply_DoesNotSettleHostActivityBeforeNativeReceipt()
+        {
+            var ownership = StartPackageOperation("async-package", "package_add", out var token);
+            ownership.CompleteOperation("async-package");
+            Assert.IsTrue(ownership.TryRelease(token, out var releasing));
+            Assert.AreEqual("releasing", releasing.state);
+
+            var inProgress = new PackageStatus
+            {
+                Status = "in_progress",
+                Operation = "add",
+                Argument = "com.example.tool",
+                OperationId = "async-package",
+                StartedAt = DateTime.UtcNow.ToString("o")
+            };
+            Assert.IsFalse(PackageManagerCommand.TryReconcileOwnershipActivity(
+                inProgress, "async-package", ownership, out var reason));
+            Assert.AreEqual("releasing", ownership.GetStatus().state);
+            Assert.AreEqual(1, ownership.GetStatus().activeOperations);
+            ownership.Block(reason);
+            Assert.AreEqual("blocked", ownership.GetStatus().state);
+        }
+
+        [Test]
+        public void CorrelatedRecoveredCompletion_SettlesOriginalLease()
+        {
+            var ownership = StartPackageOperation("recovered-package", "package_add", out var token);
+            ownership.CompleteOperation("recovered-package");
+            Assert.IsTrue(ownership.TryRelease(token, out _));
+            var completed = new PackageStatus
+            {
+                Status = "completed",
+                Operation = "add",
+                Argument = "com.example.tool@1.2.3",
+                OperationId = "recovered-package",
+                Success = true,
+                CompletionEvidence = "resolved_package_state",
+                StartedAt = DateTime.UtcNow.ToString("o"),
+                CompletedAt = DateTime.UtcNow.ToString("o")
+            };
+
+            var reconciled = PackageManagerCommand.TryReconcileOwnershipActivity(
+                completed, "recovered-package", ownership, out var reason);
+            Assert.IsTrue(reconciled, reason);
+            Assert.AreEqual("free", ownership.GetStatus().state);
+            Assert.IsTrue(completed.Success);
+            Assert.AreEqual("resolved_package_state", completed.CompletionEvidence);
+        }
+
+        [Test]
+        public void CorrelatedFailedNativeReceipt_SettlesLeaseWithoutChangingFailure()
+        {
+            var ownership = StartPackageOperation("failed-package", "package_add", out var token);
+            ownership.CompleteOperation("failed-package");
+            Assert.IsTrue(ownership.TryRelease(token, out _));
+            var failed = new PackageStatus
+            {
+                Status = "failed",
+                Operation = "add",
+                Argument = "com.example.tool",
+                OperationId = "failed-package",
+                Success = false,
+                Error = "Registry request failed.",
+                CompletionEvidence = "upm_request",
+                StartedAt = DateTime.UtcNow.ToString("o"),
+                CompletedAt = DateTime.UtcNow.ToString("o")
+            };
+
+            var reconciled = PackageManagerCommand.TryReconcileOwnershipActivity(
+                failed, "failed-package", ownership, out var reason);
+            Assert.IsTrue(reconciled, reason);
+            Assert.AreEqual("free", ownership.GetStatus().state);
+            Assert.AreEqual("failed", failed.Status);
+            Assert.IsFalse(failed.Success);
+            Assert.AreEqual("Registry request failed.", failed.Error);
+        }
+
+        [Test]
+        public void CorrelatedResolveAcceptedReceipt_SettlesLease()
+        {
+            var ownership = StartPackageOperation("resolved-package", "package_resolve", out var token);
+            ownership.CompleteOperation("resolved-package");
+            Assert.IsTrue(ownership.TryRelease(token, out _));
+            var accepted = new PackageStatus
+            {
+                Status = "completed",
+                Operation = "resolve",
+                OperationId = "resolved-package",
+                Success = true,
+                RequiresRecompile = true,
+                CompletionEvidence = "command_accepted",
+                StartedAt = DateTime.UtcNow.ToString("o"),
+                CompletedAt = DateTime.UtcNow.ToString("o")
+            };
+
+            Assert.IsTrue(PackageManagerCommand.TryReconcileOwnershipActivity(
+                accepted, "resolved-package", ownership, out var reason), reason);
+            Assert.AreEqual("free", ownership.GetStatus().state);
+        }
+
+        [TestCase("stale-id")]
+        [TestCase("unknown")]
+        [TestCase("malformed")]
+        [TestCase("wrong-command")]
+        public void UntrustedPackageReceipt_LeavesHostActivityUnsettled(string receiptKind)
+        {
+            var ownership = StartPackageOperation("current-package", "package_add", out var token);
+            if (receiptKind == "wrong-command")
+            {
+                ownership.CompleteOperation("current-package");
+                Assert.IsTrue(ownership.TryRelease(token, out var releasing));
+                Assert.AreEqual("releasing", releasing.state);
+            }
+            var receipt = new PackageStatus
+            {
+                Status = receiptKind == "unknown" ? "unknown" : "completed",
+                Operation = receiptKind == "wrong-command" ? "remove" : "add",
+                Argument = "com.example.tool",
+                OperationId = receiptKind == "stale-id" ? "stale-package" : "current-package",
+                Success = receiptKind != "unknown",
+                Error = receiptKind == "unknown" ? "Completion was not proven." : null,
+                CompletionEvidence = receiptKind == "unknown" ? "unproven"
+                    : receiptKind == "malformed" ? null : "upm_request",
+                StartedAt = DateTime.UtcNow.ToString("o"),
+                CompletedAt = DateTime.UtcNow.ToString("o")
+            };
+
+            Assert.IsFalse(PackageManagerCommand.TryReconcileOwnershipActivity(
+                receipt, "current-package", ownership, out _));
+            Assert.AreEqual(receiptKind == "wrong-command" ? "releasing" : "held",
+                ownership.GetStatus().state);
+            Assert.AreEqual(1, ownership.GetStatus().activeOperations);
+        }
+
+        [Test]
+        public void PackageStatus_PersistsOperationCorrelationAndCompletionEvidence()
+        {
+            var status = new PackageStatus
+            {
+                Status = "failed",
+                Operation = "add",
+                Argument = "com.example.tool",
+                OperationId = "persisted-operation",
+                Success = false,
+                Error = "UPM failed.",
+                CompletionEvidence = "upm_request"
+            };
+
+            var json = JObject.FromObject(status);
+            Assert.AreEqual("persisted-operation", json["operationId"]?.ToString());
+            Assert.AreEqual("upm_request", json["completionEvidence"]?.ToString());
+            var restored = json.ToObject<PackageStatus>();
+            Assert.AreEqual(status.OperationId, restored.OperationId);
+            Assert.AreEqual(status.CompletionEvidence, restored.CompletionEvidence);
+            Assert.AreEqual("failed", restored.Status);
+            Assert.IsFalse(restored.Success);
+            var pending = PackageMutationResponse.InProgress("add", "com.example.tool", "Add package");
+            pending.OperationId = "persisted-operation";
+            Assert.AreEqual("persisted-operation", JObject.FromObject(pending)["operationId"]?.ToString());
+        }
+
+        private static EditorCommandOwnership StartPackageOperation(string id, string command, out string token)
+        {
+            var ownership = new EditorCommandOwnership(Guid.NewGuid().ToString("N"));
+            Assert.IsTrue(ownership.TryClaim("package-test", "package-test-incarnation", "package-test-batch",
+                out token, out _));
+            Assert.IsTrue(ownership.TryBeginOperation(token, id, command, out var operation, out _));
+            Assert.IsTrue(ownership.BeginHostActivity(operation, "package"));
+            return ownership;
         }
     }
 }

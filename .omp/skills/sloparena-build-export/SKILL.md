@@ -36,7 +36,8 @@ its readiness, match count and authentication observations are not current proof
 
 - Ship only the approved source snapshot. Preserve unrelated edits; release
   approval does not implicitly authorize commits, pushes or installations.
-- Coordinate saved-source writers. Live Unity commands use the canonical gateway
+- Honor explicit source freezes; coordinate only affected writers for the approved
+  release snapshot, not the current Editor lease holder. Live Unity commands use the canonical gateway
   in `{planning-root}/scripts/unity-editor-gateway.ts`, your own runtime-issued
   `ORCA_TERMINAL_HANDLE`, and the current coordination protocol. Missing identity,
   blocked ownership or ambiguous settlement is a blocker, not permission.

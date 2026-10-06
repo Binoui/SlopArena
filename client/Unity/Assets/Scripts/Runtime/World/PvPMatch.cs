@@ -413,10 +413,8 @@ namespace SlopArena.Client.World
         }
 
         /// <summary>
-        /// While target-locked (ADR-0018 / issue #127): move the Cinemachine follow
-        /// target to the player↔locked-enemy midpoint so both fighters stay framed.
-        /// Restores the player follow target when unlocked or the target renderer
-        /// is missing (dead — the sim re-picks next tick).
+        /// Follow the authoritative locked enemy while keeping the camera anchored
+        /// on the player. Missing targets and unlock restore manual orbit behavior.
         /// </summary>
         private void UpdateLockCamera()
         {

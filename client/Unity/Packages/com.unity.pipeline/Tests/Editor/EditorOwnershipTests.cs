@@ -152,6 +152,22 @@ namespace Unity.Pipeline.Tests.Editor
         }
 
         [Test]
+        public void HostActivity_PersistsOriginatingCommandAcrossReload()
+        {
+            var ownership = new EditorCommandOwnership("host-command-session");
+            Assert.IsTrue(ownership.TryClaim("terminal", "incarnation", "batch", out var token, out _));
+            Assert.IsTrue(ownership.TryBeginOperation(token, "package-operation", "package_add", out var operation, out _));
+            Assert.IsTrue(ownership.BeginHostActivity(operation, "package"));
+
+            var serialized = JsonConvert.SerializeObject(ownership.SnapshotForPersistence());
+            var persisted = JsonConvert.DeserializeObject<EditorCommandOwnership.PersistenceState>(serialized);
+            Assert.AreEqual("package_add", persisted.HostActivities[0].Command);
+            var restored = new EditorCommandOwnership("host-command-session");
+            restored.Restore(persisted);
+            Assert.AreEqual("package_add", restored.SnapshotForPersistence().HostActivities[0].Command);
+        }
+
+        [Test]
         public void ManualRecovery_FreesSettledLease_RevokesTokenAndPersistsAcrossReload()
         {
             var manager = new EditorCommandOwnership("manual-recovery-session");
@@ -254,6 +270,34 @@ namespace Unity.Pipeline.Tests.Editor
 
             var released = await PostAsync("/api/editor-ownership/release", new { }, token);
             Assert.AreEqual((int)HttpStatusCode.OK, released.StatusCode);
+            Assert.AreEqual("free", released.Json["state"]?.ToString());
+        }
+
+        [Test]
+        public async Task PackageStatus_IsDispatchableDuringPackageHostActivity()
+        {
+            var token = await ClaimAsync("terminal", "incarnation", "package-status");
+            var ownership = m_Server.Ownership;
+            Assert.IsTrue(ownership.TryBeginOperation(token, "async-package-op", "package_add", out var operation, out _));
+            Assert.IsTrue(ownership.BeginHostActivity(operation, "package"));
+            ownership.CompleteOperation("async-package-op");
+
+            var response = await PostAsync("/api/exec", new
+            {
+                command = "package_status",
+                parameters = new { }
+            }, token);
+
+            Assert.AreEqual((int)HttpStatusCode.OK, response.StatusCode, response.Raw);
+            Assert.AreEqual(true, response.Json["success"]?.Value<bool>(), response.Raw);
+            Assert.AreEqual("held", ownership.GetStatus().state);
+            for (var attempt = 0; attempt < 100 && ownership.GetStatus().activeOperations != 1; attempt++)
+                await Task.Delay(10);
+            Assert.AreEqual(1, ownership.GetStatus().activeOperations);
+
+            ownership.CompleteHostActivity("async-package-op");
+            var released = await PostAsync("/api/editor-ownership/release", new { }, token);
+            Assert.AreEqual((int)HttpStatusCode.OK, released.StatusCode, released.Raw);
             Assert.AreEqual("free", released.Json["state"]?.ToString());
         }
 

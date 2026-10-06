@@ -36,6 +36,7 @@ LIVING_DOCS = {
     Path("docs/systems/hitstun-di.md"),
     Path("docs/systems/netcode-architecture.md"),
     Path("docs/contributing/conventions.md"),
+    Path("docs/contributing/quality.md"),
     Path("docs/contributing/unity-cli.md"),
     Path(".omp/skills/sloparena-character-workflow/SKILL.md"),
     Path(".omp/skills/sloparena-combat-engine/SKILL.md"),
@@ -79,6 +80,55 @@ LEGACY_OR_WARNING = re.compile(
 # Inline Markdown links. Reference-style links are intentionally outside this
 # check because their destinations are not recoverable without a full Markdown AST.
 MARKDOWN_LINK = re.compile(r"(?<!!)\[[^\]]*\]\(([^)\s]+)(?:\s+[^)]*)?\)")
+QUALITY_CODE_BLOCK = re.compile(r"(?m)^```(?:bash|sh)\s*\n(.*?)^```\s*$", re.DOTALL)
+QUALITY_COMMAND = re.compile(
+    r"(?m)^\s*(?:make\s+(?P<make>[A-Za-z0-9_.-]+)|"
+    r"dotnet\s+(?:build|test)\s+(?P<dotnet>[^-\s\\][^\s\\]*)|"
+    r"python3?\s+-m\s+unittest\s+discover\s+-s\s+(?P<unittest_start>[^\s]+)\s+"
+    r"-p\s+['\"]?(?P<unittest_pattern>[^'\"\s]+)|"
+    r"python3?\s+(?P<python>[^-\s\\][^\s\\]*)|bun\s+(?P<bun>[^-\s\\][^\s\\]*))"
+)
+QUALITY_REFERENCED_PATH = re.compile(r"`(?P<path>(?:[A-Za-z0-9_.-]+/)*[A-Za-z0-9_.-]+)`")
+
+
+def check_quality_commands(errors: list[str], files: list[Path]) -> None:
+    source = Path("docs/contributing/quality.md")
+    if source not in files:
+        return
+    text = (ROOT / source).read_text(encoding="utf-8", errors="replace")
+    for match in QUALITY_REFERENCED_PATH.finditer(text):
+        target = match.group("path")
+        if "/" not in target and not target.endswith((".csproj", ".sln")):
+            continue
+        if not (ROOT / target).is_file():
+            line = text.count("\n", 0, match.start()) + 1
+            errors.append(f"{source}:{line}: missing referenced workflow/script/project {target}")
+    for block in QUALITY_CODE_BLOCK.finditer(text):
+        for match in QUALITY_COMMAND.finditer(block.group(1)):
+            make_target = match.group("make")
+            unittest_start = match.group("unittest_start")
+            unittest_pattern = match.group("unittest_pattern")
+            target = make_target or match.group("dotnet") or match.group("python") or match.group("bun") or unittest_start
+            if make_target:
+                makefile = ROOT / "Makefile"
+                targets: set[str] = set()
+                if makefile.is_file():
+                    for line in makefile.read_text(encoding="utf-8", errors="replace").splitlines():
+                        if line and not line[0].isspace() and ":" in line:
+                            targets.update(line.split(":", 1)[0].split())
+                exists = make_target in targets
+            elif unittest_start:
+                test_dir = ROOT / unittest_start
+                exists = test_dir.is_dir() and any(path.is_file() for path in test_dir.glob(unittest_pattern))
+            elif match.group("python") or match.group("bun") or target.endswith((".csproj", ".sln")):
+                exists = (ROOT / target).is_file()
+            else:
+                exists = (ROOT / target).is_dir()
+            if not exists:
+                line = text.count("\n", 0, block.start(1) + match.start()) + 1
+                errors.append(f"{source}:{line}: missing executable target/path {target}")
+
+
 
 
 def markdown_files() -> list[Path]:
@@ -196,6 +246,7 @@ def main() -> int:
         return 1
     check_links(errors, files)
     check_forbidden_terms(errors, files)
+    check_quality_commands(errors, files)
     check_canonical_paths(errors)
     if errors:
         print("Documentation checks failed:")

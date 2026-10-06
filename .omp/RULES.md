@@ -13,8 +13,10 @@
   from the active pane. Wait for your own lease, run/restoration, then settled release;
   no ordinary owner-inbox verification delegation. Runtime status is authoritative,
   historical ownership records are not. `blocked`/unknown/ambiguous work never permits takeover.
-  Coordinate source writers before imports/plugin copies/reload/restart. Offline player/release
-  builds retain separate approval and confirmed-closed-project requirements.
+  Coordinate only concrete overlapping source writes or explicitly required stable-source
+  verification; honor existing freezes. Routine gateway work needs no owner messages or
+  blanket acknowledgments. Plugin copies still require your own bounded lease. Offline
+  player/release builds retain separate approval and confirmed-closed-project requirements.
   NEVER use raw unowned Editor commands, removed Unity MCP tools, `gamedev-mcp-server`,
   `localhost:26356`, or deleted `scripts/mcp-*.sh` wrappers. Follow `docs/contributing/unity-cli.md`.
 - General verification follows [`docs/testing.md`](../docs/testing.md).
