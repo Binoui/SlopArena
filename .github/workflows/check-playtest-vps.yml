@@ -1,0 +1,37 @@
+name: Check Playtest VPS
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+concurrency:
+  group: sloparena-playtest-release
+  cancel-in-progress: false
+
+
+jobs:
+  check:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment: playtest-vps
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Bring up the private WireGuard peer
+        env:
+          PLAYTEST_WIREGUARD_CONFIG: ${{ secrets.PLAYTEST_WIREGUARD_CONFIG }}
+        run: bash scripts/playtest-vps-network.sh up
+      - name: Verify pinned SSH and refusal boundaries
+        env:
+          PLAYTEST_SSH_HOST: ${{ vars.PLAYTEST_SSH_HOST }}
+          PLAYTEST_SSH_PORT: ${{ vars.PLAYTEST_SSH_PORT }}
+          PLAYTEST_SSH_USER: ${{ vars.PLAYTEST_SSH_USER }}
+          PLAYTEST_SSH_PRIVATE_KEY: ${{ secrets.PLAYTEST_SSH_PRIVATE_KEY }}
+          PLAYTEST_SSH_KNOWN_HOSTS: ${{ secrets.PLAYTEST_SSH_KNOWN_HOSTS }}
+        run: bash scripts/playtest-vps-network.sh check
+      - name: Tear down the private WireGuard peer and runner secrets
+        if: always()
+        run: bash scripts/playtest-vps-network.sh down

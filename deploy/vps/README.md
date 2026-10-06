@@ -57,8 +57,11 @@ Install the reviewed helper versions into the existing root-owned code directory
 sudo install -o root -g root -m 0644 \
   deploy/vps/release.py deploy/vps/recovery.py deploy/vps/ci_release.py \
   /opt/sloparena/deploy/vps/
-sudo install -o root -g root -m 0755 deploy/vps/ci-release-ssh \
-  /opt/sloparena/deploy/vps/ci-release-ssh
+sudo install -o root -g root -m 0755 \
+  deploy/vps/ci-release-ssh deploy/vps/ci-network-firewall \
+  /opt/sloparena/deploy/vps/
+sudo install -o root -g root -m 0755 deploy/vps/docker-firewall.sh \
+  /usr/local/sbin/sloparena-vps-docker-firewall
 sudo useradd --user-group --home-dir /var/lib/sloparena-ci --shell /bin/sh sloparena-ci
 sudo install -d -o root -g root -m 0755 /var/lib/sloparena-ci
 sudo install -d -o root -g sloparena-ci -m 0750 /var/lib/sloparena-ci/.ssh
@@ -68,6 +71,12 @@ Keep `/opt/sloparena`, its deployment directories, installed scripts/Compose
 files and their ancestors root-owned and not writable by the account/operator.
 Do not use a symlink into a writable Git checkout. The CI account must not join
 the Docker group or receive general sudo access.
+
+Before replacing an installed backup helper on a prepared host, inspect its
+private storage configuration and service arguments. The current helper requires
+the private `storage.json` and `--storage-config` described below; create them
+from the existing environment's real values without changing its credentials.
+Do not break a working backup timer by copying a new helper without its contract.
 
 Create a dedicated CI key privately. Install its public key as the single line
 below in `/var/lib/sloparena-ci/.ssh/authorized_keys`, owned by
@@ -91,54 +100,89 @@ excludes user-controlled imports/environment; the receiver adds only its trusted
 installed sibling directory. The SSH wrapper accepts the literal remote command
 `sloparena-release` and no arguments.
 
-### CI ingress without weakening management SSH
+### Private CI ingress without weakening management SSH
 
-GitHub-hosted runner addresses are not the workstation's management CIDR.
-Preserve the existing management listener/firewall. Either use already reviewed
-controlled CI egress, or provision a **separate CI-only SSH listener**. A dedicated
-Ubuntu listener can use the following root-owned configuration at
-`/etc/ssh/sshd_config.sloparena-ci`; port `2223` is explicit and IPv4-only:
+Use a dedicated WireGuard peer, not a public CI SSH listener or an allowlist of
+every hosted-runner network. The fixed profile is IPv4 UDP `51830`, interface
+`sloparena-ci`, server `10.253.253.1/32`, and CI peer `10.253.253.2/32`.
+The CI SSH daemon binds only `10.253.253.1:2223`. Preserve management SSH and its
+source restriction. Do not reset UFW, restart management SSH or introduce a
+provider default-deny cutover while provisioning this route.
 
-```text
-Port 2223
-AddressFamily inet
-ListenAddress 0.0.0.0
-PidFile /run/sshd-sloparena-ci.pid
-HostKey /etc/ssh/ssh_host_ed25519_key
-AuthorizedKeysFile /var/lib/sloparena-ci/.ssh/authorized_keys
-AllowUsers sloparena-ci
-AuthenticationMethods publickey
-PubkeyAuthentication yes
-PasswordAuthentication no
-KbdInteractiveAuthentication no
-PermitRootLogin no
-PermitTTY no
-AllowTcpForwarding no
-AllowAgentForwarding no
-X11Forwarding no
-PermitTunnel no
-PermitUserEnvironment no
-PermitUserRC no
-ForceCommand /opt/sloparena/deploy/vps/ci-release-ssh
-UsePAM yes
+Install WireGuard tools on the host after confirming the running kernel supports
+the module; no kernel upgrade or restart is required. Generate separate
+server/client keypairs privately. Keep the server configuration root-owned,
+mode `0600`, at `/etc/wireguard/sloparena-ci.conf`:
+
+```ini
+[Interface]
+Address = 10.253.253.1/32
+ListenPort = 51830
+PrivateKey = <private-server-key>
+PreUp = /usr/local/sbin/sloparena-vps-docker-firewall
+PreUp = /opt/sloparena/deploy/vps/ci-network-firewall up
+PostDown = /opt/sloparena/deploy/vps/ci-network-firewall down
+
+[Peer]
+PublicKey = <client-public-key>
+AllowedIPs = 10.253.253.2/32
 ```
 
-Validate with `sudo /usr/sbin/sshd -t -f /etc/ssh/sshd_config.sloparena-ci`.
-Run it through a dedicated systemd service whose `ExecStartPre` is that validation
-and whose `ExecStart` is
-`/usr/sbin/sshd -D -e -f /etc/ssh/sshd_config.sloparena-ci`; do not replace the
-existing management `ssh.service`. Permit **only reviewed CI source CIDRs** to
-TCP `2223` in both provider and host firewalls, keeping management SSH restricted.
-GitHub publishes hosted runner ranges through its [metadata API](https://docs.github.com/en/rest/meta/meta#get-github-meta-information);
-review/update them as infrastructure policy rather than opening management SSH
-to the world. Keep CI IPv6 closed unless separately reviewed. If no reviewed
-route exists, leave CI deployment disabled.
+Store the matching raw client configuration as the protected `playtest-vps`
+secret `PLAYTEST_WIREGUARD_CONFIG`; it must contain only this server route:
 
-Set the protected `playtest-vps` environment's host/user/port variables and pinned
-host-key secret only after verifying the new listener/key out of band. Port `2223`
-requires `[hostname]:2223` known-hosts entries. Confirm a malformed stdin candidate
-is refused and `ssh ... id`, interactive sessions and forwarding are rejected;
-do not submit a valid candidate merely to test authentication.
+```ini
+[Interface]
+Address = 10.253.253.2/32
+PrivateKey = <private-client-key>
+
+[Peer]
+PublicKey = <server-public-key>
+Endpoint = <approved-public-vps-ipv4>:51830
+AllowedIPs = 10.253.253.1/32
+PersistentKeepalive = 25
+```
+
+Never log/upload either configuration or retain unused temporary key files.
+The runner helper writes private files, brings up the tunnel, and tears it down
+on job settlement. Host INPUT admits only peer-to-server TCP `2223`, denies
+other tunnel traffic in both families, and the existing Docker-aware firewall
+drops tunnel forwarding before conntrack/bridge exceptions. Do not insert a
+competing FORWARD hook ahead of its unique-first DOCKER-USER policy.
+
+Permit encrypted IPv4 UDP `51830` in the host firewall. Review provider policy
+without changing existing management, web or Steam relay traffic. Keep CI IPv6
+closed. Allow only `10.253.253.2` to `10.253.253.1:2223` on `sloparena-ci`;
+do not open CI SSH on the public interface.
+
+Install the reviewed private listener assets:
+
+```bash
+sudo install -o root -g root -m 0644 deploy/vps/sshd_config.sloparena-ci \
+  /etc/ssh/sshd_config.sloparena-ci
+sudo install -o root -g root -m 0644 deploy/vps/sloparena-ci-ssh.service \
+  /etc/systemd/system/sloparena-ci-ssh.service
+sudo /usr/sbin/sshd -t -f /etc/ssh/sshd_config.sloparena-ci
+sudo systemctl daemon-reload
+sudo systemctl enable --now wg-quick@sloparena-ci.service
+sudo systemctl enable --now sloparena-ci-ssh.service
+sudo /opt/sloparena/deploy/vps/ci-network-firewall --verify
+sudo /usr/local/sbin/sloparena-vps-docker-firewall --verify
+```
+
+The separate SSH service depends on WireGuard and never replaces `ssh.service`.
+Set protected `PLAYTEST_SSH_HOST=10.253.253.1`, `PLAYTEST_SSH_PORT=2223` and
+`PLAYTEST_SSH_USER=sloparena-ci` after listener/key verification. Pin the existing
+trusted host's Ed25519 key as `[10.253.253.1]:2223` in
+`PLAYTEST_SSH_KNOWN_HOSTS`; never disable host-key checking. Store the dedicated
+CI private key in `PLAYTEST_SSH_PRIVATE_KEY`.
+
+Run **Check Playtest VPS** on `main`, with the normal protected VPS approval.
+It proves the hosted tunnel and pinned SSH route, malformed-candidate refusal,
+shell/TTY/forwarding denial and private runner cleanup. No valid candidate,
+client build, Steam upload or deployment is performed. Namespace packet tests
+also prove forbidden INPUT/forwarding against live isolated listeners, without
+changing the host's operational rules.
 
 ### Candidate handling and recovery
 

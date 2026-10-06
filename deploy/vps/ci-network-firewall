@@ -1,0 +1,84 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+readonly IPV4_CHAIN=SLOPARENA-CI-INPUT
+readonly IPV6_CHAIN=SLOPARENA-CI6-INPUT
+readonly IFACE=sloparena-ci
+
+usage() { echo "usage: $0 up|down|--verify" >&2; exit 2; }
+[[ $# == 1 ]] || usage
+case "$1" in up|down|--verify) action=$1 ;; *) usage ;; esac
+for tool in iptables ip6tables; do
+  command -v "$tool" >/dev/null || { echo "missing required firewall tool: $tool" >&2; exit 1; }
+done
+
+configure_family() {
+  local tool=$1 chain=$2 family=$3 expected_count=0 actual_count
+  local -a rules
+  if [[ $family == ipv4 ]]; then
+    rules=("-i $IFACE -s 10.253.253.2/32 -d 10.253.253.1/32 -p tcp --dport 2223 -j ACCEPT"
+           "-i $IFACE -j DROP")
+  else
+    rules=("-i $IFACE -j DROP")
+  fi
+
+  if [[ $action == down ]]; then
+    while "$tool" -w -C INPUT -j "$chain" 2>/dev/null; do
+      "$tool" -w -D INPUT -j "$chain"
+    done
+    if "$tool" -w -S "$chain" >/dev/null 2>&1; then
+      "$tool" -w -F "$chain"
+      "$tool" -w -X "$chain"
+    fi
+    return
+  fi
+
+  if [[ $action == up ]]; then
+    local hook_count chain_exists=false
+    "$tool" -w -S "$chain" >/dev/null 2>&1 && chain_exists=true
+    hook_count=$("$tool" -w -S INPUT | grep -Ec "^-A INPUT -j $chain$" || true)
+    ((hook_count <= 1)) || { echo "$tool INPUT has duplicate $chain hooks" >&2; return 1; }
+    if [[ $chain_exists == false ]]; then
+      "$tool" -w -N "$chain"
+    fi
+    if ((hook_count == 0)); then
+      "$tool" -w -F "$chain"
+      for rule in "${rules[@]}"; do
+        read -r -a args <<< "$rule"
+        "$tool" -w -A "$chain" "${args[@]}"
+      done
+      "$tool" -w -I INPUT 1 -j "$chain"
+    else
+      # Reposition an existing hook without opening an unfiltered INPUT gap.
+      local -a input_rules
+      mapfile -t input_rules < <("$tool" -w -S INPUT | grep '^-A INPUT')
+      if [[ ${input_rules[0]:-} != "-A INPUT -j $chain" ]]; then
+        local index
+        for index in "${!input_rules[@]}"; do
+          if [[ ${input_rules[index]} == "-A INPUT -j $chain" ]]; then
+            "$tool" -w -I INPUT 1 -j "$chain"
+            "$tool" -w -D INPUT "$((index + 2))"
+            break
+          fi
+        done
+      fi
+    fi
+  fi
+
+  "$tool" -w -C INPUT -j "$chain"
+  [[ $("$tool" -w -S INPUT | grep '^-A INPUT' | sed -n '1p') == "-A INPUT -j $chain" ]] || {
+    echo "$tool $chain hook is not first in INPUT" >&2; return 1;
+  }
+  for rule in "${rules[@]}"; do
+    read -r -a args <<< "$rule"
+    "$tool" -w -C "$chain" "${args[@]}"
+    ((expected_count+=1))
+  done
+  actual_count=$("$tool" -w -S "$chain" | grep -c "^-A $chain")
+  [[ $actual_count == "$expected_count" ]] || {
+    echo "$tool $chain contains unexpected firewall rules" >&2; return 1;
+  }
+}
+
+configure_family iptables "$IPV4_CHAIN" ipv4
+configure_family ip6tables "$IPV6_CHAIN" ipv6

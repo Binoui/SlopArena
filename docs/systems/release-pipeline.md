@@ -49,8 +49,9 @@ not authorize incompatible rollback or destructive database recovery.
 
 **Final human action:** open the Steamworks builds link in the successful job
 summary and set the recorded **BuildID** live on the Playtest default branch.
-No CI secret grants or code path performs this activation. Then exercise the
-packaged-client match/rematch acceptance described below.
+No workflow code activates a Steam branch. Valve's minimum builder permissions
+are broader than upload-only; keep default promotion a separate operator action.
+Then exercise the packaged-client match/rematch acceptance described below.
 
 ### One-time configuration
 
@@ -70,15 +71,20 @@ repository in Master's Actions settings.
 | `playtest-build` variable | `PLAYTEST_MASTER_URL` | Approved HTTPS Master endpoint, currently `https://master-test.sloparena.barakaslurp.fr`; must equal the compiled client endpoint and private VPS test host. |
 | `playtest-build` variable | `STEAM_BUILD_USER` | Dedicated Steam account with permission to upload only this Playtest app/depot. |
 | `playtest-build` secret | `STEAM_CONFIG_VDF` | Single-line base64 (`base64 -w0` on Linux) of the builder account's authenticated SteamCMD `config.vdf`; obtain/renew it in a private local SteamCMD session with Steam Guard, not in chat or CI logs. |
-| `playtest-vps` variables | `PLAYTEST_SSH_HOST`, `PLAYTEST_SSH_PORT`, `PLAYTEST_SSH_USER` | Explicit reviewed VPS and restricted deployment account. |
+| `playtest-vps` variables | `PLAYTEST_SSH_HOST`, `PLAYTEST_SSH_PORT`, `PLAYTEST_SSH_USER` | Private WireGuard endpoint `10.253.253.1`, port `2223`, restricted account `sloparena-ci`. |
 | `playtest-vps` secrets | `PLAYTEST_SSH_PRIVATE_KEY`, `PLAYTEST_SSH_KNOWN_HOSTS` | Dedicated noninteractive CI key and out-of-band-verified OpenSSH host-key lines (including `[host]:port` for a nondefault port). Never disable host-key checking. |
+| `playtest-vps` secret | `PLAYTEST_WIREGUARD_CONFIG` | Raw dedicated client WireGuard configuration, with private peer key and only `10.253.253.1/32` allowed. Keep it out of logs/artifacts; the workflow creates/removes it privately on the hosted runner. |
 
 Install the forced-command account and root-owned helper using the
 [VPS CI setup](../../deploy/vps/README.md#restricted-ci-release-account).
 The existing VPS profile, private files, registry pull authorization, firewall
 policy and successful off-host backup service must already be configured.
-Hosted runner SSH ingress requires a reviewed provider/host policy; do not open
-management SSH globally or run bootstrap again merely to accommodate CI.
+The protected deployment job opens a dedicated WireGuard link, connects only to
+private CI SSH, then tears the tunnel down even on failure. The host admits the
+encrypted IPv4 UDP endpoint, restricts tunnel INPUT to the pinned CI SSH peer,
+and denies forwarding into Docker/backend networks. Do not widen management SSH,
+expose CI SSH publicly, enable a new provider default-deny policy, or rerun
+bootstrap merely to accommodate CI.
 
 Receipts are sanitized; Steam session files, raw SteamCMD output, private VPS
 environment files and Docker logs are not uploaded. A failed/ambiguous deploy is
@@ -86,6 +92,11 @@ not success: inspect private host status/events before another action. Use a new
 workflow run for a new candidate. A release ID is immutable, so rerunning the full
 pipeline after deployment can produce a different Steam BuildID/image digest and
 be rejected instead of overwriting the old release.
+
+Use the manual **Check Playtest VPS** workflow on `main` to verify the tunnel,
+pinned SSH key and candidate/shell/TTY/forwarding refusals independently of a
+release. It uses the same protected `playtest-vps` approval and submits no valid
+candidate, builds no client, uploads nothing to Steam and performs no deployment.
 
 The numbered sections below are the **manual fallback**. Do not repeat their
 build/upload/deploy steps alongside a running CI release.

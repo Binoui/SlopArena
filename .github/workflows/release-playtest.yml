@@ -234,6 +234,10 @@ jobs:
         with:
           name: playtest-upload-receipts
           path: build/playtest
+      - name: Open the private VPS deployment tunnel
+        env:
+          PLAYTEST_WIREGUARD_CONFIG: ${{ secrets.PLAYTEST_WIREGUARD_CONFIG }}
+        run: bash scripts/playtest-vps-network.sh up
       - name: Deploy through the fixed restricted SSH command
         env:
           PLAYTEST_SSH_HOST: ${{ vars.PLAYTEST_SSH_HOST }}
@@ -244,6 +248,9 @@ jobs:
         run: |
           python3 scripts/playtest-release.py deploy --candidate build/playtest/candidate-public.json \
             --output build/playtest/release.json
+      - name: Close the private VPS deployment tunnel
+        if: always()
+        run: bash scripts/playtest-vps-network.sh down
       - name: Publish resumable sanitized release evidence
         if: always()
         uses: actions/upload-artifact@v7

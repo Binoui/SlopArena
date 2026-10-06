@@ -5,6 +5,8 @@ set -euo pipefail
 expected_policy() {
   local tool=$1 chain=$2
   printf '%s\n' \
+    "-A $chain -i sloparena-ci -j DROP" \
+    "-A $chain -o sloparena-ci -j DROP" \
     "-A $chain -m conntrack --ctstate RELATED,ESTABLISHED -j RETURN" \
     "-A $chain -i docker0 -j RETURN" \
     "-A $chain -i br+ -j RETURN" \
