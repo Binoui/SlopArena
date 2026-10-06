@@ -11,6 +11,46 @@ import recovery
 import release
 
 
+class ImageProvenanceTests(unittest.TestCase):
+    reference = "ghcr.io/binoui/sloparena-gameserver@sha256:" + "a" * 64
+
+    def image(self):
+        return {
+            "RepoDigests": [self.reference],
+            "Config": {"Labels": {
+                "org.opencontainers.image.revision": "revision",
+                "org.opencontainers.image.version": "release",
+            }},
+        }
+
+    def test_registry_refusal_blocks_even_matching_local_image_metadata(self):
+        def registry_refusal(event, name, argv, **kwargs):
+            if argv[:3] == ["docker", "image", "inspect"]:
+                return json.dumps([self.image()])
+            raise release.CommandFailure(name, 1, "manifest unknown")
+
+        with patch.object(release, "step", side_effect=registry_refusal):
+            with self.assertRaisesRegex(release.CommandFailure, "manifest unknown"):
+                release.inspect_image({}, self.reference, "revision", "release", {})
+
+    def test_pulled_image_must_match_digest_revision_and_release(self):
+        for mismatch in ("digest", "revision", "release"):
+            with self.subTest(mismatch=mismatch):
+                image = self.image()
+                if mismatch == "digest":
+                    image["RepoDigests"] = [self.reference[:-1] + "b"]
+                else:
+                    label = "revision" if mismatch == "revision" else "version"
+                    image["Config"]["Labels"]["org.opencontainers.image." + label] = "wrong"
+
+                def pulled_image(event, name, argv, **kwargs):
+                    return json.dumps([image]) if argv[:3] == ["docker", "image", "inspect"] else ""
+
+                with patch.object(release, "step", side_effect=pulled_image):
+                    with self.assertRaises(release.ReleaseError):
+                        release.inspect_image({}, self.reference, "revision", "release", {})
+
+
 class PublishedPortsTests(unittest.TestCase):
     @staticmethod
     def config():

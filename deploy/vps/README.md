@@ -47,6 +47,13 @@ sudo python3 deploy/vps/release.py rollback \
 
 The deployment lock serializes changes; image/digest/label, DNS and Compose checks precede writer disruption. Deployment and rollback of an active release also require fresh Master heartbeat evidence of zero active matches immediately before stopping writers; stale/unavailable registration is not zero. Schema changes stop writers, require a successful `pg_dump` before running the pinned EF bundle, then check the applied migration. Keep an off-host copy of the pre-migration backup before relying on disaster recovery. Do not use `down -v`, destructive prune, or runtime-config rsync.
 
+Registry provenance uses Docker Engine pulls of each exact digest before checking
+the local RepoDigest and application revision/version labels. Do not replace this
+with standalone `docker manifest inspect`: Docker 29.1.3 rejects some valid OCI
+indexes even when the registry response bytes match the pin. A cached local image
+does not exempt a production release from registry-backed pull verification;
+only disposable application-image fixtures have that explicit exemption.
+
 A prior raw-UDP release record may remain readable for preflight, but it must not be restored through a Steam-only deployment as an insecure public fallback. If migration or compatibility checks fail, pause new matches and repair/roll forward.
 
 ## Restricted CI release account

@@ -463,6 +463,11 @@ def check_published_ports(config: dict[str, Any], disposable: bool) -> None:
 
 
 def inspect_image(event: dict[str, Any], reference: str, expected_revision: str | None, expected_release: str | None, env: dict[str, str], allow_local_image_id: bool = False) -> None:
+    if not allow_local_image_id:
+        # Engine pull verifies registry bytes for the exact pin, including OCI indexes.
+        # Local-only RepoDigest aliases cannot satisfy a registry-backed pull.
+        step(event, f"pull_image_{hashlib.sha256(reference.encode()).hexdigest()[:10]}",
+             ["docker", "pull", reference], env=env)
     output = step(event, f"inspect_image_{hashlib.sha256(reference.encode()).hexdigest()[:10]}", ["docker", "image", "inspect", reference], env=env)
     try:
         image = json.loads(output)[0]
@@ -474,12 +479,6 @@ def inspect_image(event: dict[str, Any], reference: str, expected_revision: str 
     canonical_reference = f"{match.group(1)}@sha256:{digest}"
     if canonical_reference not in repo_digests:
         raise ReleaseError(f"image {reference} is not available under that exact RepoDigest")
-    if not allow_local_image_id:
-        # Docker's image ID may equal a genuine pulled manifest digest (Docker 29).
-        # Ask the registry for the exact reference; local-only pseudo digests
-        # cannot pass this check even when their RepoDigests look identical.
-        step(event, f"registry_manifest_{hashlib.sha256(reference.encode()).hexdigest()[:10]}",
-             ["docker", "manifest", "inspect", reference], env=env)
     labels = (image.get("Config") or {}).get("Labels") or {}
     if expected_revision is not None and labels.get("org.opencontainers.image.revision") != expected_revision:
         raise ReleaseError(f"image {reference} revision label does not match source_revisions")
@@ -489,15 +488,14 @@ def inspect_image(event: dict[str, Any], reference: str, expected_revision: str 
 
 def prepare_release(event: dict[str, Any], target: Path, manifest: dict[str, Any], env_file: Path, override: Path | None, env: dict[str, str], allow_local_image_ids: bool = False) -> dict[str, Any]:
     config = image_config(event, target, env_file, override, env, manifest)
-    pull_services = ("caddy", "postgres") if allow_local_image_ids else SERVICES
-    step(event, "pull_pinned_images", compose_argv(target, env_file, override, ["--profile", "migration", "pull", *pull_services]), env=env)
     if allow_local_image_ids:
         event["image_identity_mode"] = "explicit disposable local-image-ID fixtures; not registry provenance"
     for service, reference in event["compose_images"].items():
         revision_key = APP_IMAGES.get(service)
         expected_revision = manifest["source_revisions"][revision_key] if revision_key else None
         expected_release = manifest["release_id"] if revision_key else None
-        inspect_image(event, reference, expected_revision, expected_release, env, allow_local_image_ids)
+        inspect_image(event, reference, expected_revision, expected_release, env,
+                      allow_local_image_ids and service in APP_IMAGES)
     return config
 
 
