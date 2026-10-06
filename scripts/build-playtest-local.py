@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -212,6 +213,44 @@ def project_is_open(project: Path) -> bool:
     return False
 
 
+def stage_local_dependencies(local_project: Path, checkout: Path, evidence: Path) -> None:
+    local_project = local_project.resolve(strict=True)
+    source_root = Path(run_capture(["git", "rev-parse", "--show-toplevel"], local_project,
+                                   "Local Unity dependency source is not a Git checkout").strip()).resolve()
+    if local_project != source_root / "client/Unity":
+        raise BuildError("Local dependency source must be that checkout's client/Unity project")
+    if not (local_project / "Packages/com.kybernetik.animancer/package.json").is_file():
+        raise BuildError("Local dependency source lacks the installed licensed Animancer package")
+    paths = run_capture(["git", "ls-files", "--others", "--ignored", "--exclude-standard", "-z", "--",
+                         "client/Unity/Assets", "client/Unity/Packages"], source_root,
+                        "Could not enumerate ignored local Unity dependencies").split("\0")
+    generated = ("client/Unity/Assets/Generated/", "client/Unity/Assets/Resources/Generated/",
+                 "client/Unity/Assets/Plugins/SlopArena.Shared/", "client/Unity/Assets/Temp/")
+    hashes = {}
+    for name in paths:
+        if not name or name.startswith(generated):
+            continue
+        relative = Path(name)
+        if any(part.startswith(".") for part in relative.parts) or relative.suffix in (".pdb", ".log"):
+            continue
+        source = source_root / relative
+        if not source.is_file():
+            continue
+        if not source.resolve().is_relative_to(local_project):
+            raise BuildError(f"Local dependency resolves outside the supplied project: {name}")
+        destination = checkout / relative
+        if destination.exists() or destination.is_symlink():
+            raise BuildError(f"Local dependency would replace committed source: {name}")
+        before = hashlib.sha256(source.read_bytes()).hexdigest()
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, destination)
+        if hashlib.sha256(destination.read_bytes()).hexdigest() != before:
+            raise BuildError(f"Local dependency changed while copying: {name}")
+        hashes[name] = before
+    (evidence / "local-dependencies.json").write_text(json.dumps(hashes, indent=2, sort_keys=True) + "\n")
+    reject_project_symlinks(checkout / "client/Unity")
+
+
 def run(args: argparse.Namespace) -> dict:
     root = Path(__file__).resolve().parents[1]
     editor = check_editor(args.unity_editor)
@@ -254,6 +293,8 @@ def run(args: argparse.Namespace) -> dict:
         raise BuildError("Isolated build output root is symlinked or not a directory")
     if project_is_open(project):
         raise BuildError("Isolated Unity project is already open in an Editor; refusing batchmode")
+
+    stage_local_dependencies(args.local_unity_project or canonical_project, checkout, evidence)
 
     shared_log = evidence / "shared-build.log"
     run_logged(["dotnet", "build", "src/Shared/", "--configuration", "Release", "--nologo"], checkout,
@@ -334,6 +375,8 @@ def parser() -> argparse.ArgumentParser:
     result.add_argument("--source-revision", required=True, type=revision_arg)
     result.add_argument("--endpoint", required=True, type=endpoint_arg)
     result.add_argument("--unity-editor", type=unity_path_arg, default=Path(DEFAULT_UNITY))
+    result.add_argument("--local-unity-project", type=Path,
+                        help="Read ignored licensed dependencies from this checkout's client/Unity; never writes there")
     return result
 
 

@@ -38,6 +38,17 @@ exact cooked payloads, endpoint, version, native libraries and attribution.
 it is injected only into the isolated build project. Failed builds produce no
 publish-ready archive; their local logs are retained for diagnosis.
 
+The workstation must also contain the required licensed, gitignored Unity inputs
+(including `Packages/com.kybernetik.animancer`). The wrapper copies ignored local
+assets/packages into the isolated project, excluding generated Shared/cook/temp
+outputs, hidden files and debug logs. It never symlinks to the open Editor or
+replaces committed source. Dependency hashes stay in private local evidence;
+restricted source assets and build logs are not GitHub release assets.
+When launching from a separate clean checkout while canonical work is dirty,
+pass `--local-unity-project /absolute/path/to/SlopArena/client/Unity` to select
+those read-only local dependencies explicitly. Uncommitted tracked edits are
+not copied or shipped.
+
 The action first requires the matching `playtest-client-<version>` prerelease
 tag to point to the **dispatched main commit**. It checks the archive's GitHub
 SHA-256 digest, refuses unsafe or unexpected archive members and verifies the
