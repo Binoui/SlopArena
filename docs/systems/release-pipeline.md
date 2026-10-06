@@ -49,6 +49,12 @@ pass `--local-unity-project /absolute/path/to/SlopArena/client/Unity` to select
 those read-only local dependencies explicitly. Uncommitted tracked edits are
 not copied or shipped.
 
+Package/toolchain input changes can invalidate accepted cook provenance even
+when gameplay and poses are unchanged. Resolve freshness through the approved
+[package cook/verify/admission workflow](../characters/adding-a-new-character.md)
+and publish the updated package/roster pins **before** selecting the client source
+commit. The build never silently recooks, relabels or bypasses that acceptance.
+
 The action first requires the matching `playtest-client-<version>` prerelease
 tag to point to the **dispatched main commit**. It checks the archive's GitHub
 SHA-256 digest, refuses unsafe or unexpected archive members and verifies the
