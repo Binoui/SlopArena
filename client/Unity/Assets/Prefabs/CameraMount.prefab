@@ -278,3 +278,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 920e321ce107d8c0fa05b1abf0346b9e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  _assistLockedTarget: 0
+  _lockYawDeadZone: 20
+  _lockYawSpeed: 60
+  _lockYawResponse: 4
+  _lockManualGraceSeconds: 0.75
