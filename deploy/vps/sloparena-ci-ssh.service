@@ -4,7 +4,7 @@ Requires=ssh.service wg-quick@sloparena-ci.service
 After=ssh.service wg-quick@sloparena-ci.service
 
 [Service]
-Type=simple
+Type=notify
 ExecStartPre=/usr/sbin/sshd -t -f /etc/ssh/sshd_config.sloparena-ci
 ExecStartPre=/opt/sloparena/deploy/vps/ci-network-firewall --verify
 ExecStartPre=/usr/local/sbin/sloparena-vps-docker-firewall --verify

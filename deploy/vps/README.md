@@ -171,6 +171,8 @@ sudo /usr/local/sbin/sloparena-vps-docker-firewall --verify
 ```
 
 The separate SSH service depends on WireGuard and never replaces `ssh.service`.
+OpenSSH's readiness notification settles `systemctl start` after listener setup,
+so initial private SSH verification cannot race daemon startup.
 Set protected `PLAYTEST_SSH_HOST=10.253.253.1`, `PLAYTEST_SSH_PORT=2223` and
 `PLAYTEST_SSH_USER=sloparena-ci` after listener/key verification. Pin the existing
 trusted host's Ed25519 key as `[10.253.253.1]:2223` in
