@@ -97,6 +97,8 @@ Use the manual **Check Playtest VPS** workflow on `main` to verify the tunnel,
 pinned SSH key and candidate/shell/TTY/forwarding refusals independently of a
 release. It uses the same protected `playtest-vps` approval and submits no valid
 candidate, builds no client, uploads nothing to Steam and performs no deployment.
+The TTY probe requires OpenSSH's explicit PTY-refusal message and exit 255:
+forced PTY refusal aborts the client before the forced command can return 126.
 
 The numbered sections below are the **manual fallback**. Do not repeat their
 build/upload/deploy steps alongside a running CI release.

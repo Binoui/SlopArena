@@ -70,7 +70,7 @@ case "${1-}" in
     unset PLAYTEST_SSH_PRIVATE_KEY PLAYTEST_SSH_KNOWN_HOSTS
     ssh_base=(ssh -i "$identity" -p "$ssh_port" -o BatchMode=yes -o IdentitiesOnly=yes
       -o StrictHostKeyChecking=yes -o "UserKnownHostsFile=$known_hosts" -o ConnectTimeout=15
-      -o LogLevel=ERROR)
+      -o LogLevel=INFO)
 
     candidate_status=0
     printf '%s\n' '{' | "${ssh_base[@]}" "$ssh_user@$server" sloparena-release >/dev/null 2>"$diagnostic" || candidate_status=$?
@@ -84,7 +84,7 @@ case "${1-}" in
 
     tty_status=0
     "${ssh_base[@]}" -tt "$ssh_user@$server" 'id' >/dev/null 2>"$diagnostic" || tty_status=$?
-    [[ "$tty_status" -eq 126 ]] && grep -Eq 'PTY allocation request failed|PTY allocation disabled' "$diagnostic" || fail 'VPS did not refuse the TTY request'
+    [[ "$tty_status" -eq 255 ]] && grep -Eq 'PTY allocation request failed|PTY allocation disabled' "$diagnostic" || fail 'VPS did not refuse the TTY request'
     rm -f -- "$diagnostic"
 
     local_port="$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1]); s.close()')"
