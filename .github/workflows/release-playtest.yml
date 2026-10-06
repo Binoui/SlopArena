@@ -29,6 +29,7 @@ jobs:
   resolve:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
+    environment: playtest-build
     outputs:
       version: ${{ steps.source.outputs.version }}
       release_id: ${{ steps.source.outputs.release_id }}
@@ -56,6 +57,23 @@ jobs:
             --version "$VERSION" --source-revision "$GAME_REVISION" \
             --master-revision "$MASTER_REVISION" --migration-from "$MIGRATION_FROM" \
             --run-id "$RUN_ID"
+      - name: Fetch and verify the source-pinned local Windows client
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+          REVISION: ${{ github.sha }}
+          MASTER_URL: ${{ vars.PLAYTEST_MASTER_URL }}
+        run: |
+          python3 scripts/playtest-release.py fetch-client \
+            --version "$VERSION" --source-revision "$REVISION" --endpoint "$MASTER_URL"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: playtest-client
+          compression-level: 0
+          if-no-files-found: error
+          path: |
+            build/release/SlopArena-${{ inputs.version }}/
+            build/playtest/client.json
 
   gameplay:
     needs: resolve
@@ -79,82 +97,8 @@ jobs:
     secrets:
       publish_token: ${{ secrets.MASTER_RELEASE_TOKEN }}
 
-  client:
-    needs: resolve
-    runs-on: ubuntu-24.04
-    timeout-minutes: 90
-    environment: playtest-build
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.resolve.outputs.game_revision }}
-      - name: Verify the immutable source checkout before generated files
-        env:
-          RELEASE_SOURCE_REVISION: ${{ needs.resolve.outputs.game_revision }}
-        run: |
-          test "$(git rev-parse HEAD)" = "$RELEASE_SOURCE_REVISION"
-          test -z "$(git status --porcelain --untracked-files=all)"
-      - name: Inject the CI-only Editor build method
-        run: |
-          mkdir -p client/Unity/Assets/Editor
-          cp scripts/ci/PlaytestReleaseBuilder.cs client/Unity/Assets/Editor/PlaytestReleaseBuilder.cs
-      - uses: actions/setup-dotnet@v6
-        with:
-          dotnet-version: '8.0.x'
-      - name: Build the selected Shared plugin
-        run: dotnet build src/Shared/ -c Release --nologo
-      - name: Check Unity license configuration
-        env:
-          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
-          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
-          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
-          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
-          MASTER_URL: ${{ vars.PLAYTEST_MASTER_URL }}
-        run: |
-          test -n "$UNITY_EMAIL" && test -n "$UNITY_PASSWORD" && test -n "$MASTER_URL" || { echo 'Configure Unity credentials and PLAYTEST_MASTER_URL in playtest-build'; exit 1; }
-          test -n "$UNITY_LICENSE" || test -n "$UNITY_SERIAL" || { echo 'Configure an activated Unity license or serial'; exit 1; }
-          [[ "$MASTER_URL" =~ ^https://[a-z0-9]([a-z0-9.-]*[a-z0-9])?$ ]] || { echo 'Master URL must be a plain HTTPS hostname, without whitespace or Unity arguments'; exit 1; }
-      - name: Build and verify the isolated Windows player
-        uses: game-ci/unity-builder@4423ee75828dff56037d1d1cfdac6b68e3a6ba00 # v4
-        env:
-          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
-          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
-          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
-          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
-        with:
-          projectPath: client/Unity
-          targetPlatform: StandaloneWindows64
-          unityVersion: 6000.0.78f1
-          customImage: unityci/editor@sha256:24b1f6790f97af0f11491fd78421641d1edcbbb14bd07899addaf731eefb54e1
-          buildMethod: PlaytestReleaseBuilder.Build
-          versioning: None
-          allowDirtyBuild: true
-          runAsHostUser: true
-          customParameters: >-
-            -releaseVersion ${{ needs.resolve.outputs.version }}
-            -releaseSourceRevision ${{ needs.resolve.outputs.game_revision }}
-            -releaseOutput build/release/SlopArena-${{ needs.resolve.outputs.version }}
-            -releaseReceipt build/playtest/client.json
-            -releaseMasterEndpoint ${{ vars.PLAYTEST_MASTER_URL }}
-      - name: Verify actual extracted package
-        env:
-          VERSION: ${{ needs.resolve.outputs.version }}
-          REVISION: ${{ needs.resolve.outputs.game_revision }}
-          MASTER_URL: ${{ vars.PLAYTEST_MASTER_URL }}
-        run: |
-          python3 scripts/playtest-release.py verify-client --client build/playtest/client.json \
-            --version "$VERSION" --source-revision "$REVISION" --endpoint "$MASTER_URL"
-      - uses: actions/upload-artifact@v7
-        with:
-          name: playtest-client
-          compression-level: 0
-          if-no-files-found: error
-          path: |
-            build/release/SlopArena-${{ needs.resolve.outputs.version }}/
-            build/playtest/client.json
-
   upload:
-    needs: [resolve, gameplay, master, client]
+    needs: [resolve, gameplay, master]
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     environment: playtest-build

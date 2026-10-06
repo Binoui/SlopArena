@@ -1,8 +1,13 @@
 """Consumer-visible refusal boundaries for the release coordinator."""
 import copy
 import importlib.util
+import io
 from pathlib import Path
+import tarfile
+import tempfile
+from types import SimpleNamespace
 import unittest
+from unittest import mock
 
 SPEC = importlib.util.spec_from_file_location("playtest_release", Path(__file__).with_name("playtest-release.py"))
 release = importlib.util.module_from_spec(SPEC)
@@ -130,5 +135,74 @@ class EnvironmentPolicyTests(unittest.TestCase):
                 release.require_environment_policy("playtest-vps", self.environment, rules)
 
 
+
+
+class ClientIntakeTests(unittest.TestCase):
+    version = "0.2.0-playtest.7"
+    revision = "a" * 40
+    endpoint = "https://master-test.sloparena.barakaslurp.fr"
+
+    def archive(self, entries):
+        stream = io.BytesIO()
+        with tarfile.open(fileobj=stream, mode="w:gz") as tar:
+            for name, kind in entries:
+                info = tarfile.TarInfo(name)
+                if kind == "link":
+                    info.type = tarfile.SYMTYPE
+                    info.linkname = "outside"
+                    tar.addfile(info)
+                elif kind == "dir":
+                    info.type = tarfile.DIRTYPE
+                    tar.addfile(info)
+                else:
+                    data = b"x"
+                    info.size = len(data)
+                    tar.addfile(info, io.BytesIO(data))
+        stream.seek(0)
+        return stream
+
+    def test_refuses_traversal_links_duplicates_and_extra_paths(self):
+        cases = (
+            [("build/playtest/client.json", "file"), ("build/release/SlopArena-" + self.version, "dir"),
+             ("build/release/SlopArena-" + self.version + "/../../outside", "file")],
+            [("build/playtest/client.json", "file"), ("build/playtest/client.json", "file"),
+             ("build/release/SlopArena-" + self.version, "dir")],
+            [("build/playtest/client.json", "file"), ("build/release/SlopArena-" + self.version, "dir"),
+             ("build/release/SlopArena-" + self.version + "/link", "link")],
+            [("build/playtest/client.json", "file"), ("build/release/SlopArena-" + self.version, "dir"),
+             ("extra/file", "file")],
+        )
+        for entries in cases:
+            with self.subTest(entries=entries), tarfile.open(fileobj=self.archive(entries), mode="r:gz") as tar:
+                with self.assertRaises(release.ReleaseError):
+                    release.safe_client_members(tar, self.version)
+
+    def test_mismatched_tag_source_refuses_before_download(self):
+        args = SimpleNamespace(version=self.version, source_revision=self.revision, endpoint=self.endpoint)
+        with mock.patch.object(release, "gh_release_json", return_value={
+                "tag_name": "playtest-client-" + self.version, "draft": False, "prerelease": True, "assets": []}), \
+             mock.patch.object(release, "gh_json", return_value={"sha": "b" * 40}), \
+             mock.patch.object(release.subprocess, "run") as run:
+            with self.assertRaises(release.ReleaseError):
+                release.fetch_client(args)
+            run.assert_not_called()
+
+    def test_corrupt_download_digest_refuses_before_extraction(self):
+        args = SimpleNamespace(version=self.version, source_revision=self.revision, endpoint=self.endpoint)
+        filename = f"SlopArena-{self.version}.tar.gz"
+        with tempfile.TemporaryDirectory() as root, \
+             mock.patch.object(release, "ROOT", Path(root)), \
+             mock.patch.object(release, "gh_release_json", return_value={
+                 "tag_name": "playtest-client-" + self.version, "draft": False, "prerelease": True,
+                 "assets": [{"name": filename, "digest": "sha256:" + "0" * 64}]}), \
+             mock.patch.object(release, "gh_json", return_value={"sha": self.revision}):
+            def download(command, **kwargs):
+                directory = Path(command[command.index("--dir") + 1])
+                (directory / filename).write_bytes(b"corrupt")
+                return SimpleNamespace(returncode=0)
+            with mock.patch.object(release.subprocess, "run", side_effect=download):
+                with self.assertRaises(release.ReleaseError):
+                    release.fetch_client(args)
+            self.assertFalse((Path(root) / "build").exists())
 if __name__ == "__main__":
     unittest.main()

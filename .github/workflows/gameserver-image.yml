@@ -28,7 +28,7 @@ on:
 
 jobs:
   image:
-    if: github.event_name == 'release' || github.ref == 'refs/heads/main'
+    if: (github.event_name == 'release' && !startsWith(github.event.release.tag_name, 'playtest-client-')) || (github.event_name != 'release' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
     permissions:
       contents: read

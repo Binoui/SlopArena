@@ -13,26 +13,43 @@ branch, service readiness, registration or match count.
 
 ## GitHub Actions — routine release
 
-After the workflow changes are published to both repositories' `main` branches
-and the one-time setup below is complete, dispatch from the game checkout:
+Push the approved source to game `main`, then build the client on the licensed
+workstation from that exact clean commit:
 
 ```bash
-gh workflow run release-playtest.yml --ref main -f 'version=0.2.0-playtest.<n>'
+version=0.2.0-playtest.7
+revision="$(git rev-parse HEAD)"
+python3 scripts/build-playtest-local.py --version "$version" \
+  --source-revision "$revision" --endpoint https://master-test.sloparena.barakaslurp.fr
+gh release create "playtest-client-$version" \
+  "build/playtest/$version/SlopArena-$version.tar.gz" \
+  --target "$revision" --prerelease --latest=false \
+  --title "Local Playtest client $version" \
+  --notes "Verified Windows client from game commit $revision. Not a Steam activation or VPS deployment."
+gh workflow run release-playtest.yml --ref main -f "version=$version"
 ```
 
-The run pins the gameplay commit and a full Master commit reachable from Master
-`main`, then builds/tests the backend images and an isolated Unity 6000.0.78f1
-Windows Mono player in parallel. `master_revision` optionally selects an older
-full Master SHA reachable from `main`; it is not a branch/tag input. The Editor
-build verifies canonical cooked packages without rewriting authoring data,
-restores settings/staging, and records the catalog identity from packaged content.
-The portable verifier checks packaged bytes, endpoint, version and attribution.
-The runner never borrows the workstation's open Unity Editor. Its CI-only method,
-`scripts/ci/PlaytestReleaseBuilder.cs`, lives outside the Unity asset tree; Actions
-copies it into `Assets/Editor` only in that runner's checkout. Editing this method
-does not trigger imports in the canonical development project.
+The local wrapper creates a fresh isolated checkout and runs the installed Unity
+`6000.0.78f1` using the workstation's existing Hub activation. It does not activate
+a license, copy into the open canonical Editor, or require Unity credentials in
+GitHub. The existing producer verifies authoring freshness, package admission,
+exact cooked payloads, endpoint, version, native libraries and attribution.
+`scripts/ci/PlaytestReleaseBuilder.cs` remains outside the canonical asset tree;
+it is injected only into the isolated build project. Failed builds produce no
+publish-ready archive; their local logs are retained for diagnosis.
 
-Only after all builds pass does SteamCMD upload depot **5325921** for app
+The action first requires the matching `playtest-client-<version>` prerelease
+tag to point to the **dispatched main commit**. It checks the archive's GitHub
+SHA-256 digest, refuses unsafe or unexpected archive members and verifies the
+actual packaged client against that source before building backend images.
+Pushing another commit requires a new matching local client; do not reuse an old
+binary by relabeling its receipt or moving an existing artifact tag.
+Use a new version and client-asset tag for each new source snapshot.
+Client-asset prereleases do not trigger backend image publication themselves.
+The run pins a full Master commit reachable from Master `main`; optional
+`master_revision` selects an approved full SHA, not a branch/tag.
+
+Only after client verification and all backend builds pass does SteamCMD upload depot **5325921** for app
 **5325920**. A zero process exit alone is insufficient: the coordinator requires
 one successful app BuildID, one new depot manifest, and matching generated depot
 metadata. Steam upload does **not** activate the default build.
@@ -67,7 +84,6 @@ repository in Master's Actions settings.
 | Scope | Name | Value/authority |
 |---|---|---|
 | Game repository secret | `MASTER_RELEASE_TOKEN` | Binoui-owned token able to read Master source and publish its GHCR packages; a classic PAT needs `repo` for private checkout and `write:packages`. Keep it out of artifacts. |
-| `playtest-build` secrets | `UNITY_EMAIL`, `UNITY_PASSWORD`, and either `UNITY_LICENSE` or `UNITY_SERIAL` | Valid headless Unity activation. `UNITY_LICENSE` is the raw `.ulf` contents, not base64; use the account/license procedure in [GameCI activation](https://game.ci/docs/github/activation/). |
 | `playtest-build` variable | `PLAYTEST_MASTER_URL` | Approved HTTPS Master endpoint, currently `https://master-test.sloparena.barakaslurp.fr`; must equal the compiled client endpoint and private VPS test host. |
 | `playtest-build` variable | `STEAM_BUILD_USER` | Dedicated Steam account with permission to upload only this Playtest app/depot. |
 | `playtest-build` secret | `STEAM_CONFIG_VDF` | Single-line base64 (`base64 -w0` on Linux) of the builder account's authenticated SteamCMD `config.vdf`; obtain/renew it in a private local SteamCMD session with Steam Guard, not in chat or CI logs. |

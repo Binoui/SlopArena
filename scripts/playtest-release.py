@@ -7,8 +7,9 @@ import base64
 import hashlib
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import re
+import shutil
 import subprocess
 import sys
 import tarfile
@@ -22,6 +23,7 @@ SHA = re.compile(r"[a-f0-9]{40}")
 VERSION = re.compile(r"[0-9]+\.[0-9]+\.[0-9]+-playtest\.[0-9]+")
 PAYLOADS = ("manifest.json", "character.runtime.json", "poses.bin", "client.bindings")
 MASTER_REPOSITORY = "Binoui/SlopArena-MasterServer"
+GAME_REPOSITORY = "Binoui/SlopArena"
 
 
 class ReleaseError(RuntimeError):
@@ -29,14 +31,7 @@ class ReleaseError(RuntimeError):
 
 
 def read_json(path: Path) -> dict:
-    def unique(pairs):
-        result = {}
-        for key, value in pairs:
-            if key in result:
-                raise ReleaseError(f"Duplicate JSON field: {key}")
-            result[key] = value
-        return result
-    value = json.loads(path.read_text(), object_pairs_hook=unique)
+    value = json.loads(path.read_text(), object_pairs_hook=_unique_pairs)
     if not isinstance(value, dict):
         raise ReleaseError("Release receipt must be a JSON object")
     return value
@@ -66,7 +61,7 @@ def validate_revision(value: str) -> str:
 def gh_json(route: str) -> dict:
     result = subprocess.run(["gh", "api", route], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
     if result.returncode:
-        raise ReleaseError("Cannot read approved Master source; check MASTER_RELEASE_TOKEN repository access")
+        raise ReleaseError("Cannot read the approved GitHub source; check the configured repository access token")
     return json.loads(result.stdout)
 
 
@@ -124,6 +119,156 @@ def resolve(args) -> None:
 def checksum(path: Path) -> str:
     with path.open("rb") as stream:
         return hashlib.file_digest(stream, "sha256").hexdigest()
+
+
+def validate_client_inputs(version: str, source_revision: str, endpoint: str) -> None:
+    validate_version(version)
+    validate_revision(source_revision)
+    require(endpoint, isinstance(endpoint, str) and len(endpoint) <= 256 and endpoint.startswith("https://")
+            and not any(char.isspace() or ord(char) < 32 for char in endpoint),
+            "Client Master endpoint must be a bounded HTTPS URL")
+
+
+def client_paths(root: Path, version: str) -> tuple[Path, Path]:
+    return root / "build/playtest/client.json", root / f"build/release/SlopArena-{version}"
+
+
+def pack_client(args) -> None:
+    validate_client_inputs(args.version, args.source_revision, args.endpoint)
+    root = args.client.resolve()
+    receipt, output = client_paths(root, args.version)
+    verify_client(read_json(receipt), args.version, args.source_revision, args.endpoint, root)
+    archive = args.output
+    require(archive, not archive.exists(), "Client archive already exists; refusing to overwrite")
+    archive.parent.mkdir(parents=True, exist_ok=True)
+    created = False
+    try:
+        with archive.open("xb") as stream:
+            created = True
+            with tarfile.open(fileobj=stream, mode="w:gz") as tar:
+                tar.add(receipt, arcname="build/playtest/client.json", recursive=False)
+                tar.add(output, arcname=f"build/release/SlopArena-{args.version}")
+    except Exception:
+        if created:
+            archive.unlink(missing_ok=True)
+        raise
+    print(f"Packed verified client artifact: {archive}")
+
+
+def gh_release_json(tag: str) -> dict:
+    result = subprocess.run(["gh", "api", f"repos/{GAME_REPOSITORY}/releases/tags/{tag}"],
+                            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+    if result.returncode:
+        raise ReleaseError("Cannot read the published client release with gh")
+    return json.loads(result.stdout)
+
+
+def safe_client_members(tar: tarfile.TarFile, version: str) -> list[tarfile.TarInfo]:
+    receipt_name = "build/playtest/client.json"
+    output_name = f"build/release/SlopArena-{version}"
+    ancestors = {"build", "build/playtest", "build/release"}
+    seen = set()
+    members = []
+    for member in tar.getmembers():
+        name = member.name
+        path_name = name.rstrip("/")
+        path = PurePosixPath(path_name)
+        require(name, name and path_name and not name.startswith("/") and "\\" not in name and
+                not re.match(r"^[A-Za-z]:", name) and all(part not in ("", ".", "..") for part in path_name.split("/")),
+                "Client archive contains an absolute or traversal path")
+        normalized = path.as_posix()
+        require(normalized, normalized not in seen, "Client archive contains duplicate members")
+        seen.add(normalized)
+        allowed = normalized in ancestors or normalized == receipt_name or normalized == output_name or normalized.startswith(output_name + "/")
+        require(normalized, allowed, "Client archive contains an unexpected path")
+        require(normalized, not (name.endswith("/") and not member.isdir()),
+                "Client archive file has a directory path")
+        require(normalized, member.type in (tarfile.DIRTYPE, tarfile.REGTYPE, tarfile.AREGTYPE),
+                "Client archive contains a link or special member")
+        require(normalized, not (member.isdir() and normalized == receipt_name) and
+                not (member.isfile() and normalized in ancestors | {output_name}),
+                "Client archive member has an unexpected type")
+        members.append(member)
+    require(members, receipt_name in seen and output_name in seen,
+            "Client archive is missing its receipt or client directory")
+    return members
+
+
+def fetch_client(args) -> None:
+    validate_client_inputs(args.version, args.source_revision, args.endpoint)
+    tag = f"playtest-client-{args.version}"
+    release = gh_release_json(tag)
+    require(release, isinstance(release, dict) and release.get("tag_name") == tag
+            and release.get("draft") is False and release.get("prerelease") is True,
+            "Client release must be the published prerelease for the requested version")
+    commit = gh_json(f"repos/{GAME_REPOSITORY}/commits/{tag}")
+    require(commit, isinstance(commit, dict) and commit.get("sha") == args.source_revision,
+            "Client release tag does not resolve to the requested source revision")
+    filename = f"SlopArena-{args.version}.tar.gz"
+    assets = release.get("assets")
+    require(assets, isinstance(assets, list) and len(assets) == 1 and isinstance(assets[0], dict)
+            and assets[0].get("name") == filename,
+            "Client release must contain exactly the expected archive asset")
+    digest = assets[0].get("digest")
+    require(digest, isinstance(digest, str) and re.fullmatch(r"sha256:[a-f0-9]{64}", digest) is not None,
+            "Client release archive has no valid SHA-256 digest")
+    root = ROOT
+    receipt_path, output_path = client_paths(root, args.version)
+    require((receipt_path, output_path), not receipt_path.exists() and not receipt_path.is_symlink()
+            and not output_path.exists() and not output_path.is_symlink(),
+            "Client extraction destination already exists")
+    for parent in (root / "build", receipt_path.parent, output_path.parent):
+        require(parent, not parent.exists() or (parent.is_dir() and not parent.is_symlink()),
+                "Client extraction parent is not a real directory")
+    with tempfile.TemporaryDirectory(prefix="playtest-client-") as temporary:
+        temporary_path = Path(temporary)
+        downloaded = subprocess.run(
+            ["gh", "release", "download", tag, "--repo", GAME_REPOSITORY, "--pattern", filename,
+             "--dir", str(temporary_path)], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+        require(downloaded, downloaded.returncode == 0, "gh could not download the approved client archive")
+        archive = temporary_path / filename
+        require(archive, archive.is_file() and checksum(archive) == digest.removeprefix("sha256:"),
+                "Downloaded client archive digest differs from the release asset")
+        stage = temporary_path / "extracted"
+        stage.mkdir()
+        with tarfile.open(archive, "r:gz") as tar:
+            members = safe_client_members(tar, args.version)
+            receipt_member = next(member for member in members if member.name == "build/playtest/client.json")
+            receipt_stream = tar.extractfile(receipt_member)
+            require(receipt_stream, receipt_stream is not None, "Client receipt is not a regular file")
+            receipt = json.loads(receipt_stream.read(), object_pairs_hook=lambda pairs: _unique_pairs(pairs))
+            require(receipt, isinstance(receipt, dict) and receipt.get("version") == args.version
+                    and receipt.get("sourceRevision") == args.source_revision
+                    and receipt.get("masterEndpoint") == args.endpoint,
+                    "Client receipt differs from the requested version, source, or endpoint")
+            for member in members:
+                destination = stage / PurePosixPath(member.name)
+                if member.isdir():
+                    destination.mkdir(parents=True, exist_ok=True)
+                    continue
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                with tar.extractfile(member) as source, destination.open("xb") as target:
+                    shutil.copyfileobj(source, target)
+        receipt_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            shutil.move(str(stage / "build/playtest/client.json"), receipt_path)
+            shutil.move(str(stage / f"build/release/SlopArena-{args.version}"), output_path)
+            verify_client(read_json(receipt_path), args.version, args.source_revision, args.endpoint, root)
+        except Exception:
+            receipt_path.unlink(missing_ok=True)
+            shutil.rmtree(output_path, ignore_errors=True)
+            raise
+    print(f"Fetched and verified client artifact for {tag}")
+
+
+def _unique_pairs(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ReleaseError(f"Duplicate JSON field: {key}")
+        result[key] = value
+    return result
 
 
 def verify_client(receipt: dict, version: str, source_revision: str, endpoint: str, root: Path = ROOT) -> Path:
@@ -360,6 +505,18 @@ def parser() -> argparse.ArgumentParser:
             command.add_argument("--migration-from", default="")
         command.set_defaults(function={"verify-client": lambda a: print(verify_client(read_json(a.client), a.version, a.source_revision, a.endpoint)),
                                        "upload": upload, "assemble": assemble}[name])
+    pack = commands.add_parser("pack-client")
+    pack.add_argument("--client", required=True, type=Path)
+    pack.add_argument("--version", required=True)
+    pack.add_argument("--source-revision", required=True)
+    pack.add_argument("--endpoint", required=True)
+    pack.add_argument("--output", required=True, type=Path)
+    pack.set_defaults(function=pack_client)
+    fetch = commands.add_parser("fetch-client")
+    fetch.add_argument("--version", required=True)
+    fetch.add_argument("--source-revision", required=True)
+    fetch.add_argument("--endpoint", required=True)
+    fetch.set_defaults(function=fetch_client)
     deployed = commands.add_parser("deploy")
     deployed.add_argument("--candidate", required=True, type=Path)
     deployed.add_argument("--output", required=True, type=Path)
@@ -372,7 +529,8 @@ def main() -> int:
         args = parser().parse_args()
         args.function(args)
         return 0
-    except (RuntimeError, ValueError, TypeError, KeyError, OSError, subprocess.TimeoutExpired) as exc:
+    except (RuntimeError, ValueError, TypeError, KeyError, OSError, EOFError,
+            tarfile.TarError, subprocess.TimeoutExpired) as exc:
         if isinstance(exc, ReleaseError):
             print(f"Release refused: {exc}", file=sys.stderr)
         else:
