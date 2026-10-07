@@ -5,6 +5,7 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using Newtonsoft.Json;
+using SlopArena.Client.Animation;
 using SlopArena.Shared;
 using UnityEditor;
 using UnityEditor.Build.Reporting;
@@ -79,6 +80,7 @@ public static class PlaytestReleaseBuilder
             BuiltInRosterManifest roster = ReadRoster(repositoryRoot);
             IReadOnlyList<PackageIdentityRow> verifiedRows = VerifyAuthoringRoster(projectRoot, roster);
             RequireSameIdentities(verifiedRows, staged.Identities, "staged cooked content");
+            GenerateClientCatalogs(Path.Combine(streamingAssets, "content-cooked"), staged);
             string sharedSourceHash = Sha256(Path.Combine(projectRoot, "Assets", "Plugins", "SlopArena.Shared", "SlopArena.Shared.dll"));
             string steamSourceHash = Sha256(ResolveSteamNativeSource(projectRoot, target));
 
@@ -222,6 +224,31 @@ public static class PlaytestReleaseBuilder
             entry.Handle, entry.LegacySelector ?? CharacterClass.None, entry.Identity, entry.DisplayName)).ToArray();
         var handleMap = new MatchContentHandleMap(MatchContentHandleMap.CurrentSchemaVersion, mapRows);
         return new PackageVerification(identities, SteamMatchDescriptor.HashContent(handleMap));
+    }
+
+    internal static void GenerateClientCatalogs(string contentRoot, PackageVerification verified)
+    {
+        foreach (PackageIdentityRow identity in verified.Identities)
+        {
+            string bindingPath = Path.Combine(contentRoot, identity.packageId, CharacterPackageAssembler.BindingPath);
+            string assetPath = CharacterCookOutput.For(identity.packageId).GeneratedAssetPath;
+            string temporary = CharacterAnimationCatalogGenerator.Generate(File.ReadAllBytes(bindingPath), assetPath);
+            CharacterAnimationCatalogGenerator.ReplaceTemporary(temporary, assetPath);
+        }
+        VerifyClientCatalogs(verified);
+    }
+
+    internal static void VerifyClientCatalogs(PackageVerification verified)
+    {
+        foreach (PackageIdentityRow identity in verified.Identities)
+        {
+            // Persisted Resources only: Editor development catalogs must not satisfy a release gate.
+            var catalogs = Resources.LoadAll<CharacterAnimationCatalog>("Generated/CharacterPackages/" + identity.packageId);
+            if (catalogs.Length != 1 || catalogs[0] == null ||
+                catalogs[0].PackageId != identity.packageId || catalogs[0].SourceHash != identity.sourceHash ||
+                catalogs[0].Rig == null)
+                throw new InvalidDataException("Generated client catalog is missing, ambiguous, stale or rigless: " + identity.packageId);
+        }
     }
 
     private static IReadOnlyList<PackageIdentityRow> VerifyAuthoringRoster(string projectRoot, BuiltInRosterManifest roster)

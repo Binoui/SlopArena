@@ -32,8 +32,16 @@ gh workflow run release-playtest.yml --ref main -f "version=$version"
 The local wrapper creates a fresh isolated checkout and runs the installed Unity
 `6000.0.78f1` using the workstation's existing Hub activation. It does not activate
 a license, copy into the open canonical Editor, or require Unity credentials in
-GitHub. The existing producer verifies authoring freshness, package admission,
-exact cooked payloads, endpoint, version, native libraries and attribution.
+GitHub. The producer verifies authoring freshness and package admission, then
+regenerates each roster character's Unity animation catalog from its verified
+staged `client.bindings` before building the player. The generated catalogs live
+under `Assets/Resources/Generated/CharacterPackages/`; they are required client
+assets, separate from the four cooked simulation payloads. The build rejects
+missing, duplicate, wrong-package, source-hash-mismatched or rigless persisted
+catalogs. Generation also rejects unresolved rig, clip, weapon and presentation
+references. Editor development catalogs cannot satisfy this persisted-asset gate.
+Endpoint, version, native-library, exact cooked payload and attribution checks
+remain mandatory.
 `scripts/ci/PlaytestReleaseBuilder.cs` remains outside the canonical asset tree;
 it is injected only into the isolated build project. Failed builds produce no
 publish-ready archive; their local logs are retained for diagnosis.
@@ -48,6 +56,16 @@ When launching from a separate clean checkout while canonical work is dirty,
 pass `--local-unity-project /absolute/path/to/SlopArena/client/Unity` to select
 those read-only local dependencies explicitly. Uncommitted tracked edits are
 not copied or shipped.
+
+For a focused catalog regression without building a player, inject the producer
+and `scripts/ci/PlaytestReleaseBuilderSelfTest.cs` into `Assets/Editor` of a
+disposable, dependency-complete Editor checkout. In Edit Mode, invoke
+`PlaytestReleaseBuilderSelfTest.Run("/absolute/path/to/client.bindings")` for an
+admitted package, using the approved gateway's `eval` command. Repeat
+for each roster package. The self-test creates only a unique synthetic catalog
+and removes its assets in `finally`; it exercises generation, bound rig/source
+resolution, missing/stale/rigless/duplicate refusal and unresolved-binding
+failure without replacing a valid catalog. It does not prove player packaging.
 
 Package/toolchain input changes can invalidate accepted cook provenance even
 when gameplay and poses are unchanged. Resolve freshness through the approved
@@ -216,6 +234,10 @@ Verify the actual extracted build:
   developer PDBs and Burst debug output. Inspect the upload mappings/exclusions.
 - Record warnings/errors, source pins, exact content/catalog identity and staging
   restoration. A successful build/content load is not a player launch or match.
+- Launch the actual packaged player in Training and Solo for every roster
+  character. Require both player and NPC to appear, animate and move; check the
+  player log for catalog/reference failures. Editor Training success and cooked
+  payload admission alone do not prove that Unity catalogs shipped.
 
 Keep task-owned probes temporary; retain their decisive output, not one-off
 operator scripts containing private host/configuration details.
