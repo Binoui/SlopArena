@@ -72,6 +72,11 @@ when gameplay and poses are unchanged. Resolve freshness through the approved
 [package cook/verify/admission workflow](../characters/adding-a-new-character.md)
 and publish the updated package/roster pins **before** selecting the client source
 commit. The build never silently recooks, relabels or bypasses that acceptance.
+Compare native cook dependency receipts when a fresh import disagrees with a
+previous Editor cache. Check runtime definitions and baked pose bytes separately
+from provenance: unchanged gameplay/poses do not make stale `client.bindings`
+source hashes or package/roster pins acceptable. After an approved native recook,
+verify again in a fresh isolated release import before uploading.
 
 The action first requires the matching `playtest-client-<version>` prerelease
 tag to point to the **dispatched main commit**. It checks the archive's GitHub
