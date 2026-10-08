@@ -143,6 +143,7 @@ public sealed partial class AbilityLabWindow : EditorWindow
     private IntegerField _scenarioDamage = null!;
     private DropdownField _scenarioOpponent = null!;
     private IntegerField _scenarioHorizon = null!;
+    private IntegerField _scenarioChargeTicks = null!;
     private Button _scenarioRun = null!;
     private Button _scenarioExit = null!;
     private Label _scenarioOutcomes = null!;
@@ -357,6 +358,7 @@ public sealed partial class AbilityLabWindow : EditorWindow
         _scenarioDamage = Required<IntegerField>("scenario-damage");
         _scenarioOpponent = Required<DropdownField>("scenario-opponent");
         _scenarioHorizon = Required<IntegerField>("scenario-horizon");
+        _scenarioChargeTicks = Required<IntegerField>("scenario-charge-ticks");
         _scenarioRun = Required<Button>("scenario-run");
         _scenarioExit = Required<Button>("scenario-exit");
         _scenarioOutcomes = Required<Label>("scenario-outcomes");
@@ -523,8 +525,9 @@ public sealed partial class AbilityLabWindow : EditorWindow
         _scenarioDistance.RegisterValueChangedCallback(_ => InvalidateScenarioControls());
         _scenarioFacing.RegisterValueChangedCallback(_ => InvalidateScenarioControls());
         _scenarioDamage.RegisterValueChangedCallback(_ => InvalidateScenarioControls());
-        _scenarioOpponent.RegisterValueChangedCallback(_ => InvalidateScenarioControls());
         _scenarioHorizon.RegisterValueChangedCallback(_ => InvalidateScenarioControls());
+        _scenarioOpponent.RegisterValueChangedCallback(_ => InvalidateScenarioControls());
+        _scenarioChargeTicks.RegisterValueChangedCallback(_ => InvalidateScenarioControls());
         _groundMovesButton.clicked += () => SelectMoveMode(false);
         _airMovesButton.clicked += () => SelectMoveMode(true);
         _timelinePlay.clicked += () =>
@@ -598,11 +601,12 @@ public sealed partial class AbilityLabWindow : EditorWindow
         {
             var options = new AbilityLabScenarioOptions(
                 CurrentSharedAction(),
-                _scenarioHorizon.value,
+                Mathf.Clamp(_scenarioHorizon.value, 0, AbilityLabScenarioOptions.MaxFrame),
                 _scenarioDistance.value,
                 _scenarioOpponent.value == "Shield" ? AbilityLabOpponentBehavior.Shield : AbilityLabOpponentBehavior.Idle,
                 (ushort)_scenarioDamage.value,
-                _scenarioFacing.value);
+                _scenarioFacing.value,
+                Mathf.Clamp(_scenarioChargeTicks.value, 0, AbilityLabScenarioOptions.MaxChargeTicks));
             options.Validate();
             _lab.Playing = false;
             _lab.RunScenario(options);
@@ -699,6 +703,7 @@ public sealed partial class AbilityLabWindow : EditorWindow
             _scenarioDamage.SetValueWithoutNotify(options.OpponentDamage);
             _scenarioOpponent.SetValueWithoutNotify(options.OpponentBehavior == AbilityLabOpponentBehavior.Shield ? "Shield" : "Idle");
             _scenarioHorizon.SetValueWithoutNotify(options.LastFrame);
+            _scenarioChargeTicks.SetValueWithoutNotify(options.ChargeTicks);
             var contacts = result.Contacts.Select(contact =>
                 $"{(contact.Hit.Blocked ? "Block" : "Hit")} frame {contact.FrameIndex} · {contact.Hit.Damage:0.##}%");
             var interactions = result.Interactions.Select(interaction =>
@@ -2363,6 +2368,7 @@ public sealed partial class AbilityLabWindow : EditorWindow
             .OfType<StartCapabilityOperationSource>()
             .Any(op => op.CapabilityId == CharacterPackageCompiler.TargetedLeapCapabilityId));
         moveGroup.Add(addTargetedLeap);
+        AddChargedDirectionalDashButton(moveGroup, stageIndex, slot);
 
 
         var presentationIds = _workspace.Draft.PresentationIds ?? Array.Empty<string>();
@@ -2468,6 +2474,99 @@ public sealed partial class AbilityLabWindow : EditorWindow
             AddHitboxShape(group, hitboxOperation.Hitbox);
             AddHitboxAttachment(group, hitboxOperation.Hitbox);
         }
+        else if (operation.Source is SpawnProjectileOperationSource projectileOperation)
+        {
+            var timing = new Foldout { text = "Timing", value = true };
+            AddDelayedInteger(timing, "Start tick", projectileOperation.Tick, value =>
+            {
+                int maxTick = Mathf.Min(ushort.MaxValue, Mathf.Max(0, CurrentStage(operation.SourceStageIndex).DurationTicks - 1));
+                CommitProjectileOperation(operation, current => current with
+                {
+                    Tick = (ushort)Mathf.Clamp(value, 0, maxTick)
+                });
+            });
+            group.Add(timing);
+
+            var flight = new Foldout { text = "Flight", value = true };
+            AddDelayedInteger(flight, "Flight lifetime ticks", projectileOperation.Projectile.MaxFlightTicks, value =>
+                CommitProjectileOperation(operation, current => current with
+                {
+                    Projectile = current.Projectile with
+                    {
+                        MaxFlightTicks = (ushort)Mathf.Clamp(value, 0, ushort.MaxValue)
+                    }
+                }));
+            AddDelayedFloat(flight, "Speed (m/s)", projectileOperation.Projectile.Speed, value =>
+                CommitProjectileOperation(operation, current => current with
+                {
+                    Projectile = current.Projectile with { Speed = value }
+                }));
+            AddDelayedFloat(flight, "Gravity", projectileOperation.Projectile.Gravity, value =>
+                CommitProjectileOperation(operation, current => current with
+                {
+                    Projectile = current.Projectile with { Gravity = value }
+                }));
+            AddDelayedFloat(flight, "Radius", projectileOperation.Projectile.Radius, value =>
+                CommitProjectileOperation(operation, current => current with
+                {
+                    Projectile = current.Projectile with { Radius = value }
+                }));
+            group.Add(flight);
+
+            var launch = new Foldout { text = "Launch", value = true };
+            AddDelayedFloat(launch, "Offset X", projectileOperation.Projectile.LaunchOffsetX, value =>
+                CommitProjectileOperation(operation, current => current with
+                {
+                    Projectile = current.Projectile with { LaunchOffsetX = value }
+                }));
+            AddDelayedFloat(launch, "Offset Y", projectileOperation.Projectile.LaunchOffsetY, value =>
+                CommitProjectileOperation(operation, current => current with
+                {
+                    Projectile = current.Projectile with { LaunchOffsetY = value }
+                }));
+            AddDelayedFloat(launch, "Offset Z", projectileOperation.Projectile.LaunchOffsetZ, value =>
+                CommitProjectileOperation(operation, current => current with
+                {
+                    Projectile = current.Projectile with { LaunchOffsetZ = value }
+                }));
+            AddDelayedFloat(launch, "Yaw spread offset (degrees)", projectileOperation.Projectile.YawOffsetDegrees, value =>
+                CommitProjectileOperation(operation, current => current with
+                {
+                    Projectile = current.Projectile with { YawOffsetDegrees = value }
+                }));
+            group.Add(launch);
+
+            var combat = new Foldout { text = "Combat", value = true };
+            AddDelayedFloat(combat, "Damage", projectileOperation.Projectile.Damage, value =>
+                CommitProjectileOperation(operation, current => current with
+                {
+                    Projectile = current.Projectile with { Damage = value }
+                }));
+            AddDelayedFloat(combat, "Knockback angle", projectileOperation.Projectile.Angle, value =>
+                CommitProjectileOperation(operation, current => current with
+                {
+                    Projectile = current.Projectile with { Angle = value }
+                }));
+            AddDelayedFloat(combat, "Base knockback", projectileOperation.Projectile.BaseKnockback, value =>
+                CommitProjectileOperation(operation, current => current with
+                {
+                    Projectile = current.Projectile with { BaseKnockback = value }
+                }));
+            AddDelayedFloat(combat, "Knockback growth", projectileOperation.Projectile.KnockbackGrowth, value =>
+                CommitProjectileOperation(operation, current => current with
+                {
+                    Projectile = current.Projectile with { KnockbackGrowth = value }
+                }));
+            AddDelayedInteger(combat, "Stun ticks", projectileOperation.Projectile.StunTicks, value =>
+                CommitProjectileOperation(operation, current => current with
+                {
+                    Projectile = current.Projectile with
+                    {
+                        StunTicks = (ushort)Mathf.Clamp(value, 0, ushort.MaxValue)
+                    }
+                }));
+            group.Add(combat);
+        }
         else if (operation.Source is ForwardLungeOperationSource lunge)
         {
             group.Add(new Label("Direction is captured from facing when the lunge begins."));
@@ -2523,9 +2622,14 @@ public sealed partial class AbilityLabWindow : EditorWindow
         {
             AddTargetedLeapInspector(group, operation, leap);
         }
-        else if (operation.Source is StartCapabilityOperationSource capability)
+        else if (operation.Source is StartCapabilityOperationSource capability &&
+            capability.Parameters is ChargedDirectionalDashCapabilityParameters chargedDash)
         {
-            AddCapabilityPresentationSelector(group, operation, capability);
+            AddChargedDashInspector(group, operation, capability, chargedDash);
+        }
+        else if (operation.Source is StartCapabilityOperationSource otherCapability)
+        {
+            AddCapabilityPresentationSelector(group, operation, otherCapability);
         }
         else if (operation.Source is EmitPresentationOperationSource presentationOperation)
         {
@@ -2841,6 +2945,32 @@ public sealed partial class AbilityLabWindow : EditorWindow
         if (!accepted) return;
         UpdateTimelineControls();
         _selectedOperation = FindProjectedOperation(selected.SourceStageIndex, selected.SourceOperationIndex);
+        _timelineTrack.SelectedOperation = _selectedOperation;
+        RefreshInspector();
+        SceneView.RepaintAll();
+    }
+
+    private void CommitProjectileOperation(
+        AbilityLabOperationProjection selected,
+        Func<SpawnProjectileOperationSource, SpawnProjectileOperationSource> edit)
+    {
+        if (_updatingControls || _lab == null ||
+            selected.Source is not SpawnProjectileOperationSource original ||
+            !_workspace.TryResolveCanonicalSlot(_lab.SelectedSlotId, out int slotIndex, out _))
+            return;
+        int stageIndex = selected.SourceStageIndex;
+        int operationIndex = selected.SourceOperationIndex;
+        _updatingControls = true;
+        bool accepted;
+        try
+        {
+            accepted = _workspace.ReplaceOperation(
+                slotIndex, stageIndex, operationIndex, edit(original));
+        }
+        finally { _updatingControls = false; }
+        if (!accepted) return;
+        UpdateTimelineControls();
+        _selectedOperation = FindProjectedOperation(stageIndex, operationIndex);
         _timelineTrack.SelectedOperation = _selectedOperation;
         RefreshInspector();
         SceneView.RepaintAll();

@@ -23,6 +23,15 @@ public sealed class CharacterPackageCompilerTests
         mutate?.Invoke(character);
         return CharacterPackageCompiler.Compile(Fixture("package.json"), character.ToJsonString(), profile);
     }
+    private static CharacterCompileResult CompileCapabilityOperation(Action<JsonObject> mutate)
+        => CompileCharacter(character =>
+        {
+            var operation = JsonNode.Parse("""
+                {"kind":"startCapability","tick":0,"unit":"ticks","capabilityId":"slop.internal.fightguy.rising-dragon.v1","capabilityVersion":"1","parameters":{"riseSpeed":11,"riseTicks":12,"riseDelay":8}}
+                """)!.AsObject();
+            mutate(operation);
+            character["slots"]![0]!["timeline"]!["stages"]![0]!["operations"]!.AsArray().Add(operation);
+        });
     private static string[] Codes(CharacterCompileResult result) => result.Diagnostics.Select(x => x.Code).ToArray();
     private static void AssertError(CharacterCompileResult result, string code)
     {
@@ -298,6 +307,116 @@ public sealed class CharacterPackageCompilerTests
         Assert.Equal(new[] { -15f, 0f, 15f }, shuriken.Select(x => x.Projectile.YawOffsetDegrees).OrderBy(x => x).ToArray());
         Assert.Equal((2, (ushort)240), (package.Definition.Slots.Single(x => x.Id == "ground.E").ChargePool!.MaxCharges, package.Definition.Slots.Single(x => x.Id == "ground.E").ChargePool!.RegenTicks));
     }
+    [Fact]
+    public void ChargedDirectionalDash_IsPublicRoundTripAndValidatesBounds()
+    {
+        string packagePath = FindRepoFile("client/Unity/Assets/CharacterPackages/wibou/package.json");
+        string characterPath = FindRepoFile("client/Unity/Assets/CharacterPackages/wibou/character.json");
+        string manifest = File.ReadAllText(packagePath);
+        var character = JsonNode.Parse(File.ReadAllText(characterPath))!.AsObject();
+        var workshop = CharacterPackageCompiler.Compile(manifest, character.ToJsonString(), CharacterCookProfile.TrustedBuiltIn);
+        CharacterCompileResult publicWorkshop = CompileCharacter(fightGuy =>
+        {
+            fightGuy["capabilityRequirements"] = new JsonArray(new JsonObject
+            {
+                ["capabilityId"] = CharacterPackageCompiler.ChargedDirectionalDashCapabilityId,
+                ["capabilityVersion"] = CharacterPackageCompiler.ChargedDirectionalDashCapabilityVersion,
+            });
+            foreach (JsonObject slot in fightGuy["slots"]!.AsArray())
+                foreach (JsonObject otherStage in slot["timeline"]!["stages"]!.AsArray())
+                {
+                    var otherOperations = otherStage["operations"]!.AsArray();
+                    for (int i = otherOperations.Count - 1; i >= 0; i--)
+                        if ((string?)otherOperations[i]!["kind"] == "startCapability")
+                            otherOperations.RemoveAt(i);
+                }
+            JsonObject operation = (JsonObject)DashOperation(character).DeepClone();
+            operation["parameters"]!["traversalHitbox"]!["startBoneId"] = null;
+            operation["parameters"]!["finisherHitbox"]!["startBoneId"] = null;
+            operation["parameters"]!["finisherHitbox"]!["endBoneId"] = null;
+            var dashSlot = fightGuy["slots"]![0]!.AsObject();
+            dashSlot["allowSlideCarry"] = false;
+            dashSlot["behavior"] = "directionalDash";
+            dashSlot["aimMode"] = "groundVector";
+            dashSlot["aimMovement"] = "mobile";
+            JsonObject stage = fightGuy["slots"]![0]!["timeline"]!["stages"]![0]!.AsObject();
+            stage["durationTicks"] = 80;
+            stage["iasaTicks"] = 0;
+            stage["operations"] = new JsonArray(operation);
+        }, CharacterCookProfile.Workshop);
+        Assert.True(publicWorkshop.CookedPackage != null,
+            string.Join("; ", publicWorkshop.Diagnostics.Select(d => d.Code + ": " + d.Message)));
+        var capability = Assert.IsType<CookedChargedDirectionalDashCapabilityParameters>(
+            workshop.CookedPackage!.Definition.Slots.Single(x => x.Id == "ground.R")
+                .Timeline.Stages.Single().Operations.OfType<CookedStartCapabilityOperation>().Single().Parameters);
+        Assert.Equal((byte)0, capability.GetChargeTier((ushort)(capability.Tier2Ticks - 1)));
+        Assert.Equal((byte)1, capability.GetChargeTier(capability.Tier2Ticks));
+        Assert.Equal((byte)1, capability.GetChargeTier((ushort)(capability.Tier3Ticks - 1)));
+        Assert.Equal((byte)2, capability.GetChargeTier(capability.Tier3Ticks));
+        Assert.Equal(capability.MinDistance, capability.GetDashDistance(0));
+        Assert.Equal(capability.MaxDistance, capability.GetDashDistance(capability.MaxChargeTicks));
+        ushort midpoint = (ushort)(capability.MaxChargeTicks / 2);
+        TestHelpers.AssertNear(capability.MinDistance +
+            (capability.MaxDistance - capability.MinDistance) * midpoint / capability.MaxChargeTicks,
+            capability.GetDashDistance(midpoint));
+        Assert.Equal(capability.MaxDistance, capability.GetDashDistance(ushort.MaxValue));
+        Assert.Equal(capability.Tier3Damage, capability.GetFinisherDamage(capability.Tier3Ticks));
+        Assert.Equal(capability.FinisherHitbox.Damage, capability.GetFinisherDamage(0));
+        Assert.Equal(capability.Tier2Damage, capability.GetFinisherDamage(capability.Tier2Ticks));
+        var canonical = workshop.CookedPackage.CanonicalBytes;
+        var loadedSource = CharacterPackageSourceCodec.Load(manifest, character.ToJsonString());
+        Assert.True(loadedSource.IsValid, string.Join("; ", loadedSource.Diagnostics.Select(x => x.Message)));
+        string roundTrippedCharacter = CharacterPackageSourceCodec.SerializeCharacter(loadedSource.Source!.Character);
+        Assert.Equal(canonical, CharacterPackageCompiler.Compile(manifest, roundTrippedCharacter,
+            CharacterCookProfile.TrustedBuiltIn).CookedPackage!.CanonicalBytes);
+
+        var badThreshold = (JsonObject)character.DeepClone();
+        DashOperation(badThreshold)["parameters"]!["tier3Ticks"] = capability.Tier2Ticks;
+        AssertError(CharacterPackageCompiler.Compile(manifest, badThreshold.ToJsonString(), CharacterCookProfile.Workshop),
+            "value.out-of-range");
+
+        var badGeometry = (JsonObject)character.DeepClone();
+        DashOperation(badGeometry)["parameters"]!["traversalHitbox"]!["startBoneId"] = "_unknown";
+        AssertError(CharacterPackageCompiler.Compile(manifest, badGeometry.ToJsonString(), CharacterCookProfile.Workshop),
+            "reference.unresolved");
+
+        var badDuration = (JsonObject)character.DeepClone();
+        DashSlot(badDuration)["timeline"]!["stages"]![0]!["durationTicks"] = 20;
+        AssertError(CharacterPackageCompiler.Compile(manifest, badDuration.ToJsonString(), CharacterCookProfile.Workshop),
+            "value.out-of-range");
+        var unsupportedVersion = (JsonObject)character.DeepClone();
+        DashOperation(unsupportedVersion)["capabilityVersion"] = "2";
+        AssertError(CharacterPackageCompiler.Compile(manifest, unsupportedVersion.ToJsonString(),
+            CharacterCookProfile.Workshop), "capability.version-mismatch");
+        var badTierOneDamage = (JsonObject)character.DeepClone();
+        DashOperation(badTierOneDamage)["parameters"]!["tier2Damage"] = 5;
+        AssertError(CharacterPackageCompiler.Compile(manifest, badTierOneDamage.ToJsonString(),
+            CharacterCookProfile.Workshop), "value.out-of-range");
+        var badSeek = (JsonObject)character.DeepClone();
+        DashOperation(badSeek)["parameters"]!["finisherSeekTick"] = 0;
+        AssertError(CharacterPackageCompiler.Compile(manifest, badSeek.ToJsonString(), CharacterCookProfile.Workshop),
+            "value.out-of-range");
+
+        var earlyCancel = (JsonObject)character.DeepClone();
+        DashSlot(earlyCancel)["timeline"]!["stages"]![0]!["iasaTicks"] = 1;
+        AssertError(CharacterPackageCompiler.Compile(manifest, earlyCancel.ToJsonString(),
+            CharacterCookProfile.Workshop), "capability.ambiguous");
+        var unholdable = (JsonObject)character.DeepClone();
+        DashSlot(unholdable)["aimMode"] = "none";
+        AssertError(CharacterPackageCompiler.Compile(manifest, unholdable.ToJsonString(),
+            CharacterCookProfile.Workshop), "capability.ambiguous");
+        var sharedHistory = (JsonObject)character.DeepClone();
+        DashOperation(sharedHistory)["parameters"]!["traversalHitbox"]!["hitGroup"] = 1;
+        AssertError(CharacterPackageCompiler.Compile(manifest, sharedHistory.ToJsonString(),
+            CharacterCookProfile.Workshop), "value.out-of-range");
+    }
+
+    private static JsonObject DashSlot(JsonObject character)
+        => character["slots"]!.AsArray().Select(node => node!.AsObject())
+            .Single(slot => (string?)slot["id"] == "ground.R");
+
+    private static JsonObject DashOperation(JsonObject character)
+        => DashSlot(character)["timeline"]!["stages"]![0]!["operations"]![0]!.AsObject();
 
     [Fact]
     public void ForwardLungeRequiresPositiveSpeedAndStageBoundedDuration()
@@ -330,6 +449,49 @@ public sealed class CharacterPackageCompilerTests
             });
         });
         AssertError(pastStage, "value.out-of-range");
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ForwardLungeRangeBrakingSurvivesSourceRoundTripAndCompilation(bool enabled)
+    {
+        var character = JsonNode.Parse(Fixture("character.json"))!.AsObject();
+        character["slots"]![0]!["allowSlideCarry"] = false;
+        var operations = character["slots"]![0]!["timeline"]!["stages"]![0]!["operations"]!.AsArray();
+        operations.RemoveAt(0);
+        operations.Insert(0, new JsonObject
+        {
+            ["kind"] = "forwardLunge", ["tick"] = 0, ["unit"] = "metersPerSecond",
+            ["speed"] = 3, ["durationTicks"] = 2, ["stopInAttackRange"] = enabled,
+        });
+        var source = CharacterPackageSourceCodec.Load(Fixture("package.json"), character.ToJsonString()).Source!;
+        var roundTrip = CharacterPackageSourceCodec.Load(Fixture("package.json"),
+            CharacterPackageSourceCodec.SerializeCharacter(source.Character)).Source!;
+        var operation = Assert.IsType<ForwardLungeOperationSource>(
+            roundTrip.Character.Slots[0].Timeline.Stages[0].Operations[0]);
+        Assert.Equal(enabled, operation.StopInAttackRange);
+        var compiled = CharacterPackageCompiler.Compile(roundTrip, CharacterCookProfile.TrustedBuiltIn);
+        Assert.NotNull(compiled.CookedPackage);
+        var cooked = Assert.IsType<CookedForwardLungeOperation>(
+            compiled.CookedPackage!.Definition.Slots[0].Timeline.Stages[0].Operations[0]);
+        Assert.Equal(enabled, cooked.StopInAttackRange);
+    }
+
+    [Fact]
+    public void RangeBrakingRequiresASubsequentSameStageHitbox()
+    {
+        var compiled = CompileCharacter(character =>
+        {
+            var operations = character["slots"]![0]!["timeline"]!["stages"]![0]!["operations"]!.AsArray();
+            operations.Clear();
+            operations.Add(new JsonObject
+            {
+                ["kind"] = "forwardLunge", ["tick"] = 0, ["unit"] = "metersPerSecond",
+                ["speed"] = 3, ["durationTicks"] = 2, ["stopInAttackRange"] = true,
+            });
+        });
+        AssertError(compiled, "operation.forward-lunge.no-subsequent-hitbox");
     }
 
     [Fact]
@@ -418,8 +580,8 @@ public sealed class CharacterPackageCompilerTests
     {
         AssertError(CompileCharacter(x => x["slots"]![0]!["timeline"]!["stages"]![0]!["operations"]![0]!["kind"] = "branch"), "operation.unknown");
         AssertError(CompileCharacter(x => x["slots"]![0]!["timeline"]!["stages"]![0]!["operations"]![0]!["unit"] = "bogus"), "unit.unknown");
-        AssertError(CompileCharacter(x => x["slots"]![8]!["timeline"]!["stages"]![0]!["operations"]![0]!["parameters"]!["extra"] = 1), "operation.parameter-unknown");
-        AssertError(CompileCharacter(x => ((JsonObject)x["slots"]![8]!["timeline"]!["stages"]![0]!["operations"]![0]!["parameters"]!).Remove("startupTicks")), "operation.parameter-missing");
+        AssertError(CompileCapabilityOperation(operation => operation["parameters"]!["extra"] = 1), "operation.parameter-unknown");
+        AssertError(CompileCapabilityOperation(operation => operation["parameters"]!.AsObject().Remove("riseSpeed")), "operation.parameter-missing");
         AssertError(CompileCharacter(x => x["slots"]![0]!["timeline"]!["stages"]![0]!["operations"]![1]!["hitbox"]!["durationTicks"] = 0), "value.out-of-range");
         AssertError(CompileCharacter(x => x["slots"]![0]!["timeline"]!["stages"]![0]!["operations"]![1]!["hitbox"]!["radius"] = -1), "value.out-of-range");
     }
@@ -440,9 +602,9 @@ public sealed class CharacterPackageCompilerTests
     [Fact]
     public void CapabilityAdmissionIsExact()
     {
-        AssertError(CompileCharacter(x => x["capabilityRequirements"]![0]!["capabilityId"] = "slop.internal.fightguy.unknown.v1"), "capability.unknown");
+        AssertError(CompileCharacter(x => x["capabilityRequirements"]![0]!["capabilityId"] = "slop.internal.fightguy.dragon-beam.v1"), "capability.unknown");
         AssertError(CompileCharacter(x => x["capabilityRequirements"]![0]!["capabilityVersion"] = "2"), "capability.unknown");
-        AssertError(CompileCharacter(x => x["slots"]![8]!["timeline"]!["stages"]![0]!["operations"]![0]!["capabilityVersion"] = "2"), "capability.version-mismatch");
+        AssertError(CompileCapabilityOperation(operation => operation["capabilityVersion"] = "2"), "capability.version-mismatch");
     }
 
     [Fact]

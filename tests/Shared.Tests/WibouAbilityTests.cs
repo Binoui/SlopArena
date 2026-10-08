@@ -86,26 +86,6 @@ public class WibouAbilityTests
         Assert.True(sim.GetState(100).DamagePercent > 0, $"slot {slot} should hit the enemy in reach");
     }
 
-    // ── R: directional dash — tap and hold both travel the same set distance ──
-
-    [Fact]
-    public void R_TapAndHold_TravelSameSetDistance()
-    {
-        var tapSim = SimWithPlayer(out _);
-        tapSim.Tick(new() { { 1, new InputState { ActiveSlot = 5, IsAiming = true, AimYaw = 0 } } });
-        tapSim.Tick(new() { { 1, new InputState { IsAiming = false, AimYaw = 0 } } });
-        for (int i = 0; i < 60; i++) tapSim.Tick(new() { { 1, default } });
-        float tapPZ = tapSim.GetState(1).PZ;
-
-        var holdSim = SimWithPlayer(out _);
-        holdSim.Tick(new() { { 1, new InputState { ActiveSlot = 5, IsAiming = true, AimYaw = 0 } } });
-        var hold = new InputState { IsAiming = true, AimYaw = 0 };
-        for (int i = 0; i < 120; i++) holdSim.Tick(new() { { 1, hold } });
-        float holdPZ = holdSim.GetState(1).PZ;
-
-        Assert.True(MathF.Abs(tapPZ - 6.4f) < 0.1f, $"tap dash should cover 6.4 m, got PZ={tapPZ:F2}");
-        Assert.True(MathF.Abs(holdPZ - 6.4f) < 0.1f, $"hold dash should cover 6.4 m, got PZ={holdPZ:F2}");
-    }
 
     // ── E: rising slash lifts Wibou off ground as recovery ──
 

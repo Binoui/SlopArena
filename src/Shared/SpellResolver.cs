@@ -167,14 +167,16 @@ namespace SlopArena.Shared
         /// <summary>
         /// Remove every active hitbox owned by one ability activation without firing
         /// projectile explosions. Used when the owning ability is cancelled before its
-        /// effects are allowed to linger.
+        /// effects are allowed to linger. A hit-history filter removes only that group.
         /// </summary>
-        internal void RemoveOwnedHitboxes(ulong ownerId, ulong activationId)
+        internal void RemoveOwnedHitboxes(ulong ownerId, ulong activationId, HashSet<ulong>? hitEntities = null)
         {
             for (int i = _hitboxes.Count - 1; i >= 0; i--)
             {
                 var hb = _hitboxes[i];
                 if (!hb.Active || hb.OwnerId != ownerId || hb.ActivationId != activationId)
+                    continue;
+                if (hitEntities != null && !ReferenceEquals(hb.HitEntities, hitEntities))
                     continue;
 
                 hb.Active = false;
@@ -255,7 +257,7 @@ namespace SlopArena.Shared
             for (int i = 0; i < _hitboxes.Count; i++)
             {
                 var hb = _hitboxes[i];
-                if (!hb.Active || !hb.TracksBone || hb.Baked == null || hb.Def == null) continue;
+                if (!hb.Active || !hb.TracksBone || hb.Def == null) continue;
                 if (!states.TryGetValue(hb.OwnerId, out var owner)) continue;
                 if (owner.AttackSlot == 0) continue; // owner interrupted/ended — leave the lingering hitbox as-is
 
@@ -541,7 +543,7 @@ namespace SlopArena.Shared
         }
 
         /// </summary>
-        private static bool CapsuleCollision(Hitbox hb, EntityData entity,
+        internal static bool CapsuleCollision(Hitbox hb, EntityData entity,
             out float dist, out float dx, out float dy, out float dz,
             out float hitX, out float hitY, out float hitZ)
         {

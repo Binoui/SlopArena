@@ -409,6 +409,9 @@ covers the operation.
 - SlopArena operations use repository `.omp/skills/`, `docs/testing.md`, and this
   document's gateway-owned Unity CLI/Pipeline commands.
 - Project skills require explicit `name` and nonempty `description` frontmatter.
+- This checkout excludes `bmad`, `bmad-*`, `bmod-*`, and `gds-*` in `.omp/config.yml`.
+  Planning workflows remain available when OMP is launched from `../sloparena-workspace`;
+  using its Unity gateway does not activate BMad in the game checkout.
 - `.agents/skills/unity-skills` is an ignored local installation; `.claude/skills/unity-skills`
   points to it. The operational umbrella is excluded for this project because it requires
   a conflicting REST route. Generic advisory skills remain available.

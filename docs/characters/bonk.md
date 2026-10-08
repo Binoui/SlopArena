@@ -87,6 +87,20 @@ and opts into **24 fixed hitstun ticks** to retain proximity without a
 percent-scaled launch. Hit 2 at **42–50** deals **8 damage, base 7, growth 28**
 at **35°**. Armor covers only **12–28**; the second swing and recovery are exposed.
 
+Both R variants opt into `forwardLunge.stopInAttackRange`: the 10 m/s,
+12-tick lunge skips or stops when a forward opponent's current hurtbox overlaps
+the first slash's baked active-window geometry. It stops once, without chasing
+or resuming, and does not change swing timing, armor, vertical motion or recovery.
+Opponents outside that geometry retain the full lunge; proximity alone is not a hit.
+
+Native ground-R mirror checks: at 1.2 m Bonk stayed at the origin and hit at
+frames 22/48; at 2.5 m he stopped after 1 m and hit at frames 23/48.
+At 12 m he travelled the full 2 m and missed. Elevated air-R versus a grounded
+dummy still respects vertical reach; this is not a guaranteed aerial connection.
+Persisted-package Shared checks with both fighters at equal elevation also
+landed both air-R swings at 1.2 m without travel and at 2.5 m after 0.833 m
+of travel. Ambient gravity was disabled for that isolated aerial reach check.
+
 Armor retains incoming damage and hitstop, but prevents ordinary launch,
 hitstun and SDI during the protected contact. Grabs still capture and cancel it;
 cancellation or a new activation cannot carry protection forward. Air A/R

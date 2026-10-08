@@ -36,8 +36,9 @@ unity command --project-path client/Unity \
 
 The UI presents both fighters and scenario controls; native `run` options are
 `--action <canonical-id|grab>`, `--ticks <last-frame>` (0–3600),
-`--distance <metres>`, `--opponent idle|shield`, `--damage 0..999`, and
-`--facing <relative-degrees>`. Defaults are 60, 2.5 m, idle, 0, and 180°.
+`--distance <metres>`, `--opponent idle|shield`, `--damage 0..999`,
+`--facing <relative-degrees>`, and `--charge-ticks 0..600`.
+Defaults are 60, 2.5 m, idle, 0, 180°, and zero held ticks.
 Run outcomes are observed, never forced: a successful command can be a hit,
 zero-damage block, miss, grab whiff, or capture/throw.
 
@@ -210,6 +211,13 @@ inspected source stage, not the preview stage. Commits and Undo retain the cumul
 and camera; shortening a move clamps the cursor and explains the change. Capability-owned
 or conditional windows remain labelled as such; unavailable editors are not presented as complete.
 
+Public `spawnProjectile` operations expose **Timing**, **Flight**, **Launch**, and
+**Combat** fields: spawn tick, flight lifetime, speed, gravity, radius, local launch
+offsets, yaw spread, damage, knockback and stun. Edits address the selected source
+operation, including individual spread shots and operations reached through air aliases.
+They compile into the live draft, use the existing Undo/Redo history, and do not save
+or cook automatically. Invalid projectile values report compiler diagnostics.
+
 `Detach fields` moves the same fields subtree into a native Editor pane, sharing the owner's
 draft and Undo history. Dock panes and SceneView manually. Closing the fields pane or using
 `Return fields inline` restores the fields inline without saving; other authoring tabs hide
@@ -236,6 +244,24 @@ fit recovery. Ordinary timeline scrubbing cannot predict the landing frame of a
 variable-length flight: use a recorded Shared scenario to inspect the actual
 landing and impact. `SAVE + COOK` persists the source/cooked package; admitted
 matches also require a roster refresh.
+
+`Add charged directional dash` creates public
+`slop.ability.charged-directional-dash.v1`, raises the runtime API minimum to
+`1.5.0`, sets the directional aim/lifecycle contract, and extends a short stage
+to fit travel/seek/recovery in the same Undo step. Its Moves inspector edits
+charge cap and tier thresholds, range/speed, finisher lead/animation seek,
+recovery, tier damage, and both nested traversal/finisher hitboxes. Live-draft
+edits affect authoritative scenarios before saving. The Scenario **Charge ticks**
+control holds aim for that many simulation ticks, then releases; a capped charge
+stays held until release. Recorded charge previews show tier-coloured endpoint
+rings. Native `capture` without `--charge-ticks` retains a matching recorded
+scenario; explicit `--charge-ticks 0` requests a tap rather than reusing a hold.
+Zero means no held input for every action, including targeted leaps; it never
+silently adds a hold. Use an explicit charge duration (for example 10 ticks) when
+a leap scenario needs to acquire a target before release. Changing the opponent
+control invalidates the previous run; the next receipt reports the recorded
+distance, opponent behavior and starting damage.
+
 
 In package Edit Mode, active resolved hitboxes expose SceneView selection buttons and a radius
 handle. Radius changes commit through the same source workspace authority. Compatibility,

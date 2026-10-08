@@ -83,17 +83,19 @@ public static class CookedCharacterPackageLoader
         {
             var m=ParseManifest(copied[CharacterPackageAssembler.ManifestPath]);
             if(m.PackageId!=requirement!.PackageId||m.Version!=requirement.Version||m.CookedContentHash!=requirement.CookedContentHash||m.PackageHash!=requirement.PackageHash) d.Add(Error("package.identity.mismatch","manifest","Package identity does not match the requested requirement."));
-            if(m.CookedSchemaVersion!=3||(m.RuntimeApiMin!="1.0.0"&&m.RuntimeApiMin!="1.1.0"&&m.RuntimeApiMin!="1.2.0"&&m.RuntimeApiMin!="1.3.0"&&m.RuntimeApiMin!="1.4.0")||m.RuntimeApiMax!="1.x") d.Add(Error("package.compatibility.unsupported","manifest","Cooked package schema/API is not supported."));
+            if(m.CookedSchemaVersion!=3||(m.RuntimeApiMin!="1.0.0"&&m.RuntimeApiMin!="1.1.0"&&m.RuntimeApiMin!="1.2.0"&&m.RuntimeApiMin!="1.3.0"&&m.RuntimeApiMin!="1.4.0"&&m.RuntimeApiMin!="1.5.0")||m.RuntimeApiMax!="1.x") d.Add(Error("package.compatibility.unsupported","manifest","Cooked package schema/API is not supported."));
             if(m.Dependencies.Count!=0) d.Add(Error("package.dependencies.unsupported","manifest.dependencies","Unresolved package dependencies are not supported."));
             foreach (var c in m.Capabilities)
             {
-                if (c.CapabilityId == CharacterPackageCompiler.RetiredTargetedLeapCapabilityId)
-                    d.Add(Error("package.capability.retired", c.CapabilityId, "The Bonk-only targeted jump slam capability has been retired."));
+                if (c.CapabilityId == CharacterPackageCompiler.RetiredTargetedLeapCapabilityId ||
+                    c.CapabilityId == CharacterPackageCompiler.RetiredWibouDashSlashCapabilityId)
+                    d.Add(Error("package.capability.retired", c.CapabilityId, "Capability has been retired."));
                 else if (!CharacterPackageCompiler.IsRuntimeCapability(c.CapabilityId, c.CapabilityVersion))
                     d.Add(Error("package.capability.unsupported", c.CapabilityId, "Cooked capability is not supported by this runtime."));
             }
             var package=RuntimeParser.Parse(copied[CharacterPackageAssembler.RuntimePath]);
             ValidateCapabilityOperations(package.Definition, d);
+            ValidateChargedDirectionalDashes(package.Definition, m.RuntimeApiMin, d);
             ValidateArmorAndFixedHitstun(package.Definition, m.RuntimeApiMin, d);
             ValidateStartupAimCorrections(package.Definition, m.RuntimeApiMin, d);
             if(package.Metadata.PackageId!=m.PackageId||package.Metadata.Version!=m.Version||package.Metadata.CookedSchemaVersion!=m.CookedSchemaVersion) d.Add(Error("package.runtime.metadata-mismatch",CharacterPackageAssembler.RuntimePath,"Runtime package metadata does not match manifest."));
@@ -125,8 +127,9 @@ public static class CookedCharacterPackageLoader
         var declared = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var requirement in definition.CapabilityRequirements)
         {
-            if (requirement.CapabilityId == CharacterPackageCompiler.RetiredTargetedLeapCapabilityId)
-                diagnostics.Add(Error("package.capability.retired", requirement.CapabilityId, "The Bonk-only targeted jump slam capability has been retired."));
+            if (requirement.CapabilityId == CharacterPackageCompiler.RetiredTargetedLeapCapabilityId ||
+                requirement.CapabilityId == CharacterPackageCompiler.RetiredWibouDashSlashCapabilityId)
+                diagnostics.Add(Error("package.capability.retired", requirement.CapabilityId, "Capability has been retired."));
             else if (!CharacterPackageCompiler.IsRuntimeCapability(requirement.CapabilityId, requirement.CapabilityVersion))
                 diagnostics.Add(Error("package.capability.unsupported", requirement.CapabilityId, "Runtime capability requirement is not supported by this runtime."));
             if (!declared.TryAdd(requirement.CapabilityId, requirement.CapabilityVersion))
@@ -139,8 +142,9 @@ public static class CookedCharacterPackageLoader
         {
             if (operation is not CookedStartCapabilityOperation capability)
                 continue;
-            if (capability.CapabilityId == CharacterPackageCompiler.RetiredTargetedLeapCapabilityId)
-                diagnostics.Add(Error("package.capability.retired", capability.CapabilityId, "The Bonk-only targeted jump slam capability has been retired."));
+            if (capability.CapabilityId == CharacterPackageCompiler.RetiredTargetedLeapCapabilityId ||
+                capability.CapabilityId == CharacterPackageCompiler.RetiredWibouDashSlashCapabilityId)
+                diagnostics.Add(Error("package.capability.retired", capability.CapabilityId, "Capability has been retired."));
             else if (!CharacterPackageCompiler.IsRuntimeCapability(capability.CapabilityId, capability.CapabilityVersion))
                 diagnostics.Add(Error("package.capability.unsupported", capability.CapabilityId, "Cooked capability version is not supported by this runtime."));
             else if (!declared.TryGetValue(capability.CapabilityId, out var version))
@@ -148,6 +152,97 @@ public static class CookedCharacterPackageLoader
             else if (version != capability.CapabilityVersion)
                 diagnostics.Add(Error("package.capability.version-mismatch", capability.CapabilityId, "Runtime capability version does not match its declaration."));
         }
+    }
+    private static void ValidateChargedDirectionalDashes(
+        CookedCharacterDefinition definition, string runtimeApiMin, List<CharacterDiagnostic> diagnostics)
+    {
+        foreach (var slot in definition.Slots)
+        {
+            int lifecycleCount = 0;
+            for (int stageIndex = 0; stageIndex < slot.Timeline.Stages.Count; stageIndex++)
+            {
+                var stage = slot.Timeline.Stages[stageIndex];
+                foreach (var operation in stage.Operations)
+                {
+                    if (operation is not CookedStartCapabilityOperation capability ||
+                        capability.CapabilityId != CharacterPackageCompiler.ChargedDirectionalDashCapabilityId)
+                        continue;
+                    lifecycleCount++;
+                    string path = slot.Id + ".chargedDirectionalDash";
+                    if (runtimeApiMin != "1.5.0")
+                        diagnostics.Add(Error("package.compatibility.unsupported", "manifest.runtimeApiMin",
+                            "Charged directional dash requires runtime API 1.5.0."));
+                    if (capability.Parameters is not CookedChargedDirectionalDashCapabilityParameters dash)
+                    {
+                        diagnostics.Add(Error("package.capability.parameters-invalid", path,
+                            "Charged directional dash parameters have the wrong type."));
+                        continue;
+                    }
+                    if (slot.Behavior != AuthoringAbilityBehavior.DirectionalDash || slot.AimMode != AuthoringAimMode.GroundVector ||
+                        slot.Timeline.Stages.Count != 1 || stage.IasaTicks != 0)
+                        diagnostics.Add(Error("package.capability.parameters-invalid", path,
+                            "Charged dash requires directionalDash, groundVector aim, and one stage with IASA disabled."));
+                    if (stageIndex != 0 || operation.Tick != 0)
+                        diagnostics.Add(Error("package.capability.parameters-invalid", path,
+                            "Charged dash lifecycle must start at tick zero in the first stage."));
+                    if (stage.Operations.Any(other => other != operation &&
+                        (other is CookedForwardLungeOperation or CookedSetVelocityOperation or CookedSpawnHitboxOperation
+                            or CookedStartCapabilityOperation or CookedStartupAimCorrectionOperation)))
+                        diagnostics.Add(Error("package.capability.parameters-invalid", path,
+                            "Charged dash cannot share its stage with another lifecycle, startup correction, motion, or extra hitboxes."));
+                    if (dash.MaxChargeTicks == 0 || dash.Tier2Ticks == 0 ||
+                        dash.Tier2Ticks >= dash.Tier3Ticks || dash.Tier3Ticks > dash.MaxChargeTicks)
+                        diagnostics.Add(Error("package.capability.parameters-invalid", path,
+                            "Charge thresholds are invalid."));
+                    float[] values = { dash.MinDistance, dash.MaxDistance, dash.DashSpeed,
+                        dash.Tier2Damage, dash.Tier3Damage };
+                    if (values.Any(value => float.IsNaN(value) || float.IsInfinity(value)) ||
+                        dash.MinDistance <= 0f || dash.MaxDistance < dash.MinDistance || dash.DashSpeed <= 0f)
+                        diagnostics.Add(Error("package.capability.parameters-invalid", path,
+                            "Distances and dash speed must be finite and in range."));
+                    if (dash.FinisherLeadTicks == 0 || dash.FinisherSeekTick == 0 || dash.RecoveryTicks == 0 ||
+                        dash.Tier2Damage < 0f || dash.Tier2Damage < dash.FinisherHitbox.Damage ||
+                        dash.Tier3Damage < dash.Tier2Damage)
+                        diagnostics.Add(Error("package.capability.parameters-invalid", path,
+                            "Finisher timing and tier damage are invalid."));
+                    ValidateChargedHitbox(dash.TraversalHitbox, definition, path + ".traversalHitbox", diagnostics);
+                    ValidateChargedHitbox(dash.FinisherHitbox, definition, path + ".finisherHitbox", diagnostics);
+                    if (dash.FinisherHitbox.DurationTicks > (int)dash.FinisherLeadTicks + dash.RecoveryTicks)
+                        diagnostics.Add(Error("package.capability.parameters-invalid", path,
+                            "Finisher duration exceeds its lead and recovery."));
+                    double travelTicks = Math.Ceiling(dash.MaxDistance / (dash.DashSpeed / 60d));
+                    if (travelTicks + dash.RecoveryTicks > stage.DurationTicks ||
+                        (int)dash.FinisherSeekTick + dash.FinisherLeadTicks + dash.RecoveryTicks > stage.DurationTicks)
+                        diagnostics.Add(Error("package.capability.parameters-invalid", path,
+                            "Charged dash travel and finisher recovery exceed stage duration."));
+                }
+            }
+            if (lifecycleCount > 1)
+                diagnostics.Add(Error("package.capability.parameters-invalid", slot.Id,
+                    "A slot may contain only one charged directional dash lifecycle."));
+        }
+    }
+
+    private static void ValidateChargedHitbox(CookedHitbox hitbox, CookedCharacterDefinition definition,
+        string path, List<CharacterDiagnostic> diagnostics)
+    {
+        float[] values = { hitbox.Radius, hitbox.OffsetX, hitbox.OffsetY, hitbox.OffsetZ,
+            hitbox.EndOffsetX, hitbox.EndOffsetY, hitbox.EndOffsetZ, hitbox.Damage,
+            hitbox.Angle, hitbox.BaseKnockback, hitbox.KnockbackGrowth };
+        if (values.Any(value => float.IsNaN(value) || float.IsInfinity(value)) ||
+            hitbox.Radius < 0f || hitbox.Damage < 0f || hitbox.Angle < -90f || hitbox.Angle > 90f ||
+            hitbox.BaseKnockback < 0f || hitbox.KnockbackGrowth < 0f || hitbox.DurationTicks == 0 ||
+            hitbox.Shape is not (AuthoringHitboxShape.Sphere or AuthoringHitboxShape.Capsule) ||
+            hitbox.KnockbackDirection is not (AuthoringKnockbackDirection.AwayFromOwner or AuthoringKnockbackDirection.TowardOwner) ||
+            hitbox.FixedHitstunTicks > 240 || hitbox.FixedHitstunTicks > 0 && hitbox.StunTicks == 0 || hitbox.HitGroup != 0)
+            diagnostics.Add(Error("package.capability.parameters-invalid", path,
+                "Charged dash hitbox geometry or values are invalid."));
+        bool HasBone(string? id) => id == null ||
+            definition.HurtboxBoneDefs.Any(bone => bone.BoneId == id) ||
+            definition.AttachmentBoneIds.Contains(id, StringComparer.Ordinal);
+        if (!HasBone(hitbox.StartBoneId) || !HasBone(hitbox.EndBoneId))
+            diagnostics.Add(Error("package.capability.parameters-invalid", path,
+                "Charged dash hitbox references an undeclared bone."));
     }
     private static void ValidateArmorAndFixedHitstun(
         CookedCharacterDefinition definition,
@@ -177,7 +272,7 @@ public static class CookedCharacterPackageLoader
                 ValidateFixedHitstun(leap.Hitbox.FixedHitstunTicks, leap.Hitbox.StunTicks,
                     slot.Id, diagnostics, ref requiresApi13);
         }
-        if (requiresApi13 && runtimeApiMin is not ("1.3.0" or "1.4.0"))
+        if (requiresApi13 && runtimeApiMin is not ("1.3.0" or "1.4.0" or "1.5.0"))
             diagnostics.Add(Error("package.compatibility.unsupported", "manifest.runtimeApiMin",
                 "Armor windows and fixed hitstun require runtime API 1.3.0 or later."));
     }
@@ -200,9 +295,9 @@ public static class CookedCharacterPackageLoader
                 {
                     if (operation is CookedStartupAimCorrectionOperation correction)
                     {
-                        if (runtimeApiMin != "1.4.0")
+                        if (runtimeApiMin is not ("1.4.0" or "1.5.0"))
                             diagnostics.Add(Error("package.compatibility.unsupported", "manifest.runtimeApiMin",
-                                "Startup aim correction requires runtime API 1.4.0."));
+                                "Startup aim correction requires runtime API 1.4.0 or later."));
                         windowCount++;
                         windows.Add((stageIndex, stageStart, correction));
                     }
@@ -414,8 +509,8 @@ public static class CookedCharacterPackageLoader
 
         private static CookedForwardLungeOperation ForwardLunge(JsonElement e, ushort tick, AuthoringUnit unit)
         {
-            var q = O(e, "kind", "tick", "unit", "speed", "durationTicks");
-            return new CookedForwardLungeOperation(tick, unit, F(q, "speed"), U(q, "durationTicks"));
+            var q = OOptional(e, new[] { "stopInAttackRange" }, "kind", "tick", "unit", "speed", "durationTicks");
+            return new CookedForwardLungeOperation(tick, unit, F(q, "speed"), U(q, "durationTicks"), BoOrDefault(q, "stopInAttackRange", false));
         }
         private static CookedGravityWindowOperation GravityWindow(JsonElement e, ushort tick, AuthoringUnit unit)
         {
@@ -497,13 +592,13 @@ public static class CookedCharacterPackageLoader
         {
             if (id == CharacterPackageCompiler.RetiredTargetedLeapCapabilityId)
                 throw new InvalidDataException("Retired capability: the Bonk-only targeted jump slam capability is not supported.");
+            if (id == CharacterPackageCompiler.RetiredWibouDashSlashCapabilityId)
+                throw new InvalidDataException("Retired capability: the Wibou dash-slash capability is not supported.");
             return id switch
             {
-                "slop.internal.fightguy.ki-shot.v1" => KiShot(O(e, "startupTicks", "durationTicks", "launchOffsetY", "projectileSpeed", "gravity", "hitboxRadius", "damage", "knockbackBase", "knockbackGrowth", "knockbackAngle", "stunTicks", "maxFlightTicks")),
                 "slop.internal.fightguy.rising-dragon.v1" => RisingDragon(O(e, "riseSpeed", "riseTicks", "riseDelay")),
                 "slop.internal.fightguy.cyclone-kick.v1" => CycloneKick(O(e, "forwardSpeed", "windupTicks", "hitboxEndTick", "durationTicks", "bodyRadius", "sideRadius", "sideOffset", "damage", "knockbackAngle", "knockbackBase", "knockbackGrowth", "stunTicks", "bodyY", "sideY")),
-                "slop.internal.fightguy.dragon-beam.v1" => DragonBeam(O(e, "durationTicks", "fireTick", "launchOffsetY", "beamRange", "beamRadius", "damage", "knockbackAngle", "knockbackBase", "knockbackGrowth", "stunTicks", "hitboxDurationTicks")),
-                "slop.internal.wibou.dash-slash.v1" => WibouDashSlash(O(e, "dashDistance", "dashDurationTicks", "maxAimTicks")),
+                "slop.ability.charged-directional-dash.v1" => ChargedDirectionalDash(O(e, "maxChargeTicks", "tier2Ticks", "tier3Ticks", "minDistance", "maxDistance", "dashSpeed", "finisherLeadTicks", "finisherSeekTick", "recoveryTicks", "tier2Damage", "tier3Damage", "traversalHitbox", "finisherHitbox")),
                 "slop.internal.wibou.rising-slash.v1" => WibouRisingSlash(O(e, "riseSpeed", "riseTicks", "homingRange", "homingSpeed")),
                 "slop.internal.wibou.blade-flurry.v1" => WibouBladeFlurry(O(e, "forwardSpeed", "moveTicks")),
                 "slop.ability.targeted-leap.v1" => TargetedLeap(O(e, "maxAimTicks", "maxFlightTicks", "minRange", "maxRange", "launchVerticalSpeed", "landingSeekTick", "recoveryTicks", "hitbox")),
@@ -515,11 +610,15 @@ public static class CookedCharacterPackageLoader
                 _ => throw new InvalidDataException("Unknown capability parameters.")
             };
         }
-        private static CookedCapabilityParameters KiShot(Dictionary<string, JsonElement> q) => new CookedKiShotCapabilityParameters(U(q, "startupTicks"), U(q, "durationTicks"), F(q, "launchOffsetY"), F(q, "projectileSpeed"), F(q, "gravity"), F(q, "hitboxRadius"), F(q, "damage"), F(q, "knockbackBase"), F(q, "knockbackGrowth"), F(q, "knockbackAngle"), U(q, "stunTicks"), U(q, "maxFlightTicks"));
         private static CookedCapabilityParameters RisingDragon(Dictionary<string, JsonElement> q) => new CookedRisingDragonCapabilityParameters(F(q, "riseSpeed"), U(q, "riseTicks"), U(q, "riseDelay"));
         private static CookedCapabilityParameters CycloneKick(Dictionary<string, JsonElement> q) => new CookedCycloneKickCapabilityParameters(F(q, "forwardSpeed"), U(q, "windupTicks"), U(q, "hitboxEndTick"), U(q, "durationTicks"), F(q, "bodyRadius"), F(q, "sideRadius"), F(q, "sideOffset"), F(q, "damage"), F(q, "knockbackAngle"), F(q, "knockbackBase"), F(q, "knockbackGrowth"), U(q, "stunTicks"), F(q, "bodyY"), F(q, "sideY"));
-        private static CookedCapabilityParameters DragonBeam(Dictionary<string, JsonElement> q) => new CookedDragonBeamCapabilityParameters(U(q, "durationTicks"), U(q, "fireTick"), F(q, "launchOffsetY"), F(q, "beamRange"), F(q, "beamRadius"), F(q, "damage"), F(q, "knockbackAngle"), F(q, "knockbackBase"), F(q, "knockbackGrowth"), U(q, "stunTicks"), U(q, "hitboxDurationTicks"));
-        private static CookedCapabilityParameters WibouDashSlash(Dictionary<string, JsonElement> q) => new CookedWibouDashSlashCapabilityParameters(F(q, "dashDistance"), U(q, "dashDurationTicks"), U(q, "maxAimTicks"));
+        private static CookedCapabilityParameters ChargedDirectionalDash(Dictionary<string, JsonElement> q)
+            => new CookedChargedDirectionalDashCapabilityParameters(
+                U(q, "maxChargeTicks"), U(q, "tier2Ticks"), U(q, "tier3Ticks"),
+                F(q, "minDistance"), F(q, "maxDistance"), F(q, "dashSpeed"),
+                U(q, "finisherLeadTicks"), U(q, "finisherSeekTick"), U(q, "recoveryTicks"),
+                F(q, "tier2Damage"), F(q, "tier3Damage"),
+                ParseHitbox(q["traversalHitbox"]), ParseHitbox(q["finisherHitbox"]));
         private static CookedCapabilityParameters WibouRisingSlash(Dictionary<string, JsonElement> q) => new CookedWibouRisingSlashCapabilityParameters(F(q, "riseSpeed"), U(q, "riseTicks"), F(q, "homingRange"), F(q, "homingSpeed"));
         private static CookedCapabilityParameters WibouBladeFlurry(Dictionary<string, JsonElement> q) => new CookedWibouBladeFlurryCapabilityParameters(F(q, "forwardSpeed"), U(q, "moveTicks"));
         private static CookedCapabilityParameters TargetedLeap(Dictionary<string, JsonElement> q)

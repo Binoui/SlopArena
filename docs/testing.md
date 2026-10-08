@@ -87,6 +87,23 @@ hops, reflected an explicit fixture jump-force change, and retained the same eng
 after process-local Manki movement/body perturbation. All 87 protected character-source,
 cooked-content and generated-package file hashes matched the pre-cleanup baseline.
 
+Release-preparation cleanup verified 2026-10-08: the full Shared suite passed
+1,265 tests with zero failures and two existing skips; Server passed all 27 tests.
+The dash traversal regression failed before lifecycle-based cleanup and passed
+afterward. The Manki artifact test retains roster/hash admission checks without
+pinning current tuning or operation order. Retired Dragon Beam code and positive
+admission coverage were removed; unsupported capability rejection remains covered.
+
+Actual Unity runtime and Editor sources compiled offline with the installed Unity
+SDK and the latest Shared DLL. An executable smoke against those assemblies loaded
+all four pinned packages and exercised idle/shield grab capture/release, scenario
+receipt settings, explicit zero-charge input, held leap contact and dash recovery.
+These checks are not live Editor/UI, physical input, packaged-player or multiplayer
+acceptance. Final plugin refresh and native Lab checks remain pending: an output
+consumer failure killed the verification gateway after recompilation, leaving its
+lease held/settled with zero operations. Human lease recovery is required; no
+timeout takeover or final live-runtime verification is claimed.
+
 ### Targeted contract tests
 
 Choose tests that cover the changed boundary:
@@ -133,7 +150,9 @@ The Bonk probe is not gameplay coverage. Record:
 package exist. The probe deliberately has no damage, timing, recovery, or capability
 contract to golden-test.
 
-The maintained FightGuy check is:
+The maintained FightGuy verifier requires `ORCA_TERMINAL_HANDLE` set to your own
+runtime-issued terminal handle. It acquires its own gateway lease and checks the
+native inspect result, ignoring the trailing ownership-status object:
 
 ```bash
 scripts/verify-fightguy-package.sh

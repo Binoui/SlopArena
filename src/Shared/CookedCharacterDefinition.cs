@@ -347,12 +347,14 @@ public sealed class CookedForwardLungeOperation : CookedTimelineOperation
 {
     public float Speed { get; }
     public ushort DurationTicks { get; }
+    public bool StopInAttackRange { get; }
 
-    public CookedForwardLungeOperation(ushort tick, AuthoringUnit unit, float speed, ushort durationTicks)
+    public CookedForwardLungeOperation(ushort tick, AuthoringUnit unit, float speed, ushort durationTicks, bool stopInAttackRange = false)
         : base(tick, unit, CookedOperationKind.ForwardLunge)
     {
         Speed = speed;
         DurationTicks = durationTicks;
+        StopInAttackRange = stopInAttackRange;
     }
 }
 public sealed class CookedGravityWindowOperation : CookedTimelineOperation
@@ -514,23 +516,38 @@ public sealed class CookedCompleteTimelineOperation : CookedTimelineOperation
         : base(tick, unit, CookedOperationKind.CompleteTimeline) { }
 }
 public abstract record CookedCapabilityParameters;
-public sealed record CookedKiShotCapabilityParameters(
-    ushort StartupTicks, ushort DurationTicks, float LaunchOffsetY, float ProjectileSpeed, float Gravity,
-    float HitboxRadius, float Damage, float KnockbackBase, float KnockbackGrowth, float KnockbackAngle,
-    ushort StunTicks, ushort MaxFlightTicks) : CookedCapabilityParameters;
 public sealed record CookedRisingDragonCapabilityParameters(float RiseSpeed, ushort RiseTicks, ushort RiseDelay) : CookedCapabilityParameters;
 public sealed record CookedCycloneKickCapabilityParameters(
     float ForwardSpeed, ushort WindupTicks, ushort HitboxEndTick, ushort DurationTicks, float BodyRadius,
     float SideRadius, float SideOffset, float Damage, float KnockbackAngle, float KnockbackBase,
     float KnockbackGrowth, ushort StunTicks, float BodyY, float SideY) : CookedCapabilityParameters;
-public sealed record CookedDragonBeamCapabilityParameters(
-    ushort DurationTicks, ushort FireTick, float LaunchOffsetY, float BeamRange, float BeamRadius,
-    float Damage, float KnockbackAngle, float KnockbackBase, float KnockbackGrowth, ushort StunTicks,
-    ushort HitboxDurationTicks) : CookedCapabilityParameters;
-public sealed record CookedWibouDashSlashCapabilityParameters(
-    float DashDistance,
-    ushort DashDurationTicks,
-    ushort MaxAimTicks) : CookedCapabilityParameters;
+public sealed record CookedChargedDirectionalDashCapabilityParameters(
+    ushort MaxChargeTicks,
+    ushort Tier2Ticks,
+    ushort Tier3Ticks,
+    float MinDistance,
+    float MaxDistance,
+    float DashSpeed,
+    ushort FinisherLeadTicks,
+    ushort FinisherSeekTick,
+    ushort RecoveryTicks,
+    float Tier2Damage,
+    float Tier3Damage,
+    CookedHitbox TraversalHitbox,
+    CookedHitbox FinisherHitbox) : CookedCapabilityParameters
+{
+    public byte GetChargeTier(ushort chargeTicks)
+        => chargeTicks >= Tier3Ticks ? (byte)2 : chargeTicks >= Tier2Ticks ? (byte)1 : (byte)0;
+
+    public float GetDashDistance(ushort chargeTicks)
+        => chargeTicks >= MaxChargeTicks ? MaxDistance
+            : MinDistance + (MaxDistance - MinDistance) * chargeTicks / MaxChargeTicks;
+
+    public float GetFinisherDamage(ushort chargeTicks)
+        => GetChargeTier(chargeTicks) == 2 ? Tier3Damage
+            : GetChargeTier(chargeTicks) == 1 ? Tier2Damage
+            : FinisherHitbox.Damage;
+}
 
 public sealed record CookedWibouRisingSlashCapabilityParameters(
     float RiseSpeed,

@@ -1072,6 +1072,14 @@ public sealed class HeuristicBotPolicy
                                 hitReach = MathF.Max(hitReach, committed
                                     + MathF.Max(cyclone.BodyRadius, cyclone.SideOffset + cyclone.SideRadius));
                             }
+                            else if (capability.Parameters is CookedChargedDirectionalDashCapabilityParameters dash)
+                            {
+                                float distance = dash.GetDashDistance(AimHoldTicks);
+                                forwardTravel = MathF.Max(forwardTravel, distance);
+                                var finisher = ToHitboxEvent(dash.FinisherHitbox, dash.FinisherSeekTick);
+                                hitReach = MathF.Max(hitReach, distance + PoseForwardReach(def, finisher,
+                                    activeSlot, airborne, animationNames, (byte)stageIndex, baked));
+                            }
                             break;
                     }
                 }
@@ -1173,11 +1181,9 @@ public sealed class HeuristicBotPolicy
     private static float DirectForwardReach(in HitboxEvent evt)
         => MathF.Max(evt.OffZ, evt.EndOffZ) + evt.Radius;
     private static bool IsSupportedCapability(CookedCapabilityParameters parameters)
-        => parameters is CookedKiShotCapabilityParameters
-            or CookedRisingDragonCapabilityParameters
+        => parameters is CookedRisingDragonCapabilityParameters
             or CookedCycloneKickCapabilityParameters
-            or CookedDragonBeamCapabilityParameters
-            or CookedWibouDashSlashCapabilityParameters
+            or CookedChargedDirectionalDashCapabilityParameters
             or CookedWibouRisingSlashCapabilityParameters
             or CookedWibouBladeFlurryCapabilityParameters
             or CookedTargetedLeapCapabilityParameters
@@ -1193,20 +1199,20 @@ public sealed class HeuristicBotPolicy
     {
         switch (parameters)
         {
-            case CookedKiShotCapabilityParameters x:
-                hitReach = MathF.Max(hitReach, x.ProjectileSpeed * x.MaxFlightTicks / 60f + x.HitboxRadius);
-                damage += x.Damage; hasDamage |= x.Damage > 0f; break;
             case CookedRisingDragonCapabilityParameters x:
                 hasMovement = true; break;
             case CookedCycloneKickCapabilityParameters x:
                 hitReach = MathF.Max(hitReach, x.ForwardSpeed * x.DurationTicks / 60f
                     + MathF.Max(x.BodyRadius, x.SideOffset + x.SideRadius));
                 damage += x.Damage; hasDamage |= x.Damage > 0f; hasMovement = true; break;
-            case CookedDragonBeamCapabilityParameters x:
-                hitReach = MathF.Max(hitReach, x.BeamRange + x.BeamRadius);
-                damage += x.Damage; hasDamage |= x.Damage > 0f; break;
-            case CookedWibouDashSlashCapabilityParameters x:
-                hitReach = MathF.Max(hitReach, x.DashDistance); hasMovement = true; hasDamage = true; break;
+            case CookedChargedDirectionalDashCapabilityParameters x:
+                hitReach = MathF.Max(hitReach, x.GetDashDistance(AimHoldTicks)
+                    + MathF.Max(x.FinisherHitbox.OffsetZ, x.FinisherHitbox.EndOffsetZ)
+                    + x.FinisherHitbox.Radius);
+                damage += x.TraversalHitbox.Damage + x.GetFinisherDamage(AimHoldTicks);
+                hasMovement = true;
+                hasDamage |= x.TraversalHitbox.Damage > 0f || x.GetFinisherDamage(AimHoldTicks) > 0f;
+                break;
             case CookedWibouRisingSlashCapabilityParameters x:
                 hitReach = MathF.Max(hitReach, x.HomingRange);
                 recoveryHorizontal = MathF.Max(recoveryHorizontal,
@@ -1237,11 +1243,9 @@ public sealed class HeuristicBotPolicy
     private static ushort CapabilityFirstActiveTicks(CookedCapabilityParameters parameters)
         => parameters switch
         {
-            CookedKiShotCapabilityParameters x => x.StartupTicks,
             CookedRisingDragonCapabilityParameters x => x.RiseDelay,
             CookedCycloneKickCapabilityParameters x => x.WindupTicks,
-            CookedDragonBeamCapabilityParameters x => x.FireTick,
-            CookedWibouDashSlashCapabilityParameters x => x.MaxAimTicks,
+            CookedChargedDirectionalDashCapabilityParameters _ => 0,
             CookedWibouRisingSlashCapabilityParameters _ => 0,
             CookedTargetedLeapCapabilityParameters x => x.MaxAimTicks,
             CookedMankiRoundBombCapabilityParameters x => x.ThrowTriggerTick,
@@ -1255,11 +1259,6 @@ public sealed class HeuristicBotPolicy
     {
         switch (parameters)
         {
-            case CookedKiShotCapabilityParameters x:
-                travelTicks = Math.Max(travelTicks, x.MaxFlightTicks);
-                travelSpeed = MathF.Max(travelSpeed, x.ProjectileSpeed);
-                travelOffset = MathF.Max(travelOffset, x.HitboxRadius);
-                break;
             case CookedMankiRoundBombCapabilityParameters x:
                 travelTicks = Math.Max(travelTicks, x.MaxFlightTicks);
                 if (x.MaxFlightTicks > 0)

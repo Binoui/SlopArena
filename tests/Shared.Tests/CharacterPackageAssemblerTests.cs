@@ -336,10 +336,12 @@ public sealed class CharacterPackageAssemblerTests
     [InlineData("1.2.0", false, true)]
     [InlineData("1.3.0", false, true)]
     [InlineData("1.4.0", false, true)]
+    [InlineData("1.5.0", false, true)]
     [InlineData("2.0.0", false, false)]
     [InlineData("1.0.0", true, false)]
     [InlineData("1.3.0", true, false)]
     [InlineData("1.4.0", true, true)]
+    [InlineData("1.5.0", true, true)]
     public void Loader_EnforcesRuntimeMinimumAgainstFeatures(string minimum, bool startupCorrection, bool supported)
     {
         string root = FindRepoFile("client/Unity/Assets/CharacterPackages/fightguy");
@@ -410,6 +412,45 @@ public sealed class CharacterPackageAssemblerTests
         Assert.NotEqual(baseline.PackageHash, changed.PackageHash);
     }
 
+    [Fact]
+    public void ChargedDirectionalDash_CookedLoaderRestoresNestedHitboxesAndApiFloor()
+    {
+        string root = FindRepoFile("client/Unity/Assets/CharacterPackages/wibou");
+        var compiled = CharacterPackageCompiler.Compile(
+            File.ReadAllText(Path.Combine(root, "package.json")),
+            File.ReadAllText(Path.Combine(root, "character.json")),
+            CharacterCookProfile.TrustedBuiltIn);
+        Assert.NotNull(compiled.CookedPackage);
+        var package = compiled.CookedPackage!;
+        Assert.Equal("1.5.0", package.Metadata.RuntimeApiMin);
+        var assembly = CharacterPackageAssembler.Assemble(BuildInput(
+            package, Array.Empty<PackageDependencySource>(), package.Definition.CapabilityRequirements,
+            Array.Empty<CharacterDiagnostic>()));
+        Assert.True(assembly.IsValid, string.Join("; ", assembly.Diagnostics.Select(x => x.Message)));
+        var loaded = CookedCharacterPackageLoader.LoadAssembly(assembly);
+        Assert.True(loaded.IsValid, string.Join("; ", loaded.Diagnostics.Select(x => x.Message)));
+        var input = BuildInput(package, Array.Empty<PackageDependencySource>(),
+            package.Definition.CapabilityRequirements, Array.Empty<CharacterDiagnostic>());
+        const string incompatibleApi = "1.4.0";
+        var runtime = JsonNode.Parse(input.RuntimeBytes)!.AsObject();
+        runtime["metadata"]!["compatibility"]!["runtimeApiMin"] = incompatibleApi;
+        byte[] runtimeBytes = Encoding.UTF8.GetBytes(runtime.ToJsonString());
+        var incompatiblePackage = new CookedCharacterPackage(
+            package.Metadata with { RuntimeApiMin = incompatibleApi }, package.Definition,
+            package.Budget, package.Diagnostics, runtimeBytes);
+        var incompatibleInput = new CharacterPackageAssemblyInput(
+            input.PackageId, input.Version, input.Creator, input.License, input.Attribution,
+            input.AuthoringSchemaVersion, input.CookedSchemaVersion, incompatibleApi, input.RuntimeApiMax,
+            input.SourceHash, input.Dependencies, input.CapabilityRequirements, input.CookerVersion,
+            input.UnityVersion, input.BindingSchemaVersion, input.PoseFormat, input.PoseVersion,
+            input.SampleRate, input.Warnings, runtimeBytes, input.PoseBytes, input.BindingBytes,
+            incompatiblePackage);
+        var incompatibleAssembly = CharacterPackageAssembler.Assemble(incompatibleInput);
+        Assert.True(incompatibleAssembly.IsValid, string.Join("; ", incompatibleAssembly.Diagnostics));
+        var rejected = CookedCharacterPackageLoader.LoadAssembly(incompatibleAssembly);
+        Assert.False(rejected.IsValid);
+        Assert.Contains(rejected.Diagnostics, x => x.Code == "package.compatibility.unsupported");
+    }
     private static CharacterPackageAssemblyResult AssembleFixture()
     {
         var package = Compile();

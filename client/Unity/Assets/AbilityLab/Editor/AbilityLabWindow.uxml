@@ -65,6 +65,7 @@
             <ui:IntegerField name="scenario-damage" label="Opponent starting damage (%)" value="0" />
             <ui:DropdownField name="scenario-opponent" label="Opponent behavior" />
             <ui:IntegerField name="scenario-horizon" label="Last frame" value="60" />
+            <ui:IntegerField name="scenario-charge-ticks" label="Charge duration (ticks, 0–600)" value="0" />
             <ui:VisualElement name="scenario-buttons" class="scenario-buttons">
               <ui:Button name="scenario-run" text="Run scenario" />
               <ui:Button name="scenario-exit" text="Exit to authoring" />

@@ -49,6 +49,7 @@ namespace SlopArena.Shared
 		private readonly Dictionary<ulong, int> _prevAnimIndex = new();
 		private List<SpellResolver.EntityData> _lastEntityList = new();
 		private readonly List<SpellResolver.EntityData> _attackEntities = new();
+		private readonly List<SpellResolver.EntityData> _lungeHurtboxes = new();
 		private readonly HashSet<ulong> _shieldSurfaceEntities = new();
 		public List<SpellResolver.HitResult> LastTickHits { get; } = new();
 		/// <summary>Exact surfaces consumed by the latest attack collision pass, including active shields.</summary>
@@ -428,6 +429,14 @@ namespace SlopArena.Shared
 			string targetAnim, int animFrame, ulong entityId = 0)
 		{
 			var list = new List<SpellResolver.EntityData>();
+			AppendEntitiesFromState(state, def, baked, targetAnim, animFrame, entityId, list);
+			return list;
+		}
+
+		private static void AppendEntitiesFromState(CharacterState state, CharacterDefinition def,
+			BakedAnimationData baked, string targetAnim, int animFrame, ulong entityId,
+			List<SpellResolver.EntityData> list)
+		{
 			if (baked != null && def.HurtboxBoneDefs != null && def.HurtboxBoneDefs.Length > 0)
 			{
 				int animIdx = baked.FindAnimIndex(targetAnim);
@@ -491,7 +500,6 @@ namespace SlopArena.Shared
 					});
 				}
 			}
-			return list;
 		}
 
         /// <summary>
@@ -500,7 +508,7 @@ namespace SlopArena.Shared
         /// Side effects: advances _animFrames and _prevAnimIndex for the entity.
         /// </summary>
         private bool ResolveBoneAnimFrame(ulong id, CharacterState state, CharacterDefinition def,
-            out BakedAnimationData baked, out string targetAnim, out int bakedFrame)
+            out BakedAnimationData baked, out string targetAnim, out int bakedFrame, bool advanceFrame = true)
         {
             baked = null!;
             targetAnim = null!;
@@ -555,10 +563,12 @@ namespace SlopArena.Shared
             int fc = baked.Animations[animIdx].FrameCount;
             int prevAnim = _prevAnimIndex.TryGetValue(id, out var p) ? p : -1;
             int frame = _animFrames.TryGetValue(id, out var f) ? f : 0;
-            if (prevAnim != animIdx) { frame = 0; _prevAnimIndex[id] = animIdx; }
-            int nextFrame = frame + 1;
-            if (nextFrame >= fc) nextFrame = 0;
-            _animFrames[id] = nextFrame;
+            if (prevAnim != animIdx) frame = 0;
+            if (advanceFrame)
+            {
+                _prevAnimIndex[id] = animIdx;
+                _animFrames[id] = (frame + 1) % fc;
+            }
 
             bakedFrame = frame;
             if ((state.State is ActionState.Attacking or ActionState.Aiming) && state.AttackSlot > 0)
@@ -574,6 +584,34 @@ namespace SlopArena.Shared
             }
 
             return true;
+        }
+
+        internal bool LungeReachesOpponent(in CharacterState attacker, ReadOnlySpan<Hitbox> reach, float sin, float cos)
+        {
+            foreach (var pair in _states)
+            {
+                var target = pair.Value;
+                if (pair.Key == attacker.EntityId || _rule.IsEliminated(target)
+                    || (target.PX - attacker.PX) * sin + (target.PZ - attacker.PZ) * cos <= 0f)
+                    continue;
+                var def = _defs[pair.Key];
+                _lungeHurtboxes.Clear();
+                if (ResolveBoneAnimFrame(pair.Key, target, def, out var baked, out var anim, out var frame, false))
+                    AppendEntitiesFromState(target, def, baked, anim, frame, pair.Key, _lungeHurtboxes);
+                else
+                    AppendEntitiesFromState(target, def, null!, "idle", 0, pair.Key, _lungeHurtboxes);
+                for (int pose = 0; pose < reach.Length; pose++)
+                {
+                    var hitbox = reach[pose];
+                    hitbox.X += attacker.PX; hitbox.Y += attacker.PY; hitbox.Z += attacker.PZ;
+                    hitbox.EndX += attacker.PX; hitbox.EndY += attacker.PY; hitbox.EndZ += attacker.PZ;
+                    for (int i = 0; i < _lungeHurtboxes.Count; i++)
+                        if (SpellResolver.CapsuleCollision(hitbox, _lungeHurtboxes[i],
+                            out _, out _, out _, out _, out _, out _, out _))
+                            return true;
+                }
+            }
+            return false;
         }
 
 		/// <summary>
@@ -1466,6 +1504,11 @@ namespace SlopArena.Shared
 					    || !_defs.TryGetValue(secondId, out var secondDef)
 					    || _rule.IsEliminated(second))
 						continue;
+                    if ((_activeAbilities.TryGetValue(firstId, out var firstAbility)
+                            && firstAbility.IgnoresFighterPushboxes)
+                        || (_activeAbilities.TryGetValue(secondId, out var secondAbility)
+                            && secondAbility.IgnoresFighterPushboxes))
+                        continue;
 
 					if (first.InteractionId != 0 && first.InteractionId == second.InteractionId)
 						continue;
@@ -1637,6 +1680,34 @@ namespace SlopArena.Shared
 			return selected != 0 && IsEligibleEnemy(selfId, selected, selfX, selfZ,
 				LockRangeMeters, out _) ? selected : 0;
 		}
+		/// <summary>Resolve a straight shot toward the current eligible target at launch.</summary>
+		internal void ResolveAutoTargetProjectileAim(ref CharacterState state,
+			float launchOffsetX, float launchOffsetY, float launchOffsetZ, out float yaw, out float pitch)
+		{
+			yaw = state.FacingYaw;
+			pitch = 0f;
+			ulong targetId = state.TargetEntityId;
+			if (targetId == 0 || !IsEligibleEnemy(state.EntityId, targetId, state.PX, state.PZ, LockRangeMeters, out _))
+				targetId = FindClosestEnemy(state.EntityId, state.PX, state.PZ, LockRangeMeters, out _);
+			if (targetId == 0)
+				return;
+
+			var target = _states[targetId];
+			float dx = target.PX - state.PX;
+			float dz = target.PZ - state.PZ;
+			if (dx * dx + dz * dz > 0.000001f)
+				yaw = MathF.Atan2(dx, dz);
+			state.FacingYaw = yaw;
+			float cosYaw = MathF.Cos(yaw);
+			float sinYaw = MathF.Sin(yaw);
+			dx -= launchOffsetX * cosYaw + launchOffsetZ * sinYaw;
+			dz -= -launchOffsetX * sinYaw + launchOffsetZ * cosYaw;
+			if (dx * dx + dz * dz > 0.000001f)
+				yaw = MathF.Atan2(dx, dz);
+			float targetY = target.PY + _defs[targetId].CapsuleHeight * .25f;
+			pitch = MathF.Atan2(targetY - state.PY - launchOffsetY, MathF.Sqrt(dx * dx + dz * dz));
+		}
+
 		internal void BeginStartupAimCorrection(ref CharacterState state, CookedStartupAimCorrectionOperation operation, in InputState input)
 		{
 			state.AttackCorrectionOwned = true;
@@ -2174,6 +2245,11 @@ namespace SlopArena.Shared
 				if (targetState.State == ActionState.Shielding)
 				{
 					ResolveShieldBlock(hit, ref targetState, ref attackerState, attackerExists);
+					if (attackerExists && _activeAbilities.TryGetValue(hit.OwnerEntityId, out var blockingAbility))
+					{
+						blockingAbility.OnShieldBlock(ref attackerState, ref targetState);
+						_states[hit.OwnerEntityId] = attackerState;
+					}
 					continue;
 				}
 

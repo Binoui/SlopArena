@@ -80,7 +80,7 @@ public static class AbilityLabScenarioSelfTest
         var controller = new AbilityLabSimulationController();
         AbilityLabScenarioResult Run(string action, float distance) =>
             controller.RunScenario(def, package.BakedAnimation,
-                new AbilityLabScenarioOptions(action, 170, distance), origin, 0f);
+                new AbilityLabScenarioOptions(action, 170, distance, chargeTicks: 10), origin, 0f);
 
         var near = Run("ground.E", 1f);
         var far = Run("ground.E", 4f);

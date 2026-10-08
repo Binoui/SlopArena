@@ -76,10 +76,25 @@ semantic clips directly through Animancer.
 
 FightGuy specials are cooked timeline and capability bindings:
 
-- A: Ki Shot
+- A: Ki Shot — public `spawnProjectile` at tick 8, shared with Wibou's shuriken
 - E: Rising Dragon
 - R: Cyclone Kick
 - F: Fist of Fury
+
+Ground and air A (physical Q) start immediately and fire Ki Shot after 8 startup
+ticks. There is no aim stance, crosshair, held-key delay, or release phase. Shared
+aims from the launch position toward the current server-selected target's torso,
+falling back to the nearest eligible opponent within the existing 20 m horizontal
+targeting range. With no eligible target, the shot fires level along combat facing.
+The projectile does not home after launch; its authored speed, gravity, damage and
+cooldown are unchanged.
+
+Ki Shot has no native capability or internal capability requirement. Its projectile
+parameters and spawn tick are editable in Ability Lab's **Selected effect** fields.
+The enclosing timeline still lasts 45 ticks; projectile launch does not end recovery.
+Dragon Beam is retired: its capability, parameter codecs and runtime factory have
+been removed. Ground/air F execute Fist of Fury; unsupported beam IDs fail admission.
+
 
 Cyclone Kick's longer tuning uses 12 units/s for 60 ticks, then brakes horizontal
 velocity once and releases velocity ownership during the remaining 12 recovery ticks.

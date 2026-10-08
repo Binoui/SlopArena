@@ -177,7 +177,8 @@ public sealed record ForwardLungeOperationSource(
     ushort Tick,
     AuthoringUnit Unit,
     float Speed,
-    ushort DurationTicks) : CharacterTimelineOperationSource(Tick, Unit);
+    ushort DurationTicks,
+    bool StopInAttackRange = false) : CharacterTimelineOperationSource(Tick, Unit);
 public sealed record GravityWindowOperationSource(
     ushort Tick,
     AuthoringUnit Unit,
@@ -283,19 +284,6 @@ public sealed record ProjectileSource(
 
 public abstract record TypedCapabilityParameters;
 
-public sealed record KiShotCapabilityParameters(
-    ushort StartupTicks,
-    ushort DurationTicks,
-    float LaunchOffsetY,
-    float ProjectileSpeed,
-    float Gravity,
-    float HitboxRadius,
-    float Damage,
-    float KnockbackBase,
-    float KnockbackGrowth,
-    float KnockbackAngle,
-    ushort StunTicks,
-    ushort MaxFlightTicks) : TypedCapabilityParameters;
 
 public sealed record RisingDragonCapabilityParameters(
     float RiseSpeed,
@@ -318,23 +306,21 @@ public sealed record CycloneKickCapabilityParameters(
     float BodyY,
     float SideY) : TypedCapabilityParameters;
 
-public sealed record DragonBeamCapabilityParameters(
-    ushort DurationTicks,
-    ushort FireTick,
-    float LaunchOffsetY,
-    float BeamRange,
-    float BeamRadius,
-    float Damage,
-    float KnockbackAngle,
-    float KnockbackBase,
-    float KnockbackGrowth,
-    ushort StunTicks,
-    ushort HitboxDurationTicks) : TypedCapabilityParameters;
 
-public sealed record WibouDashSlashCapabilityParameters(
-    float DashDistance,
-    ushort DashDurationTicks,
-    ushort MaxAimTicks) : TypedCapabilityParameters;
+public sealed record ChargedDirectionalDashCapabilityParameters(
+    ushort MaxChargeTicks,
+    ushort Tier2Ticks,
+    ushort Tier3Ticks,
+    float MinDistance,
+    float MaxDistance,
+    float DashSpeed,
+    ushort FinisherLeadTicks,
+    ushort FinisherSeekTick,
+    ushort RecoveryTicks,
+    float Tier2Damage,
+    float Tier3Damage,
+    HitboxSource TraversalHitbox,
+    HitboxSource FinisherHitbox) : TypedCapabilityParameters;
 
 public sealed record WibouRisingSlashCapabilityParameters(
     float RiseSpeed,

@@ -37,6 +37,8 @@ namespace SlopArena.Client.Combat
         [SerializeField] private float _minRange = 1f;
         [SerializeField] private float _maxRange = 12f;
 
+        private CookedChargedDirectionalDashCapabilityParameters _chargedDashParameters;
+        private bool _hasChargedDashParameters;
         private CameraMode _activeMode = CameraMode.Normal;
         private byte _aimingSlot;
         private Transform _characterTransform;
@@ -235,6 +237,18 @@ namespace SlopArena.Client.Combat
                                 _groundVectorDistance = authoredDistance;
                         }
                     }
+                    _hasChargedDashParameters = false;
+                    var cookedAimSlot = charDef.GetCookedSlotAbility((byte)(_aimingSlot + 1), !playerState.IsGrounded);
+                    if (cookedAimSlot != null)
+                        foreach (var stage in cookedAimSlot.Timeline.Stages)
+                        foreach (var operation in stage.Operations)
+                            if (operation is CookedStartCapabilityOperation
+                                { Parameters: CookedChargedDirectionalDashCapabilityParameters parameters })
+                            {
+                                _chargedDashParameters = parameters;
+                                _hasChargedDashParameters = true;
+                                break;
+                            }
                 }
 
                 // Entering Aiming — activate aim camera, inherit current yaw + zoom distance
@@ -309,6 +323,14 @@ namespace SlopArena.Client.Combat
                 float dashWidth = 1.1f;
                 if (spec?.Stages is { Length: > 0 } && spec.Stages[0].HitboxEvents is { Length: > 0 })
                     dashWidth = spec.Stages[0].HitboxEvents[0].Radius * 2f;
+                if (_hasChargedDashParameters)
+                    dashWidth = _chargedDashParameters.FinisherHitbox.Radius * 2f;
+                byte? chargeTier = null;
+                if (_hasChargedDashParameters)
+                {
+                    dashDistance = _chargedDashParameters.GetDashDistance(playerState.ChargeTicks);
+                    chargeTier = _chargedDashParameters.GetChargeTier(playerState.ChargeTicks);
+                }
 
                 float yaw = _lastAimYawRad;
                 ushort distCm = (ushort)Mathf.Clamp(dashDistance * 100f, 0f, 6500f);
@@ -325,7 +347,11 @@ namespace SlopArena.Client.Combat
                     Vector3 dir = new(Mathf.Sin(yaw), 0f, Mathf.Cos(yaw));
                     Vector3 feetY = _characterTransform.position;
                     Vector3 destination = feetY + dir * dashDistance;
-                    _groundDestinationIndicator?.SetDestination(destination, dir, dashWidth);
+                    _groundDestinationIndicator?.SetDestination(destination, dir, dashWidth, chargeTier,
+                        _hasChargedDashParameters
+                            ? Mathf.Lerp(0.7f, 1.3f, Mathf.InverseLerp(
+                                _chargedDashParameters.MinDistance, _chargedDashParameters.MaxDistance, dashDistance))
+                            : 1f);
                     _trajectoryIndicator?.Clear();
                 }
             }
@@ -377,8 +403,7 @@ namespace SlopArena.Client.Combat
                 }
             }
 
-            ShowCrosshair = (aimMode is AimMode.GroundCursor or AimMode.CameraForward3D)
-                && !(charDef.Class == CharacterClass.Wibou && (byte)(_aimingSlot + 1) == AbilitySlots.A);
+            ShowCrosshair = aimMode is AimMode.GroundCursor or AimMode.CameraForward3D;
             return ctx;
         }
 

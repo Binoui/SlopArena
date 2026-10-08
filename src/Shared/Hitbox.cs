@@ -16,8 +16,8 @@ namespace SlopArena.Shared
     /// Position is absolute. Non-tracked hitboxes keep their spawn position and
     /// move only by velocity (Velocity (0,0,0) = static melee hitbox, non-zero =
     /// projectile). Tracked hitboxes (TracksBone) re-resolve X/Y/Z and capsule
-    /// EndX/EndY/EndZ every tick from the owner's baked bone pose and ignore
-    /// VX/VY/VZ — the limb sweeps the hitbox through the move.
+    /// EndX/EndY/EndZ every tick from the owner's baked bone pose, or facing-relative
+    /// root offsets when no baked pose is available, and ignore VX/VY/VZ.
     /// Shape: Sphere (default) or Capsule (uses EndX/EndY/EndZ).
     /// Resolved via sphere/capsule collision each tick in SpellResolver.
     /// </summary>
@@ -117,13 +117,13 @@ namespace SlopArena.Shared
         /// </summary>
         public bool IgnoresEntities;
 
-        /// <summary>True = bone-attached melee hitbox that re-resolves its bone position every tick.</summary>
+        /// <summary>True = owner-following melee hitbox; resolves bone or root-relative offsets each tick.</summary>
         public bool TracksBone;
 
         /// <summary>Original HitboxEvent (BoneName + Off* + EndOff*), for per-tick re-resolution.</summary>
         public HitboxEvent SourceEvent;
 
-        /// <summary>Baked skeleton for bone re-resolution. Null unless TracksBone.</summary>
+        /// <summary>Optional baked skeleton for tracked hitbox resolution; null uses root-relative offsets.</summary>
         public BakedAnimationData? Baked;
 
         /// <summary>Owner's CharacterDefinition (HurtboxBoneScale, HipHeight, stage duration). Null unless TracksBone.</summary>

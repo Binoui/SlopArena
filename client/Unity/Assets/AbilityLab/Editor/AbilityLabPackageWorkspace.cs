@@ -765,6 +765,74 @@ public sealed class AbilityLabPackageWorkspace
                 CharacterPackageCompiler.TargetedLeapCapabilityVersion, parameters)));
     }
 
+    public bool AddChargedDirectionalDash(string canonicalSlotId, int stageIndex)
+    {
+        if (!HasPackage) return Fail("workspace.missing", "workspace", "No package is open.");
+        if (!TryResolveCanonicalSlot(canonicalSlotId, out int slotIndex, out var sourceSlot))
+            return Fail("edit.slot.unresolved", canonicalSlotId, "Canonical slot does not resolve to an explicit source slot.");
+        if (stageIndex < 0 || stageIndex >= sourceSlot.Timeline.Stages.Count)
+            return Fail("edit.index.out-of-range", $"character.slots[{slotIndex}].timeline.stages[{stageIndex}]", "Stage index is out of range.");
+        if (stageIndex != 0 || sourceSlot.Timeline.Stages.Count != 1)
+            return Fail("edit.charged-dash.stage", canonicalSlotId, "Charged directional dash requires one stage starting at tick zero.");
+        var stage = sourceSlot.Timeline.Stages[stageIndex];
+        if (stage.Operations.Any(operation => operation is SpawnHitboxOperationSource
+            or ForwardLungeOperationSource or SetVelocityOperationSource or StartCapabilityOperationSource
+            or StartupAimCorrectionOperationSource))
+            return Fail("edit.charged-dash.operation-conflict", canonicalSlotId,
+                "Remove authored hitboxes, motion, startup correction, and other lifecycles before adding this primitive.");
+        if (sourceSlot.Timeline.Stages.SelectMany(stage => stage.Operations)
+            .OfType<StartCapabilityOperationSource>()
+            .Any(operation => operation.CapabilityId == CharacterPackageCompiler.ChargedDirectionalDashCapabilityId))
+            return Fail("edit.operation.duplicate", canonicalSlotId, "This move already has a charged directional dash.");
+
+        var requirements = Draft.CapabilityRequirements.ToList();
+        if (requirements.Any(item => item.CapabilityId == CharacterPackageCompiler.ChargedDirectionalDashCapabilityId &&
+            item.CapabilityVersion != CharacterPackageCompiler.ChargedDirectionalDashCapabilityVersion))
+            return Fail("edit.capability.version", canonicalSlotId, "Charged directional dash requires a different capability version.");
+        if (!requirements.Any(item => item.CapabilityId == CharacterPackageCompiler.ChargedDirectionalDashCapabilityId))
+            requirements.Add(new CapabilityRequirementSource(
+                CharacterPackageCompiler.ChargedDirectionalDashCapabilityId,
+                CharacterPackageCompiler.ChargedDirectionalDashCapabilityVersion));
+
+        var traversal = new HitboxSource(AuthoringHitboxShape.Sphere, 0.45f,
+            0f, 0f, 0f, 0f, 0f, 0f, "bone.hips", null,
+            1f, 0f, 0f, 0f, 0, 1, true, 0);
+        bool hasSwordBones = Draft.AttachmentBoneIds?.Contains("_weapon_hilt", StringComparer.Ordinal) == true &&
+            Draft.AttachmentBoneIds.Contains("_weapon_tip", StringComparer.Ordinal);
+        var finisher = hasSwordBones
+            ? new HitboxSource(AuthoringHitboxShape.Capsule, 0.5f,
+                0f, 0f, 0f, 0f, 0f, 0f, "_weapon_hilt", "_weapon_tip",
+                6f, 45f, 5f, 80f, 8, 9, true, 0)
+            : new HitboxSource(AuthoringHitboxShape.Sphere, 0.5f,
+                0f, 0f, 0f, 0f, 0f, 0f, "bone.hips", null,
+                6f, 45f, 5f, 80f, 8, 9, true, 0);
+        var parameters = new ChargedDirectionalDashCapabilityParameters(
+            60, 20, 45, 1.2f, 6.4f, 10.5f, 4, 31, 24, 9f, 12f, traversal, finisher);
+        int minimumStageTicks = Math.Max(
+            (int)Math.Ceiling(parameters.MaxDistance / (parameters.DashSpeed / 60d)) + parameters.RecoveryTicks,
+            parameters.FinisherSeekTick + parameters.FinisherLeadTicks + parameters.RecoveryTicks);
+        var slots = Draft.Slots.ToArray();
+        slots[slotIndex] = sourceSlot with
+        {
+            Behavior = AuthoringAbilityBehavior.DirectionalDash,
+            AimMode = AuthoringAimMode.GroundVector,
+            AimMovement = AuthoringAimMovementMode.Mobile,
+            AllowSlideCarry = false,
+            PreserveMomentumOnStart = false,
+            Timeline = new CharacterTimelineSource(new[]
+            {
+                stage with { DurationTicks = (ushort)Math.Max(stage.DurationTicks, minimumStageTicks), IasaTicks = 0 },
+            }),
+        };
+        var source = new CharacterPackageSource(Manifest,
+            Draft with { CapabilityRequirements = requirements, Slots = slots });
+        return ApplyEdit(CharacterPackageSourceCodec.AddOperation(source, slotIndex, stageIndex,
+            new StartCapabilityOperationSource(0, AuthoringUnit.Ticks,
+                CharacterPackageCompiler.ChargedDirectionalDashCapabilityId,
+                CharacterPackageCompiler.ChargedDirectionalDashCapabilityVersion, parameters)));
+    }
+
+
 
     public bool ReplaceStage(int slotIndex, int stageIndex, CharacterStageSource stage)
     {

@@ -30,6 +30,9 @@ public sealed class CharacterCompileResult
 
 public static class CharacterPackageCompiler
 {
+    public const string ChargedDirectionalDashCapabilityId = "slop.ability.charged-directional-dash.v1";
+    public const string ChargedDirectionalDashCapabilityVersion = "1";
+    internal const string RetiredWibouDashSlashCapabilityId = "slop.internal.wibou.dash-slash.v1";
     public const string TargetedLeapCapabilityId = "slop.ability.targeted-leap.v1";
     public const string TargetedLeapCapabilityVersion = "1";
     internal const string RetiredTargetedLeapCapabilityId = "slop.internal.bonk.targeted-jump-slam.v1";
@@ -50,11 +53,8 @@ public static class CharacterPackageCompiler
     public static IReadOnlyList<string> CanonicalSlotIds => CanonicalSlotIdsReadOnly;
     private static readonly string[] TrustedCapabilities =
     {
-        "slop.internal.fightguy.ki-shot.v1",
         "slop.internal.fightguy.rising-dragon.v1",
         "slop.internal.fightguy.cyclone-kick.v1",
-        "slop.internal.fightguy.dragon-beam.v1",
-        "slop.internal.wibou.dash-slash.v1",
         "slop.internal.wibou.rising-slash.v1",
         "slop.internal.wibou.blade-flurry.v1",
         "slop.internal.manki.round-bomb.v1",
@@ -65,7 +65,8 @@ public static class CharacterPackageCompiler
     };
     internal static bool IsTrustedCapability(string id) => TrustedCapabilities.Contains(id);
     public static bool IsPublicCapability(string id, string version)
-        => id == TargetedLeapCapabilityId && version == TargetedLeapCapabilityVersion;
+        => id == TargetedLeapCapabilityId && version == TargetedLeapCapabilityVersion
+            || id == ChargedDirectionalDashCapabilityId && version == ChargedDirectionalDashCapabilityVersion;
 
     internal static bool IsRuntimeCapability(string id, string version)
         => IsPublicCapability(id, version) || version == "1" && IsTrustedCapability(id);
@@ -77,6 +78,10 @@ public static class CharacterPackageCompiler
             {
                 Parameters: TargetedLeapCapabilityParameters leap
             } && leap.Hitbox.FixedHitstunTicks > 0)));
+    private static bool RequiresRuntimeApi15(CharacterAuthoringDocument character)
+        => character.Slots.Any(slot => slot.Timeline.Stages.Any(stage => stage.Operations.Any(operation =>
+            operation is StartCapabilityOperationSource capability &&
+            capability.CapabilityId == ChargedDirectionalDashCapabilityId)));
 
     public static CharacterCompileResult Compile(string packageManifestJson, string characterJson, CharacterCookProfile profile = CharacterCookProfile.Workshop)
     {
@@ -133,8 +138,9 @@ public static class CharacterPackageCompiler
             ValidateId(requirement.CapabilityId, "character.capabilityRequirements[" + (capabilityCount - 1) + "].capabilityId", d);
             if (!capabilityMap.TryAdd(requirement.CapabilityId, requirement.CapabilityVersion)) d.Error("id.duplicate", "character.capabilityRequirements[" + (capabilityCount - 1) + "].capabilityId", "Duplicate capability requirement.");
             string requirementPath = "character.capabilityRequirements[" + (capabilityCount - 1) + "].capabilityId";
-            if (requirement.CapabilityId == RetiredTargetedLeapCapabilityId)
-                d.Error("capability.retired", requirementPath, "The Bonk-only targeted jump slam capability has been retired.");
+            if (requirement.CapabilityId == RetiredTargetedLeapCapabilityId ||
+                requirement.CapabilityId == RetiredWibouDashSlashCapabilityId)
+                d.Error("capability.retired", requirementPath, "This capability has been retired.");
             else if (requirement.CapabilityId.StartsWith("slop.internal.", StringComparison.Ordinal))
             {
                 if (profile == CharacterCookProfile.Workshop)
@@ -142,9 +148,12 @@ public static class CharacterPackageCompiler
                 else if (!IsTrustedCapability(requirement.CapabilityId) || requirement.CapabilityVersion != "1")
                     d.Error("capability.unknown", requirementPath, "Capability is not admitted by the trusted profile.");
             }
-            else if (requirement.CapabilityId == TargetedLeapCapabilityId)
+            else if (requirement.CapabilityId == TargetedLeapCapabilityId ||
+                     requirement.CapabilityId == ChargedDirectionalDashCapabilityId)
             {
-                if (requirement.CapabilityVersion != TargetedLeapCapabilityVersion)
+                string supportedVersion = requirement.CapabilityId == TargetedLeapCapabilityId
+                    ? TargetedLeapCapabilityVersion : ChargedDirectionalDashCapabilityVersion;
+                if (requirement.CapabilityVersion != supportedVersion)
                     d.Error("capability.version-mismatch", requirementPath, "Capability version is not supported.");
             }
             else
@@ -189,8 +198,9 @@ public static class CharacterPackageCompiler
         if (d.HasErrors) return;
         var metadata = new CookedPackageMetadata(
             m.PackageId, m.Version, CookedSchemaVersion,
-            c.Slots.Any(slot => slot.Timeline.Stages.Any(stage => stage.Operations.Any(operation =>
-                operation is StartupAimCorrectionOperationSource))) ? "1.4.0"
+            RequiresRuntimeApi15(c) ? "1.5.0"
+                : c.Slots.Any(slot => slot.Timeline.Stages.Any(stage => stage.Operations.Any(operation =>
+                    operation is StartupAimCorrectionOperationSource))) ? "1.4.0"
                 : RequiresRuntimeApi13(c) ? "1.3.0" : RuntimeApiMin, RuntimeApiMax);
         var definition = new CookedCharacterDefinition(
             c.DisplayName,
@@ -237,6 +247,18 @@ public static class CharacterPackageCompiler
         if (targetedLeapCount > 1)
             d.Error("capability.ambiguous", $"character.slots[{index}].timeline",
                 "A slot may contain only one targeted-leap lifecycle.");
+        var chargedDashCount = slot.Timeline.Stages.Sum(stage =>
+            stage.Operations.Count(operation =>
+                operation is StartCapabilityOperationSource capability &&
+                capability.CapabilityId == ChargedDirectionalDashCapabilityId));
+        if (chargedDashCount > 1)
+            d.Error("capability.ambiguous", $"character.slots[{index}].timeline",
+                "A slot may contain only one charged directional dash lifecycle.");
+        if (chargedDashCount > 0 &&
+            (slot.Behavior != AuthoringAbilityBehavior.DirectionalDash || slot.AimMode != AuthoringAimMode.GroundVector ||
+                slot.Timeline.Stages.Count != 1 || slot.Timeline.Stages[0].IasaTicks != 0))
+            d.Error("capability.ambiguous", $"character.slots[{index}]",
+                "Charged directional dash requires directionalDash, groundVector aim, and one stage with IASA disabled.");
         foreach (var stage in slot.Timeline.Stages)
         {
             if (stage.DurationTicks == 0 || stage.IasaTicks > stage.DurationTicks || stage.LandingLagTicks > stage.DurationTicks || stage.AutoCancelBeforeTicks > stage.DurationTicks || stage.AutoCancelAfterTicks > stage.DurationTicks) d.Error("value.out-of-range", "character.slots[" + index + "].timeline", "Stage timing is outside its duration.");
@@ -246,6 +268,16 @@ public static class CharacterPackageCompiler
             if (stage.WarpRange < 0f) d.Error("value.out-of-range", $"character.slots[{index}].timeline.warpRange", "Warp range must be non-negative.");
             if (stage.TrackingStrength < 0f || stage.TrackingStrength > 1f) d.Error("value.out-of-range", $"character.slots[{index}].timeline.trackingStrength", "Tracking strength must be between 0 and 1.");
             if (stage.Operations.Count > CookedBudget.MaxOperationsPerStage) d.Error("budget.exceeded", "character.slots[" + index + "].timeline", "Stage operation budget exceeded.");
+            foreach (var lunge in stage.Operations.OfType<ForwardLungeOperationSource>()
+                .Where(operation => operation.StopInAttackRange))
+            {
+                if (!stage.Operations.Any(operation =>
+                    operation is SpawnHitboxOperationSource hitbox && hitbox.Tick > lunge.Tick))
+                    d.Error("operation.forward-lunge.no-subsequent-hitbox",
+                        $"character.slots[{index}].timeline",
+                        "A forward lunge that stops in attack range requires a subsequent spawnHitbox in the same stage.");
+            }
+
             foreach (var id in stage.AnimationIds) { ValidateId(id, "character.animationId", d); if (!IsKnownAnimation(id, c)) d.Error("reference.unresolved", "character.animationId", "Animation ID is not declared."); }
             foreach (var operation in stage.Operations)
             {
@@ -264,6 +296,22 @@ public static class CharacterPackageCompiler
                 {
                     if (!capabilities.TryGetValue(capability.CapabilityId, out var version)) d.Error("capability.unknown", "character.operation.capabilityId", "Capability is not declared.");
                     else if (version != capability.CapabilityVersion) d.Error("capability.version-mismatch", "character.operation.capabilityVersion", "Capability version does not match its declaration.");
+                }
+                if (operation is StartCapabilityOperationSource chargedDash &&
+                    chargedDash.Parameters is ChargedDirectionalDashCapabilityParameters dash)
+                {
+                    if (operation.Tick != 0 || stage != slot.Timeline.Stages[0])
+                        d.Error("value.out-of-range", "character.operation.tick", "Charged dash lifecycle must start at tick zero in the first stage.");
+                    if (stage.Operations.Any(other => other != operation &&
+                        (other is ForwardLungeOperationSource or SetVelocityOperationSource or SpawnHitboxOperationSource
+                            or StartCapabilityOperationSource or StartupAimCorrectionOperationSource)))
+                        d.Error("capability.ambiguous", "character.operation.parameters",
+                            "Charged dash cannot share its stage with another lifecycle, startup correction, motion, or extra hitboxes.");
+                    double maxTravelTicks = Math.Ceiling(dash.MaxDistance / (dash.DashSpeed / 60d));
+                    if (maxTravelTicks + dash.RecoveryTicks > stage.DurationTicks ||
+                        dash.FinisherSeekTick + dash.FinisherLeadTicks + dash.RecoveryTicks > stage.DurationTicks)
+                        d.Error("value.out-of-range", "character.operation.parameters.recoveryTicks",
+                            "Charged dash travel and finisher recovery must fit within its stage.");
                 }
                 if (operation is StartCapabilityOperationSource targetedLeap &&
                     targetedLeap.Parameters is TargetedLeapCapabilityParameters leap &&
@@ -437,6 +485,9 @@ public static class CharacterPackageCompiler
             case StartCapabilityOperationSource capability when capability.Parameters is TargetedLeapCapabilityParameters leap:
                 ValidateTargetedLeap(leap, c, d);
                 break;
+            case StartCapabilityOperationSource capability when capability.Parameters is ChargedDirectionalDashCapabilityParameters dash:
+                ValidateChargedDirectionalDash(dash, c, d);
+                break;
             case StartupAimCorrectionOperationSource:
                 break;
         }
@@ -468,6 +519,56 @@ public static class CharacterPackageCompiler
              (placement.BoneId != null && !c.HurtboxBoneDefs.Any(x => x.BoneId == placement.BoneId) &&
               !c.AttachmentBoneIds.Contains(placement.BoneId, StringComparer.Ordinal))))
             d.Error("reference.unresolved", "character.operation.placement.boneId", "Presentation bone must be a declared bone.");
+    }
+    private static void ValidateChargedDirectionalDash(
+        ChargedDirectionalDashCapabilityParameters x, CharacterAuthoringDocument c, DiagnosticBag d)
+    {
+        if (x.MaxChargeTicks == 0 || x.Tier2Ticks == 0 ||
+            x.Tier2Ticks >= x.Tier3Ticks || x.Tier3Ticks > x.MaxChargeTicks)
+            d.Error("value.out-of-range", "character.operation.parameters.tier2Ticks",
+                "Charge thresholds must satisfy 0 < tier2Ticks < tier3Ticks <= maxChargeTicks.");
+        ValidateFiniteValues(new[] { x.MinDistance, x.MaxDistance, x.DashSpeed, x.Tier2Damage, x.Tier3Damage },
+            "character.operation.parameters", d);
+        if (x.MinDistance <= 0f || x.MaxDistance < x.MinDistance)
+            d.Error("value.out-of-range", "character.operation.parameters.minDistance",
+                "Distances must satisfy 0 < minDistance <= maxDistance.");
+        if (x.DashSpeed <= 0f)
+            d.Error("value.out-of-range", "character.operation.parameters.dashSpeed", "Dash speed must be positive.");
+        if (x.FinisherLeadTicks == 0 || x.FinisherSeekTick == 0 || x.RecoveryTicks == 0)
+            d.Error("value.out-of-range", "character.operation.parameters.finisherSeekTick",
+                "Finisher seek, lead, and recovery must be positive.");
+        if (x.Tier2Damage < x.FinisherHitbox.Damage || x.Tier3Damage < x.Tier2Damage)
+            d.Error("value.out-of-range", "character.operation.parameters.tier2Damage",
+                "Finisher and tier damage must be non-negative and nondecreasing.");
+        ValidateCapabilityHitbox(x.TraversalHitbox, c, "traversalHitbox", d);
+        if (x.TraversalHitbox.HitGroup != 0 || x.FinisherHitbox.HitGroup != 0)
+            d.Error("value.out-of-range", "character.operation.parameters.hitGroup",
+                "Traversal and finisher require independent hit histories (hitGroup 0).");
+        ValidateCapabilityHitbox(x.FinisherHitbox, c, "finisherHitbox", d);
+        if (x.FinisherHitbox.DurationTicks > (int)x.FinisherLeadTicks + x.RecoveryTicks)
+            d.Error("value.out-of-range", "character.operation.parameters.finisherHitbox.durationTicks",
+                "Finisher hitbox duration must fit within finisher lead and recovery.");
+    }
+
+    private static void ValidateCapabilityHitbox(HitboxSource x, CharacterAuthoringDocument c, string name, DiagnosticBag d)
+    {
+        string path = "character.operation.parameters." + name;
+        ValidateFiniteValues(new[] { x.Radius, x.OffsetX, x.OffsetY, x.OffsetZ, x.EndOffsetX, x.EndOffsetY,
+            x.EndOffsetZ, x.Damage, x.Angle, x.BaseKnockback, x.KnockbackGrowth }, path, d);
+        ValidateNonNegative(x.Radius, path + ".radius", d);
+        ValidateNonNegative(x.Damage, path + ".damage", d);
+        ValidateAngle(x.Angle, path + ".angle", d);
+        ValidateNonNegative(x.BaseKnockback, path + ".baseKnockback", d);
+        ValidateNonNegative(x.KnockbackGrowth, path + ".knockbackGrowth", d);
+        if (x.DurationTicks == 0) d.Error("value.out-of-range", path + ".durationTicks", "Duration must be positive.");
+        ValidateFixedHitstun(x.FixedHitstunTicks, x.StunTicks, path + ".fixedHitstunTicks", d);
+        if (x.Shape != AuthoringHitboxShape.Sphere && x.Shape != AuthoringHitboxShape.Capsule)
+            d.Error("value.out-of-range", path + ".shape", "Unknown hitbox shape.");
+        if (x.KnockbackDirection != AuthoringKnockbackDirection.AwayFromOwner &&
+            x.KnockbackDirection != AuthoringKnockbackDirection.TowardOwner)
+            d.Error("value.out-of-range", path + ".knockbackDirection", "Unknown knockback direction.");
+        ValidateBoneReference(x.StartBoneId, c, path + ".startBoneId", d);
+        ValidateBoneReference(x.EndBoneId, c, path + ".endBoneId", d);
     }
 
 
@@ -678,11 +779,13 @@ public static class CharacterPackageCompiler
     private static TypedCapabilityParameters CloneParameters(TypedCapabilityParameters p)
         => p switch
         {
-            KiShotCapabilityParameters x => x with { },
             RisingDragonCapabilityParameters x => x with { },
             CycloneKickCapabilityParameters x => x with { },
-            DragonBeamCapabilityParameters x => x with { },
-            WibouDashSlashCapabilityParameters x => x with { },
+            ChargedDirectionalDashCapabilityParameters x => x with
+            {
+                TraversalHitbox = x.TraversalHitbox with { },
+                FinisherHitbox = x.FinisherHitbox with { }
+            },
             WibouRisingSlashCapabilityParameters x => x with { },
             WibouBladeFlurryCapabilityParameters x => x with { },
             TargetedLeapCapabilityParameters x => x with { Hitbox = x.Hitbox with { } },
@@ -710,7 +813,7 @@ public static class CharacterPackageCompiler
                 switch (op)
                 {
                     case SetVelocityOperationSource x: cookedOps.Add(new CookedSetVelocityOperation(x.Tick, x.Unit, x.VelocityMode, x.X, x.Y, x.Z)); break;
-                    case ForwardLungeOperationSource x: cookedOps.Add(new CookedForwardLungeOperation(x.Tick, x.Unit, x.Speed, x.DurationTicks)); break;
+                    case ForwardLungeOperationSource x: cookedOps.Add(new CookedForwardLungeOperation(x.Tick, x.Unit, x.Speed, x.DurationTicks, x.StopInAttackRange)); break;
                     case GravityWindowOperationSource x: cookedOps.Add(new CookedGravityWindowOperation(x.Tick, x.Unit, x.GravityScale, x.DurationTicks)); break;
                     case ArmorWindowOperationSource x: cookedOps.Add(new CookedArmorWindowOperation(x.Tick, x.Unit, x.DurationTicks)); break;
                     case SpawnHitboxOperationSource x: hitboxes++; cookedOps.Add(new CookedSpawnHitboxOperation(x.Tick, x.Unit, CookHitbox(x.Hitbox))); break;
@@ -719,6 +822,7 @@ public static class CharacterPackageCompiler
                     case StartCapabilityOperationSource x:
                         capabilities++;
                         if (x.Parameters is TargetedLeapCapabilityParameters) hitboxes++;
+                        else if (x.Parameters is ChargedDirectionalDashCapabilityParameters) hitboxes += 2;
                         cookedOps.Add(new CookedStartCapabilityOperation(x.Tick, x.Unit, x.CapabilityId, x.CapabilityVersion, CookParameters(x.Parameters)));
                         break;
                     case StartupAimCorrectionOperationSource x:
@@ -744,11 +848,12 @@ public static class CharacterPackageCompiler
 
     private static CookedCapabilityParameters CookParameters(TypedCapabilityParameters p) => p switch
     {
-        KiShotCapabilityParameters x => new CookedKiShotCapabilityParameters(x.StartupTicks, x.DurationTicks, x.LaunchOffsetY, x.ProjectileSpeed, x.Gravity, x.HitboxRadius, x.Damage, x.KnockbackBase, x.KnockbackGrowth, x.KnockbackAngle, x.StunTicks, x.MaxFlightTicks),
         RisingDragonCapabilityParameters x => new CookedRisingDragonCapabilityParameters(x.RiseSpeed, x.RiseTicks, x.RiseDelay),
         CycloneKickCapabilityParameters x => new CookedCycloneKickCapabilityParameters(x.ForwardSpeed, x.WindupTicks, x.HitboxEndTick, x.DurationTicks, x.BodyRadius, x.SideRadius, x.SideOffset, x.Damage, x.KnockbackAngle, x.KnockbackBase, x.KnockbackGrowth, x.StunTicks, x.BodyY, x.SideY),
-        DragonBeamCapabilityParameters x => new CookedDragonBeamCapabilityParameters(x.DurationTicks, x.FireTick, x.LaunchOffsetY, x.BeamRange, x.BeamRadius, x.Damage, x.KnockbackAngle, x.KnockbackBase, x.KnockbackGrowth, x.StunTicks, x.HitboxDurationTicks),
-        WibouDashSlashCapabilityParameters x => new CookedWibouDashSlashCapabilityParameters(x.DashDistance, x.DashDurationTicks, x.MaxAimTicks),
+        ChargedDirectionalDashCapabilityParameters x => new CookedChargedDirectionalDashCapabilityParameters(
+            x.MaxChargeTicks, x.Tier2Ticks, x.Tier3Ticks, x.MinDistance, x.MaxDistance, x.DashSpeed,
+            x.FinisherLeadTicks, x.FinisherSeekTick, x.RecoveryTicks, x.Tier2Damage, x.Tier3Damage,
+            CookHitbox(x.TraversalHitbox), CookHitbox(x.FinisherHitbox)),
         WibouRisingSlashCapabilityParameters x => new CookedWibouRisingSlashCapabilityParameters(x.RiseSpeed, x.RiseTicks, x.HomingRange, x.HomingSpeed),
         WibouBladeFlurryCapabilityParameters x => new CookedWibouBladeFlurryCapabilityParameters(x.ForwardSpeed, x.MoveTicks),
         TargetedLeapCapabilityParameters x => new CookedTargetedLeapCapabilityParameters(x.MaxAimTicks, x.MaxFlightTicks, x.MinRange, x.MaxRange, x.LaunchVerticalSpeed, x.LandingSeekTick, x.RecoveryTicks, CookHitbox(x.Hitbox)),
@@ -918,6 +1023,7 @@ public static class CharacterPackageCompiler
             case CookedForwardLungeOperation l:
                 Number(w, "speed", l.Speed);
                 w.WriteNumber("durationTicks", l.DurationTicks);
+                if (l.StopInAttackRange) w.WriteBoolean("stopInAttackRange", true);
                 break;
             case CookedGravityWindowOperation gravity:
                 Number(w, "gravityScale", gravity.GravityScale);
@@ -960,17 +1066,39 @@ public static class CharacterPackageCompiler
         w.WriteEndObject();
     }
     private static void WriteHitbox(Utf8JsonWriter w, CookedHitbox x) { w.WritePropertyName("hitbox"); w.WriteStartObject(); w.WriteNumber("shape", (byte)x.Shape); Number(w, "radius", x.Radius); Number(w, "offsetX", x.OffsetX); Number(w, "offsetY", x.OffsetY); Number(w, "offsetZ", x.OffsetZ); Number(w, "endOffsetX", x.EndOffsetX); Number(w, "endOffsetY", x.EndOffsetY); Number(w, "endOffsetZ", x.EndOffsetZ); if (x.StartBoneId != null) w.WriteString("startBoneId", x.StartBoneId); else w.WriteNull("startBoneId"); if (x.EndBoneId != null) w.WriteString("endBoneId", x.EndBoneId); else w.WriteNull("endBoneId"); Number(w, "damage", x.Damage); Number(w, "angle", x.Angle); Number(w, "baseKnockback", x.BaseKnockback); Number(w, "knockbackGrowth", x.KnockbackGrowth); w.WriteNumber("stunTicks", x.StunTicks); w.WriteNumber("durationTicks", x.DurationTicks); w.WriteBoolean("interruptible", x.Interruptible); w.WriteNumber("hitGroup", x.HitGroup); w.WriteNumber("knockbackDirection", (byte)x.KnockbackDirection); if (x.FixedHitstunTicks > 0) w.WriteNumber("fixedHitstunTicks", x.FixedHitstunTicks); w.WriteEndObject(); }
+    private static void WriteHitboxObject(Utf8JsonWriter w, CookedHitbox x, string name)
+    {
+        w.WritePropertyName(name); w.WriteStartObject();
+        w.WriteNumber("shape", (byte)x.Shape); Number(w, "radius", x.Radius);
+        Number(w, "offsetX", x.OffsetX); Number(w, "offsetY", x.OffsetY); Number(w, "offsetZ", x.OffsetZ);
+        Number(w, "endOffsetX", x.EndOffsetX); Number(w, "endOffsetY", x.EndOffsetY); Number(w, "endOffsetZ", x.EndOffsetZ);
+        if (x.StartBoneId != null) w.WriteString("startBoneId", x.StartBoneId); else w.WriteNull("startBoneId");
+        if (x.EndBoneId != null) w.WriteString("endBoneId", x.EndBoneId); else w.WriteNull("endBoneId");
+        Number(w, "damage", x.Damage); Number(w, "angle", x.Angle);
+        Number(w, "baseKnockback", x.BaseKnockback); Number(w, "knockbackGrowth", x.KnockbackGrowth);
+        w.WriteNumber("stunTicks", x.StunTicks); w.WriteNumber("durationTicks", x.DurationTicks);
+        w.WriteBoolean("interruptible", x.Interruptible); w.WriteNumber("hitGroup", x.HitGroup);
+        w.WriteNumber("knockbackDirection", (byte)x.KnockbackDirection);
+        w.WriteNumber("fixedHitstunTicks", x.FixedHitstunTicks); w.WriteEndObject();
+    }
     private static void WriteProjectile(Utf8JsonWriter w, CookedProjectile x) { w.WritePropertyName("projectile"); w.WriteStartObject(); Number(w, "launchOffsetX", x.LaunchOffsetX); Number(w, "launchOffsetY", x.LaunchOffsetY); Number(w, "launchOffsetZ", x.LaunchOffsetZ); Number(w, "speed", x.Speed); Number(w, "gravity", x.Gravity); Number(w, "radius", x.Radius); Number(w, "damage", x.Damage); Number(w, "angle", x.Angle); Number(w, "baseKnockback", x.BaseKnockback); Number(w, "knockbackGrowth", x.KnockbackGrowth); w.WriteNumber("stunTicks", x.StunTicks); w.WriteNumber("maxFlightTicks", x.MaxFlightTicks); Number(w, "yawOffsetDegrees", x.YawOffsetDegrees); w.WriteEndObject(); }
     private static void WriteParameters(Utf8JsonWriter w, CookedCapabilityParameters p)
     {
         w.WriteStartObject();
         switch (p)
         {
-            case CookedKiShotCapabilityParameters x: w.WriteNumber("startupTicks", x.StartupTicks); w.WriteNumber("durationTicks", x.DurationTicks); Number(w, "launchOffsetY", x.LaunchOffsetY); Number(w, "projectileSpeed", x.ProjectileSpeed); Number(w, "gravity", x.Gravity); Number(w, "hitboxRadius", x.HitboxRadius); Number(w, "damage", x.Damage); Number(w, "knockbackBase", x.KnockbackBase); Number(w, "knockbackGrowth", x.KnockbackGrowth); Number(w, "knockbackAngle", x.KnockbackAngle); w.WriteNumber("stunTicks", x.StunTicks); w.WriteNumber("maxFlightTicks", x.MaxFlightTicks); break;
             case CookedRisingDragonCapabilityParameters x: Number(w, "riseSpeed", x.RiseSpeed); w.WriteNumber("riseTicks", x.RiseTicks); w.WriteNumber("riseDelay", x.RiseDelay); break;
             case CookedCycloneKickCapabilityParameters x: Number(w, "forwardSpeed", x.ForwardSpeed); w.WriteNumber("windupTicks", x.WindupTicks); w.WriteNumber("hitboxEndTick", x.HitboxEndTick); w.WriteNumber("durationTicks", x.DurationTicks); Number(w, "bodyRadius", x.BodyRadius); Number(w, "sideRadius", x.SideRadius); Number(w, "sideOffset", x.SideOffset); Number(w, "damage", x.Damage); Number(w, "knockbackAngle", x.KnockbackAngle); Number(w, "knockbackBase", x.KnockbackBase); Number(w, "knockbackGrowth", x.KnockbackGrowth); w.WriteNumber("stunTicks", x.StunTicks); Number(w, "bodyY", x.BodyY); Number(w, "sideY", x.SideY); break;
-            case CookedDragonBeamCapabilityParameters x: w.WriteNumber("durationTicks", x.DurationTicks); w.WriteNumber("fireTick", x.FireTick); Number(w, "launchOffsetY", x.LaunchOffsetY); Number(w, "beamRange", x.BeamRange); Number(w, "beamRadius", x.BeamRadius); Number(w, "damage", x.Damage); Number(w, "knockbackAngle", x.KnockbackAngle); Number(w, "knockbackBase", x.KnockbackBase); Number(w, "knockbackGrowth", x.KnockbackGrowth); w.WriteNumber("stunTicks", x.StunTicks); w.WriteNumber("hitboxDurationTicks", x.HitboxDurationTicks); break;
-            case CookedWibouDashSlashCapabilityParameters x: Number(w, "dashDistance", x.DashDistance); w.WriteNumber("dashDurationTicks", x.DashDurationTicks); w.WriteNumber("maxAimTicks", x.MaxAimTicks); break;
+            case CookedChargedDirectionalDashCapabilityParameters x:
+                w.WriteNumber("maxChargeTicks", x.MaxChargeTicks); w.WriteNumber("tier2Ticks", x.Tier2Ticks);
+                w.WriteNumber("tier3Ticks", x.Tier3Ticks); Number(w, "minDistance", x.MinDistance);
+                Number(w, "maxDistance", x.MaxDistance); Number(w, "dashSpeed", x.DashSpeed);
+                w.WriteNumber("finisherLeadTicks", x.FinisherLeadTicks); w.WriteNumber("finisherSeekTick", x.FinisherSeekTick);
+                w.WriteNumber("recoveryTicks", x.RecoveryTicks); Number(w, "tier2Damage", x.Tier2Damage);
+                Number(w, "tier3Damage", x.Tier3Damage);
+                WriteHitboxObject(w, x.TraversalHitbox, "traversalHitbox");
+                WriteHitboxObject(w, x.FinisherHitbox, "finisherHitbox");
+                break;
             case CookedWibouRisingSlashCapabilityParameters x: Number(w, "riseSpeed", x.RiseSpeed); w.WriteNumber("riseTicks", x.RiseTicks); Number(w, "homingRange", x.HomingRange); Number(w, "homingSpeed", x.HomingSpeed); break;
             case CookedWibouBladeFlurryCapabilityParameters x: Number(w, "forwardSpeed", x.ForwardSpeed); w.WriteNumber("moveTicks", x.MoveTicks); break;
             case CookedTargetedLeapCapabilityParameters x:

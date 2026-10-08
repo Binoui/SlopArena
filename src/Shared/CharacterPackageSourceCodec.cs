@@ -428,11 +428,13 @@ public static class CharacterPackageSourceCodec
     private static TypedCapabilityParameters CloneParameters(TypedCapabilityParameters p)
         => p switch
         {
-            KiShotCapabilityParameters x => x with { },
             RisingDragonCapabilityParameters x => x with { },
             CycloneKickCapabilityParameters x => x with { },
-            DragonBeamCapabilityParameters x => x with { },
-            WibouDashSlashCapabilityParameters x => x with { },
+            ChargedDirectionalDashCapabilityParameters x => x with
+            {
+                TraversalHitbox = x.TraversalHitbox with { },
+                FinisherHitbox = x.FinisherHitbox with { }
+            },
             WibouRisingSlashCapabilityParameters x => x with { },
             WibouBladeFlurryCapabilityParameters x => x with { },
             TargetedLeapCapabilityParameters x => x with { Hitbox = x.Hitbox with { } },
@@ -577,6 +579,7 @@ public static class CharacterPackageSourceCodec
             case ForwardLungeOperationSource lunge:
                 Number(w, "speed", lunge.Speed);
                 w.WriteNumber("durationTicks", lunge.DurationTicks);
+                if (lunge.StopInAttackRange) w.WriteBoolean("stopInAttackRange", true);
                 break;
             case GravityWindowOperationSource gravity:
                 Number(w, "gravityScale", gravity.GravityScale);
@@ -636,17 +639,38 @@ public static class CharacterPackageSourceCodec
         w.WriteEndObject();
     }
     private static void WriteHitbox(Utf8JsonWriter w, HitboxSource x) { w.WritePropertyName("hitbox"); w.WriteStartObject(); w.WriteString("shape",ShapeText(x.Shape)); Number(w,"radius",x.Radius); Number(w,"offsetX",x.OffsetX); Number(w,"offsetY",x.OffsetY); Number(w,"offsetZ",x.OffsetZ); Number(w,"endOffsetX",x.EndOffsetX); Number(w,"endOffsetY",x.EndOffsetY); Number(w,"endOffsetZ",x.EndOffsetZ); if(x.StartBoneId == null) w.WriteNull("startBoneId"); else w.WriteString("startBoneId",x.StartBoneId); if(x.EndBoneId == null) w.WriteNull("endBoneId"); else w.WriteString("endBoneId",x.EndBoneId); Number(w,"damage",x.Damage); Number(w,"angle",x.Angle); Number(w,"baseKnockback",x.BaseKnockback); Number(w,"knockbackGrowth",x.KnockbackGrowth); w.WriteNumber("stunTicks",x.StunTicks); w.WriteNumber("durationTicks",x.DurationTicks); w.WriteBoolean("interruptible",x.Interruptible); w.WriteNumber("hitGroup",x.HitGroup); w.WriteString("knockbackDirection",KnockbackDirectionText(x.KnockbackDirection)); if (x.FixedHitstunTicks > 0) w.WriteNumber("fixedHitstunTicks", x.FixedHitstunTicks); w.WriteEndObject(); }
+    private static void WriteHitboxNamed(Utf8JsonWriter w, HitboxSource x, string name)
+    {
+        w.WritePropertyName(name); w.WriteStartObject(); w.WriteString("shape", ShapeText(x.Shape));
+        Number(w, "radius", x.Radius); Number(w, "offsetX", x.OffsetX); Number(w, "offsetY", x.OffsetY);
+        Number(w, "offsetZ", x.OffsetZ); Number(w, "endOffsetX", x.EndOffsetX);
+        Number(w, "endOffsetY", x.EndOffsetY); Number(w, "endOffsetZ", x.EndOffsetZ);
+        if (x.StartBoneId == null) w.WriteNull("startBoneId"); else w.WriteString("startBoneId", x.StartBoneId);
+        if (x.EndBoneId == null) w.WriteNull("endBoneId"); else w.WriteString("endBoneId", x.EndBoneId);
+        Number(w, "damage", x.Damage); Number(w, "angle", x.Angle);
+        Number(w, "baseKnockback", x.BaseKnockback); Number(w, "knockbackGrowth", x.KnockbackGrowth);
+        w.WriteNumber("stunTicks", x.StunTicks); w.WriteNumber("durationTicks", x.DurationTicks);
+        w.WriteBoolean("interruptible", x.Interruptible); w.WriteNumber("hitGroup", x.HitGroup);
+        w.WriteString("knockbackDirection", KnockbackDirectionText(x.KnockbackDirection));
+        if (x.FixedHitstunTicks > 0) w.WriteNumber("fixedHitstunTicks", x.FixedHitstunTicks);
+        w.WriteEndObject();
+    }
     private static void WriteProjectile(Utf8JsonWriter w, ProjectileSource x) { w.WritePropertyName("projectile"); w.WriteStartObject(); Number(w,"launchOffsetX",x.LaunchOffsetX); Number(w,"launchOffsetY",x.LaunchOffsetY); Number(w,"launchOffsetZ",x.LaunchOffsetZ); Number(w,"speed",x.Speed); Number(w,"gravity",x.Gravity); Number(w,"radius",x.Radius); Number(w,"damage",x.Damage); Number(w,"angle",x.Angle); Number(w,"baseKnockback",x.BaseKnockback); Number(w,"knockbackGrowth",x.KnockbackGrowth); w.WriteNumber("stunTicks",x.StunTicks); w.WriteNumber("maxFlightTicks",x.MaxFlightTicks); Number(w,"yawOffsetDegrees",x.YawOffsetDegrees); w.WriteEndObject(); }
     private static void WriteParameters(Utf8JsonWriter w, TypedCapabilityParameters x)
     {
         w.WriteStartObject();
         switch (x)
         {
-            case KiShotCapabilityParameters p: w.WriteNumber("startupTicks", p.StartupTicks); w.WriteNumber("durationTicks", p.DurationTicks); Number(w, "launchOffsetY", p.LaunchOffsetY); Number(w, "projectileSpeed", p.ProjectileSpeed); Number(w, "gravity", p.Gravity); Number(w, "hitboxRadius", p.HitboxRadius); Number(w, "damage", p.Damage); Number(w, "knockbackBase", p.KnockbackBase); Number(w, "knockbackGrowth", p.KnockbackGrowth); Number(w, "knockbackAngle", p.KnockbackAngle); w.WriteNumber("stunTicks", p.StunTicks); w.WriteNumber("maxFlightTicks", p.MaxFlightTicks); break;
             case RisingDragonCapabilityParameters p: Number(w, "riseSpeed", p.RiseSpeed); w.WriteNumber("riseTicks", p.RiseTicks); w.WriteNumber("riseDelay", p.RiseDelay); break;
             case CycloneKickCapabilityParameters p: w.WriteNumber("forwardSpeed", p.ForwardSpeed); w.WriteNumber("windupTicks", p.WindupTicks); w.WriteNumber("hitboxEndTick", p.HitboxEndTick); w.WriteNumber("durationTicks", p.DurationTicks); Number(w, "bodyRadius", p.BodyRadius); Number(w, "sideRadius", p.SideRadius); Number(w, "sideOffset", p.SideOffset); Number(w, "damage", p.Damage); Number(w, "knockbackAngle", p.KnockbackAngle); Number(w, "knockbackBase", p.KnockbackBase); Number(w, "knockbackGrowth", p.KnockbackGrowth); w.WriteNumber("stunTicks", p.StunTicks); Number(w, "bodyY", p.BodyY); Number(w, "sideY", p.SideY); break;
-            case DragonBeamCapabilityParameters p: w.WriteNumber("durationTicks", p.DurationTicks); w.WriteNumber("fireTick", p.FireTick); Number(w, "launchOffsetY", p.LaunchOffsetY); Number(w, "beamRange", p.BeamRange); Number(w, "beamRadius", p.BeamRadius); Number(w, "damage", p.Damage); Number(w, "knockbackAngle", p.KnockbackAngle); Number(w, "knockbackBase", p.KnockbackBase); Number(w, "knockbackGrowth", p.KnockbackGrowth); w.WriteNumber("stunTicks", p.StunTicks); w.WriteNumber("hitboxDurationTicks", p.HitboxDurationTicks); break;
-            case WibouDashSlashCapabilityParameters p: Number(w, "dashDistance", p.DashDistance); w.WriteNumber("dashDurationTicks", p.DashDurationTicks); w.WriteNumber("maxAimTicks", p.MaxAimTicks); break;
+            case ChargedDirectionalDashCapabilityParameters p:
+                w.WriteNumber("maxChargeTicks", p.MaxChargeTicks); w.WriteNumber("tier2Ticks", p.Tier2Ticks);
+                w.WriteNumber("tier3Ticks", p.Tier3Ticks); Number(w, "minDistance", p.MinDistance);
+                Number(w, "maxDistance", p.MaxDistance); Number(w, "dashSpeed", p.DashSpeed);
+                w.WriteNumber("finisherLeadTicks", p.FinisherLeadTicks); w.WriteNumber("finisherSeekTick", p.FinisherSeekTick);
+                w.WriteNumber("recoveryTicks", p.RecoveryTicks); Number(w, "tier2Damage", p.Tier2Damage);
+                Number(w, "tier3Damage", p.Tier3Damage); WriteHitboxNamed(w, p.TraversalHitbox, "traversalHitbox");
+                WriteHitboxNamed(w, p.FinisherHitbox, "finisherHitbox"); break;
             case WibouRisingSlashCapabilityParameters p: Number(w, "riseSpeed", p.RiseSpeed); w.WriteNumber("riseTicks", p.RiseTicks); Number(w, "homingRange", p.HomingRange); Number(w, "homingSpeed", p.HomingSpeed); break;
             case WibouBladeFlurryCapabilityParameters p: Number(w, "forwardSpeed", p.ForwardSpeed); w.WriteNumber("moveTicks", p.MoveTicks); break;
             case TargetedLeapCapabilityParameters p:
@@ -925,7 +949,7 @@ public static class CharacterPackageSourceCodec
         foreach (var e in a.EnumerateArray())
         {
             var opPath = path + ".operations[" + i + "]";
-            var p = ReadObject(e, opPath, d, "kind", "tick", "unit", "velocityMode", "x", "y", "z", "speed", "durationTicks", "gravityScale", "hitbox", "projectile", "aimState", "capabilityId", "capabilityVersion", "parameters", "presentationId", "placement", "endTick", "acquisitionRange", "acquisitionHalfAngleDegrees", "maxYawDegrees", "maxPitchDegrees", "yawDegreesPerSecond", "pitchDegreesPerSecond");
+            var p = ReadObject(e, opPath, d, "kind", "tick", "unit", "velocityMode", "x", "y", "z", "speed", "durationTicks", "stopInAttackRange", "gravityScale", "hitbox", "projectile", "aimState", "capabilityId", "capabilityVersion", "parameters", "presentationId", "placement", "endTick", "acquisitionRange", "acquisitionHalfAngleDegrees", "maxYawDegrees", "maxPitchDegrees", "yawDegreesPerSecond", "pitchDegreesPerSecond");
             var kind = String(p, "kind", opPath + ".kind", d);
             var tick = UShort(p, "tick", opPath + ".tick", d);
             var unit = ParseUnit(p, "unit", opPath + ".unit", d);
@@ -935,7 +959,7 @@ public static class CharacterPackageSourceCodec
                 case "setVelocity":
                     result.Add(new SetVelocityOperationSource(tick, unit, EnumValue(p, "velocityMode", opPath + ".velocityMode", d, ParseVelocityMode), Float(p, "x", opPath + ".x", d), Float(p, "y", opPath + ".y", d), Float(p, "z", opPath + ".z", d))); break;
                 case "forwardLunge":
-                    result.Add(new ForwardLungeOperationSource(tick, unit, Float(p, "speed", opPath + ".speed", d), UShort(p, "durationTicks", opPath + ".durationTicks", d))); break;
+                    result.Add(new ForwardLungeOperationSource(tick, unit, Float(p, "speed", opPath + ".speed", d), UShort(p, "durationTicks", opPath + ".durationTicks", d), OptionalBool(p, "stopInAttackRange", opPath + ".stopInAttackRange", d))); break;
                 case "gravityWindow":
                     result.Add(new GravityWindowOperationSource(tick, unit, Float(p, "gravityScale", opPath + ".gravityScale", d), UShort(p, "durationTicks", opPath + ".durationTicks", d))); break;
                 case "armorWindow":
@@ -970,7 +994,7 @@ public static class CharacterPackageSourceCodec
         var allowed = kind switch
         {
             "setVelocity" => new[] { "kind", "tick", "unit", "velocityMode", "x", "y", "z" },
-            "forwardLunge" => new[] { "kind", "tick", "unit", "speed", "durationTicks" },
+            "forwardLunge" => new[] { "kind", "tick", "unit", "speed", "durationTicks", "stopInAttackRange" },
             "gravityWindow" => new[] { "kind", "tick", "unit", "gravityScale", "durationTicks" },
             "armorWindow" => new[] { "kind", "tick", "unit", "durationTicks" },
             "spawnHitbox" => new[] { "kind", "tick", "unit", "hitbox" },
@@ -985,7 +1009,8 @@ public static class CharacterPackageSourceCodec
         if (allowed.Length == 0) return;
         foreach (var name in properties.Keys) if (!allowed.Contains(name, StringComparer.Ordinal)) d.Error("operation.parameter-unknown", path + "." + name, "Field is not valid for this operation.");
         foreach (var name in allowed)
-            if (!properties.ContainsKey(name) && !(kind == "emitPresentation" && name == "placement"))
+            if (!properties.ContainsKey(name) && !(kind == "emitPresentation" && name == "placement")
+                && !(kind == "forwardLunge" && name == "stopInAttackRange"))
                 d.Error("operation.parameter-missing", path + "." + name, "Field is required for this operation.");
     }
 
@@ -1013,6 +1038,13 @@ public static class CharacterPackageSourceCodec
             OptionalUShort(p, "durationTicks", path + ".placement.durationTicks", d, 28));
     }
 
+    private static HitboxSource ParseHitboxNamed(Dictionary<string, JsonElement> parent, string name, string path, DiagnosticBag d)
+    {
+        var nested = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
+        if (parent.TryGetValue(name, out var hitbox)) nested.Add("hitbox", hitbox);
+        else d.Error("operation.parameter-missing", path, "Hitbox is required.");
+        return ParseHitbox(nested, path, d);
+    }
     private static HitboxSource ParseHitbox(Dictionary<string, JsonElement> parent, string path, DiagnosticBag d)
     {
         var p = Object(parent, "hitbox", path + ".hitbox", d, "shape", "radius", "offsetX", "offsetY", "offsetZ", "endOffsetX", "endOffsetY", "endOffsetZ", "startBoneId", "endBoneId", "damage", "angle", "baseKnockback", "knockbackGrowth", "stunTicks", "durationTicks", "interruptible", "hitGroup", "knockbackDirection", "fixedHitstunTicks");
@@ -1053,14 +1085,17 @@ public static class CharacterPackageSourceCodec
             d.Error("capability.retired", path + ".capabilityId", "The Bonk-only targeted jump slam capability has been retired.");
             return new RisingDragonCapabilityParameters(0, 0, 0);
         }
+        if (id == CharacterPackageCompiler.RetiredWibouDashSlashCapabilityId)
+        {
+            d.Error("capability.retired", path + ".capabilityId", "The Wibou dash-slash capability has been retired.");
+            return new RisingDragonCapabilityParameters(0, 0, 0);
+        }
         if (!parent.TryGetValue("parameters", out var element)) { d.Error("operation.parameter-missing", path + ".parameters", "Capability parameters are required."); return new RisingDragonCapabilityParameters(0, 0, 0); }
         var allowed = id switch
         {
-            "slop.internal.fightguy.ki-shot.v1" => new[] { "startupTicks", "durationTicks", "launchOffsetY", "projectileSpeed", "gravity", "hitboxRadius", "damage", "knockbackBase", "knockbackGrowth", "knockbackAngle", "stunTicks", "maxFlightTicks" },
             "slop.internal.fightguy.rising-dragon.v1" => new[] { "riseSpeed", "riseTicks", "riseDelay" },
             "slop.internal.fightguy.cyclone-kick.v1" => new[] { "forwardSpeed", "windupTicks", "hitboxEndTick", "durationTicks", "bodyRadius", "sideRadius", "sideOffset", "damage", "knockbackAngle", "knockbackBase", "knockbackGrowth", "stunTicks", "bodyY", "sideY" },
-            "slop.internal.fightguy.dragon-beam.v1" => new[] { "durationTicks", "fireTick", "launchOffsetY", "beamRange", "beamRadius", "damage", "knockbackAngle", "knockbackBase", "knockbackGrowth", "stunTicks", "hitboxDurationTicks" },
-            "slop.internal.wibou.dash-slash.v1" => new[] { "dashDistance", "dashDurationTicks", "maxAimTicks" },
+            "slop.ability.charged-directional-dash.v1" => new[] { "maxChargeTicks", "tier2Ticks", "tier3Ticks", "minDistance", "maxDistance", "dashSpeed", "finisherLeadTicks", "finisherSeekTick", "recoveryTicks", "tier2Damage", "tier3Damage", "traversalHitbox", "finisherHitbox" },
             "slop.internal.wibou.rising-slash.v1" => new[] { "riseSpeed", "riseTicks", "homingRange", "homingSpeed" },
             "slop.internal.wibou.blade-flurry.v1" => new[] { "forwardSpeed", "moveTicks" },
             "slop.ability.targeted-leap.v1" => new[] { "maxAimTicks", "maxFlightTicks", "minRange", "maxRange", "launchVerticalSpeed", "landingSeekTick", "recoveryTicks", "hitbox" },
@@ -1073,10 +1108,23 @@ public static class CharacterPackageSourceCodec
         };
         var p = ReadObjectWithCode(element, path + ".parameters", d, "operation.parameter-unknown", allowed);
         foreach (var required in allowed) if (!string.Equals(required, "explosionPresentationId", StringComparison.Ordinal) && !p.ContainsKey(required)) d.Error("operation.parameter-missing", path + ".parameters." + required, "Required capability parameter is missing.");
-        if (id.EndsWith("ki-shot.v1", StringComparison.Ordinal)) return new KiShotCapabilityParameters(UShort(p, "startupTicks", path + ".parameters.startupTicks", d), UShort(p, "durationTicks", path + ".parameters.durationTicks", d), Float(p, "launchOffsetY", path + ".parameters.launchOffsetY", d), Float(p, "projectileSpeed", path + ".parameters.projectileSpeed", d), Float(p, "gravity", path + ".parameters.gravity", d), Float(p, "hitboxRadius", path + ".parameters.hitboxRadius", d), Float(p, "damage", path + ".parameters.damage", d), Float(p, "knockbackBase", path + ".parameters.knockbackBase", d), Float(p, "knockbackGrowth", path + ".parameters.knockbackGrowth", d), Float(p, "knockbackAngle", path + ".parameters.knockbackAngle", d), UShort(p, "stunTicks", path + ".parameters.stunTicks", d), UShort(p, "maxFlightTicks", path + ".parameters.maxFlightTicks", d));
         if (id.EndsWith("rising-dragon.v1", StringComparison.Ordinal)) return new RisingDragonCapabilityParameters(Float(p, "riseSpeed", path + ".parameters.riseSpeed", d), UShort(p, "riseTicks", path + ".parameters.riseTicks", d), UShort(p, "riseDelay", path + ".parameters.riseDelay", d));
         if (id.EndsWith("cyclone-kick.v1", StringComparison.Ordinal)) return new CycloneKickCapabilityParameters(Float(p, "forwardSpeed", path + ".parameters.forwardSpeed", d), UShort(p, "windupTicks", path + ".parameters.windupTicks", d), UShort(p, "hitboxEndTick", path + ".parameters.hitboxEndTick", d), UShort(p, "durationTicks", path + ".parameters.durationTicks", d), Float(p, "bodyRadius", path + ".parameters.bodyRadius", d), Float(p, "sideRadius", path + ".parameters.sideRadius", d), Float(p, "sideOffset", path + ".parameters.sideOffset", d), Float(p, "damage", path + ".parameters.damage", d), Float(p, "knockbackAngle", path + ".parameters.knockbackAngle", d), Float(p, "knockbackBase", path + ".parameters.knockbackBase", d), Float(p, "knockbackGrowth", path + ".parameters.knockbackGrowth", d), UShort(p, "stunTicks", path + ".parameters.stunTicks", d), Float(p, "bodyY", path + ".parameters.bodyY", d), Float(p, "sideY", path + ".parameters.sideY", d));
-        if (id.EndsWith("wibou.dash-slash.v1", StringComparison.Ordinal)) return new WibouDashSlashCapabilityParameters(Float(p, "dashDistance", path + ".parameters.dashDistance", d), UShort(p, "dashDurationTicks", path + ".parameters.dashDurationTicks", d), UShort(p, "maxAimTicks", path + ".parameters.maxAimTicks", d));
+        if (id == CharacterPackageCompiler.ChargedDirectionalDashCapabilityId)
+            return new ChargedDirectionalDashCapabilityParameters(
+                UShort(p, "maxChargeTicks", path + ".parameters.maxChargeTicks", d),
+                UShort(p, "tier2Ticks", path + ".parameters.tier2Ticks", d),
+                UShort(p, "tier3Ticks", path + ".parameters.tier3Ticks", d),
+                Float(p, "minDistance", path + ".parameters.minDistance", d),
+                Float(p, "maxDistance", path + ".parameters.maxDistance", d),
+                Float(p, "dashSpeed", path + ".parameters.dashSpeed", d),
+                UShort(p, "finisherLeadTicks", path + ".parameters.finisherLeadTicks", d),
+                UShort(p, "finisherSeekTick", path + ".parameters.finisherSeekTick", d),
+                UShort(p, "recoveryTicks", path + ".parameters.recoveryTicks", d),
+                Float(p, "tier2Damage", path + ".parameters.tier2Damage", d),
+                Float(p, "tier3Damage", path + ".parameters.tier3Damage", d),
+                ParseHitboxNamed(p, "traversalHitbox", path + ".parameters.traversalHitbox", d),
+                ParseHitboxNamed(p, "finisherHitbox", path + ".parameters.finisherHitbox", d));
         if (id.EndsWith("wibou.rising-slash.v1", StringComparison.Ordinal)) return new WibouRisingSlashCapabilityParameters(Float(p, "riseSpeed", path + ".parameters.riseSpeed", d), UShort(p, "riseTicks", path + ".parameters.riseTicks", d), Float(p, "homingRange", path + ".parameters.homingRange", d), Float(p, "homingSpeed", path + ".parameters.homingSpeed", d));
         if (id.EndsWith("wibou.blade-flurry.v1", StringComparison.Ordinal)) return new WibouBladeFlurryCapabilityParameters(Float(p, "forwardSpeed", path + ".parameters.forwardSpeed", d), UShort(p, "moveTicks", path + ".parameters.moveTicks", d));
         if (id == CharacterPackageCompiler.TargetedLeapCapabilityId)
@@ -1094,7 +1142,8 @@ public static class CharacterPackageSourceCodec
         if (id == "slop.internal.manki.bazooka.v1") return new MankiBazookaCapabilityParameters(UShort(p, "fireTriggerTick", path + ".parameters.fireTriggerTick", d), Float(p, "projectileSpeed", path + ".parameters.projectileSpeed", d), Float(p, "hitboxRadius", path + ".parameters.hitboxRadius", d), Float(p, "damage", path + ".parameters.damage", d), Float(p, "gravity", path + ".parameters.gravity", d), UShort(p, "maxFlightTicks", path + ".parameters.maxFlightTicks", d), UShort(p, "stunTicks", path + ".parameters.stunTicks", d), Float(p, "explosionRadius", path + ".parameters.explosionRadius", d), Float(p, "kbAngle", path + ".parameters.kbAngle", d), Float(p, "explosionKbBase", path + ".parameters.explosionKbBase", d), Float(p, "explosionKbGrowth", path + ".parameters.explosionKbGrowth", d), UShort(p, "explosionStunTicks", path + ".parameters.explosionStunTicks", d), UShort(p, "explosionDurationTicks", path + ".parameters.explosionDurationTicks", d), Float(p, "explosionKbAngle", path + ".parameters.explosionKbAngle", d), UShort(p, "castDuration", path + ".parameters.castDuration", d), UShort(p, "recoveryDuration", path + ".parameters.recoveryDuration", d), OptionalString(p, "explosionPresentationId", path + ".parameters.explosionPresentationId", d) ?? "");
         if (id == "slop.internal.manki.aerosol-inferno.v1") return new MankiAerosolInfernoCapabilityParameters(UShort(p, "fireTriggerTick", path + ".parameters.fireTriggerTick", d), UShort(p, "fireDurationTicks", path + ".parameters.fireDurationTicks", d), UShort(p, "hitboxDurationTicks", path + ".parameters.hitboxDurationTicks", d), Float(p, "hitboxRadius", path + ".parameters.hitboxRadius", d), Float(p, "offsetY", path + ".parameters.offsetY", d), Float(p, "offsetZ", path + ".parameters.offsetZ", d), Float(p, "endOffsetZ", path + ".parameters.endOffsetZ", d), Float(p, "damage", path + ".parameters.damage", d), Float(p, "knockbackAngle", path + ".parameters.knockbackAngle", d), Float(p, "knockbackBase", path + ".parameters.knockbackBase", d), Float(p, "knockbackGrowth", path + ".parameters.knockbackGrowth", d), UShort(p, "stunTicks", path + ".parameters.stunTicks", d), Byte(p, "hitGroup", path + ".parameters.hitGroup", d));
 
-        return new DragonBeamCapabilityParameters(UShort(p, "durationTicks", path + ".parameters.durationTicks", d), UShort(p, "fireTick", path + ".parameters.fireTick", d), Float(p, "launchOffsetY", path + ".parameters.launchOffsetY", d), Float(p, "beamRange", path + ".parameters.beamRange", d), Float(p, "beamRadius", path + ".parameters.beamRadius", d), Float(p, "damage", path + ".parameters.damage", d), Float(p, "knockbackAngle", path + ".parameters.knockbackAngle", d), Float(p, "knockbackBase", path + ".parameters.knockbackBase", d), Float(p, "knockbackGrowth", path + ".parameters.knockbackGrowth", d), UShort(p, "stunTicks", path + ".parameters.stunTicks", d), UShort(p, "hitboxDurationTicks", path + ".parameters.hitboxDurationTicks", d));
+        d.Error("capability.unknown", path + ".capabilityId", "Capability parameters are not supported.");
+        return new RisingDragonCapabilityParameters(0, 0, 0);
     }
     private static Dictionary<string, JsonElement> ReadObject(JsonElement element, string path, DiagnosticBag d, params string[] allowed)
     {

@@ -32,6 +32,8 @@ namespace SlopArena.Shared.Abilities
         public virtual bool OwnsVerticalMotion => false;
         /// <summary>Multiplier applied to ordinary airborne gravity while this ability is active.</summary>
         public virtual float GravityMultiplier => 1f;
+        /// <summary>Whether this activation phases through other fighters' pushboxes.</summary>
+        public virtual bool IgnoresFighterPushboxes => false;
 
         /// <summary>True while this activation's authored armor window remains active.</summary>
         public bool HasArmor => _armorWindowTicks > 0;
@@ -96,6 +98,8 @@ namespace SlopArena.Shared.Abilities
             ref float damage, ref float knockbackForce)
         {
         }
+        /// <summary>Called when one of this activation's hitboxes contacts an active shield.</summary>
+        public virtual void OnShieldBlock(ref CharacterState attacker, ref CharacterState defender) { }
 
         /// <summary>Target-side counter hook with the launched attacker's definition.</summary>
         public virtual bool TryCounter(ref CharacterState defender, ref CharacterState attacker,
@@ -165,7 +169,7 @@ namespace SlopArena.Shared.Abilities
         /// When evt.BoneName is set and baked data is available, positions at the
         /// bone's world position instead of the fixed OffX/Y/Z offset.
         /// </summary>
-        protected void SpawnHitbox(ref CharacterState s, HitboxEvent evt)
+        protected HashSet<ulong> SpawnHitbox(ref CharacterState s, HitboxEvent evt, bool followOwner = false)
         {
             // Position resolution is shared with the Ability Lab preview + tests
             // (spec #119) — one implementation, previews cannot drift from the server.
@@ -180,10 +184,9 @@ namespace SlopArena.Shared.Abilities
             // Resolve knockback profile to flat values
             var (kbAngle, kbBase, kbGrowth) = evt.Knockback.Resolve();
 
-            // Bone-attached melee hitboxes re-resolve their bone position every tick
-            // (SpellResolver.UpdateBoneHitboxes) — the limb sweeps the hitbox. A
-            // capsule with EndBoneName tracks its end point the same way.
-            bool tracksBone = (evt.BoneName != null || evt.EndBoneName != null) && BakedData != null;
+            // Explicit owner attachment also supports root-relative geometry and
+            // missing baked poses; ordinary hitboxes retain their existing policy.
+            bool tracksBone = followOwner || (evt.BoneName != null || evt.EndBoneName != null) && BakedData != null;
 
             HashSet<ulong>? sharedHitEntities = null;
             if (evt.HitGroup != 0)
@@ -196,7 +199,7 @@ namespace SlopArena.Shared.Abilities
                 }
             }
 
-            Resolver.Spawn(new Hitbox
+            var hitbox = new Hitbox
             {
                 X = wx, Y = wy, Z = wz,
                 // Tracked hitboxes are re-resolved to the bone's absolute world
@@ -224,7 +227,7 @@ namespace SlopArena.Shared.Abilities
                 AttackSequence = PresentationAttackSequence,
                 FreezesOwner = true,
                 HitsMultipleOpponents = true,
-                HitEntities = sharedHitEntities,
+                HitEntities = sharedHitEntities ??= new HashSet<ulong>(),
                 TracksBone = tracksBone,
                 SourceEvent = evt,
                 Baked = BakedData,
@@ -234,7 +237,9 @@ namespace SlopArena.Shared.Abilities
                 Slot = Slot,
                 AttackSlot = (byte)(Slot + 1),
                 Airborne = !s.IsGrounded,
-            });
+            };
+            Resolver.Spawn(hitbox);
+            return sharedHitEntities;
         }
 
 

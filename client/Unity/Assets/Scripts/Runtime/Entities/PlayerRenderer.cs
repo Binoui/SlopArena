@@ -541,6 +541,9 @@ namespace SlopArena.Client.Entities
             var stage = spec.Stages[Math.Min(state.ComboStage, spec.Stages.Length - 1)];
             if (state.AttackElapsedTicks >= stage.DurationTicks)
                 return false;
+            if (TryGetChargedSwordTrigger(state, airborne, out ushort finisherTick)
+                && state.AttackElapsedTicks >= finisherTick)
+                return true;
             var events = stage.HitboxEvents;
             if (events == null)
                 return false;
@@ -552,6 +555,25 @@ namespace SlopArena.Client.Entities
                     return true;
             return false;
         }
+        private bool TryGetChargedSwordTrigger(in CharacterState state, bool airborne, out ushort triggerTick)
+        {
+            triggerTick = 0;
+            var slot = _charDef?.GetCookedSlotAbility(state.AttackSlot, airborne);
+            if (slot == null || slot.Timeline.Stages.Count == 0)
+                return false;
+            var operations = slot.Timeline.Stages[Math.Min(state.ComboStage, slot.Timeline.Stages.Count - 1)].Operations;
+            for (int i = 0; i < operations.Count; i++)
+                if (operations[i] is CookedStartCapabilityOperation
+                    { Parameters: CookedChargedDirectionalDashCapabilityParameters dash }
+                    && dash.FinisherHitbox.StartBoneId == "_weapon_hilt"
+                    && dash.FinisherHitbox.EndBoneId == "_weapon_tip")
+                {
+                    triggerTick = dash.FinisherSeekTick;
+                    return true;
+                }
+            return false;
+        }
+
 
         private void CaptureWeaponTrailState(CharacterState state)
         {
@@ -883,6 +905,14 @@ namespace SlopArena.Client.Entities
             if (ability?.Stages is not { Length: > 0 })
                 return;
 
+            if (state.State == ActionState.Attacking
+                && TryGetChargedSwordTrigger(state, _currentAttackAirborne, out ushort finisherTick)
+                && _lastState.AttackElapsedTicks < finisherTick
+                && state.AttackElapsedTicks >= finisherTick)
+            {
+                PlaySwordHitboxSfx(wibou, bonk);
+                return;
+            }
             int stageIndex = Math.Min(state.ComboStage, ability.Stages.Length - 1);
             var hitboxes = ability.Stages[stageIndex].HitboxEvents;
             if (hitboxes == null)
@@ -894,14 +924,17 @@ namespace SlopArena.Client.Entities
                     || state.AttackElapsedTicks < hitbox.TriggerTick)
                     continue;
 
-                AudioClip[] pool = wibou
-                    ? _wibouSwordHitboxSfx
-                    : bonk ? _bonkSwooshSfx : _commonSwooshSfx;
-                AudioClip clip = pool[_wibouSwordSfxSequence++ % pool.Length];
-                if (clip != null)
-                    _sfxSource.PlayOneShot(clip);
+                PlaySwordHitboxSfx(wibou, bonk);
                 return;
             }
+        }
+
+        private void PlaySwordHitboxSfx(bool wibou, bool bonk)
+        {
+            AudioClip[] pool = wibou ? _wibouSwordHitboxSfx : bonk ? _bonkSwooshSfx : _commonSwooshSfx;
+            AudioClip clip = pool[_wibouSwordSfxSequence++ % pool.Length];
+            if (clip != null)
+                _sfxSource.PlayOneShot(clip);
         }
 
         public void ApplyServerState(CharacterState state)

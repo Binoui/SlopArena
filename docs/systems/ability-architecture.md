@@ -45,6 +45,14 @@ cap or resetting FloatWindow. FastFall overrides the window. Time pauses during 
 the most recently started overlapping window replaces the earlier one. The operation
 is part of runtime API `1.2.0`.
 
+`forwardLunge` optionally sets `stopInAttackRange: true` (omitted means false).
+It requires a later same-stage `spawnHitbox`. Shared caches that first hitbox's
+active pose geometry and stops horizontal lunge motion once a forward opponent's
+current hurtbox intersects it. Braking is latched: movement never resumes after
+the opponent leaves, and attack/armor/recovery timing and vertical velocity remain
+unchanged. It neither turns toward a target nor guarantees contact during startup.
+Bonk ground/air R enable this; other lunges keep their authored travel.
+
 `armorWindow` uses ticks and a positive duration that ends within its stage.
 It protects ordinary damaging contacts without reducing damage or granting
 invincibility; grabs remain effective. The timer belongs to the active ability,
@@ -67,6 +75,21 @@ transition and interruption. At most one targeted leap may own a slot, its
 seek plus recovery fits the authored stage, and its hitbox lifetime fits
 recovery. Ability Lab edits the same typed source contract, not a separate
 simulation or a Bonk-specific ability.
+
+`slop.ability.charged-directional-dash.v1` is a public lifecycle requiring runtime
+API `1.5.0`. It owns capped hold charge, release-locked manual direction,
+continuously scaled distance, fighter-pushbox-only phasing, separate traversal
+and tier-scaled sword hit histories, final-segment animation seek, and recovery.
+Shields/terrain stop travel; incoming attacks retain ordinary interruption and
+damage authority. Its slot uses `DirectionalDash`/`GroundVector`, one stage,
+tick-zero activation and zero IASA. Competing lifecycle, startup correction,
+motion and external hitbox operations are rejected. Lead/seek/recovery timings
+must fit the stage; both nested hitboxes use independent hit group zero.
+Ability Lab edits these typed parameters and records actual hold/release frames.
+Traversal keeps its one-hit-per-opponent history through Hitstop-paused travel,
+then is removed at the endpoint or a shield/terrain stop. Sword lifetime remains
+independent; interruption removes both activation-owned hitboxes.
+
 
 ## Engine-owned mechanics
 

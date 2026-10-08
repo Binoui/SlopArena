@@ -8,56 +8,38 @@ public class FightGuyAbilityTests
 {
     private static readonly float GroundPY = TestHelpers.GroundPY(TestHelpers.FightGuyDef);
 
-    // ── A (FightGuyKiShot) ──
+    // ── A (Ki Shot — cooked projectile) ──
 
     [Fact]
-    public void FightGuyKiShot_Press_EntersAimHold()
+    public void FightGuyKiShot_PressStartsAttackWithoutAimState()
     {
         var sim = TestHelpers.MakeSim();
         var state = TestHelpers.PlayerState();
         state.PY = GroundPY;
         TestHelpers.RegisterPlayer(sim, TestHelpers.FightGuyDef, state);
-
-        var t0 = TestHelpers.TickN(sim, new InputState
-        {
-            ActiveSlot = 11,
-            AimYaw = 9000,
-            IsAiming = true,
-        }, 1);
-
-        // Hold-to-aim: the press opens the aim stance; the projectile only fires
-        // after release (see FightGuyKiShot_FiresOneMovingProjectileAfterRelease).
-        Assert.Equal(ActionState.Aiming, t0.State);
-        Assert.Equal((byte)11, t0.AttackSlot);
-        Assert.True(t0.IsAiming);
+        var result = TestHelpers.TickN(sim, new InputState { ActiveSlot = 11, IsAiming = true, AimYaw = 9000 }, 1);
+        Assert.Equal(ActionState.Attacking, result.State);
+        Assert.False(result.IsAiming);
     }
 
     [Fact]
-    public void FightGuyKiShot_FiresOneMovingProjectileAfterRelease()
+    public void FightGuyKiShot_FiresAfterStartupWhileAimInputIsIgnored()
     {
         var sim = TestHelpers.MakeSim();
         var state = TestHelpers.PlayerState();
         state.PY = GroundPY;
         TestHelpers.RegisterPlayer(sim, TestHelpers.FightGuyDef, state);
-
-        // Press, aim at 90°, hold, then release — the projectile must NOT spawn
-        // while held and must use the aim captured at release.
-        sim.Tick(new() { { 1, new InputState { ActiveSlot = 11, AimYaw = 9000, IsAiming = true } } });
-        for (int i = 0; i < 10; i++)
-            sim.Tick(new() { { 1, new InputState { AimYaw = 9000, IsAiming = true } } });
-        Assert.Empty(sim.Resolver.GetActiveHitboxes());
-
-        for (int i = 0; i < 10; i++)
-            sim.Tick(new() { { 1, default } });
-
+        sim.Tick(new() { { 1, new InputState { ActiveSlot = 11, IsAiming = true, AimYaw = 9000, AimPitch = 5000 } } });
+        for (int i = 0; i < 6; i++)
+        {
+            sim.Tick(new() { { 1, new InputState { IsAiming = true, AimYaw = 9000, AimPitch = 5000 } } });
+            Assert.Empty(sim.Resolver.GetActiveHitboxes());
+        }
+        sim.Tick(new() { { 1, new InputState { IsAiming = true, AimYaw = 9000, AimPitch = 5000 } } });
         var projectile = Assert.Single(sim.Resolver.GetActiveHitboxes());
         Assert.Equal(HitboxShape.Sphere, projectile.Shape);
-        // Fired at the 90° release aim, level pitch: 25 speed sideways. VY may
-        // carry a tick or two of the projectile's own gravity — the contract is
-        // the direction, not the exact post-spawn velocity.
-        Assert.InRange(projectile.VX, 24.99f, 25.01f);
-        Assert.InRange(projectile.VY, -0.1f, 0.1f);
-        Assert.InRange(MathF.Abs(projectile.VZ), 0f, 0.02f);
+        Assert.True(projectile.VZ > 0f && MathF.Abs(projectile.VX) < projectile.VZ);
+        Assert.InRange(MathF.Abs(projectile.VY), 0f, 0.1f);
     }
 
     [Fact]
@@ -69,21 +51,14 @@ public class FightGuyAbilityTests
         var player = TestHelpers.PlayerState();
         player.PY = GroundPY;
         sim.RegisterEntity(1, def, player);
-
         var npc = TestHelpers.NpcState(0f, 2f);
         npc.PY = GroundPY;
         sim.RegisterEntity(100, def, npc, baked);
-
-        var aim = new InputState { ActiveSlot = 11, AimYaw = 0, IsAiming = true };
-        sim.Tick(new() { { 1, aim }, { 100, default } });
-        aim.ActiveSlot = 0;
-        for (int i = 0; i < 10; i++)
-            sim.Tick(new() { { 1, aim }, { 100, default } });
-        aim.IsAiming = false;
-        sim.Tick(new() { { 1, aim }, { 100, default } });
+        sim.Tick(new() { { 1, new InputState { ActiveSlot = 11, IsAiming = true, AimYaw = 9000, AimPitch = 5000 } }, { 100, default } });
+        for (int i = 0; i < 8; i++)
+            sim.Tick(new() { { 1, new InputState { IsAiming = true, AimYaw = 9000, AimPitch = 5000 } }, { 100, default } });
         for (int i = 0; i < 40; i++)
             sim.Tick(new() { { 1, default }, { 100, default } });
-
         var target = sim.GetState(100);
         Assert.Equal((ushort)6, target.DamagePercent);
         Assert.Equal((byte)0, target.StatusFlags);

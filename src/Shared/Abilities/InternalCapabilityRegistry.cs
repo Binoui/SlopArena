@@ -16,26 +16,23 @@ public static class InternalCapabilityRegistry
 
         switch (capabilityId)
         {
-            case "slop.internal.fightguy.ki-shot.v1" when parameters is CookedKiShotCapabilityParameters ki:
-                capability = new FightGuyKiShot(ki);
-                return true;
             case "slop.internal.fightguy.rising-dragon.v1" when parameters is CookedRisingDragonCapabilityParameters rising:
                 capability = new FightGuyRisingKick(rising);
                 return true;
             case "slop.internal.fightguy.cyclone-kick.v1" when parameters is CookedCycloneKickCapabilityParameters cyclone:
                 capability = new FightGuyCycloneKick(cyclone);
                 return true;
-            case "slop.internal.fightguy.dragon-beam.v1" when parameters is CookedDragonBeamCapabilityParameters beam:
-                capability = new FightGuyDragonBeam(beam);
-                return true;
-            case "slop.internal.wibou.dash-slash.v1" when parameters is CookedWibouDashSlashCapabilityParameters dash:
-                capability = new WibouDashSlash(dash);
-                return true;
+
             case "slop.internal.wibou.rising-slash.v1" when parameters is CookedWibouRisingSlashCapabilityParameters rising:
                 capability = new WibouRisingSlash(rising);
                 return true;
             case "slop.internal.wibou.blade-flurry.v1" when parameters is CookedWibouBladeFlurryCapabilityParameters flurry:
                 capability = new WibouUltFlurry(flurry);
+                return true;
+            case CharacterPackageCompiler.ChargedDirectionalDashCapabilityId
+                when capabilityVersion == CharacterPackageCompiler.ChargedDirectionalDashCapabilityVersion &&
+                     parameters is CookedChargedDirectionalDashCapabilityParameters dash:
+                capability = new ChargedDirectionalDashAbility(dash);
                 return true;
             case CharacterPackageCompiler.TargetedLeapCapabilityId when parameters is CookedTargetedLeapCapabilityParameters leap:
                 capability = new TargetedLeapAbility(leap);

@@ -16,7 +16,7 @@ presentation_prefab: client/Unity/Assets/Resources/Stages/scifi_city_demo.prefab
 
 The authoritative shell preserves the central rooftop cluster using `WestRoof`, `EastRoof`, `UpperDeck`, a continuous `BridgeDeck`, and `WestStairRamp`/`EastStairRamp`. The roof solids use primitive meshes; the bridge and ramps use stage-owned subassets in `CollisionMeshes.asset`. Shallow bridge joins and stair ramps provide continuous walking routes instead of exposing decorative triangle seams or stair risers to collision.
 
-The four spawn positions and overall horizontal arena bounds are preserved. This repair does not enlarge the arena. Small art-panel height offsets and facade trim are intentionally excluded from the simple collision surfaces. The surrounding city remains presentation-only.
+Four ordered spawns alternate between the west and east roofs. The first two occupy opposite-roof diagonal positions for a duel; the remaining two complete matching rows with equal within-roof spacing. All four face toward the bridge-centered fight space. The spawn repair preserves collision surfaces, spawn elevation, and overall arena bounds. Small art-panel height offsets and facade trim are intentionally excluded from the simple collision surfaces. The surrounding city remains presentation-only.
 
 ## Presentation
 

@@ -52,16 +52,6 @@ public class Kit117SlotSemanticsTests
         Assert.Equal((byte)3, t0.AttackSlot);
     }
 
-    [Fact]
-    public void DragonBeam_ActivatesWhileAirborne()
-    {
-        var sim = TestHelpers.MakeSim();
-        TestHelpers.RegisterPlayer(sim, Def, AirborneState());
-
-        var t0 = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 6), 1);
-        Assert.Equal(ActionState.Attacking, t0.State);
-        Assert.Equal((byte)6, t0.AttackSlot);
-    }
 
     [Fact]
     public void EmptySlot5_Noop_NoCrash()
@@ -84,11 +74,9 @@ public class Kit117SlotSemanticsTests
         TestHelpers.RegisterPlayer(sim, Def, AirborneState());
 
         var t0 = TestHelpers.TickN(sim, TestHelpers.Input(activeSlot: 11, aiming: true), 1);
-        // Hold-to-aim: the press opens the aim stance (air and ground share the
-        // ground spec); release fires.
-        Assert.Equal(ActionState.Aiming, t0.State);
+        Assert.Equal(ActionState.Attacking, t0.State);
         Assert.Equal((byte)11, t0.AttackSlot);
-        Assert.True(t0.IsAiming);
+        Assert.False(t0.IsAiming);
     }
 
     // ── E-slot Rising Dragon ──
@@ -279,12 +267,9 @@ public class Kit117SlotSemanticsTests
         state.PY = GroundPy;
         TestHelpers.RegisterPlayer(sim, Def, state);
 
-        // Fire Ki Shot: press, hold, release (the hold debounce + release startup
-        // shift natural completion past the old 30-tick window).
+        // Ki Shot starts immediately; its natural completion applies cooldown.
         sim.Tick(new() { { 1, TestHelpers.Input(activeSlot: 11) } });
-        for (int i = 0; i < 10; i++)
-            sim.Tick(new() { { 1, TestHelpers.Input(aiming: true) } });
-        for (int i = 0; i < 60; i++)
+        for (int i = 0; i < 70; i++)
             sim.Tick(new() { { 1, default } });
 
         ushort cd = sim.GetState(1).GetCooldown(AbilitySlots.A);

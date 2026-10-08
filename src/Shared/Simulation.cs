@@ -361,7 +361,9 @@ namespace SlopArena.Shared
                 // During squat: preserve horizontal momentum, no acceleration
             }
             }
-            s.IsAiming = input.IsAiming;
+            var activeCookedSlot = def.GetCookedSlotAbility(s.AttackSlot, !s.IsGrounded);
+            s.IsAiming = input.IsAiming && !(activeCookedSlot?.Behavior == AuthoringAbilityBehavior.AimedProjectile
+                && activeCookedSlot.AimMode == AuthoringAimMode.None);
 
             // 1. Tick timers
             ushort rushBeforeMovement = s.RushTicks;

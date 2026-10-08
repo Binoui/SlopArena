@@ -73,6 +73,96 @@ public sealed class TimelineRuntimeTests
         TestHelpers.AssertNear(0f, state.VZ);
     }
 
+    [Theory]
+    [InlineData(0f, 1.3f, 0f, true)]
+    [InlineData(0f, 10f, 0f, false)]
+    [InlineData(0f, -1.3f, 0f, false)]
+    [InlineData(2f, 1.3f, 0f, false)]
+    [InlineData(0f, 1.3f, 3f, false)]
+    public void RangeAwareLungeBrakesOnlyForReachableForwardHurtboxes(
+        float x, float z, float height, bool brakes)
+    {
+        var slot = BrakingSlot();
+        var (sim, def) = Create(slot);
+        sim.RegisterEntity(100, def, TestHelpers.NpcState(x, z)
+            with { PY = sim.GetState(1).PY + height });
+        sim.ActivateAbility(1, new CookedTimelineAbility(slot, Array.Empty<string>()), 0, def);
+
+        TestHelpers.AssertNear(brakes ? 0f : 12f, sim.GetState(1).VZ);
+        Assert.Equal(ActionState.Attacking, sim.GetState(1).State);
+        Assert.Empty(sim.Resolver.GetActiveHitboxes());
+        for (int tick = 0; tick < 5; tick++)
+            sim.TickAbilities(new());
+        Assert.Single(sim.Resolver.GetActiveHitboxes());
+    }
+
+    [Fact]
+    public void RangeAwareLungeBrakesOnApproachWithoutRestartingOrAdvancingSwings()
+    {
+        var slot = BrakingSlot();
+        var (sim, def) = Create(slot);
+        sim.RegisterEntity(100, def, TestHelpers.NpcState(0f, 2.5f));
+        sim.ActivateAbility(1, new CookedTimelineAbility(slot, Array.Empty<string>()), 0, def);
+        Assert.True(sim.GetState(1).VZ > 0f);
+        sim.SetState(1, sim.GetState(1) with { PZ = 1.2f, VY = 3f });
+        sim.TickAbilities(new());
+        TestHelpers.AssertNear(0f, sim.GetState(1).VZ);
+        TestHelpers.AssertNear(3f, sim.GetState(1).VY);
+        sim.SetState(100, sim.GetState(100) with { PZ = 10f });
+        for (int tick = 1; tick < 4; tick++)
+        {
+            sim.TickAbilities(new());
+            TestHelpers.AssertNear(0f, sim.GetState(1).VZ);
+            Assert.Empty(sim.Resolver.GetActiveHitboxes());
+        }
+        sim.TickAbilities(new());
+        Assert.Single(sim.Resolver.GetActiveHitboxes());
+        sim.SetState(1, sim.GetState(1) with { State = ActionState.Hitstun, VZ = -4f });
+        sim.TickAbilities(new());
+        Assert.Null(sim.GetActiveAbility(1));
+        TestHelpers.AssertNear(-4f, sim.GetState(1).VZ);
+    }
+
+    [Theory]
+    [InlineData(1.3f, false)]
+    [InlineData(2.5f, false)]
+    [InlineData(1.3f, true)]
+    [InlineData(2.5f, true)]
+    public void RangeAwareLungeStopsBeforePassingTargetAndFirstSwingConnects(float distance, bool airborne)
+    {
+        var slot = BrakingSlot();
+        float height = airborne ? 20f : .75f;
+        var (sim, def) = Create(slot, TestHelpers.PlayerState() with { PY = height, IsGrounded = !airborne });
+        def.Slot1 = new AbilitySpec
+        {
+            Stages = new[] { new AttackStage { DurationTicks = 20 } },
+        };
+        def.AirSlot1 = def.Slot1;
+        def.Movement.Gravity = 0f;
+        sim.NoGravityEntityId = 1;
+        sim.RegisterEntity(100, def, TestHelpers.NpcState(0f, distance)
+            with { PY = height, IsGrounded = !airborne });
+        sim.ActivateAbility(1, new CookedTimelineAbility(slot, Array.Empty<string>()), 2, def);
+        var inputs = new Dictionary<ulong, InputState> { [1] = default, [100] = default };
+        bool connected = false;
+        for (int tick = 0; tick < 12; tick++)
+        {
+            sim.Tick(inputs);
+            connected |= sim.LastTickHits.Any(hit => hit.OwnerEntityId == 1 && hit.TargetEntityId == 100);
+            Assert.True(sim.GetState(1).PZ < sim.GetState(100).PZ);
+        }
+        Assert.True(connected);
+        Assert.True(sim.GetState(100).DamagePercent > 0);
+    }
+
+    private static CookedSlotDefinition BrakingSlot()
+        => Slot(20,
+            new CookedForwardLungeOperation(0, AuthoringUnit.MetersPerSecond, 12f, 10, true),
+            new CookedSpawnHitboxOperation(5, AuthoringUnit.Meters,
+                new CookedHitbox(AuthoringHitboxShape.Sphere, .4f,
+                    0f, 0f, 1f, 0f, 0f, 0f, null, null,
+                    3f, 20f, 2f, 4f, 5, 2, true, 0)));
+
     [Fact]
     public void AerialAuthoringSuspendsAmbientGravityButPreservesAuthoredVelocity()
     {
@@ -423,10 +513,8 @@ public sealed class TimelineRuntimeTests
     {
         var cases = new (string Id, CookedCapabilityParameters Parameters, Type Type)[]
         {
-            ("slop.internal.fightguy.ki-shot.v1", new CookedKiShotCapabilityParameters(1, 2, 1, 2, 1, 1, 1, 1, 1, 30, 1, 3), typeof(FightGuyKiShot)),
             ("slop.internal.fightguy.rising-dragon.v1", new CookedRisingDragonCapabilityParameters(11, 12, 8), typeof(FightGuyRisingKick)),
             ("slop.internal.fightguy.cyclone-kick.v1", new CookedCycloneKickCapabilityParameters(17, 6, 34, 40, 1, 1, 1, 7, 15, 8, 5, 6, 1, 1), typeof(FightGuyCycloneKick)),
-            ("slop.internal.fightguy.dragon-beam.v1", new CookedDragonBeamCapabilityParameters(28, 24, 1, 18, 1, 14, 20, 18, 10, 24, 2), typeof(FightGuyDragonBeam)),
         };
         foreach (var item in cases)
         {
@@ -444,8 +532,8 @@ public sealed class TimelineRuntimeTests
     {
         var slot = Slot(10,
             new CookedStartCapabilityOperation(0, AuthoringUnit.Ticks,
-                "slop.internal.fightguy.ki-shot.v1", "1",
-                new CookedKiShotCapabilityParameters(8, 24, 1.2f, 25f, 1f, .5f, 6f, 3f, 4.5f, 30, 12, 90)),
+                "slop.internal.manki.round-bomb.v1", "1",
+                new CookedMankiRoundBombCapabilityParameters(10, 12f, 30f, 30f, .6f, 6f, 22, 90, 30, 4f, 2.3f, 5f, 9f, 15, 4, 45)),
             new CookedSetAimStateOperation(0, AuthoringUnit.Ticks, AuthoringAimMode.CameraForward3D));
         var initial = TestHelpers.PlayerState() with { PY = 100f, IsGrounded = false, VX = 4f, VZ = 5f };
         var (sim, def) = Create(slot, initial);
@@ -779,6 +867,143 @@ public sealed class TimelineRuntimeTests
         var fired = Assert.Single(sim.Resolver.GetActiveHitboxes());
         TestHelpers.AssertNear(30f * MathF.Sin(launch.FacingYaw), fired.VX, 1e-5f);
         TestHelpers.AssertNear(30f * MathF.Cos(launch.FacingYaw), fired.VZ, 1e-5f);
+    }
+
+    [Theory]
+    [InlineData("manki", "F")]
+    [InlineData("fightguy", "R")]
+    [InlineData("fightguy", "F")]
+    [InlineData("wibou", "F")]
+    [InlineData("bonk", "A")]
+    [InlineData("bonk", "R")]
+    public void AuthoredSpecialsCorrectStartupAndCommitGroundAndAir(string package, string label)
+    {
+        var def = CompileSourceDefinition(package);
+        foreach (bool airborne in new[] { false, true })
+        foreach (bool locked in new[] { false, true })
+        {
+            var slot = def.CookedSlots!.Single(s => s.Id == $"{(airborne ? "air" : "ground")}.{label}");
+            var initial = TestHelpers.PlayerState() with
+            {
+                PY = airborne ? 20f : def.CapsuleHeight * .5f, IsGrounded = !airborne,
+                LockOn = locked, TargetEntityId = locked ? 100UL : 0UL,
+            };
+            var sim = TestHelpers.MakeSim();
+            sim.NoGravityEntityId = 1;
+            sim.RegisterEntity(1, def, initial);
+            var targetDef = TestHelpers.EngineDef;
+            targetDef.Movement.Gravity = 0f;
+            sim.RegisterEntity(100, targetDef, TestHelpers.NpcState(2.5f, 0f)
+                with { PY = initial.PY, IsGrounded = !airborne });
+            byte wireSlot = label switch { "A" => AbilitySlots.A, "R" => AbilitySlots.R, _ => AbilitySlots.F };
+            // Derive the cutoff from actual attack/launch timing, never the correction profile.
+            int commitmentTick = slot.Timeline.Stages[0].Operations.Select(operation => operation switch
+            {
+                CookedSpawnHitboxOperation hit => (int)hit.Tick,
+                CookedForwardLungeOperation lunge => (int)lunge.Tick,
+                CookedStartCapabilityOperation { Parameters: CookedMankiAerosolInfernoCapabilityParameters flame }
+                    => flame.FireTriggerTick,
+                CookedStartCapabilityOperation { Parameters: CookedCycloneKickCapabilityParameters cyclone }
+                    => cyclone.WindupTicks + 1,
+                _ => int.MaxValue,
+            }).Min();
+            bool aimedHold = package == "manki";
+            sim.Tick(new() { [1] = new InputState
+                { ActiveSlot = wireSlot, IsAiming = aimedHold, TargetEntityId = 100 } });
+            var inputs = new Dictionary<ulong, InputState>
+                { [1] = new() { TargetEntityId = 100, AimYaw = -9000 } };
+            if (aimedHold)
+            {
+                // Manki receives the cached manual aim on release.
+                sim.Tick(new() { [1] = new InputState { TargetEntityId = 100 } });
+            }
+            float previousYaw = sim.GetState(1).FacingYaw;
+            TestHelpers.AssertNear(MathF.PI / 30f, previousYaw);
+            for (int tick = aimedHold ? 1 : 2; tick < commitmentTick; tick++)
+            {
+                sim.Tick(inputs);
+                var state = sim.GetState(1);
+                Assert.InRange(state.FacingYaw - previousYaw, 0f, MathF.PI / 30f + 1e-5f);
+                Assert.InRange(state.FacingYaw, 0f, MathF.PI / 4f + 1e-5f);
+                previousYaw = state.FacingYaw;
+            }
+            float expectedYaw = MathF.Min(MathF.PI / 4f,
+                MathF.PI / 30f * (aimedHold ? commitmentTick : commitmentTick - 1));
+            TestHelpers.AssertNear(expectedYaw, previousYaw);
+            // Crossing at the first active/launch tick must not permit one last correction.
+            sim.SetState(100, sim.GetState(100) with { PX = -2.5f });
+            sim.Tick(inputs);
+            TestHelpers.AssertNear(previousYaw, sim.GetState(1).FacingYaw);
+            Assert.False(sim.GetState(1).AttackCorrectionActive);
+            if (package == "bonk")
+            {
+                var launched = sim.GetState(1);
+                Assert.True(launched.VX * launched.VX + launched.VZ * launched.VZ > 0f);
+                TestHelpers.AssertNear(previousYaw, MathF.Atan2(launched.VX, launched.VZ));
+            }
+            else
+                Assert.Contains(sim.Resolver.GetActiveHitboxes(), hit => hit.OwnerId == 1);
+            for (int tick = 0; tick < 8; tick++)
+            {
+                sim.Tick(inputs);
+                TestHelpers.AssertNear(previousYaw, sim.GetState(1).FacingYaw);
+                Assert.False(sim.GetState(1).AttackCorrectionActive);
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData("manki", "F", "valid")]
+    [InlineData("manki", "F", "invalidated")]
+    [InlineData("manki", "F", "empty")]
+    public void AimedSpecialReleaseCorrectsFinalManualFacingWithoutReacquiring(
+        string package, string label, string targetScenario)
+    {
+        var def = CompileSourceDefinition(package);
+        var slot = def.CookedSlots!.Single(s => s.Id == $"ground.{label}");
+        var initial = TestHelpers.PlayerState() with { PY = def.CapsuleHeight * .5f };
+        var (sim, _) = Create(slot, initial);
+        sim.RegisterEntity(1, def, initial);
+        sim.RegisterEntity(100, def, TestHelpers.NpcState(targetScenario == "empty" ? 10f : 2.5f, 0f)
+            with { PY = initial.PY });
+        byte wireSlot = label == "R" ? AbilitySlots.R : AbilitySlots.F;
+        sim.ActivateAbility(1, new CookedTimelineAbility(slot, Array.Empty<string>()),
+            (byte)(wireSlot - 1), def, activationInput: new InputState { TargetEntityId = 100 });
+        var hold = new Dictionary<ulong, InputState> { [1] = new() { IsAiming = true } };
+        const float manualYaw = MathF.PI / 3f;
+        sim.SetState(1, sim.GetState(1) with { AimYaw = manualYaw });
+        for (int tick = 0; tick < 24; tick++)
+        {
+            if (targetScenario == "invalidated" && tick == 2)
+                sim.SetState(100, sim.GetState(100) with { PX = 10f });
+            if (targetScenario != "valid" && tick == 3)
+                sim.SetState(100, sim.GetState(100) with { PX = 2.5f });
+            sim.TickAbilities(hold);
+            TestHelpers.AssertNear(manualYaw, sim.GetState(1).FacingYaw);
+            Assert.Equal(ActionState.Aiming, sim.GetState(1).State);
+        }
+        sim.TickAbilities(new() { [1] = default });
+        float expected = manualYaw + (targetScenario == "valid" ? MathF.PI / 30f : 0f);
+        TestHelpers.AssertNear(expected, sim.GetState(1).FacingYaw);
+        Assert.Equal(ActionState.Attacking, sim.GetState(1).State);
+        Assert.Equal(targetScenario == "empty" ? 0UL : 100UL, sim.GetState(1).AttackCorrectionTargetId);
+        if (targetScenario != "valid")
+            Assert.False(sim.GetState(1).AttackCorrectionActive);
+        sim.SetState(1, sim.GetState(1) with { State = ActionState.Hitstun });
+        sim.TickAbilities(new());
+        Assert.False(sim.GetState(1).AttackCorrectionOwned);
+        Assert.Equal(0UL, sim.GetState(1).AttackCorrectionTargetId);
+    }
+
+    private static CharacterDefinition CompileSourceDefinition(string package)
+    {
+        string directory = RepoFile($"client/Unity/Assets/CharacterPackages/{package}");
+        var compiled = CharacterPackageCompiler.Compile(
+            File.ReadAllText(Path.Combine(directory, "package.json")),
+            File.ReadAllText(Path.Combine(directory, "character.json")),
+            CharacterCookProfile.TrustedBuiltIn);
+        Assert.NotNull(compiled.CookedPackage);
+        return CookedCharacterRuntimeAdapter.ToCharacterDefinition(compiled.CookedPackage!);
     }
 
     private static CookedSlotDefinition CorrectionSlot(ushort endTick, float pitch = 0f)

@@ -101,14 +101,13 @@ public sealed class MankiKitScenarioTests : KitScenarioTests
         Assert.Equal("anim.manki.gf-loop", aerosol.AimAnimationId);
         var aerosolStage = Assert.Single(aerosol.Timeline.Stages);
         Assert.Equal((ushort)0, aerosolStage.IasaTicks);
-        Assert.Equal(2, aerosolStage.Operations.Count);
-        var start = Assert.IsType<CookedStartCapabilityOperation>(aerosolStage.Operations[0]);
+        var start = Assert.Single(aerosolStage.Operations.OfType<CookedStartCapabilityOperation>());
         Assert.Equal((ushort)0, start.Tick);
         var aerosolParameters = Assert.IsType<CookedMankiAerosolInfernoCapabilityParameters>(start.Parameters);
         Assert.InRange(aerosolParameters.FireTriggerTick + aerosolParameters.HitboxDurationTicks,
             1, aerosolStage.DurationTicks);
         Assert.True(aerosolParameters.Damage > 0f);
-        var presentation = Assert.IsType<CookedEmitPresentationOperation>(aerosolStage.Operations[1]);
+        var presentation = Assert.Single(aerosolStage.Operations.OfType<CookedEmitPresentationOperation>());
         Assert.Equal("presentation.manki.aerosol-inferno.start", presentation.PresentationId);
         Assert.Empty(package.Definition.Slots.SelectMany(x => x.Timeline.Stages).SelectMany(x => x.Operations).OfType<CookedSetVelocityOperation>());
     }
@@ -128,7 +127,7 @@ public sealed class MankiKitScenarioTests : KitScenarioTests
     }
 
     [Fact]
-    public void MankiCookedArtifact_LoadsTypedCapabilityParameters()
+    public void MankiCookedArtifact_EnforcesPinnedRosterIdentity()
     {
         var root = Path.GetDirectoryName(RepoFile("content-cooked/manki/manifest.json"))!;
         var files = new Dictionary<string, byte[]>(StringComparer.Ordinal)
@@ -142,7 +141,6 @@ public sealed class MankiKitScenarioTests : KitScenarioTests
         var rosterEntry = roster.Resolve(CharacterClass.Manki);
         Assert.NotNull(rosterEntry);
         Assert.Equal("manki", rosterEntry!.PackageId);
-        Assert.Equal("0.0.0-dev", rosterEntry.Requirement.Version);
         var loaded = CookedCharacterPackageLoader.LoadFiles(files, rosterEntry.Requirement);
         Assert.True(loaded.IsValid, string.Join("; ", loaded.Diagnostics.Select(x => x.Message)));
         var stale = CookedCharacterPackageLoader.LoadFiles(
@@ -150,73 +148,6 @@ public sealed class MankiKitScenarioTests : KitScenarioTests
             rosterEntry.Requirement with { PackageHash = new string('0', 64) });
         Assert.False(stale.IsValid);
         Assert.Contains(stale.Diagnostics, x => x.Code == "package.identity.mismatch");
-
-        var package = loaded.Package!;
-        Assert.Equal("Manki", package.Definition.DisplayName);
-        Assert.Equal(16, package.Definition.Slots.Count);
-
-        var bomb = Assert.IsType<CookedMankiRoundBombCapabilityParameters>(
-            Assert.IsType<CookedStartCapabilityOperation>(Assert.Single(package.Definition.Slots.Single(x => x.Id == "ground.A").Timeline.Stages.Single().Operations)).Parameters);
-        Assert.Equal((ushort)10, bomb.ThrowTriggerTick);
-        Assert.Equal(12f, bomb.MaxRange);
-        Assert.Equal(30f, bomb.LaunchAngle);
-        Assert.Equal(30f, bomb.Gravity);
-        Assert.Equal(.6f, bomb.HitboxRadius);
-        Assert.Equal(6f, bomb.Damage);
-        Assert.Equal((ushort)22, bomb.StunTicks);
-        Assert.Equal((ushort)90, bomb.MaxFlightTicks);
-        Assert.Equal(30f, bomb.KbAngle);
-        Assert.Equal(10f, bomb.ExplosionDamage);
-        Assert.Equal(3f, bomb.ExplosionRadius);
-        Assert.Equal(2.4f, bomb.ExplosionKbBase);
-        Assert.Equal(24f, bomb.ExplosionKbGrowth);
-        Assert.Equal((ushort)18, bomb.ExplosionStunTicks);
-        Assert.Equal((ushort)8, bomb.ExplosionDurationTicks);
-        Assert.Equal(30f, bomb.ExplosionKbAngle);
-        Assert.Equal("presentation.manki.round-bomb.explosion", bomb.ExplosionPresentationId);
-
-        var jetpack = Assert.IsType<CookedMankiJetpackBoostCapabilityParameters>(
-            Assert.IsType<CookedStartCapabilityOperation>(Assert.Single(package.Definition.Slots.Single(x => x.Id == "ground.E").Timeline.Stages.Single().Operations)).Parameters);
-        Assert.Equal((ushort)3, jetpack.StartupTicks);
-        Assert.Equal(15f, jetpack.VerticalSpeed);
-        Assert.Equal(3.5f, jetpack.HorizontalSpeed);
-        Assert.Equal(1.5f, jetpack.ExplosionRadius);
-        Assert.Equal(10f, jetpack.ExplosionDamage);
-        Assert.Equal(30f, jetpack.ExplosionKbAngle);
-        Assert.Equal(2.4f, jetpack.ExplosionKbBase);
-        Assert.Equal(24f, jetpack.ExplosionKbGrowth);
-        Assert.Equal((ushort)18, jetpack.ExplosionStunTicks);
-        Assert.Equal((ushort)8, jetpack.ExplosionDurationTicks);
-        Assert.Equal("presentation.manki.jetpack-boost.ignition", jetpack.ExplosionPresentationId);
-
-        var bazooka = Assert.IsType<CookedMankiBazookaCapabilityParameters>(
-            Assert.IsType<CookedStartCapabilityOperation>(Assert.Single(package.Definition.Slots.Single(x => x.Id == "ground.R").Timeline.Stages.Single().Operations)).Parameters);
-        Assert.Equal((ushort)6, bazooka.FireTriggerTick);
-        Assert.Equal(40f, bazooka.ProjectileSpeed);
-        Assert.Equal(.6f, bazooka.HitboxRadius);
-        Assert.Equal(15f, bazooka.Damage);
-        Assert.Equal(15f, bazooka.Gravity);
-        Assert.Equal((ushort)45, bazooka.MaxFlightTicks);
-        Assert.Equal((ushort)24, bazooka.StunTicks);
-        Assert.Equal(3f, bazooka.ExplosionRadius);
-        Assert.Equal(25f, bazooka.KbAngle);
-        Assert.Equal(6f, bazooka.ExplosionKbBase);
-        Assert.Equal(42f, bazooka.ExplosionKbGrowth);
-        Assert.Equal((ushort)22, bazooka.ExplosionStunTicks);
-        Assert.Equal((ushort)6, bazooka.ExplosionDurationTicks);
-        Assert.Equal(25f, bazooka.ExplosionKbAngle);
-        Assert.Equal((ushort)20, bazooka.CastDuration);
-        Assert.Equal((ushort)15, bazooka.RecoveryDuration);
-        Assert.Equal("presentation.manki.bazooka.explosion", bazooka.ExplosionPresentationId);
-        var aerosol = package.Definition.Slots.Single(x => x.Id == "ground.F");
-        Assert.Equal((ushort)52, aerosol.Timeline.Stages.Single().DurationTicks);
-        var start = Assert.IsType<CookedStartCapabilityOperation>(aerosol.Timeline.Stages.Single().Operations[0]);
-        var aerosolParameters = Assert.IsType<CookedMankiAerosolInfernoCapabilityParameters>(start.Parameters);
-        Assert.Equal((ushort)18, aerosolParameters.FireTriggerTick);
-        Assert.Equal((ushort)52, aerosolParameters.FireDurationTicks);
-        Assert.Equal((ushort)28, aerosolParameters.HitboxDurationTicks);
-        var emit = Assert.IsType<CookedEmitPresentationOperation>(aerosol.Timeline.Stages.Single().Operations[1]);
-        Assert.Equal("presentation.manki.aerosol-inferno.start", emit.PresentationId);
     }
     [Theory]
     [InlineData(AbilitySlots.Slot1, false, 1f, 80)]

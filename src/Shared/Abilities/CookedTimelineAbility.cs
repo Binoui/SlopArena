@@ -16,6 +16,7 @@ public sealed class CookedTimelineAbility : ServerAbility
     private float _forwardLungeYaw;
     private ushort _forwardLungeTicksRemaining;
     private bool _forwardLungeActive;
+    private Hitbox[] _lungeReach = Array.Empty<Hitbox>();
     private ushort _gravityWindowTicksRemaining;
     private float _gravityWindowScale = 1f;
     private readonly bool _timelineOwnsVerticalMotion;
@@ -33,6 +34,16 @@ public sealed class CookedTimelineAbility : ServerAbility
                 return true;
             for (var i = 0; i < _capabilities.Count; i++)
                 if (_capabilities[i].OwnsVerticalMotion)
+                    return true;
+            return false;
+        }
+    }
+    public override bool IgnoresFighterPushboxes
+    {
+        get
+        {
+            for (var i = 0; i < _capabilities.Count; i++)
+                if (_capabilities[i].IgnoresFighterPushboxes)
                     return true;
             return false;
         }
@@ -125,6 +136,11 @@ public sealed class CookedTimelineAbility : ServerAbility
             _stageTick++;
             UpdateStartupAimCorrection(ref s);
         }
+        else if (_startupCorrection != null)
+        {
+            // Validate the captured target while held without fighting manual aim.
+            OwnerSimulation!.UpdateStartupAimCorrection(ref s, _startupCorrection, applyPose: false);
+        }
         ExecuteOperations(ref s, def);
         if (_completed)
             return;
@@ -134,7 +150,15 @@ public sealed class CookedTimelineAbility : ServerAbility
 
         // Aim-hold capabilities freeze stage time during aiming; reset the clock on release.
         if (wasAiming && s.State != ActionState.Aiming)
+        {
             _stageTick = 0;
+            if (_startupCorrection != null)
+            {
+                // Capabilities have committed their final manual/cached aim.
+                s.AttackCorrectionStartYaw = s.FacingYaw;
+                UpdateStartupAimCorrection(ref s);
+            }
+        }
         if (wasAiming)
             return;
 
@@ -186,6 +210,11 @@ public sealed class CookedTimelineAbility : ServerAbility
     {
         for (var i = 0; i < _capabilities.Count; i++)
             _capabilities[i].OnHitEntity(ref attacker, ref target, attackerDef, targetDef, ref damage, ref knockbackForce);
+    }
+    public override void OnShieldBlock(ref CharacterState attacker, ref CharacterState defender)
+    {
+        for (var i = 0; i < _capabilities.Count; i++)
+            _capabilities[i].OnShieldBlock(ref attacker, ref defender);
     }
 
     private void UpdateStartupAimCorrection(ref CharacterState s)
@@ -279,6 +308,41 @@ public sealed class CookedTimelineAbility : ServerAbility
         _forwardLungeYaw = s.FacingYaw;
         _forwardLungeTicksRemaining = operation.DurationTicks;
         _forwardLungeActive = true;
+        _lungeReach = Array.Empty<Hitbox>();
+        if (operation.StopInAttackRange)
+        {
+            for (int i = _operationCursor; i < CurrentStage.Operations.Count; i++)
+            {
+                if (CurrentStage.Operations[i] is not CookedSpawnHitboxOperation hit) continue;
+                var cooked = hit.Hitbox;
+                var evt = new HitboxEvent
+                {
+                    Shape = cooked.Shape == AuthoringHitboxShape.Capsule ? HitboxShape.Capsule : HitboxShape.Sphere,
+                    Radius = cooked.Radius,
+                    OffX = cooked.OffsetX, OffY = cooked.OffsetY, OffZ = cooked.OffsetZ,
+                    EndOffX = cooked.EndOffsetX, EndOffY = cooked.EndOffsetY, EndOffZ = cooked.EndOffsetZ,
+                    BoneName = RuntimeBoneId(cooked.StartBoneId),
+                    EndBoneName = RuntimeBoneId(cooked.EndBoneId),
+                };
+                // Cache the first swing's active poses relative to the lunge origin.
+                _lungeReach = new Hitbox[Math.Max(1, (int)cooked.DurationTicks)];
+                var pose = s;
+                pose.PX = pose.PY = pose.PZ = 0f;
+                for (int tick = 0; tick < _lungeReach.Length; tick++)
+                {
+                    pose.AttackElapsedTicks = (ushort)(hit.Tick + tick);
+                    HitboxGeometry.ResolvePositions(pose, evt, BakedData, CharacterDef,
+                        AnimationNames, AnimIndex, Slot, !s.IsGrounded,
+                        out float x, out float y, out float z, out float ex, out float ey, out float ez);
+                    _lungeReach[tick] = new Hitbox
+                    {
+                        Shape = evt.Shape, Radius = evt.Radius,
+                        X = x, Y = y, Z = z, EndX = ex, EndY = ey, EndZ = ez,
+                    };
+                }
+                break;
+            }
+        }
         ApplyForwardLunge(ref s);
     }
 
@@ -287,11 +351,20 @@ public sealed class CookedTimelineAbility : ServerAbility
         if (!_forwardLungeActive)
             return;
 
+        float sin = MathF.Sin(_forwardLungeYaw), cos = MathF.Cos(_forwardLungeYaw);
+        if (_lungeReach.Length > 0 && OwnerSimulation!.LungeReachesOpponent(s, _lungeReach, sin, cos))
+        {
+            ClearVelocityOwnership(ref s);
+            s.VX = s.VZ = 0f;
+            _forwardLungeActive = false;
+            return;
+        }
+
         if (_forwardLungeTicksRemaining > 0)
         {
             ClearVelocityOwnership(ref s);
-            s.VX = MathF.Sin(_forwardLungeYaw) * _forwardLungeSpeed;
-            s.VZ = MathF.Cos(_forwardLungeYaw) * _forwardLungeSpeed;
+            s.VX = sin * _forwardLungeSpeed;
+            s.VZ = cos * _forwardLungeSpeed;
             _forwardLungeTicksRemaining--;
         }
         else
@@ -338,8 +411,19 @@ public sealed class CookedTimelineAbility : ServerAbility
 
     private void SpawnCookedProjectile(ref CharacterState s, CookedProjectile projectile, int operationIndex)
     {
-        float aimYaw = (s.AttackCorrectionOwned ? s.FacingYaw : s.AimYaw) + projectile.YawOffsetDegrees * MathF.PI / 180f;
-        float aimPitch = s.AttackCorrectionOwned ? s.AttackPosePitch : s.AimPitch;
+        float aimYaw;
+        float aimPitch;
+        if (_slot.Behavior == AuthoringAbilityBehavior.AimedProjectile && _slot.AimMode == AuthoringAimMode.None)
+        {
+            OwnerSimulation!.ResolveAutoTargetProjectileAim(ref s, projectile.LaunchOffsetX,
+                projectile.LaunchOffsetY, projectile.LaunchOffsetZ, out aimYaw, out aimPitch);
+        }
+        else
+        {
+            aimYaw = s.AttackCorrectionOwned ? s.FacingYaw : s.AimYaw;
+            aimPitch = s.AttackCorrectionOwned ? s.AttackPosePitch : s.AimPitch;
+        }
+        aimYaw += projectile.YawOffsetDegrees * MathF.PI / 180f;
         float cosPitch = MathF.Cos(aimPitch);
         float dirX = cosPitch * MathF.Sin(aimYaw);
         float dirY = MathF.Sin(aimPitch);
@@ -379,6 +463,8 @@ public sealed class CookedTimelineAbility : ServerAbility
             throw new InvalidOperationException($"Capability '{operation.CapabilityId}' version '{operation.CapabilityVersion}' is not admitted.");
 
         capability.Resolver = Resolver;
+        capability.OwnerSimulation = OwnerSimulation;
+        capability.ActivationInput = ActivationInput;
         capability.SimulationStates = SimulationStates;
         capability.BakedData = BakedData;
         capability.CharacterDef = CharacterDef;

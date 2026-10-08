@@ -44,7 +44,7 @@ Twin Roofs: one main roof plus a lower second roof connected by a catwalk bridge
 - The HVAC service decks are the main floor's high ground, in two tiers west of center (user-tuned heights): level 1 at top y=2.01, one well-timed jump from the floor; level 2 at top y=4.43, out of double-jump reach from the floor but reachable from level 1 with a double jump. No stair access; both are shell collision.
 - The second building roof (14×10, top y=-1.2) is flank and reset space, 1.2 below the main roof: reachable by jump from the bridge end, traded for height disadvantage. A penthouse block breaks sightlines on it.
 - The 4-unit alley between the roofs has no floor: falling into it is a blast death.
-- Four ordered spawn markers: two on the main roof's clear south quadrants, two on the second roof, supporting 2-player and 4-player matches without a stage-specific capacity rule.
+- Four ordered spawn markers: two on the main roof's clear south quadrants, two on the second roof, supporting 2-player and 4-player matches without a stage-specific capacity rule. Each roof's pair uses mirrored inward facing: main-roof fighters face into the main fight, and second-roof fighters face toward the bridge approach. The intentional roof split and all spawn positions are preserved.
 - Side blast boundaries re-derive from the twin-roof geometry; the brief does not override those values.
 - No hazards, moving geometry, decorative colliders, or client-owned gameplay behavior.
 

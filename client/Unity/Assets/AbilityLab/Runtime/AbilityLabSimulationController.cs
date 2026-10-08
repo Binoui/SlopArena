@@ -95,7 +95,6 @@ public sealed class AbilityLabSimulationController
         bool grab = options.Action == "grab";
         SlotAddress address = default;
         byte wireSlot = 0;
-        bool targetedLeap = false;
         if (grab && definition.CaptureGeometry == null)
             throw new ArgumentException("This package has no cooked capture geometry.");
         if (!grab)
@@ -106,18 +105,6 @@ public sealed class AbilityLabSimulationController
             var spec = definition.GetSlotAbility((byte)(wireSlot - 1), address.IsAirborne);
             if (spec?.Stages is not { Length: > 0 })
                 throw new ArgumentException($"Action '{options.Action}' is unavailable in this package.");
-            var cooked = definition.GetCookedSlotAbility(wireSlot, address.IsAirborne);
-            if (cooked != null)
-            {
-                for (int stageIndex = 0; stageIndex < cooked.Timeline.Stages.Count && !targetedLeap; stageIndex++)
-                    foreach (var operation in cooked.Timeline.Stages[stageIndex].Operations)
-                        if (operation is CookedStartCapabilityOperation
-                            { Parameters: CookedTargetedLeapCapabilityParameters })
-                        {
-                            targetedLeap = true;
-                            break;
-                        }
-            }
         }
 
         float floorY = origin.y - definition.CapsuleHeight * 0.5f;
@@ -162,8 +149,8 @@ public sealed class AbilityLabSimulationController
                 GrabPressed = frame == 0 && grab,
                 FacingYaw = ToDegreesHundredths(facingYaw),
                 AimYaw = ToDegreesHundredths(facingYaw),
-                // Let the authored leap cache its selected target before the release edge.
-                IsAiming = targetedLeap && frame < 10,
+                // ChargeTicks counts held input frames including activation; release on the next frame.
+                IsAiming = frame < options.ChargeTicks,
                 AimDistance = (ushort)Mathf.RoundToInt(Mathf.Min(options.Distance, 65f) * 100f),
             };
             inputs[opponentId] = new InputState

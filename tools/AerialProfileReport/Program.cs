@@ -1149,9 +1149,7 @@ internal static class Program
             CookedSpawnProjectileOperation x => x.Projectile.Damage > 0f,
             CookedStartCapabilityOperation x => x.Parameters switch
             {
-                CookedKiShotCapabilityParameters p => p.Damage > 0f,
                 CookedCycloneKickCapabilityParameters p => p.Damage > 0f,
-                CookedDragonBeamCapabilityParameters p => p.Damage > 0f,
                 CookedTargetedLeapCapabilityParameters p => p.Hitbox.Damage > 0f,
                 CookedMankiRoundBombCapabilityParameters p => p.Damage > 0f || p.ExplosionDamage > 0f,
                 CookedMankiJetpackBoostCapabilityParameters p => p.ExplosionDamage > 0f,

@@ -35,7 +35,7 @@ The static shell is a 32×26 deck with bounds x −16..16 and z −13..13, top y
 - Two solid thin platforms are 6×5, with top y=2 and bottom y=1.5.
 - Platform centers are (−10,−8) and (10,8), forming an equal diagonal pair.
 - Both platforms are intended as full-jump-accessible positional choices; the open center remains the primary combat space.
-- Four ordered deck spawns have X/Z positions (−5,−4), (5,4), (−5,4), and (5,−4). Their marker centers use y=0.85 under the existing spawn-marker contract; the deck surface remains y=0.
+- Four ordered deck spawns have X/Z positions (−5,−4), (5,4), (−5,4), and (5,−4). Each faces the deck center. Their marker centers use y=0.85 under the existing spawn-marker contract; the deck surface remains y=0.
 - Side blast boundaries remain derived from the baked collision shell; the authored kill-height marker preserves the current death plane while the walls extend down to it.
 - No hazards, moving geometry, decorative colliders, or client-owned gameplay behavior are part of the static variant.
 

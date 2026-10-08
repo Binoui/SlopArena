@@ -10,16 +10,17 @@ public enum AbilityLabOpponentBehavior { Idle, Shield }
 public sealed class AbilityLabScenarioOptions
 {
     public const int MaxFrame = 3600;
+    public const int MaxChargeTicks = 600;
     public string Action { get; }
     public int LastFrame { get; }
     public float Distance { get; }
     public AbilityLabOpponentBehavior OpponentBehavior { get; }
     public ushort OpponentDamage { get; }
     public float RelativeFacingDegrees { get; }
-
+    public int ChargeTicks { get; }
     public AbilityLabScenarioOptions(string action, int lastFrame = 60, float distance = 2.5f,
         AbilityLabOpponentBehavior opponentBehavior = AbilityLabOpponentBehavior.Idle,
-        ushort opponentDamage = 0, float relativeFacingDegrees = 180f)
+        ushort opponentDamage = 0, float relativeFacingDegrees = 180f, int chargeTicks = 0)
     {
         Action = action;
         LastFrame = lastFrame;
@@ -27,6 +28,7 @@ public sealed class AbilityLabScenarioOptions
         OpponentBehavior = opponentBehavior;
         OpponentDamage = opponentDamage;
         RelativeFacingDegrees = relativeFacingDegrees;
+        ChargeTicks = chargeTicks;
     }
 
     public void Validate()
@@ -43,6 +45,8 @@ public sealed class AbilityLabScenarioOptions
             throw new ArgumentOutOfRangeException(nameof(OpponentBehavior));
         if (OpponentDamage > 999)
             throw new ArgumentOutOfRangeException(nameof(OpponentDamage), "Opponent damage must be in [0, 999].");
+        if (ChargeTicks < 0 || ChargeTicks > MaxChargeTicks)
+            throw new ArgumentOutOfRangeException(nameof(ChargeTicks), $"Charge duration must be in [0, {MaxChargeTicks}].");
     }
 }
 

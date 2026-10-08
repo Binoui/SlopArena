@@ -476,6 +476,18 @@
             ],
             "operations": [
               {
+                "kind": "startupAimCorrection",
+                "tick": 0,
+                "unit": "ticks",
+                "endTick": 12,
+                "acquisitionRange": 4,
+                "acquisitionHalfAngleDegrees": 180,
+                "maxYawDegrees": 45,
+                "maxPitchDegrees": 0,
+                "yawDegreesPerSecond": 360,
+                "pitchDegreesPerSecond": 0
+              },
+              {
                 "kind": "armorWindow",
                 "tick": 12,
                 "unit": "ticks",
@@ -627,6 +639,18 @@
             ],
             "operations": [
               {
+                "kind": "startupAimCorrection",
+                "tick": 0,
+                "unit": "ticks",
+                "endTick": 12,
+                "acquisitionRange": 4,
+                "acquisitionHalfAngleDegrees": 180,
+                "maxYawDegrees": 45,
+                "maxPitchDegrees": 0,
+                "yawDegreesPerSecond": 360,
+                "pitchDegreesPerSecond": 0
+              },
+              {
                 "kind": "armorWindow",
                 "tick": 12,
                 "unit": "ticks",
@@ -637,7 +661,8 @@
                 "tick": 12,
                 "unit": "metersPerSecond",
                 "speed": 10,
-                "durationTicks": 12
+                "durationTicks": 12,
+                "stopInAttackRange": true
               },
               {
                 "kind": "spawnHitbox",
@@ -1180,6 +1205,18 @@
             ],
             "operations": [
               {
+                "kind": "startupAimCorrection",
+                "tick": 0,
+                "unit": "ticks",
+                "endTick": 12,
+                "acquisitionRange": 4,
+                "acquisitionHalfAngleDegrees": 180,
+                "maxYawDegrees": 45,
+                "maxPitchDegrees": 0,
+                "yawDegreesPerSecond": 360,
+                "pitchDegreesPerSecond": 0
+              },
+              {
                 "kind": "gravityWindow",
                 "tick": 0,
                 "unit": "normalized",
@@ -1338,6 +1375,18 @@
             ],
             "operations": [
               {
+                "kind": "startupAimCorrection",
+                "tick": 0,
+                "unit": "ticks",
+                "endTick": 12,
+                "acquisitionRange": 4,
+                "acquisitionHalfAngleDegrees": 180,
+                "maxYawDegrees": 45,
+                "maxPitchDegrees": 0,
+                "yawDegreesPerSecond": 360,
+                "pitchDegreesPerSecond": 0
+              },
+              {
                 "kind": "gravityWindow",
                 "tick": 0,
                 "unit": "normalized",
@@ -1355,7 +1404,8 @@
                 "tick": 12,
                 "unit": "metersPerSecond",
                 "speed": 10,
-                "durationTicks": 12
+                "durationTicks": 12,
+                "stopInAttackRange": true
               },
               {
                 "kind": "spawnHitbox",

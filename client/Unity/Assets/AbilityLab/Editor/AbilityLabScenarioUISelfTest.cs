@@ -1,6 +1,10 @@
 using System;
+using System.IO;
+using System.Linq;
 using System.Reflection;
 using SlopArena.Client.Tools;
+using SlopArena.Shared;
+using SlopArena.Client.Entities;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -63,6 +67,82 @@ public static class AbilityLabScenarioUISelfTest
             lab.RestoreTimelineCursor(cursor);
             window.RefreshScenarioControls();
         }
+    }
+
+    [MenuItem("Tools/SlopArena/Tests/Charged Dash Scenario Controls")]
+    public static void RunChargedDashScenarioChargeControlSelfTest()
+    {
+        var window = AbilityLabWindow.FindExistingForCommand();
+        if (window == null || !window.EnsureCommandUi() || window.CommandLab == null)
+            throw new InvalidOperationException("Open a valid charged-dash package preview in Ability Lab first.");
+        var lab = window.CommandLab;
+        if (!CanonicalSlotProjection.TryGet("ground.R", out var address))
+            throw new InvalidOperationException("Ground R is not a canonical slot.");
+        int slotIndex = Array.IndexOf(AbilityLab.SlotNames, address.InputLabel);
+        var cooked = lab.Def.GetCookedSlotAbility((byte)(AbilityLab.SlotIndices[slotIndex] + 1), address.IsAirborne);
+        var parameters = cooked?.Timeline.Stages.SelectMany(stage => stage.Operations)
+            .OfType<CookedStartCapabilityOperation>()
+            .Select(operation => operation.Parameters)
+            .OfType<CookedChargedDirectionalDashCapabilityParameters>()
+            .FirstOrDefault();
+        if (parameters == null)
+            throw new InvalidOperationException("The package preview has no cooked charged directional dash on ground.R.");
+
+        var cursor = lab.CaptureTimelineCursor();
+        string output = $".ability-lab-cache/charged-dash-window-{Guid.NewGuid():N}";
+        string tapOutput = output + "-tap";
+        string outputDirectory = Path.Combine(UnityCharacterAssetCooker.ProjectRoot(), output);
+        string tapOutputDirectory = Path.Combine(UnityCharacterAssetCooker.ProjectRoot(), tapOutput);
+        try
+        {
+            lab.SetSlot(address);
+            window.RefreshScenarioControls();
+            var chargeField = window.rootVisualElement.Q<IntegerField>("scenario-charge-ticks");
+            var horizonField = window.rootVisualElement.Q<IntegerField>("scenario-horizon");
+            if (chargeField == null || horizonField == null)
+                throw new InvalidOperationException("Scenario charge/duration controls are missing.");
+            chargeField.value = 20;
+            horizonField.value = 80;
+            Click(window.rootVisualElement.Q<Button>("scenario-run"));
+
+            var scenario = lab.Scenario ?? throw new InvalidOperationException("Scenario controls did not record a Shared run.");
+            if (scenario.Options.ChargeTicks != 20 ||
+                scenario.Frames[19].Actor.ChargeTicks != 20 ||
+                scenario.Frames[19].Actor.IsAiming == false ||
+                scenario.Frames[20].Actor.ChargeTicks != 20)
+                throw new InvalidOperationException("Charge duration did not hold exactly twenty input frames in the authoritative snapshot.");
+            if (parameters.GetChargeTier(scenario.Frames[19].Actor.ChargeTicks) != 1)
+                throw new InvalidOperationException("Recorded charge did not reach the expected tier-2 boundary.");
+            bool SwordTrail(AbilityLabScenarioFrame frame)
+                => lab.Renderer.IsSwordTrailTick(frame.Actor, address.IsAirborne);
+            int firstSwordFrame = scenario.Frames.Select((frame, index) => (frame, index))
+                .FirstOrDefault(item => SwordTrail(item.frame)).index;
+            if (firstSwordFrame <= 0 || SwordTrail(scenario.Frames[firstSwordFrame - 1]) ||
+                scenario.Frames[firstSwordFrame].Actor.AttackElapsedTicks < parameters.FinisherSeekTick ||
+                SwordTrail(scenario.Frames[scenario.Frames.Count - 1]))
+                throw new InvalidOperationException("The charge scenario did not expose a distinct windup-to-sword-pose window and recovery boundary.");
+
+            var capture = SlopArenaAbilityLabCommands.Capture("ground.R", firstSwordFrame.ToString(),
+                output, width: 320, height: 240, overlays: "none");
+            if (!capture.Success || capture.Captures?.Count != 1 ||
+                capture.Captures[0].Frame?.Actor.ChargeTicks != 20)
+                throw new InvalidOperationException("Capture omitted the recorded charged sword-pose frame and charge receipt.");
+            var tapCapture = SlopArenaAbilityLabCommands.Capture("ground.R", firstSwordFrame.ToString(),
+                tapOutput, width: 320, height: 240, overlays: "none", chargeTicks: 0);
+            if (!tapCapture.Success || tapCapture.Captures?.Count != 1 ||
+                tapCapture.Captures[0].Frame?.Actor.ChargeTicks != 0 ||
+                lab.Scenario?.Options.ChargeTicks != 20)
+                throw new InvalidOperationException("Explicit --charge-ticks 0 did not replace the recorded hold for capture or restore the prior scenario.");
+            window.RefreshScenarioControls();
+        }
+        finally
+        {
+            lab.RestoreTimelineCursor(cursor);
+            window.RefreshScenarioControls();
+            if (Directory.Exists(outputDirectory)) Directory.Delete(outputDirectory, true);
+            if (Directory.Exists(tapOutputDirectory)) Directory.Delete(tapOutputDirectory, true);
+        }
+        Debug.Log("[AbilityLabScenarioUISelfTest] Charged dash UI charge control, tier threshold, sword-pose window, recovery boundary and native capture receipt passed.");
     }
 
     private static void Click(Button button)

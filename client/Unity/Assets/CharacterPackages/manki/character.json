@@ -1012,6 +1012,18 @@
             ],
             "operations": [
               {
+                "kind": "startupAimCorrection",
+                "tick": 0,
+                "unit": "ticks",
+                "endTick": 18,
+                "acquisitionRange": 4,
+                "acquisitionHalfAngleDegrees": 180,
+                "maxYawDegrees": 45,
+                "maxPitchDegrees": 0,
+                "yawDegreesPerSecond": 360,
+                "pitchDegreesPerSecond": 0
+              },
+              {
                 "kind": "startCapability",
                 "tick": 0,
                 "unit": "ticks",

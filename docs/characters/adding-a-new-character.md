@@ -182,12 +182,12 @@ returns semantic `success: false` and preserves the last valid artifact, generat
 and cook status. It must not promote invalid drafts.
 
 Cooked schema version remains 3 and runtime API maximum is `1.x`. The loader accepts
-known minima `1.0.0` through `1.4.0`; select the lowest feature floor the authored content
+known minima `1.0.0` through `1.5.0`; select the lowest feature floor the authored content
 requires. `1.0.0` is the baseline, timed gravity-window operations require `1.2.0`, armor
-windows and nonzero `fixedHitstunTicks` require `1.3.0`, and `startupAimCorrection` requires
-`1.4.0`. A package combining features uses the highest required minimum; older runtimes
-must reject features above their API level. New additive source fields do not themselves
-change the cooked schema.
+windows and nonzero `fixedHitstunTicks` require `1.3.0`, `startupAimCorrection` requires
+`1.4.0`, and public charged directional dash requires `1.5.0`. A package combining
+features uses the highest required minimum; older runtimes must reject features above
+their API level. New additive source fields do not themselves change the cooked schema.
 
 Semantic animation IDs and pose-track IDs are distinct namespaces: validated client
 bindings map loaded pose tracks to runtime semantic lookup IDs.

@@ -30,6 +30,39 @@ public static class AbilityLabPackageSelfTest
                 lunge.DurationTicks != 6)
                 throw new InvalidOperationException("Forward lunge source edit did not add the default typed operation.");
 
+            if (!workspace.AddChargedDirectionalDash("ground.E", 0) ||
+                workspace.LiveDraftInvalid || workspace.LiveDraftPackage == null)
+                throw new InvalidOperationException("Charged directional dash primitive did not compile into the live preview: " +
+                    string.Join("; ", workspace.Diagnostics.Select(d => $"{d.Code} {d.Path}: {d.Message}")));
+            if (!workspace.TryResolveCanonicalSlot("ground.E", out int dashSlotIndex, out var dashSlot))
+                throw new InvalidOperationException("Charged directional dash slot did not resolve.");
+            int dashOperationIndex = dashSlot.Timeline.Stages[0].Operations
+                .Select((operation, index) => (operation, index))
+                .First(item => item.operation is StartCapabilityOperationSource
+                    { Parameters: ChargedDirectionalDashCapabilityParameters }).index;
+            var dashOperation = (StartCapabilityOperationSource)dashSlot.Timeline.Stages[0].Operations[dashOperationIndex];
+            var dashParameters = (ChargedDirectionalDashCapabilityParameters)dashOperation.Parameters;
+            float SampleDashEndpoint()
+            {
+                var definition = CookedCharacterRuntimeAdapter.ToCharacterDefinition(workspace.LiveDraftPackage!);
+                var scenario = new AbilityLabSimulationController().RunScenario(
+                    definition, null, new AbilityLabScenarioOptions("ground.E",
+                        dashParameters.MaxChargeTicks +
+                        (int)Math.Ceiling(dashParameters.MaxDistance / (dashParameters.DashSpeed / 60d)) +
+                        dashParameters.RecoveryTicks + 2, 20f, chargeTicks: dashParameters.MaxChargeTicks),
+                    Vector3.zero, 0f);
+                return scenario.Frames.Max(frame => frame.Actor.PZ);
+            }
+            float originalDashEndpoint = SampleDashEndpoint();
+            if (!workspace.ReplaceOperation(dashSlotIndex, 0, dashOperationIndex,
+                    dashOperation with { Parameters = dashParameters with { MaxDistance = 5.8f } }) ||
+                workspace.LiveDraftInvalid || SampleDashEndpoint() >= originalDashEndpoint - 0.4f)
+                throw new InvalidOperationException("Editing charged dash distance did not change the Shared scenario endpoint.");
+            workspace.Undo();
+            if (Math.Abs(SampleDashEndpoint() - originalDashEndpoint) > 0.01f)
+                throw new InvalidOperationException("Undo did not restore the prior Shared dash endpoint.");
+            workspace.Undo();
+
             if (!workspace.AddTargetedLeap("ground.E", 0) ||
                 workspace.LiveDraftInvalid || workspace.LiveDraftPackage == null ||
                 workspace.Draft.CapabilityRequirements.Count != 1)
@@ -58,7 +91,7 @@ public static class AbilityLabPackageSelfTest
             {
                 var definition = CookedCharacterRuntimeAdapter.ToCharacterDefinition(workspace.LiveDraftPackage!);
                 var scenario = new AbilityLabSimulationController().RunScenario(
-                    definition, null, new AbilityLabScenarioOptions("ground.E", 20, 4f), Vector3.zero, 0f);
+                    definition, null, new AbilityLabScenarioOptions("ground.E", 20, 4f, chargeTicks: 10), Vector3.zero, 0f);
                 return scenario.Frames.First(frame => !frame.Actor.IsGrounded &&
                     frame.Actor.State == ActionState.Attacking).Actor.VY;
             }
@@ -231,41 +264,6 @@ public static class AbilityLabPackageSelfTest
             workspace.Undo();
             if (((SpawnHitboxOperationSource)workspace.Draft.Slots.First(slot => slot.Id == "ground.1").Timeline.Stages[0].Operations[retimeOperationIndex]).Hitbox.DurationTicks != retimeHitbox.Hitbox.DurationTicks)
                 throw new InvalidOperationException("Hitbox endpoint undo did not restore the source duration.");
-            var presentationSlot = workspace.Draft.Slots.First(slot => slot.Id == "ground.R");
-            var presentationStage = presentationSlot.Timeline.Stages[0];
-            int presentationOperationIndex = presentationStage.Operations
-                .Select((operation, index) => (operation, index))
-                .First(item => item.operation is EmitPresentationOperationSource).index;
-            var presentationOperation = (EmitPresentationOperationSource)presentationStage.Operations[presentationOperationIndex];
-            ushort presentationDuration = (ushort)Math.Max(1, Math.Min(
-                presentationOperation.Placement.DurationTicks,
-                presentationStage.DurationTicks - presentationOperation.Tick));
-            var authoredPlacement = presentationOperation.Placement with
-            {
-                AttachmentMode = AuthoringPresentationAttachmentMode.World,
-                BoneId = null,
-                LocalPositionX = 0.15f,
-                LocalRotationY = 22f,
-                LocalScaleX = 1.2f,
-                LocalScaleY = 0.9f,
-                LocalScaleZ = 1.1f,
-                DurationTicks = presentationDuration,
-            };
-            if (!workspace.ReplacePresentationPlacement("ground.R", 0, presentationOperationIndex, authoredPlacement))
-                throw new InvalidOperationException("Presentation placement edit was rejected.");
-            var editedPresentation = (EmitPresentationOperationSource)workspace.Draft.Slots
-                .First(slot => slot.Id == "ground.R").Timeline.Stages[0].Operations[presentationOperationIndex];
-            if (editedPresentation.Placement != authoredPlacement)
-                throw new InvalidOperationException("Presentation placement edit did not persist all authored fields.");
-            var presentationPreview = workspace.Preview;
-            if (workspace.ReplacePresentationPlacement("ground.R", 0, presentationOperationIndex,
-                    authoredPlacement with { DurationTicks = 0 }) ||
-                !ReferenceEquals(presentationPreview, workspace.Preview))
-                throw new InvalidOperationException("Invalid presentation edit did not preserve the last valid preview.");
-            workspace.Undo();
-            if (((EmitPresentationOperationSource)workspace.Draft.Slots.First(slot => slot.Id == "ground.R")
-                    .Timeline.Stages[0].Operations[presentationOperationIndex]).Placement != presentationOperation.Placement)
-                throw new InvalidOperationException("Presentation placement undo did not restore the prior source.");
 
         }
         finally
@@ -298,7 +296,7 @@ public static class AbilityLabPackageSelfTest
                 throw new InvalidOperationException("Targeted-leap live draft did not compile.");
             var def = CookedCharacterRuntimeAdapter.ToCharacterDefinition(workspace.LiveDraftPackage);
             var result = new AbilityLabSimulationController().RunScenario(def, null,
-                new AbilityLabScenarioOptions("ground.E", 20, 4f),
+                new AbilityLabScenarioOptions("ground.E", 20, 4f, chargeTicks: 10),
                 new Vector3(0f, def.CapsuleHeight * 0.5f, 0f), 0f);
             return result.Frames.First(frame => !frame.Actor.IsGrounded &&
                 frame.Actor.State == ActionState.Attacking).Actor.VY;

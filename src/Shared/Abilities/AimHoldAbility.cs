@@ -4,7 +4,7 @@ namespace SlopArena.Shared.Abilities
 {
     /// <summary>
     /// Shared base for hold-to-aim, release-to-fire abilities (AbilityBehavior.AimedProjectile
-    /// family: Manki Q/E/R, FightGuy Q. Owns the whole hold lifecycle so the
+    /// family: Manki Q/E/R. Owns the whole hold lifecycle so the
     /// per-ability classes are just projectile spawners:
     ///
     ///   - OnStart: Aiming state (hold = aim stance), IsAiming, AnimLockTicks,
@@ -19,13 +19,11 @@ namespace SlopArena.Shared.Abilities
     ///     The cap reads the SPEC's ChargeHoldTicks — the same field Simulation.cs clamps
     ///     so the auto-release can't drift from the clamp.
     ///   - Throw phase: fire once at throw_trigger_tick (IsAiming=false) in the
-    ///     Attacking state (action phase, mirroring WibouDashSlash's Aiming → Attacking
-    ///     dash transition), end at throw_duration.
+    ///     Attacking state, then end at throw_duration.
     ///
     /// Subclasses only implement the hooks. MankiBazooka keeps its own
-    /// three-phase FSM (firing/recovery doesn't fit this shape); WibouDashSlash
-    /// is an aim-to-dash, not a projectile, and stays standalone — both carry
-    /// the same ascent-stop inline.
+    /// three-phase FSM; directional dash capabilities own their separate
+    /// charge, travel, and recovery lifecycles.
     /// </summary>
     public abstract class AimHoldAbility : ServerAbility
     {
@@ -98,8 +96,7 @@ namespace SlopArena.Shared.Abilities
                 if (s.AttackElapsedTicks > 8 && released)
                 {
                     OnRelease(ref s, def);
-                    // Throw phase is an action phase — re-enter Attacking (mirrors
-                    // WibouDashSlash.StartDash: Aiming → Attacking).
+                    // Release enters the action phase.
                     s.State = ActionState.Attacking;
                     s.ComboStage = 1;
                     AnimIndex = GetReleaseAnimIndex(def);

@@ -278,11 +278,10 @@ public sealed class MatchRecorder
     private static int CapabilityWindowTicks(CookedCapabilityParameters parameters)
         => parameters switch
         {
-            CookedKiShotCapabilityParameters x => x.StartupTicks + x.DurationTicks + x.MaxFlightTicks,
             CookedRisingDragonCapabilityParameters x => x.RiseDelay + x.RiseTicks,
             CookedCycloneKickCapabilityParameters x => x.DurationTicks,
-            CookedDragonBeamCapabilityParameters x => x.DurationTicks + x.HitboxDurationTicks,
-            CookedWibouDashSlashCapabilityParameters x => x.MaxAimTicks + x.DashDurationTicks,
+            CookedChargedDirectionalDashCapabilityParameters x => x.MaxChargeTicks
+                + (int)MathF.Ceiling(x.MaxDistance / (x.DashSpeed * Simulation.TickDt)) + x.RecoveryTicks,
             CookedWibouRisingSlashCapabilityParameters x => x.RiseTicks,
             CookedWibouBladeFlurryCapabilityParameters x => x.MoveTicks,
             CookedTargetedLeapCapabilityParameters x => x.MaxAimTicks + x.MaxFlightTicks + x.RecoveryTicks,

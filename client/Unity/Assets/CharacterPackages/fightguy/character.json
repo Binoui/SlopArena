@@ -182,10 +182,6 @@
   ],
   "capabilityRequirements": [
     {
-      "capabilityId": "slop.internal.fightguy.ki-shot.v1",
-      "capabilityVersion": "1"
-    },
-    {
       "capabilityId": "slop.internal.fightguy.rising-dragon.v1",
       "capabilityVersion": "1"
     },
@@ -217,6 +213,9 @@
             "autoCancelAfterTicks": 0,
             "attackRange": 1.75,
             "warpRange": 0,
+            "useTargetLock": false,
+            "rotateTowardTarget": false,
+            "trackingStrength": 0,
             "animationIds": [
               "anim.low-kick"
             ],
@@ -286,6 +285,9 @@
             "autoCancelAfterTicks": 26,
             "attackRange": 1.75,
             "warpRange": 0,
+            "useTargetLock": false,
+            "rotateTowardTarget": false,
+            "trackingStrength": 0,
             "animationIds": [
               "anim.double-punch"
             ],
@@ -381,6 +383,9 @@
             "autoCancelAfterTicks": 0,
             "attackRange": 2.25,
             "warpRange": 0,
+            "useTargetLock": false,
+            "rotateTowardTarget": false,
+            "trackingStrength": 0,
             "animationIds": [
               "anim.straight-punch"
             ],
@@ -450,6 +455,9 @@
             "autoCancelAfterTicks": 33,
             "attackRange": 1.75,
             "warpRange": 0,
+            "useTargetLock": false,
+            "rotateTowardTarget": false,
+            "trackingStrength": 0,
             "animationIds": [
               "anim.floating-kick"
             ],
@@ -545,6 +553,9 @@
             "autoCancelAfterTicks": 0,
             "attackRange": 2.25,
             "warpRange": 0,
+            "useTargetLock": false,
+            "rotateTowardTarget": false,
+            "trackingStrength": 0,
             "animationIds": [
               "anim.sweeping-kick"
             ],
@@ -614,6 +625,9 @@
             "autoCancelAfterTicks": 35,
             "attackRange": 1.75,
             "warpRange": 0,
+            "useTargetLock": false,
+            "rotateTowardTarget": false,
+            "trackingStrength": 0,
             "animationIds": [
               "anim.high-kick"
             ],
@@ -683,6 +697,9 @@
             "autoCancelAfterTicks": 0,
             "attackRange": 0,
             "warpRange": 0,
+            "useTargetLock": false,
+            "rotateTowardTarget": false,
+            "trackingStrength": 0,
             "animationIds": [
               "anim.double-kick"
             ],
@@ -752,6 +769,9 @@
             "autoCancelAfterTicks": 44,
             "attackRange": 0,
             "warpRange": 0,
+            "useTargetLock": false,
+            "rotateTowardTarget": false,
+            "trackingStrength": 0,
             "animationIds": [
               "anim.air-smash"
             ],
@@ -802,12 +822,11 @@
     {
       "id": "ground.A",
       "name": "Ki Shot",
-      "description": "Ki Shot",
+      "description": "After startup, fire a ki projectile toward the current target.",
       "iconId": "icon.a",
       "behavior": "aimedProjectile",
-      "aimMode": "cameraForward3D",
+      "aimMode": "none",
       "aimMovement": "fixed",
-      "aimAnimationId": "anim.ki-shot-loop",
       "hitPresentationId": "presentation.fightguy.ki-shot.hit",
       "cooldownTicks": 120,
       "isRecoveryMove": false,
@@ -831,24 +850,23 @@
             ],
             "operations": [
               {
-                "kind": "startCapability",
-                "tick": 0,
-                "unit": "ticks",
-                "capabilityId": "slop.internal.fightguy.ki-shot.v1",
-                "capabilityVersion": "1",
-                "parameters": {
-                  "startupTicks": 8,
-                  "durationTicks": 24,
+                "kind": "spawnProjectile",
+                "tick": 8,
+                "unit": "meters",
+                "projectile": {
+                  "launchOffsetX": 0,
                   "launchOffsetY": 1.2,
-                  "projectileSpeed": 25,
+                  "launchOffsetZ": 0,
+                  "speed": 25,
                   "gravity": 1,
-                  "hitboxRadius": 0.5,
+                  "radius": 0.5,
                   "damage": 6,
-                  "knockbackBase": 3,
+                  "angle": 30,
+                  "baseKnockback": 3,
                   "knockbackGrowth": 4.5,
-                  "knockbackAngle": 30,
                   "stunTicks": 12,
-                  "maxFlightTicks": 90
+                  "maxFlightTicks": 90,
+                  "yawOffsetDegrees": 0
                 }
               }
             ]
@@ -1010,6 +1028,18 @@
             ],
             "operations": [
               {
+                "kind": "startupAimCorrection",
+                "tick": 0,
+                "unit": "ticks",
+                "endTick": 7,
+                "acquisitionRange": 4,
+                "acquisitionHalfAngleDegrees": 180,
+                "maxYawDegrees": 45,
+                "maxPitchDegrees": 0,
+                "yawDegreesPerSecond": 360,
+                "pitchDegreesPerSecond": 0
+              },
+              {
                 "kind": "startCapability",
                 "tick": 0,
                 "unit": "ticks",
@@ -1067,6 +1097,18 @@
             ],
             "operations": [
               {
+                "kind": "startupAimCorrection",
+                "tick": 0,
+                "unit": "ticks",
+                "endTick": 10,
+                "acquisitionRange": 4,
+                "acquisitionHalfAngleDegrees": 180,
+                "maxYawDegrees": 45,
+                "maxPitchDegrees": 0,
+                "yawDegreesPerSecond": 360,
+                "pitchDegreesPerSecond": 0
+              },
+              {
                 "kind": "spawnHitbox",
                 "tick": 10,
                 "unit": "meters",
@@ -1086,11 +1128,11 @@
                   "baseKnockback": 20,
                   "knockbackGrowth": 0,
                   "stunTicks": 12,
-                  "fixedHitstunTicks": 90,
                   "durationTicks": 5,
                   "interruptible": true,
                   "hitGroup": 0,
-                  "knockbackDirection": "towardOwner"
+                  "knockbackDirection": "towardOwner",
+                  "fixedHitstunTicks": 90
                 }
               },
               {
@@ -1113,11 +1155,11 @@
                   "baseKnockback": 20,
                   "knockbackGrowth": 0,
                   "stunTicks": 12,
-                  "fixedHitstunTicks": 80,
                   "durationTicks": 5,
                   "interruptible": true,
                   "hitGroup": 0,
-                  "knockbackDirection": "towardOwner"
+                  "knockbackDirection": "towardOwner",
+                  "fixedHitstunTicks": 80
                 }
               },
               {
@@ -1140,11 +1182,11 @@
                   "baseKnockback": 20,
                   "knockbackGrowth": 0,
                   "stunTicks": 12,
-                  "fixedHitstunTicks": 72,
                   "durationTicks": 5,
                   "interruptible": true,
                   "hitGroup": 0,
-                  "knockbackDirection": "towardOwner"
+                  "knockbackDirection": "towardOwner",
+                  "fixedHitstunTicks": 72
                 }
               },
               {
@@ -1167,11 +1209,11 @@
                   "baseKnockback": 20,
                   "knockbackGrowth": 0,
                   "stunTicks": 12,
-                  "fixedHitstunTicks": 64,
                   "durationTicks": 5,
                   "interruptible": true,
                   "hitGroup": 0,
-                  "knockbackDirection": "towardOwner"
+                  "knockbackDirection": "towardOwner",
+                  "fixedHitstunTicks": 64
                 }
               },
               {
@@ -1194,11 +1236,11 @@
                   "baseKnockback": 20,
                   "knockbackGrowth": 0,
                   "stunTicks": 12,
-                  "fixedHitstunTicks": 56,
                   "durationTicks": 4,
                   "interruptible": true,
                   "hitGroup": 0,
-                  "knockbackDirection": "towardOwner"
+                  "knockbackDirection": "towardOwner",
+                  "fixedHitstunTicks": 56
                 }
               },
               {
@@ -1221,11 +1263,11 @@
                   "baseKnockback": 20,
                   "knockbackGrowth": 0,
                   "stunTicks": 12,
-                  "fixedHitstunTicks": 48,
                   "durationTicks": 4,
                   "interruptible": true,
                   "hitGroup": 0,
-                  "knockbackDirection": "towardOwner"
+                  "knockbackDirection": "towardOwner",
+                  "fixedHitstunTicks": 48
                 }
               },
               {
@@ -1274,11 +1316,11 @@
                   "baseKnockback": 20,
                   "knockbackGrowth": 0,
                   "stunTicks": 12,
-                  "fixedHitstunTicks": 40,
                   "durationTicks": 11,
                   "interruptible": false,
                   "hitGroup": 0,
-                  "knockbackDirection": "towardOwner"
+                  "knockbackDirection": "towardOwner",
+                  "fixedHitstunTicks": 40
                 }
               }
             ]

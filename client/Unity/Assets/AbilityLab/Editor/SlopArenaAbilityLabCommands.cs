@@ -71,8 +71,9 @@ public static class SlopArenaAbilityLabCommands
         [CliArg("ticks", "Last zero-based scenario frame (0–3600).", Required = false, DefaultValue = 60)] int ticks = 60,
         [CliArg("distance", "Opponent distance in metres.", Required = false, DefaultValue = 2.5f)] float distance = 2.5f,
         [CliArg("opponent", "Opponent behavior: idle or shield.", Required = false, DefaultValue = "idle")] string opponent = "idle",
-        [CliArg("damage", "Starting opponent damage percent (0–999).", Required = false, DefaultValue = 0)] int damage = 0,
-        [CliArg("facing", "Relative facing angle in degrees.", Required = false, DefaultValue = 180f)] float facing = 180f)
+        [CliArg("facing", "Relative facing angle in degrees.", Required = false, DefaultValue = 180f)] float facing = 180f,
+        [CliArg("damage", "Opponent initial damage (0–999).", Required = false, DefaultValue = 0)] int damage = 0,
+        [CliArg("charge-ticks", "Held charge duration (0–600 input frames).", Required = false, DefaultValue = 0)] int chargeTicks = 0)
     {
         AbilityLabWindow? window = AbilityLabWindow.FindExistingForCommand();
         if (!CanMutate(out var modeError))
@@ -96,7 +97,7 @@ public static class SlopArenaAbilityLabCommands
         AbilityLabScenarioOptions options;
         try
         {
-            options = new AbilityLabScenarioOptions(action, ticks, distance, behavior, (ushort)damage, facing);
+            options = new AbilityLabScenarioOptions(action, ticks, distance, behavior, (ushort)damage, facing, chargeTicks);
             options.Validate();
         }
         catch (ArgumentException ex)
@@ -280,9 +281,12 @@ public static class SlopArenaAbilityLabCommands
         [CliArg("camera-yaw", "Absolute world camera yaw in degrees [-180,180]; cannot combine with --view.")] string cameraYaw = null,
         [CliArg("camera-pitch", "Absolute world camera pitch in degrees [-90,90]; cannot combine with --view.")] string cameraPitch = null,
         [CliArg("overlays", "'current', 'none', or comma-separated hitboxes,hurtboxes,bones,trajectory. 'none' also hides the coupled dummy hurtbox overlay.")] string overlays = null,
-        [CliArg("dummy", "'on' or 'off' for the rendered opponent and its coupled hurtbox overlay; omit to retain current.")] string dummy = null)
+        [CliArg("dummy", "'on' or 'off' for the rendered opponent and its coupled hurtbox overlay; omit to retain current.")] string dummy = null,
+        [CliArg("charge-ticks", "Held charge duration for a new scenario capture (0–600); omit to retain a recorded scenario.", Required = false, DefaultValue = -1)] int chargeTicks = -1)
     {
         AbilityLabWindow? window = AbilityLabWindow.FindExistingForCommand();
+        if (chargeTicks is < -1 or > AbilityLabScenarioOptions.MaxChargeTicks)
+            return Failure("scenario.charge-ticks.invalid", "Charge ticks must be omitted or in [0, 600].", window);
         if (!CanMutate(out var modeError))
             return Failure("lab.mode.unsupported", modeError, window);
         if (!TryParseViewOptions(view, cameraYaw, cameraPitch, overlays, dummy, out var viewOptions, out string viewError))
@@ -301,15 +305,23 @@ public static class SlopArenaAbilityLabCommands
         AbilityLab? lab = window.CommandLab;
         AbilityLabScenarioResult? scenario = lab?.Scenario;
         bool createDefaultGrab = action == "grab" && scenario?.Options.Action != "grab";
-        bool scenarioFrames = scenario?.Options.Action == action;
+        bool createChargeScenario = action != "grab" && chargeTicks >= 0 &&
+            (scenario?.Options.Action != action || scenario.Options.ChargeTicks != chargeTicks);
+        bool scenarioFrames = scenario?.Options.Action == action || createChargeScenario;
         SlotAddress address = default;
         AbilityLabTimelineProjection? projection = null;
-        if (scenarioFrames)
+        if (scenarioFrames && !createChargeScenario)
         {
             int maxFrame = scenario!.Frames.Count - 1;
             if (requestedTicks.Any(sample => sample < 0 || sample > maxFrame))
                 return Failure("capture.tick.out-of-range",
                     $"Every scenario frame must be in [0, {maxFrame}] for action '{action}'.", window);
+        }
+        else if (createChargeScenario)
+        {
+            if (requestedTicks.Any(sample => sample < 0 || sample > AbilityLabScenarioOptions.MaxFrame))
+                return Failure("capture.tick.out-of-range",
+                    $"Every scenario frame must be in [0, {AbilityLabScenarioOptions.MaxFrame}] for action '{action}'.", window);
         }
         else if (action == "grab")
         {
@@ -374,6 +386,13 @@ public static class SlopArenaAbilityLabCommands
                 if (skin.forceMatrixRecalculationPerRender) continue;
                 offscreenSkins.Add(skin);
                 skin.forceMatrixRecalculationPerRender = true;
+            }
+            if (createChargeScenario)
+            {
+                int lastFrame = requestedTicks.Max();
+                lab.RunScenario(new AbilityLabScenarioOptions(action, lastFrame, chargeTicks: chargeTicks));
+                scenario = lab.Scenario;
+                scenarioFrames = true;
             }
             if (createDefaultGrab)
             {
@@ -1059,6 +1078,7 @@ public static class SlopArenaAbilityLabCommands
             Opponent = scenario.Options.OpponentBehavior.ToString().ToLowerInvariant(),
             Damage = scenario.Options.OpponentDamage,
             Facing = scenario.Options.RelativeFacingDegrees,
+            ChargeTicks = scenario.Options.ChargeTicks,
             Frames = scenario.Frames.Select(frame => ToFrameDto(scenario, frame)).ToList(),
             Contacts = scenario.Contacts.Select(ToContactDto).ToList(),
             Interactions = scenario.Interactions.Select(item => new AbilityLabCommandInteraction
@@ -1151,6 +1171,8 @@ public static class SlopArenaAbilityLabCommands
             InteractionTerminalTick = state.InteractionTerminalTick,
             AttackElapsedTicks = state.AttackElapsedTicks,
             AttackSlot = state.AttackSlot,
+            ChargeTicks = state.ChargeTicks,
+            IsAiming = state.IsAiming,
             InPostHitstunFlight = state.InPostHitstunFlight,
         };
 
@@ -1278,6 +1300,7 @@ public sealed class AbilityLabCommandScenario
     [JsonProperty("opponent")] public string Opponent { get; set; } = "";
     [JsonProperty("damage")] public ushort Damage { get; set; }
     [JsonProperty("facing")] public float Facing { get; set; }
+    [JsonProperty("chargeTicks")] public int ChargeTicks { get; set; }
     [JsonProperty("frames")] public List<AbilityLabCommandFrame> Frames { get; set; } = new();
     [JsonProperty("contacts")] public List<AbilityLabCommandContact> Contacts { get; set; } = new();
     [JsonProperty("interactions")] public List<AbilityLabCommandInteraction> Interactions { get; set; } = new();
@@ -1326,6 +1349,8 @@ public sealed class AbilityLabCommandFighter
     [JsonProperty("interactionTerminalTick")] public uint InteractionTerminalTick { get; set; }
     [JsonProperty("attackElapsedTicks")] public ushort AttackElapsedTicks { get; set; }
     [JsonProperty("attackSlot")] public byte AttackSlot { get; set; }
+    [JsonProperty("chargeTicks")] public ushort ChargeTicks { get; set; }
+    [JsonProperty("isAiming")] public bool IsAiming { get; set; }
     [JsonProperty("inPostHitstunFlight")] public bool InPostHitstunFlight { get; set; }
 }
 

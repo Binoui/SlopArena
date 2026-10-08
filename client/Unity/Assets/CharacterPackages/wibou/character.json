@@ -183,7 +183,7 @@
   "presentationIds": [],
   "capabilityRequirements": [
     {
-      "capabilityId": "slop.internal.wibou.dash-slash.v1",
+      "capabilityId": "slop.ability.charged-directional-dash.v1",
       "capabilityVersion": "1"
     },
     {
@@ -751,10 +751,10 @@
     {
       "id": "ground.A",
       "name": "Shuriken Toss",
-      "description": "Shuriken Toss",
+      "description": "After startup, throw three shuriken toward the current target.",
       "iconId": "icon.a",
       "behavior": "aimedProjectile",
-      "aimMode": "cameraForward3D",
+      "aimMode": "none",
       "aimMovement": "fixed",
       "cooldownTicks": 120,
       "isRecoveryMove": false,
@@ -777,12 +777,6 @@
               "anim.wibou.shuriken"
             ],
             "operations": [
-              {
-                "kind": "setAimState",
-                "tick": 0,
-                "unit": "ticks",
-                "aimState": "cameraForward3D"
-              },
               {
                 "kind": "spawnProjectile",
                 "tick": 8,
@@ -941,7 +935,7 @@
         "stages": [
           {
             "durationTicks": 80,
-            "iasaTicks": 65,
+            "iasaTicks": 0,
             "landingLagTicks": 0,
             "autoCancelBeforeTicks": 0,
             "autoCancelAfterTicks": 0,
@@ -958,60 +952,63 @@
                 "kind": "startCapability",
                 "tick": 0,
                 "unit": "ticks",
-                "capabilityId": "slop.internal.wibou.dash-slash.v1",
+                "capabilityId": "slop.ability.charged-directional-dash.v1",
                 "capabilityVersion": "1",
                 "parameters": {
-                  "dashDistance": 6.4,
-                  "dashDurationTicks": 50,
-                  "maxAimTicks": 60
+                  "maxChargeTicks": 60,
+                  "tier2Ticks": 20,
+                  "tier3Ticks": 45,
+                  "minDistance": 1.2,
+                  "maxDistance": 6.4,
+                  "dashSpeed": 10.5,
+                  "finisherLeadTicks": 4,
+                  "finisherSeekTick": 31,
+                  "recoveryTicks": 24,
+                  "tier2Damage": 9,
+                  "tier3Damage": 12,
+                  "traversalHitbox": {
+                    "shape": "sphere",
+                    "radius": 0.45,
+                    "offsetX": 0,
+                    "offsetY": 0,
+                    "offsetZ": 0,
+                    "endOffsetX": 0,
+                    "endOffsetY": 0,
+                    "endOffsetZ": 0,
+                    "startBoneId": "bone.hips",
+                    "endBoneId": null,
+                    "damage": 1,
+                    "angle": 0,
+                    "baseKnockback": 0,
+                    "knockbackGrowth": 0,
+                    "stunTicks": 0,
+                    "durationTicks": 1,
+                    "interruptible": true,
+                    "hitGroup": 0,
+                    "knockbackDirection": "awayFromOwner"
+                  },
+                  "finisherHitbox": {
+                    "shape": "capsule",
+                    "radius": 0.5,
+                    "offsetX": 0,
+                    "offsetY": 0,
+                    "offsetZ": 0,
+                    "endOffsetX": 0,
+                    "endOffsetY": 0,
+                    "endOffsetZ": 0,
+                    "startBoneId": "_weapon_hilt",
+                    "endBoneId": "_weapon_tip",
+                    "damage": 6,
+                    "angle": 45,
+                    "baseKnockback": 5,
+                    "knockbackGrowth": 80,
+                    "stunTicks": 8,
+                    "durationTicks": 9,
+                    "interruptible": true,
+                    "hitGroup": 0,
+                    "knockbackDirection": "awayFromOwner"
+                  }
                 }
-              },
-              {
-                "kind": "spawnHitbox",
-                "tick": 31,
-                "unit": "meters",
-                "hitbox": {
-                  "shape": "capsule",
-                  "radius": 0.5,
-                  "offsetX": 0,
-                  "offsetY": 0,
-                  "offsetZ": 0,
-                  "endOffsetX": 0,
-                  "endOffsetY": 0,
-                  "endOffsetZ": 0,
-                  "startBoneId": "_weapon_hilt",
-                  "endBoneId": "_weapon_tip",
-                  "damage": 1,
-                  "angle": 45,
-                  "baseKnockback": 5,
-                  "knockbackGrowth": 80,
-                  "stunTicks": 8,
-                  "durationTicks": 9,
-                  "interruptible": false,
-                  "hitGroup": 0,
-                  "knockbackDirection": "awayFromOwner"
-                }
-              },
-              {
-                "kind": "forwardLunge",
-                "tick": 1,
-                "unit": "metersPerSecond",
-                "speed": 5,
-                "durationTicks": 6
-              },
-              {
-                "kind": "forwardLunge",
-                "tick": 7,
-                "unit": "metersPerSecond",
-                "speed": 10.5,
-                "durationTicks": 25
-              },
-              {
-                "kind": "forwardLunge",
-                "tick": 32,
-                "unit": "metersPerSecond",
-                "speed": 5.1,
-                "durationTicks": 18
               }
             ]
           }
@@ -1047,6 +1044,18 @@
               "anim.wibou.f"
             ],
             "operations": [
+              {
+                "kind": "startupAimCorrection",
+                "tick": 0,
+                "unit": "ticks",
+                "endTick": 14,
+                "acquisitionRange": 4,
+                "acquisitionHalfAngleDegrees": 180,
+                "maxYawDegrees": 45,
+                "maxPitchDegrees": 0,
+                "yawDegreesPerSecond": 360,
+                "pitchDegreesPerSecond": 0
+              },
               {
                 "kind": "startCapability",
                 "tick": 0,

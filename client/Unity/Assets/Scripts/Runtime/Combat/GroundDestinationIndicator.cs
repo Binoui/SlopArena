@@ -26,8 +26,56 @@ namespace SlopArena.Client.Combat
         [SerializeField] private Transform[] _corners = new Transform[CornerCount];
         [SerializeField] private Transform _wedge;
 
+        private MaterialPropertyBlock _properties;
+        private Material _ringMaterial;
+        private Renderer[] _markerRenderers = System.Array.Empty<Renderer>();
+        private LineRenderer[] _tierRings = System.Array.Empty<LineRenderer>();
+        private static readonly Color[] TierColors =
+        {
+            new(0.35f, 0.85f, 1f, 1f),
+            new(1f, 0.8f, 0.15f, 1f),
+            new(1f, 0.3f, 0.12f, 1f),
+        };
         private void Awake() => Clear();
 
+        private void EnsureChargeVisuals()
+        {
+            if (_tierRings.Length != 0) return;
+            _properties = new MaterialPropertyBlock();
+            _markerRenderers = GetComponentsInChildren<Renderer>(true);
+            _ringMaterial = new Material(Shader.Find("Sprites/Default"));
+            _tierRings = new LineRenderer[3];
+            for (int tier = 0; tier < _tierRings.Length; tier++)
+            {
+                var ringObject = new GameObject($"ChargeTierRing{tier + 1}");
+                ringObject.hideFlags = HideFlags.DontSave;
+                ringObject.layer = gameObject.layer;
+                ringObject.transform.SetParent(transform, false);
+                var line = ringObject.AddComponent<LineRenderer>();
+                line.useWorldSpace = false;
+                line.loop = true;
+                line.positionCount = 32;
+                line.startWidth = line.endWidth = 0.025f;
+                line.sharedMaterial = _ringMaterial;
+                line.startColor = line.endColor = TierColors[tier];
+                line.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                line.receiveShadows = false;
+                float radius = 0.36f + tier * 0.2f;
+                for (int i = 0; i < line.positionCount; i++)
+                {
+                    float angle = i * Mathf.PI * 2f / line.positionCount;
+                    line.SetPosition(i, new Vector3(Mathf.Cos(angle) * radius, 0.025f, Mathf.Sin(angle) * radius));
+                }
+                _tierRings[tier] = line;
+            }
+        }
+
+        private void OnDestroy()
+        {
+            if (_ringMaterial == null) return;
+            if (Application.isPlaying) Destroy(_ringMaterial);
+            else DestroyImmediate(_ringMaterial);
+        }
         private void OnEnable() => Clear();
 
         private void OnDisable() => Clear();
@@ -37,9 +85,11 @@ namespace SlopArena.Client.Combat
         /// horizontal travel direction. Width controls both corner spread and authored shape
         /// scale, so the short geometry remains proportionate at every footprint size.
         /// </summary>
-        public void SetDestination(Vector3 position, Vector3 travelDirection, float width)
+        public void SetDestination(Vector3 position, Vector3 travelDirection, float width,
+            byte? chargeTier = null, float endpointScale = 1f)
         {
-            float visualWidth = Mathf.Max(0f, width);
+            if (chargeTier.HasValue) EnsureChargeVisuals();
+            float visualWidth = Mathf.Max(0f, width * endpointScale);
             bool visible = visualWidth > MinimumVisibleWidth;
             float halfWidth = visualWidth * 0.5f;
 
@@ -77,6 +127,30 @@ namespace SlopArena.Client.Combat
                 _wedge.localScale = Vector3.one * visualWidth;
                 _wedge.gameObject.SetActive(visible);
             }
+            if (chargeTier.HasValue)
+            {
+                Color color = chargeTier.HasValue && chargeTier.Value < TierColors.Length
+                    ? TierColors[chargeTier.Value] : Color.white;
+                if (_corners != null)
+                    foreach (var corner in _corners)
+                        if (corner != null)
+                            SetColor(corner, color);
+                if (_wedge != null) SetColor(_wedge, color);
+            }
+            for (int tier = 0; tier < _tierRings.Length; tier++)
+                _tierRings[tier].gameObject.SetActive(
+                    visible && chargeTier.HasValue && tier <= chargeTier.Value);
+        }
+        private void SetColor(Transform target, Color color)
+        {
+            foreach (var renderer in _markerRenderers)
+            {
+                if (renderer == null || !renderer.transform.IsChildOf(target)) continue;
+                renderer.GetPropertyBlock(_properties);
+                _properties.SetColor("_Color", color);
+                _properties.SetColor("_BaseColor", color);
+                renderer.SetPropertyBlock(_properties);
+            }
         }
 
         /// <summary>Hides all authored marker children.</summary>
@@ -94,6 +168,9 @@ namespace SlopArena.Client.Combat
 
             if (_wedge != null)
                 _wedge.gameObject.SetActive(false);
+            if (_tierRings != null)
+                foreach (var ring in _tierRings)
+                    if (ring != null) ring.gameObject.SetActive(false);
         }
     }
 }
